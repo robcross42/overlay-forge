@@ -2,8 +2,22 @@ node_modules/
 dist/
 src-tauri/target/
 src-tauri/gen/
+
+# Cargo build output, including GitHub's default Rust ignore patterns.
+debug/
+target/
+
+# Rust formatting and compiler artifacts.
+**/*.rs.bk
+*.pdb
+
+# Cargo mutants output.
+**/mutants.out*/
+
 *.log
 .env
 .env.*
 !.env.example
 
+# RustRover / JetBrains IDE metadata.
+#.idea/
