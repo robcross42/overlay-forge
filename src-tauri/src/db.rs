@@ -1,5 +1,5 @@
 use rusqlite::{params, Connection, Result};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -53,6 +53,29 @@ pub struct ProjectRecord {
     pub name: String,
     pub description: String,
     pub status: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+pub struct PlanningMessageRecord {
+    pub id: i64,
+    #[serde(rename = "conversationId")]
+    pub conversation_id: i64,
+    pub role: String,
+    pub content: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+}
+
+#[derive(Serialize)]
+pub struct PlanningConversationRecord {
+    pub id: i64,
+    #[serde(rename = "projectId")]
+    pub project_id: i64,
+    pub title: String,
     #[serde(rename = "createdAt")]
     pub created_at: String,
     #[serde(rename = "updatedAt")]
@@ -117,6 +140,22 @@ impl AppDatabase {
                 status TEXT NOT NULL DEFAULT 'ACTIVE',
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS planning_conversations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                title TEXT NOT NULL DEFAULT 'Planning conversation',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS planning_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                conversation_id INTEGER NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
             ",
         )?;
@@ -473,6 +512,154 @@ impl AppDatabase {
         Ok(())
     }
 
+    pub fn get_project(&self, id: i64) -> Result<ProjectRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_project_by_id(&connection, id)
+    }
+
+    pub fn list_planning_conversations(
+        &self,
+        project_id: Option<i64>,
+    ) -> Result<Vec<PlanningConversationRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+
+        if let Some(project_id) = project_id {
+            let mut statement = connection.prepare(
+                "
+                SELECT id, project_id, title, created_at, updated_at
+                FROM planning_conversations
+                WHERE project_id = ?1
+                ORDER BY updated_at DESC, id DESC
+                ",
+            )?;
+
+            return statement
+                .query_map(params![project_id], planning_conversation_from_row)?
+                .collect::<Result<Vec<_>>>();
+        }
+
+        let mut statement = connection.prepare(
+            "
+            SELECT id, project_id, title, created_at, updated_at
+            FROM planning_conversations
+            ORDER BY updated_at DESC, id DESC
+            ",
+        )?;
+
+        let conversations = statement
+            .query_map([], planning_conversation_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(conversations)
+    }
+
+    pub fn create_planning_conversation(
+        &self,
+        project_id: i64,
+        title: &str,
+    ) -> Result<PlanningConversationRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_project_by_id(&connection, project_id)?;
+        let clean_title = if title.trim().is_empty() {
+            "Planning conversation"
+        } else {
+            title.trim()
+        };
+
+        connection.execute(
+            "
+            INSERT INTO planning_conversations (project_id, title)
+            VALUES (?1, ?2)
+            ",
+            params![project_id, clean_title],
+        )?;
+
+        let id = connection.last_insert_rowid();
+        Self::get_planning_conversation_by_id(&connection, id)
+    }
+
+    pub fn get_planning_conversation(&self, id: i64) -> Result<PlanningConversationRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_planning_conversation_by_id(&connection, id)
+    }
+
+    pub fn list_planning_messages(
+        &self,
+        conversation_id: i64,
+    ) -> Result<Vec<PlanningMessageRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_planning_conversation_by_id(&connection, conversation_id)?;
+        Self::list_planning_messages_for_connection(&connection, conversation_id)
+    }
+
+    pub fn recent_planning_messages(
+        &self,
+        conversation_id: i64,
+        limit: i64,
+    ) -> Result<Vec<PlanningMessageRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        let mut statement = connection.prepare(
+            "
+            SELECT id, conversation_id, role, content, created_at
+            FROM (
+                SELECT id, conversation_id, role, content, created_at
+                FROM planning_messages
+                WHERE conversation_id = ?1
+                ORDER BY id DESC
+                LIMIT ?2
+            )
+            ORDER BY id ASC
+            ",
+        )?;
+
+        let messages = statement
+            .query_map(params![conversation_id, limit], planning_message_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(messages)
+    }
+
+    pub fn create_planning_message(
+        &self,
+        conversation_id: i64,
+        role: &str,
+        content: &str,
+    ) -> Result<PlanningMessageRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_planning_conversation_by_id(&connection, conversation_id)?;
+        connection.execute(
+            "
+            INSERT INTO planning_messages (conversation_id, role, content)
+            VALUES (?1, ?2, ?3)
+            ",
+            params![conversation_id, role, content],
+        )?;
+        connection.execute(
+            "
+            UPDATE planning_conversations
+            SET updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?1
+            ",
+            params![conversation_id],
+        )?;
+
+        let id = connection.last_insert_rowid();
+        Self::get_planning_message_by_id(&connection, id)
+    }
+
+    pub fn delete_planning_conversation(&self, conversation_id: i64) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute(
+            "DELETE FROM planning_messages WHERE conversation_id = ?1",
+            params![conversation_id],
+        )?;
+        connection.execute(
+            "DELETE FROM planning_conversations WHERE id = ?1",
+            params![conversation_id],
+        )?;
+        Ok(())
+    }
+
     fn get_task_by_id(connection: &Connection, id: i64) -> Result<TaskRecord> {
         connection.query_row(
             "
@@ -582,4 +769,74 @@ impl AppDatabase {
             },
         )
     }
+
+    fn get_planning_conversation_by_id(
+        connection: &Connection,
+        id: i64,
+    ) -> Result<PlanningConversationRecord> {
+        connection.query_row(
+            "
+            SELECT id, project_id, title, created_at, updated_at
+            FROM planning_conversations
+            WHERE id = ?1
+            ",
+            params![id],
+            planning_conversation_from_row,
+        )
+    }
+
+    fn get_planning_message_by_id(
+        connection: &Connection,
+        id: i64,
+    ) -> Result<PlanningMessageRecord> {
+        connection.query_row(
+            "
+            SELECT id, conversation_id, role, content, created_at
+            FROM planning_messages
+            WHERE id = ?1
+            ",
+            params![id],
+            planning_message_from_row,
+        )
+    }
+
+    fn list_planning_messages_for_connection(
+        connection: &Connection,
+        conversation_id: i64,
+    ) -> Result<Vec<PlanningMessageRecord>> {
+        let mut statement = connection.prepare(
+            "
+            SELECT id, conversation_id, role, content, created_at
+            FROM planning_messages
+            WHERE conversation_id = ?1
+            ORDER BY id ASC
+            ",
+        )?;
+
+        let messages = statement
+            .query_map(params![conversation_id], planning_message_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(messages)
+    }
+}
+
+fn planning_conversation_from_row(row: &rusqlite::Row<'_>) -> Result<PlanningConversationRecord> {
+    Ok(PlanningConversationRecord {
+        id: row.get(0)?,
+        project_id: row.get(1)?,
+        title: row.get(2)?,
+        created_at: row.get(3)?,
+        updated_at: row.get(4)?,
+    })
+}
+
+fn planning_message_from_row(row: &rusqlite::Row<'_>) -> Result<PlanningMessageRecord> {
+    Ok(PlanningMessageRecord {
+        id: row.get(0)?,
+        conversation_id: row.get(1)?,
+        role: row.get(2)?,
+        content: row.get(3)?,
+        created_at: row.get(4)?,
+    })
 }

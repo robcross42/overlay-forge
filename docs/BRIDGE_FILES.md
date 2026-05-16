@@ -2,7 +2,7 @@
 
 Bridge files are markdown handoff documents that describe project state, constraints, and implementation requests for Codex.
 
-Until Overlay Forge includes its own OpenAI planning module, bridge files should be created and updated manually, then pasted into ChatGPT or Codex chats when context needs to move between sessions.
+Milestone 3 introduces an OpenAI Planning Chat foundation, but full bridge-file generation is still deferred. Bridge files should still be created and updated manually, then pasted into ChatGPT or Codex chats when context needs to move between sessions.
 
 ## Current Manual Bridge
 
@@ -20,15 +20,17 @@ The Milestone 0 scratchpad component is complete and passed. Scratchpad content 
 
 Milestone 1 is complete, passed, and successful.
 
-Current project baseline is Milestone 2. Future bridge files should instruct ChatGPT/Codex to start from the Milestone 2 app state.
+Current project baseline is Milestone 3. Future bridge files should instruct ChatGPT/Codex to start from the Milestone 3 app state.
 
-Milestone numbering note: Milestone 2 is the Local Projects component and is complete, passed, and successful. Do not infer milestone IDs from numbered-list positions.
+Milestone 3 is complete, passed, and successful. It adds local planning conversations/messages and backend OpenAI Responses API calls, but it does not generate bridge files yet.
+
+Milestone numbering note: Milestone 2 is the Local Projects component and is complete, passed, and successful. Milestone 3 is the OpenAI Planning Chat component. Do not infer milestone IDs from numbered-list positions.
 
 ## Intended Future Workflow
 
 1. Select a local project in Overlay Forge.
 2. Plan with the in-app OpenAI chat component.
-3. Generate a Codex-ready markdown bridge file.
+3. Generate a Codex-ready markdown bridge file in a later milestone.
 4. Save the bridge file in SQLite.
 5. Export the bridge file to disk.
 6. Paste or provide the bridge file to Codex for implementation.

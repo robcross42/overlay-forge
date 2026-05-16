@@ -8,15 +8,17 @@ Provide this file to ChatGPT or Codex when a new chat needs current project cont
 
 ## Current Milestone
 
-Milestone 2 - Local Projects component
+Milestone 3 - OpenAI Planning Chat component
 
 Status: **Complete / Passed / Successful**
 
-Current project baseline: **Milestone 2**. Future bridge prompts, planning, and implementation should start from Milestone 2.
+Current project baseline: **Milestone 3**. Future bridge prompts, planning, and implementation should start from Milestone 3.
 
 Milestone 0 remains complete, passed, and successful. Milestone 1 adds component navigation plus SQLite-backed Tasks, Notes, and Calendar components. User validation is complete and Milestone 1 passed.
 
 Milestone 2 adds the local Projects component with SQLite persistence. User validation is complete and Milestone 2 passed.
+
+Milestone 3 adds Planning Chat with backend OpenAI Responses API calls and local SQLite conversation/message persistence. User validation is complete and Milestone 3 passed.
 
 Milestone numbering note: Milestone 2 is the Local Projects component. Do not mistake roadmap list item positions for milestone IDs.
 
@@ -36,6 +38,9 @@ Milestone numbering note: Milestone 2 is the Local Projects component. Do not mi
 - SQLite-backed note persistence
 - SQLite-backed calendar event persistence
 - SQLite-backed local project persistence
+- SQLite-backed planning conversation persistence
+- SQLite-backed planning message persistence
+- Backend-only OpenAI API calls through `OPENAI_API_KEY`
 
 ## Hotkey
 
@@ -45,15 +50,16 @@ Ctrl+Shift+Space
 
 ## Deferred
 
-- OpenAI API integration
 - GitHub integration
 - YouTube component
 - Advanced calendar workflows
 - Advanced task workflows
 - Advanced notes workflows
-- OpenAI planning chat
 - Bridge-file generation UI
 - Exclusive fullscreen game overlay support
+- File upload/vector store workflows
+- Web search tooling
+- Automatic Codex handoff
 
 ## Latest Validation Notes
 
@@ -103,3 +109,15 @@ Update this section manually after each validation pass.
 - Verified: rebuilt release app starts hidden in the background after Milestone 2 implementation
 - Fixed: Projects status dropdown option readability
 - Passed: Milestone 2 manual validation checklist
+- Implemented: Milestone 3 Planning Chat navigation entry
+- Implemented: local project selector for planning chat context
+- Implemented: SQLite `planning_conversations` and `planning_messages` tables
+- Implemented: backend OpenAI Responses API service using `OPENAI_API_KEY`
+- Implemented: conversation create/list/delete and message list/send commands
+- Implemented: readable missing `OPENAI_API_KEY` error path
+- Verified: `npm install` passes after Milestone 3 implementation
+- Verified: `npm run build` passes after Milestone 3 implementation
+- Verified: `cargo build` passes after Milestone 3 implementation
+- Passed: Milestone 3 manual validation checklist
+- Fixed: scrollable component lists show scrollbars when content exceeds visible space
+- Fixed: list item title/date rows keep stable spacing during overlay resizing

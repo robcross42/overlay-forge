@@ -1,4 +1,8 @@
-use crate::db::{CalendarEventRecord, NoteRecord, ProjectRecord, TaskRecord};
+use crate::db::{
+    CalendarEventRecord, NoteRecord, PlanningConversationRecord, PlanningMessageRecord,
+    ProjectRecord, TaskRecord,
+};
+use crate::openai;
 use crate::AppState;
 use serde::Serialize;
 use tauri::{AppHandle, State};
@@ -30,7 +34,7 @@ pub fn save_scratchpad(content: String, state: State<'_, AppState>) -> Result<()
 #[tauri::command]
 pub fn get_milestone_status(state: State<'_, AppState>) -> Result<MilestoneStatus, String> {
     Ok(MilestoneStatus {
-        milestone: "Milestone 2".to_string(),
+        milestone: "Milestone 3".to_string(),
         hotkey: "Ctrl+Shift+Space".to_string(),
         database_ready: state.database.is_ready(),
     })
@@ -249,6 +253,89 @@ pub fn delete_project(id: i64, state: State<'_, AppState>) -> Result<(), String>
     state
         .database
         .delete_project(id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn list_planning_conversations(
+    project_id: Option<i64>,
+    state: State<'_, AppState>,
+) -> Result<Vec<PlanningConversationRecord>, String> {
+    state
+        .database
+        .list_planning_conversations(project_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn create_planning_conversation(
+    project_id: i64,
+    title: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<PlanningConversationRecord, String> {
+    state
+        .database
+        .create_planning_conversation(project_id, title.as_deref().unwrap_or_default())
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn list_planning_messages(
+    conversation_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<PlanningMessageRecord>, String> {
+    state
+        .database
+        .list_planning_messages(conversation_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn send_planning_message(
+    conversation_id: i64,
+    content: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<PlanningMessageRecord>, String> {
+    require_text(&content, "Message")?;
+    let conversation = state
+        .database
+        .get_planning_conversation(conversation_id)
+        .map_err(|error| error.to_string())?;
+    let project = state
+        .database
+        .get_project(conversation.project_id)
+        .map_err(|error| error.to_string())?;
+
+    state
+        .database
+        .create_planning_message(conversation_id, "user", &content)
+        .map_err(|error| error.to_string())?;
+
+    let recent_messages = state
+        .database
+        .recent_planning_messages(conversation_id, 20)
+        .map_err(|error| error.to_string())?;
+    let assistant_content = openai::create_planning_response(&project, &recent_messages).await?;
+
+    state
+        .database
+        .create_planning_message(conversation_id, "assistant", &assistant_content)
+        .map_err(|error| error.to_string())?;
+
+    state
+        .database
+        .list_planning_messages(conversation_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn delete_planning_conversation(
+    conversation_id: i64,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .database
+        .delete_planning_conversation(conversation_id)
         .map_err(|error| error.to_string())
 }
 

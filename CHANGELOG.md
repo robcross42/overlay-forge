@@ -10,8 +10,9 @@ All notable changes to Overlay Forge will be documented in this file.
 - The Milestone 0 scratchpad component is complete and passed.
 - Scratchpad content saves to SQLite and restores between app sessions.
 - Milestone 1 - Calendar, To-do, Notes, and Scratchpad Expansion is complete, passed, and successful.
-- Current project baseline is Milestone 2.
+- Current project baseline is Milestone 3.
 - Milestone 2 - Local Projects component is complete, passed, and successful.
+- Milestone 3 - OpenAI Planning Chat component is complete, passed, and successful.
 
 ### Added
 
@@ -42,6 +43,12 @@ All notable changes to Overlay Forge will be documented in this file.
 - Added Tauri CRUD commands for local projects.
 - Added Projects component with create, select, read-only view, edit, delete, list, status, and restart restore support.
 - Added `docs/MILESTONE_2.md` with setup validation and manual validation steps.
+- Added Planning Chat component navigation.
+- Added SQLite `planning_conversations` and `planning_messages` tables.
+- Added Tauri planning chat commands for conversation listing, creation, deletion, message listing, and backend message sending.
+- Added a backend OpenAI Responses API integration using `OPENAI_API_KEY`.
+- Added Planning Chat project selection, conversation list, new conversation action, message history, message input, loading state, and readable error display.
+- Added `docs/MILESTONE_3.md` with setup validation and manual validation steps.
 
 ### Changed
 
@@ -68,6 +75,7 @@ All notable changes to Overlay Forge will be documented in this file.
 - Documented the Windows WebView2 shutdown class-unregister log as deferred cleanup.
 - Clarified milestone numbering in project docs so Milestone 2 is not confused with the second item in the roadmap.
 - Updated project documentation for Milestone 2 validation success.
+- Updated project documentation for Milestone 3 validation success.
 
 ### Validation
 
@@ -92,3 +100,7 @@ All notable changes to Overlay Forge will be documented in this file.
 - Verified rebuilt release app starts hidden in the background after Milestone 2 implementation.
 - Fixed Projects status dropdown option readability.
 - User manually validated Milestone 2 successfully.
+- Verified `npm install` completes successfully after Milestone 3 implementation.
+- Verified frontend build after Milestone 3 implementation with `npm run build`.
+- Verified Rust backend compile after Milestone 3 implementation with `cargo build`.
+- User manually validated Milestone 3 successfully.

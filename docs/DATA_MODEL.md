@@ -6,6 +6,8 @@ Milestone 1 data model is complete, passed, and successful.
 
 Milestone 2 project data model is complete, passed, and successful.
 
+Milestone 3 planning chat data model is complete, passed, and successful.
+
 ## Tables
 
 ### scratchpad
@@ -73,3 +75,35 @@ updated_at
 ```
 
 Local project records for Milestone 2. Valid Milestone 2 status values are `ACTIVE` and `ARCHIVED`; complex project lifecycle workflows are deferred.
+
+### planning_conversations
+
+```text
+id
+project_id
+title
+created_at
+updated_at
+```
+
+Local planning chat conversation records for Milestone 3. Each conversation belongs to one local project.
+
+### planning_messages
+
+```text
+id
+conversation_id
+role
+content
+created_at
+```
+
+Local planning chat messages for Milestone 3. Valid role values are:
+
+```text
+user
+assistant
+system
+```
+
+Milestone 3 writes `user` and `assistant` messages during normal chat use. `system` is reserved for future workflow needs; the active planning instruction is backend-owned and not stored as a user-visible message.

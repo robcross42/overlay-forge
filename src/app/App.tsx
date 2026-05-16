@@ -3,20 +3,22 @@ import { ComponentHost } from "../components/ComponentHost";
 import { WindowResizeHandles, WindowTitlebar } from "../components/WindowControls";
 import { Calendar } from "../features/calendar/Calendar";
 import { Notes } from "../features/notes/Notes";
+import { PlanningChat } from "../features/planning-chat/PlanningChat";
 import { Projects } from "../features/projects/Projects";
 import { Scratchpad } from "../features/scratchpad/Scratchpad";
 import { Tasks } from "../features/tasks/Tasks";
 import { getMilestoneStatus } from "../services/appStatus";
 import type { MilestoneStatus } from "../services/appStatus";
 
-type ComponentId = "scratchpad" | "tasks" | "notes" | "calendar" | "projects";
+type ComponentId = "scratchpad" | "tasks" | "notes" | "calendar" | "projects" | "planning-chat";
 
 const navItems = [
   { id: "scratchpad", label: "Scratchpad" },
   { id: "tasks", label: "Tasks" },
   { id: "notes", label: "Notes" },
   { id: "calendar", label: "Calendar" },
-  { id: "projects", label: "Projects" }
+  { id: "projects", label: "Projects" },
+  { id: "planning-chat", label: "Planning Chat" }
 ] satisfies Array<{ id: ComponentId; label: string }>;
 
 export default function App() {
@@ -93,6 +95,7 @@ export default function App() {
             {activeComponent === "notes" && <Notes />}
             {activeComponent === "calendar" && <Calendar />}
             {activeComponent === "projects" && <Projects />}
+            {activeComponent === "planning-chat" && <PlanningChat />}
           </ComponentHost>
         </section>
       </div>
