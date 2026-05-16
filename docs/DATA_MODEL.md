@@ -10,6 +10,8 @@ Milestone 3 planning chat data model is complete, passed, and successful.
 
 Milestone 4 - GitHub Integration data model is complete, passed, and successful.
 
+Milestone 5 - Controlled YouTube Component data model is complete, passed, and successful.
+
 ## Tables
 
 ### scratchpad
@@ -149,6 +151,32 @@ last_fetch_status
 
 GitHub tokens are not stored in SQLite.
 
+### youtube_references
+
+```text
+id
+title
+url
+video_id
+channel_name
+notes
+tags
+created_at
+updated_at
+```
+
+Local user-curated YouTube references for Milestone 5. Minimum required fields are:
+
+```text
+id
+title
+url
+created_at
+updated_at
+```
+
+The backend parses and stores `video_id` from supported URL shapes when a reference is created or updated. `channel_name`, `notes`, and `tags` are optional user-entered metadata. No YouTube API key, account login, scraping, transcript retrieval, recommendations, downloads, or account sync data is stored.
+
 ## Migration Notes
 
 Milestone 4 uses non-destructive idempotent table initialization:
@@ -158,3 +186,11 @@ CREATE TABLE IF NOT EXISTS project_github_repositories
 ```
 
 Existing user data remains intact. Deleting a local project deletes that project's GitHub repository linkage record, but does not affect any GitHub remote repository.
+
+Milestone 5 uses non-destructive idempotent table initialization:
+
+```text
+CREATE TABLE IF NOT EXISTS youtube_references
+```
+
+Existing user data remains intact. Deleting a YouTube reference removes only that local SQLite row and does not affect YouTube or any external account.

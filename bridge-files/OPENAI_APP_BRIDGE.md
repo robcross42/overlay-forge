@@ -8,11 +8,11 @@ Provide this file to ChatGPT or Codex when a new chat needs current project cont
 
 ## Current Milestone
 
-Milestone 4 - GitHub Integration
+Milestone 5 - Controlled YouTube Component
 
 Status: **Complete / Passed / Successful**
 
-Current project baseline: **Milestone 4**. Future bridge prompts, planning, and implementation should start from Milestone 4.
+Current project baseline: **Milestone 5**. Future bridge prompts, planning, and implementation should start from Milestone 5.
 
 Milestone 0 remains complete, passed, and successful. Milestone 1 adds component navigation plus SQLite-backed Tasks, Notes, and Calendar components. User validation is complete and Milestone 1 passed.
 
@@ -22,7 +22,9 @@ Milestone 3 adds Planning Chat with backend OpenAI Responses API calls and local
 
 Milestone 4 adds project-scoped GitHub repository linkage, SQLite-backed repository metadata/status, backend-only `GITHUB_TOKEN` handling, and a GitHub Repository section inside Projects. User validation is complete and Milestone 4 passed.
 
-Milestone numbering note: Milestone 2 is the Local Projects component. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Do not mistake roadmap list item positions for milestone IDs.
+Milestone 5 adds controlled user-curated YouTube references, SQLite-backed reference persistence, backend YouTube URL validation, frontend YouTube reference CRUD UI, and external opening of saved URLs. User validation is complete and Milestone 5 passed.
+
+Milestone numbering note: Milestone 2 is the Local Projects component. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Do not mistake roadmap list item positions for milestone IDs.
 
 ## Current Scope
 
@@ -45,6 +47,7 @@ Milestone numbering note: Milestone 2 is the Local Projects component. Milestone
 - Backend-only OpenAI API calls through `OPENAI_API_KEY`
 - SQLite-backed project GitHub repository linkage
 - Backend-only GitHub metadata fetches through `GITHUB_TOKEN`
+- SQLite-backed controlled YouTube reference persistence
 
 ## Hotkey
 
@@ -54,7 +57,7 @@ Ctrl+Shift+Space
 
 ## Deferred
 
-- YouTube component
+- YouTube account login, YouTube API integration, scraping, transcripts, recommendations, downloads, and account sync
 - Advanced calendar workflows
 - Advanced task workflows
 - Advanced notes workflows
@@ -136,6 +139,17 @@ Update this section manually after each validation pass.
 - Verified: `cargo build` passes after Milestone 4 implementation
 - Verified: `npm run tauri:dev` launches after Milestone 4 implementation when run outside the sandbox with app-data write access
 - Passed: Milestone 4 manual validation checklist
+- Implemented: Milestone 5 YouTube navigation entry
+- Implemented: SQLite `youtube_references` table
+- Implemented: Rust/Tauri YouTube reference list/get/create/update/delete/open commands
+- Implemented: backend YouTube URL validation for common watch, short link, and shorts URL forms
+- Implemented: frontend YouTube reference CRUD UI with selected/read-only/edit behavior
+- Implemented: external opening of saved YouTube URLs through the system browser
+- Verified: `npm install` passes after Milestone 5 implementation
+- Verified: `npm run build` passes after Milestone 5 implementation
+- Verified: `cargo build` passes after Milestone 5 implementation
+- Verified: `npm run tauri:dev` launches after Milestone 5 implementation when run outside the sandbox with app-data write access
+- Passed: Milestone 5 manual validation checklist
 
 ## Milestone Validation Workflow
 

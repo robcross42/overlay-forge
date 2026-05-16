@@ -14,6 +14,7 @@ All notable changes to Overlay Forge will be documented in this file.
 - Milestone 2 - Local Projects component is complete, passed, and successful.
 - Milestone 3 - OpenAI Planning Chat component is complete, passed, and successful.
 - Milestone 4 - GitHub Integration is complete, passed, and successful.
+- Milestone 5 - Controlled YouTube Component is complete, passed, and successful.
 
 ### Added
 
@@ -56,6 +57,13 @@ All notable changes to Overlay Forge will be documented in this file.
 - Added frontend GitHub project-link UI inside the Projects component.
 - Added readable missing-token, invalid repository full-name, and GitHub request error handling.
 - Added `docs/MILESTONE_4.md` with setup validation and manual validation steps.
+- Added YouTube component navigation.
+- Added SQLite `youtube_references` table initialization for local YouTube reference persistence.
+- Added Rust/Tauri YouTube reference commands for list, get, create, update, delete, and external open.
+- Added frontend YouTube reference CRUD UI with create, selected read-only view, edit, delete, list, and optional user-entered metadata.
+- Added YouTube URL validation for common watch, short link, and shorts URL forms.
+- Added external-open behavior for saved YouTube URLs through the system browser.
+- Added `docs/MILESTONE_5.md` with setup validation and manual validation steps.
 
 ### Changed
 
@@ -84,6 +92,7 @@ All notable changes to Overlay Forge will be documented in this file.
 - Updated project documentation for Milestone 2 validation success.
 - Updated project documentation for Milestone 3 validation success.
 - Updated project documentation for Milestone 4 validation success.
+- Updated project documentation for Milestone 5 validation success.
 
 ### Validation
 
@@ -117,3 +126,8 @@ All notable changes to Overlay Forge will be documented in this file.
 - Verified Rust backend compile after Milestone 4 implementation with `cargo build`.
 - Verified development launch after Milestone 4 implementation with `npm run tauri:dev` outside the sandbox so the app could write the app-data SQLite database.
 - User manually validated Milestone 4 successfully.
+- Verified `npm install` completes successfully after Milestone 5 implementation.
+- Verified frontend build after Milestone 5 implementation with `npm run build`.
+- Verified Rust backend compile after Milestone 5 implementation with `cargo build`.
+- Verified development launch after Milestone 5 implementation with `npm run tauri:dev` outside the sandbox; the app process started and was stopped after the validation timeout.
+- User manually validated Milestone 5 successfully.

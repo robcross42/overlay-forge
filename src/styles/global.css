@@ -687,7 +687,19 @@ select.text-input option:hover {
   scrollbar-width: thin;
 }
 
+.youtube-editor-form {
+  grid-template-rows: auto auto auto minmax(96px, 1fr) auto auto;
+  overflow: auto;
+  padding-right: 2px;
+  scrollbar-color: rgba(79, 208, 165, 0.48) rgba(255, 255, 255, 0.06);
+  scrollbar-width: thin;
+}
+
 .project-editor-form::-webkit-scrollbar {
+  width: 10px;
+}
+
+.youtube-editor-form::-webkit-scrollbar {
   width: 10px;
 }
 
@@ -696,7 +708,19 @@ select.text-input option:hover {
   border-radius: 999px;
 }
 
+.youtube-editor-form::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+}
+
 .project-editor-form::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(79, 208, 165, 0.48);
+  background-clip: content-box;
+}
+
+.youtube-editor-form::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: 999px;
   background: rgba(79, 208, 165, 0.48);
@@ -759,6 +783,10 @@ select.text-input option:hover {
   color: var(--text);
   font-size: 0.82rem;
   overflow-wrap: anywhere;
+}
+
+.compact-metadata {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .planning-panel {

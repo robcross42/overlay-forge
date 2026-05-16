@@ -1,6 +1,6 @@
 use crate::db::{
     CalendarEventRecord, NoteRecord, PlanningConversationRecord, PlanningMessageRecord,
-    ProjectGitHubRepositoryRecord, ProjectRecord, TaskRecord,
+    ProjectGitHubRepositoryRecord, ProjectRecord, TaskRecord, YouTubeReferenceRecord,
 };
 use crate::github;
 use crate::openai;
@@ -35,7 +35,7 @@ pub fn save_scratchpad(content: String, state: State<'_, AppState>) -> Result<()
 #[tauri::command]
 pub fn get_milestone_status(state: State<'_, AppState>) -> Result<MilestoneStatus, String> {
     Ok(MilestoneStatus {
-        milestone: "Milestone 4".to_string(),
+        milestone: "Milestone 5".to_string(),
         hotkey: "Ctrl+Shift+Space".to_string(),
         database_ready: state.database.is_ready(),
     })
@@ -407,6 +407,79 @@ pub fn delete_planning_conversation(
         .map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+pub fn list_youtube_references(
+    state: State<'_, AppState>,
+) -> Result<Vec<YouTubeReferenceRecord>, String> {
+    state
+        .database
+        .list_youtube_references()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn get_youtube_reference(
+    id: i64,
+    state: State<'_, AppState>,
+) -> Result<YouTubeReferenceRecord, String> {
+    state
+        .database
+        .get_youtube_reference(id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn create_youtube_reference(
+    title: String,
+    url: String,
+    channel_name: String,
+    notes: String,
+    tags: String,
+    state: State<'_, AppState>,
+) -> Result<YouTubeReferenceRecord, String> {
+    require_text(&title, "YouTube reference title")?;
+    let video_id = extract_youtube_video_id(&url)?;
+    state
+        .database
+        .create_youtube_reference(&title, &url, &video_id, &channel_name, &notes, &tags)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn update_youtube_reference(
+    id: i64,
+    title: String,
+    url: String,
+    channel_name: String,
+    notes: String,
+    tags: String,
+    state: State<'_, AppState>,
+) -> Result<YouTubeReferenceRecord, String> {
+    require_text(&title, "YouTube reference title")?;
+    let video_id = extract_youtube_video_id(&url)?;
+    state
+        .database
+        .update_youtube_reference(id, &title, &url, &video_id, &channel_name, &notes, &tags)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn delete_youtube_reference(id: i64, state: State<'_, AppState>) -> Result<(), String> {
+    state
+        .database
+        .delete_youtube_reference(id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn open_youtube_reference(id: i64, state: State<'_, AppState>) -> Result<(), String> {
+    let reference = state
+        .database
+        .get_youtube_reference(id)
+        .map_err(|error| error.to_string())?;
+    open_external_url(&reference.url)
+}
+
 fn validate_calendar_event(
     title: &str,
     start_date: &str,
@@ -428,6 +501,81 @@ fn validate_project(name: &str, status: &str) -> Result<(), String> {
         "ACTIVE" | "ARCHIVED" => Ok(()),
         _ => Err("Project status must be ACTIVE or ARCHIVED".to_string()),
     }
+}
+
+fn extract_youtube_video_id(url: &str) -> Result<String, String> {
+    let trimmed = url.trim();
+    if trimmed.is_empty() {
+        return Err("YouTube URL is required".to_string());
+    }
+
+    if let Some(rest) = trimmed.strip_prefix("https://www.youtube.com/watch?") {
+        return extract_watch_video_id(rest);
+    }
+
+    if let Some(rest) = trimmed.strip_prefix("https://youtube.com/watch?") {
+        return extract_watch_video_id(rest);
+    }
+
+    if let Some(rest) = trimmed.strip_prefix("https://youtu.be/") {
+        return extract_path_video_id(rest);
+    }
+
+    if let Some(rest) = trimmed.strip_prefix("https://www.youtube.com/shorts/") {
+        return extract_path_video_id(rest);
+    }
+
+    Err("Enter a valid YouTube URL, such as https://www.youtube.com/watch?v=VIDEO_ID or https://youtu.be/VIDEO_ID".to_string())
+}
+
+fn extract_watch_video_id(query: &str) -> Result<String, String> {
+    for pair in query.split('&') {
+        let mut parts = pair.splitn(2, '=');
+        if parts.next() == Some("v") {
+            let value = parts.next().unwrap_or_default();
+            return validate_youtube_video_id(value);
+        }
+    }
+
+    Err("YouTube watch URLs must include a video id in the v parameter".to_string())
+}
+
+fn extract_path_video_id(path: &str) -> Result<String, String> {
+    let value = path.split(['?', '&', '#', '/']).next().unwrap_or_default();
+    validate_youtube_video_id(value)
+}
+
+fn validate_youtube_video_id(value: &str) -> Result<String, String> {
+    let video_id = value.trim();
+    if video_id.len() != 11 {
+        return Err("YouTube video id must be 11 characters long".to_string());
+    }
+
+    if !video_id
+        .chars()
+        .all(|character| character.is_ascii_alphanumeric() || character == '-' || character == '_')
+    {
+        return Err("YouTube video id contains unsupported characters".to_string());
+    }
+
+    Ok(video_id.to_string())
+}
+
+fn open_external_url(url: &str) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    let result = std::process::Command::new("rundll32")
+        .args(["url.dll,FileProtocolHandler", url])
+        .spawn();
+
+    #[cfg(target_os = "macos")]
+    let result = std::process::Command::new("open").arg(url).spawn();
+
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let result = std::process::Command::new("xdg-open").arg(url).spawn();
+
+    result
+        .map(|_| ())
+        .map_err(|error| format!("Could not open YouTube URL externally: {error}"))
 }
 
 fn require_text(value: &str, field_name: &str) -> Result<(), String> {

@@ -104,6 +104,23 @@ pub struct ProjectGitHubRepositoryRecord {
     pub updated_at: String,
 }
 
+#[derive(Serialize)]
+pub struct YouTubeReferenceRecord {
+    pub id: i64,
+    pub title: String,
+    pub url: String,
+    #[serde(rename = "videoId")]
+    pub video_id: String,
+    #[serde(rename = "channelName")]
+    pub channel_name: String,
+    pub notes: String,
+    pub tags: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
 pub struct AppDatabase {
     connection: Mutex<Connection>,
     ready: bool,
@@ -189,6 +206,18 @@ impl AppDatabase {
                 visibility TEXT NOT NULL DEFAULT '',
                 last_fetched_at TEXT NOT NULL DEFAULT '',
                 last_fetch_status TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS youtube_references (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                url TEXT NOT NULL,
+                video_id TEXT NOT NULL DEFAULT '',
+                channel_name TEXT NOT NULL DEFAULT '',
+                notes TEXT NOT NULL DEFAULT '',
+                tags TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
@@ -808,6 +837,99 @@ impl AppDatabase {
         Ok(())
     }
 
+    pub fn list_youtube_references(&self) -> Result<Vec<YouTubeReferenceRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        let mut statement = connection.prepare(
+            "
+            SELECT id, title, url, video_id, channel_name, notes, tags, created_at, updated_at
+            FROM youtube_references
+            ORDER BY updated_at DESC, id DESC
+            ",
+        )?;
+
+        let references = statement
+            .query_map([], youtube_reference_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(references)
+    }
+
+    pub fn get_youtube_reference(&self, id: i64) -> Result<YouTubeReferenceRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_youtube_reference_by_id(&connection, id)
+    }
+
+    pub fn create_youtube_reference(
+        &self,
+        title: &str,
+        url: &str,
+        video_id: &str,
+        channel_name: &str,
+        notes: &str,
+        tags: &str,
+    ) -> Result<YouTubeReferenceRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute(
+            "
+            INSERT INTO youtube_references (title, url, video_id, channel_name, notes, tags)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+            ",
+            params![
+                title.trim(),
+                url.trim(),
+                video_id.trim(),
+                channel_name.trim(),
+                notes,
+                tags.trim()
+            ],
+        )?;
+        let id = connection.last_insert_rowid();
+        Self::get_youtube_reference_by_id(&connection, id)
+    }
+
+    pub fn update_youtube_reference(
+        &self,
+        id: i64,
+        title: &str,
+        url: &str,
+        video_id: &str,
+        channel_name: &str,
+        notes: &str,
+        tags: &str,
+    ) -> Result<YouTubeReferenceRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute(
+            "
+            UPDATE youtube_references
+            SET title = ?1,
+                url = ?2,
+                video_id = ?3,
+                channel_name = ?4,
+                notes = ?5,
+                tags = ?6,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?7
+            ",
+            params![
+                title.trim(),
+                url.trim(),
+                video_id.trim(),
+                channel_name.trim(),
+                notes,
+                tags.trim(),
+                id
+            ],
+        )?;
+
+        Self::get_youtube_reference_by_id(&connection, id)
+    }
+
+    pub fn delete_youtube_reference(&self, id: i64) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute("DELETE FROM youtube_references WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
     fn get_task_by_id(connection: &Connection, id: i64) -> Result<TaskRecord> {
         connection.query_row(
             "
@@ -1005,6 +1127,21 @@ impl AppDatabase {
 
         Ok(messages)
     }
+
+    fn get_youtube_reference_by_id(
+        connection: &Connection,
+        id: i64,
+    ) -> Result<YouTubeReferenceRecord> {
+        connection.query_row(
+            "
+            SELECT id, title, url, video_id, channel_name, notes, tags, created_at, updated_at
+            FROM youtube_references
+            WHERE id = ?1
+            ",
+            params![id],
+            youtube_reference_from_row,
+        )
+    }
 }
 
 fn planning_conversation_from_row(row: &rusqlite::Row<'_>) -> Result<PlanningConversationRecord> {
@@ -1024,5 +1161,19 @@ fn planning_message_from_row(row: &rusqlite::Row<'_>) -> Result<PlanningMessageR
         role: row.get(2)?,
         content: row.get(3)?,
         created_at: row.get(4)?,
+    })
+}
+
+fn youtube_reference_from_row(row: &rusqlite::Row<'_>) -> Result<YouTubeReferenceRecord> {
+    Ok(YouTubeReferenceRecord {
+        id: row.get(0)?,
+        title: row.get(1)?,
+        url: row.get(2)?,
+        video_id: row.get(3)?,
+        channel_name: row.get(4)?,
+        notes: row.get(5)?,
+        tags: row.get(6)?,
+        created_at: row.get(7)?,
+        updated_at: row.get(8)?,
     })
 }

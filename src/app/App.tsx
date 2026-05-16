@@ -7,10 +7,18 @@ import { PlanningChat } from "../features/planning-chat/PlanningChat";
 import { Projects } from "../features/projects/Projects";
 import { Scratchpad } from "../features/scratchpad/Scratchpad";
 import { Tasks } from "../features/tasks/Tasks";
+import { YouTube } from "../features/youtube/YouTube";
 import { getMilestoneStatus } from "../services/appStatus";
 import type { MilestoneStatus } from "../services/appStatus";
 
-type ComponentId = "scratchpad" | "tasks" | "notes" | "calendar" | "projects" | "planning-chat";
+type ComponentId =
+  | "scratchpad"
+  | "tasks"
+  | "notes"
+  | "calendar"
+  | "projects"
+  | "planning-chat"
+  | "youtube";
 
 const navItems = [
   { id: "scratchpad", label: "Scratchpad" },
@@ -18,7 +26,8 @@ const navItems = [
   { id: "notes", label: "Notes" },
   { id: "calendar", label: "Calendar" },
   { id: "projects", label: "Projects" },
-  { id: "planning-chat", label: "Planning Chat" }
+  { id: "planning-chat", label: "Planning Chat" },
+  { id: "youtube", label: "YouTube" }
 ] satisfies Array<{ id: ComponentId; label: string }>;
 
 export default function App() {
@@ -30,7 +39,7 @@ export default function App() {
       .then(setStatus)
       .catch(() => {
         setStatus({
-          milestone: "Milestone 4",
+          milestone: "Milestone 5",
           hotkey: "Ctrl+Shift+Space",
           databaseReady: false
         });
@@ -40,7 +49,7 @@ export default function App() {
   const activeMeta = useMemo(
     () => ({
       title: navItems.find((item) => item.id === activeComponent)?.label ?? "Scratchpad",
-      eyebrow: status?.milestone ?? "Milestone 4",
+      eyebrow: status?.milestone ?? "Milestone 5",
       hotkey: status?.hotkey ?? "Ctrl+Shift+Space"
     }),
     [activeComponent, status]
@@ -96,6 +105,7 @@ export default function App() {
             {activeComponent === "calendar" && <Calendar />}
             {activeComponent === "projects" && <Projects />}
             {activeComponent === "planning-chat" && <PlanningChat />}
+            {activeComponent === "youtube" && <YouTube />}
           </ComponentHost>
         </section>
       </div>
