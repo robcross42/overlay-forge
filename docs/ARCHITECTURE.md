@@ -32,6 +32,8 @@ Milestone 5 - Controlled YouTube Component is complete, passed, and successful. 
 
 Milestone 6 - Project Workspace Chat is complete, passed, and successful. It makes Projects the workspace shell for selected-project planning chat by rendering Overview, GitHub, and Chat sections inside the selected project context. The existing Planning Chat feature is reused in project-bound mode so chat no longer needs a second project selector.
 
+Milestone 7 - Project Workspace Layout Refinement is complete, passed, and successful. It refines Projects as the primary workspace shell by adding a stable active-project header and four selected-project workspace sections: Overview, GitHub, Chat, and References.
+
 ## UI Consistency
 
 Organizer components should follow the same interaction pattern unless a milestone explicitly documents a reason to diverge:
@@ -78,11 +80,15 @@ Milestone 5 adds idempotent table initialization for `youtube_references`. The t
 
 Milestone 6 adds no new tables. It preserves existing `planning_conversations` and `planning_messages` records and scopes the frontend Chat section through the selected Projects workspace.
 
+Milestone 7 adds no new tables. Overview continues to use `projects`, GitHub continues to use `project_github_repositories`, Chat continues to use `planning_conversations` and `planning_messages`, and References only summarizes existing local context categories.
+
 ## OpenAI Boundary
 
 Planning Chat calls the OpenAI Responses API from the Rust/Tauri backend. React invokes local Tauri commands only and never reads `OPENAI_API_KEY`. Model selection, request shape, and the planning assistant instruction are centralized in the backend OpenAI service module so later bridge-file generation, tools, streaming, or model changes do not leak through the frontend.
 
 In Milestone 6, the primary UI path for Planning Chat is Projects -> selected project -> Chat. The selected project is passed directly into the chat surface, while the backend continues to enforce conversation ownership through `planning_conversations.project_id`.
+
+Milestone 7 preserves this boundary. Chat remains a selected-project workspace section and remains backed by the existing planning conversation/message tables.
 
 ## GitHub Boundary
 
@@ -102,6 +108,8 @@ last_fetch_status
 
 The integration is project-scoped and read-only. Milestone 4 does not perform Codex handoff, GitHub write operations, branch creation, commit creation, pull request creation, issue management, repository file browsing, GitHub Actions integration, OAuth, or multi-account workflows.
 
+In Milestone 7, GitHub remains a selected-project workspace section backed by the existing project GitHub repository table. No token exposure or GitHub write behavior is added.
+
 ## YouTube Boundary
 
 Milestone 5 YouTube references are local-first and user-curated. React invokes local Tauri commands to save, list, edit, delete, and open references. SQLite stores the title, URL, parsed video id, optional channel name, notes, tags, and timestamps.
@@ -109,6 +117,10 @@ Milestone 5 YouTube references are local-first and user-curated. React invokes l
 No YouTube API key is required. No YouTube account login, OAuth flow, watch history, subscription import, playlist sync, comment sync, transcript extraction, recommendations, downloads, scraping, background metadata crawler, or account sync is used.
 
 Saved YouTube URLs open externally in the system browser. This is preferred over an unrestricted embedded browser so the overlay workflow remains controlled.
+
+## References Boundary
+
+Milestone 7 References are intentionally minimal. The References workspace section summarizes selected project details, linked GitHub metadata, future attachment availability, and future prompt context availability. It does not attach context to chat, generate prompt previews, browse GitHub files, generate bridge files, or include unrelated app-level YouTube library data.
 
 ## Bridge Files
 

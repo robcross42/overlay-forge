@@ -696,6 +696,44 @@ select.text-input option:hover {
   overflow: hidden;
 }
 
+.workspace-context-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 14px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.workspace-context-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.workspace-context-copy p,
+.workspace-context-copy h4 {
+  margin: 0;
+}
+
+.workspace-context-copy p,
+.workspace-context-copy span {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.workspace-context-copy h4 {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .workspace-tabs {
   display: flex;
   align-items: center;
@@ -734,6 +772,98 @@ select.text-input option:hover {
 .project-workspace-content .planning-panel {
   border: 0;
   background: transparent;
+}
+
+.references-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding-right: 2px;
+}
+
+.references-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.references-heading p,
+.references-heading h4 {
+  margin: 0;
+}
+
+.references-heading p {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.references-heading h4 {
+  font-size: 0.95rem;
+}
+
+.reference-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-color: rgba(79, 208, 165, 0.48) rgba(255, 255, 255, 0.06);
+  scrollbar-width: thin;
+}
+
+.reference-summary-grid::-webkit-scrollbar {
+  width: 10px;
+}
+
+.reference-summary-grid::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+}
+
+.reference-summary-grid::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(79, 208, 165, 0.48);
+  background-clip: content-box;
+}
+
+.reference-summary-item {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.reference-summary-item span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.reference-summary-item strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.92rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reference-summary-item p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.4;
 }
 
 .youtube-editor-form {
@@ -984,6 +1114,11 @@ select.text-input option:hover {
     overflow-x: auto;
   }
 
+  .workspace-context-header {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
   .sub-list {
     max-height: 190px;
   }
@@ -1001,6 +1136,10 @@ select.text-input option:hover {
   }
 
   .metadata-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .reference-summary-grid {
     grid-template-columns: 1fr;
   }
 }

@@ -8,11 +8,11 @@ Provide this file to ChatGPT or Codex when a new chat needs current project cont
 
 ## Current Milestone
 
-Milestone 6 - Project Workspace Chat
+Milestone 7 - Project Workspace Layout Refinement
 
 Status: **Complete / Passed / Successful**
 
-Current user-validated project baseline: **Milestone 6**. Future bridge prompts, planning, and implementation should start from Milestone 6.
+Current user-validated project baseline: **Milestone 7**. Future bridge prompts, planning, and implementation should start from Milestone 7.
 
 Milestone 0 remains complete, passed, and successful. Milestone 1 adds component navigation plus SQLite-backed Tasks, Notes, and Calendar components. User validation is complete and Milestone 1 passed.
 
@@ -27,7 +27,10 @@ Milestone 5 adds controlled user-curated YouTube references, SQLite-backed refer
 Milestone 6 moves project-scoped chat into the selected Projects workspace. Selecting a project now exposes Overview, GitHub, and Chat sections. The Chat section uses the selected project automatically, preserves existing planning conversation/message persistence, and does not require a separate project selector.
 User validation is complete and Milestone 6 passed.
 
-Milestone numbering note: Milestone 2 is the Local Projects component. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Milestone 6 is Project Workspace Chat. Do not mistake roadmap list item positions for milestone IDs.
+Milestone 7 refines the selected Projects workspace layout. The active project workspace now has a clear project header and Overview, GitHub, Chat, and References sections. References is intentionally minimal and summarizes project-local context categories without implementing manual attachments. YouTube remains a separate app-level component and is not part of the Projects References section.
+User validation is complete and Milestone 7 passed.
+
+Milestone numbering note: Milestone 2 is the Local Projects component. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Milestone 6 is Project Workspace Chat. Milestone 7 is Project Workspace Layout Refinement. Do not mistake roadmap list item positions for milestone IDs.
 
 ## Current Scope
 
@@ -52,6 +55,7 @@ Milestone numbering note: Milestone 2 is the Local Projects component. Milestone
 - Backend-only GitHub metadata fetches through `GITHUB_TOKEN`
 - SQLite-backed controlled YouTube reference persistence
 - Project workspace Chat inside selected Projects context
+- Selected-project workspace sections for Overview, GitHub, Chat, and References
 
 ## Hotkey
 
@@ -70,6 +74,8 @@ Ctrl+Shift+Space
 - Automatic context attachment
 - GitHub file reading
 - ChatGPT import
+- AI-generated project summaries
+- Advanced project dashboard analytics
 - Exclusive fullscreen game overlay support
 - File upload/vector store workflows
 - Web search tooling
@@ -164,6 +170,14 @@ Update this section manually after each validation pass.
 - Verified: `npm run build` passes after Milestone 6 implementation
 - Verified: `cargo build` passes after Milestone 6 implementation
 - Passed: Milestone 6 manual validation checklist
+- Implemented: Milestone 7 selected-project workspace header
+- Implemented: Overview, GitHub, Chat, and References workspace sections
+- Implemented: minimal References summary without attachment workflows
+- Verified: `npm install` passes after Milestone 7 implementation
+- Verified: `npm run build` passes after Milestone 7 implementation
+- Verified: `cargo build` passes after Milestone 7 implementation
+- Verified: `npm run tauri:dev` launches after Milestone 7 implementation
+- Passed: Milestone 7 manual validation checklist
 
 ## Milestone Validation Workflow
 

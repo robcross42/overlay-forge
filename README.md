@@ -6,7 +6,7 @@ Overlay Forge is a local-first desktop overlay shell for planning, notes, tasks,
 
 **Milestone 1 is complete, passed, and successful.** It adds Tasks, Notes, and Calendar components beside the existing Scratchpad without replacing the Milestone 0 foundation.
 
-**Current project baseline: Milestone 6.** Future bridge prompts, planning, and implementation should treat Milestone 6 as the latest completed and user-validated app state.
+**Current project baseline: Milestone 7.** Future bridge prompts, planning, and implementation should treat Milestone 7 as the latest completed and user-validated app state.
 
 **Milestone 2 is complete, passed, and successful.** It adds a local Projects component with SQLite persistence.
 
@@ -25,6 +25,12 @@ Milestone 5 adds a local-first YouTube component for intentionally saved, user-c
 Status: **Complete / Passed / Successful**
 
 Milestone 6 moves project-scoped chat into the Projects section. Selecting a project now establishes the active project workspace, with Overview, GitHub, and Chat sections scoped to that selected project. The Chat section reuses existing `planning_conversations` and `planning_messages` data and no longer requires a second project selector.
+
+**Milestone 7 - Project Workspace Layout Refinement**
+
+Status: **Complete / Passed / Successful**
+
+Milestone 7 refines the selected Projects workspace layout. The active project workspace now shows a clear project header and internal sections for Overview, GitHub, Chat, and References. References is intentionally minimal and summarizes project-local context categories without adding attachment workflows.
 
 Completed Milestone 0 capabilities:
 
@@ -56,6 +62,8 @@ Milestone 5 intentionally keeps YouTube account login, YouTube API integration, 
 
 Milestone 6 intentionally keeps bridge-file generation, prompt preview, automatic context attachment, GitHub file reading, Codex handoff, ChatGPT import, conversation search/filtering, chat streaming, and model picker UI deferred.
 
+Milestone 7 intentionally keeps manual context attachments, prompt preview, bridge-file generation, GitHub file browsing, Codex handoff, ChatGPT import, conversation search/filtering, chat streaming, model picker UI, AI-generated project summaries, and advanced project dashboard analytics deferred.
+
 ## ChatGPT / Codex Bridge Context
 
 When using this repository as context in ChatGPT or Codex, do not rely only on this README. The bridge should explicitly reference every project Markdown file in the repo, including files under `docs/`, because chatgpt.com may not automatically discover nested documentation.
@@ -75,11 +83,12 @@ Required Markdown context files:
 - `docs/MILESTONE_4.md`
 - `docs/MILESTONE_5.md`
 - `docs/MILESTONE_6.md`
+- `docs/MILESTONE_7.md`
 - `docs/PROJECT_PLAN.md`
 
 For future bridge prompts, instruct ChatGPT/Codex to read all `*.md` files in the project repo structure before making planning or implementation decisions.
 
-Milestone numbering note: use explicit milestone IDs from the Markdown files. Do not infer milestone numbers from numbered list positions. Milestone 3 is the OpenAI Planning Chat component and is complete, passed, and successful. Milestone 4 is GitHub Integration and is complete, passed, and successful. Milestone 5 is the Controlled YouTube Component and is complete, passed, and successful. Milestone 6 is Project Workspace Chat and is complete, passed, and successful.
+Milestone numbering note: use explicit milestone IDs from the Markdown files. Do not infer milestone numbers from numbered list positions. Milestone 3 is the OpenAI Planning Chat component and is complete, passed, and successful. Milestone 4 is GitHub Integration and is complete, passed, and successful. Milestone 5 is the Controlled YouTube Component and is complete, passed, and successful. Milestone 6 is Project Workspace Chat and is complete, passed, and successful. Milestone 7 is Project Workspace Layout Refinement and is complete, passed, and successful.
 
 ## Development
 

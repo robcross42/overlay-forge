@@ -17,7 +17,7 @@ const emptyProject: ProjectInput = {
 };
 
 type ProjectMode = "idle" | "create" | "view" | "edit";
-type WorkspaceSection = "overview" | "github" | "chat";
+type WorkspaceSection = "overview" | "github" | "chat" | "references";
 
 export function Projects() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -247,31 +247,50 @@ export function Projects() {
         {selectedProject || projectMode === "create" ? (
           <div className="project-workspace">
             {selectedProject && (
-              <nav className="workspace-tabs" aria-label="Project workspace sections">
-                <button
-                  className={
-                    workspaceSection === "overview" ? "workspace-tab active" : "workspace-tab"
-                  }
-                  onClick={() => setWorkspaceSection("overview")}
-                  type="button"
-                >
-                  Overview
-                </button>
-                <button
-                  className={workspaceSection === "github" ? "workspace-tab active" : "workspace-tab"}
-                  onClick={() => setWorkspaceSection("github")}
-                  type="button"
-                >
-                  GitHub
-                </button>
-                <button
-                  className={workspaceSection === "chat" ? "workspace-tab active" : "workspace-tab"}
-                  onClick={() => setWorkspaceSection("chat")}
-                  type="button"
-                >
-                  Chat
-                </button>
-              </nav>
+              <div className="workspace-context-header">
+                <div className="workspace-context-copy">
+                  <p>Active Workspace</p>
+                  <h4>{selectedProject.name}</h4>
+                  <span>{formatProjectStatus(selectedProject.status)}</span>
+                </div>
+
+                <nav className="workspace-tabs" aria-label="Project workspace sections">
+                  <button
+                    className={
+                      workspaceSection === "overview" ? "workspace-tab active" : "workspace-tab"
+                    }
+                    onClick={() => setWorkspaceSection("overview")}
+                    type="button"
+                  >
+                    Overview
+                  </button>
+                  <button
+                    className={
+                      workspaceSection === "github" ? "workspace-tab active" : "workspace-tab"
+                    }
+                    onClick={() => setWorkspaceSection("github")}
+                    type="button"
+                  >
+                    GitHub
+                  </button>
+                  <button
+                    className={workspaceSection === "chat" ? "workspace-tab active" : "workspace-tab"}
+                    onClick={() => setWorkspaceSection("chat")}
+                    type="button"
+                  >
+                    Chat
+                  </button>
+                  <button
+                    className={
+                      workspaceSection === "references" ? "workspace-tab active" : "workspace-tab"
+                    }
+                    onClick={() => setWorkspaceSection("references")}
+                    type="button"
+                  >
+                    References
+                  </button>
+                </nav>
+              </div>
             )}
 
             <div className="project-workspace-content">
@@ -428,6 +447,41 @@ export function Projects() {
               )}
 
               {selectedProject && workspaceSection === "chat" && <PlanningChat project={selectedProject} />}
+
+              {selectedProject && workspaceSection === "references" && (
+                <section className="references-panel" aria-label="Project references">
+                  <div className="references-heading">
+                    <div>
+                      <p>References</p>
+                      <h4>Local Context Sources</h4>
+                    </div>
+                    <span className="save-pill">Planned</span>
+                  </div>
+
+                  <div className="reference-summary-grid">
+                    <article className="reference-summary-item">
+                      <span>Project Details</span>
+                      <strong>{selectedProject.name}</strong>
+                      <p>Available from the selected project overview.</p>
+                    </article>
+                    <article className="reference-summary-item">
+                      <span>GitHub Repository</span>
+                      <strong>{githubLink?.repositoryFullName || "No repository linked"}</strong>
+                      <p>Available when a repository is linked in the GitHub section.</p>
+                    </article>
+                    <article className="reference-summary-item">
+                      <span>Attachments</span>
+                      <strong>Planned later</strong>
+                      <p>Manual context attachment workflows are deferred beyond Milestone 7.</p>
+                    </article>
+                    <article className="reference-summary-item">
+                      <span>Prompt Context</span>
+                      <strong>Planned later</strong>
+                      <p>Prompt preview and context inclusion are deferred beyond Milestone 7.</p>
+                    </article>
+                  </div>
+                </section>
+              )}
             </div>
           </div>
         ) : (

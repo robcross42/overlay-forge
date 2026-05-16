@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**Current project baseline: Milestone 6.**
+**Current project baseline: Milestone 7.**
 
-Milestone 6 is the latest completed, tested, and user-validated milestone.
+Milestone 7 is the latest completed, tested, and user-validated milestone.
 
 **Milestone 0 - Overlay Shell Validation is complete, passed, and successful.**
 
@@ -40,6 +40,12 @@ Status: **Complete / Passed / Successful**
 
 Milestone 6 makes Projects the active workspace shell for project-scoped chat. Selecting a project exposes Overview, GitHub, and Chat sections; Chat uses the selected project automatically and preserves the existing planning conversation/message data.
 
+**Milestone 7 - Project Workspace Layout Refinement**
+
+Status: **Complete / Passed / Successful**
+
+Milestone 7 refines Projects into a clearer selected-project workspace shell with Overview, GitHub, Chat, and References sections. References is intentionally minimal, project-local, and does not implement attachment workflows.
+
 ## Product Direction
 
 Overlay Forge is a personal desktop command hub that floats above the user's workflow and eventually helps turn ideas, notes, tasks, and project plans into Codex-ready markdown bridge files.
@@ -55,13 +61,16 @@ Use explicit milestone IDs. Do not infer milestone numbers from this list's item
 - Milestone 4 - GitHub integration - complete and passed
 - Milestone 5 - Controlled YouTube component - complete and passed
 - Milestone 6 - Project workspace chat - complete and passed
+- Milestone 7 - Project workspace layout refinement - complete and passed
 
 ## Scope Guard
 
-Milestone 6 is the current passed stable baseline for later work. Do not implement later milestone features by reverting to an earlier code path; future work should begin from the completed overlay shell, hotkey behavior, always-on-top behavior, component host, local SQLite scratchpad, Tasks, Notes, Calendar, Projects workspace, Planning Chat persistence, GitHub Integration, and YouTube components.
+Milestone 7 is the current passed stable baseline for later work. Do not implement later milestone features by reverting to an earlier code path; future work should begin from the completed overlay shell, hotkey behavior, always-on-top behavior, component host, local SQLite scratchpad, Tasks, Notes, Calendar, Projects workspace, Planning Chat persistence, GitHub Integration, and YouTube components.
 
 Milestone 4 remains intentionally small. It does not include automatic Codex handoff, GitHub write operations, pull request creation, branch creation, issue management, full repository browsing, GitHub Actions integration, OAuth, multi-account support, advanced sync, vector store/repo indexing, YouTube integration, external calendar integration, cloud sync, or multi-user auth.
 
 Milestone 5 remains intentionally controlled. It does not include YouTube account login, YouTube API integration, OAuth, subscription import, watch history import, recommendations, transcript retrieval, transcript summarization, video/audio downloads, embedded unrestricted browsing, playlist sync, comment sync, channel scraping, background metadata crawlers, bridge-file generation from videos, Codex handoff from videos, cloud sync, or multi-user auth.
 
 Milestone 6 remains intentionally small. It does not include bridge-file generation, prompt preview, automatic context attachment, GitHub file reading, Codex handoff, ChatGPT import, conversation search/filtering, chat streaming, or model picker UI.
+
+Milestone 7 remains intentionally layout-focused. It does not include manual context attachments, prompt preview, bridge-file generation, GitHub file browsing, Codex handoff, ChatGPT import, conversation search/filtering, chat streaming, model picker UI, AI-generated project summaries, or advanced project dashboard analytics.
