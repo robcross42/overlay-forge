@@ -10,9 +10,10 @@ All notable changes to Overlay Forge will be documented in this file.
 - The Milestone 0 scratchpad component is complete and passed.
 - Scratchpad content saves to SQLite and restores between app sessions.
 - Milestone 1 - Calendar, To-do, Notes, and Scratchpad Expansion is complete, passed, and successful.
-- Current project baseline is Milestone 3.
+- Current project baseline is Milestone 4.
 - Milestone 2 - Local Projects component is complete, passed, and successful.
 - Milestone 3 - OpenAI Planning Chat component is complete, passed, and successful.
+- Milestone 4 - GitHub Integration is complete, passed, and successful.
 
 ### Added
 
@@ -49,6 +50,12 @@ All notable changes to Overlay Forge will be documented in this file.
 - Added a backend OpenAI Responses API integration using `OPENAI_API_KEY`.
 - Added Planning Chat project selection, conversation list, new conversation action, message history, message input, loading state, and readable error display.
 - Added `docs/MILESTONE_3.md` with setup validation and manual validation steps.
+- Added SQLite `project_github_repositories` table initialization for project-scoped GitHub repository linkage and metadata/status.
+- Added Rust/Tauri GitHub integration commands for getting, saving, deleting, and fetching project repository metadata.
+- Added backend-only GitHub metadata fetch behavior using `GITHUB_TOKEN`.
+- Added frontend GitHub project-link UI inside the Projects component.
+- Added readable missing-token, invalid repository full-name, and GitHub request error handling.
+- Added `docs/MILESTONE_4.md` with setup validation and manual validation steps.
 
 ### Changed
 
@@ -76,6 +83,7 @@ All notable changes to Overlay Forge will be documented in this file.
 - Clarified milestone numbering in project docs so Milestone 2 is not confused with the second item in the roadmap.
 - Updated project documentation for Milestone 2 validation success.
 - Updated project documentation for Milestone 3 validation success.
+- Updated project documentation for Milestone 4 validation success.
 
 ### Validation
 
@@ -104,3 +112,8 @@ All notable changes to Overlay Forge will be documented in this file.
 - Verified frontend build after Milestone 3 implementation with `npm run build`.
 - Verified Rust backend compile after Milestone 3 implementation with `cargo build`.
 - User manually validated Milestone 3 successfully.
+- Verified `npm install` completes successfully after Milestone 4 implementation.
+- Verified frontend build after Milestone 4 implementation with `npm run build`.
+- Verified Rust backend compile after Milestone 4 implementation with `cargo build`.
+- Verified development launch after Milestone 4 implementation with `npm run tauri:dev` outside the sandbox so the app could write the app-data SQLite database.
+- User manually validated Milestone 4 successfully.

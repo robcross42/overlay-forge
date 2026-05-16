@@ -26,6 +26,8 @@ Milestone 2 is complete, passed, and successful. It adds a Projects feature fold
 
 Milestone 3 is complete, passed, and successful. It adds a Planning Chat feature folder inside the shell-owned component host while preserving Scratchpad, Tasks, Notes, Calendar, and Projects.
 
+Milestone 4 - GitHub Integration is complete, passed, and successful. It extends the Projects feature with a project-scoped GitHub Repository section while preserving the existing shell-owned component host and all Milestone 0 through Milestone 3 components.
+
 ## UI Consistency
 
 Organizer components should follow the same interaction pattern unless a milestone explicitly documents a reason to diverge:
@@ -49,6 +51,8 @@ The Tauri backend owns:
 - Project CRUD commands
 - Planning conversation and message CRUD commands
 - Backend-only OpenAI Responses API request handling
+- Project-scoped GitHub repository link commands
+- Backend-only GitHub repository metadata fetch handling
 - Global hotkey registration
 - Window show/hide behavior
 
@@ -62,9 +66,29 @@ Milestone 2 adds idempotent table initialization for `projects`.
 
 Milestone 3 adds idempotent table initialization for `planning_conversations` and `planning_messages`. Later milestones should add tables for bridge file drafts and exported bridge-file workflow state.
 
+Milestone 4 adds idempotent table initialization for `project_github_repositories`. The table stores project repository linkage and fetched metadata/status only. Migrations are non-destructive and must not remove existing Scratchpad, Tasks, Notes, Calendar, Projects, or Planning Chat data.
+
 ## OpenAI Boundary
 
 Planning Chat calls the OpenAI Responses API from the Rust/Tauri backend. React invokes local Tauri commands only and never reads `OPENAI_API_KEY`. Model selection, request shape, and the planning assistant instruction are centralized in the backend OpenAI service module so later bridge-file generation, tools, streaming, or model changes do not leak through the frontend.
+
+## GitHub Boundary
+
+Milestone 4 GitHub metadata fetches are backend-owned. React invokes local Tauri commands and never receives `GITHUB_TOKEN`. The token is read from the Rust process environment, is not stored in SQLite, and is not passed into frontend state.
+
+SQLite stores repository linkage and fetched metadata/status only:
+
+```text
+project_id
+repository_full_name
+repository_url
+default_branch
+visibility
+last_fetched_at
+last_fetch_status
+```
+
+The integration is project-scoped and read-only. Milestone 4 does not perform Codex handoff, GitHub write operations, branch creation, commit creation, pull request creation, issue management, repository file browsing, GitHub Actions integration, OAuth, or multi-account workflows.
 
 ## Bridge Files
 

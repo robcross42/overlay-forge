@@ -679,6 +679,88 @@ select.text-input option:hover {
   grid-template-rows: auto minmax(0, 1fr) auto auto;
 }
 
+.project-editor-form {
+  grid-template-rows: auto minmax(96px, 1fr) auto auto;
+  overflow: auto;
+  padding-right: 2px;
+  scrollbar-color: rgba(79, 208, 165, 0.48) rgba(255, 255, 255, 0.06);
+  scrollbar-width: thin;
+}
+
+.project-editor-form::-webkit-scrollbar {
+  width: 10px;
+}
+
+.project-editor-form::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+}
+
+.project-editor-form::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(79, 208, 165, 0.48);
+  background-clip: content-box;
+}
+
+.github-link-panel {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.github-link-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.github-link-heading p,
+.github-link-heading h4,
+.metadata-grid {
+  margin: 0;
+}
+
+.github-link-heading p {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.github-link-heading h4 {
+  font-size: 0.95rem;
+}
+
+.metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.metadata-grid div {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.metadata-grid dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.metadata-grid dd {
+  min-width: 0;
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
 .planning-panel {
   min-width: 0;
 }
@@ -811,6 +893,10 @@ select.text-input option:hover {
   }
 
   .field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metadata-grid {
     grid-template-columns: 1fr;
   }
 }

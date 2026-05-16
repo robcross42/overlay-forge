@@ -6,11 +6,13 @@ Overlay Forge is a local-first desktop overlay shell for planning, notes, tasks,
 
 **Milestone 1 is complete, passed, and successful.** It adds Tasks, Notes, and Calendar components beside the existing Scratchpad without replacing the Milestone 0 foundation.
 
-**Current project baseline: Milestone 3.** Future bridge prompts, planning, and implementation should treat Milestone 3 as the latest completed and user-validated app state.
+**Current project baseline: Milestone 4.** Future bridge prompts, planning, and implementation should treat Milestone 4 as the latest completed and user-validated app state.
 
 **Milestone 2 is complete, passed, and successful.** It adds a local Projects component with SQLite persistence.
 
 **Milestone 3 is complete, passed, and successful.** It adds a backend-mediated OpenAI Planning Chat component with local SQLite conversation and message persistence.
+
+**Milestone 4 - GitHub Integration** is complete, passed, and successful. It adds project-scoped GitHub repository linkage, backend-only `GITHUB_TOKEN` metadata fetches, and local SQLite storage for repository metadata/status.
 
 Completed Milestone 0 capabilities:
 
@@ -34,7 +36,9 @@ Milestone 1 intentionally keeps OpenAI, GitHub, YouTube, cloud sync, recurring e
 
 Milestone 2 intentionally keeps OpenAI, GitHub, project import/export, planning chat, bridge-file generation UI, cloud sync, and advanced project lifecycle workflows deferred.
 
-Milestone 3 intentionally keeps GitHub integration, YouTube, external calendar integrations, cloud sync, file upload/vector store workflows, web search tooling, full bridge-file generation UI, and automatic Codex handoff deferred.
+Milestone 3 intentionally kept GitHub integration, YouTube, external calendar integrations, cloud sync, file upload/vector store workflows, web search tooling, full bridge-file generation UI, and automatic Codex handoff deferred.
+
+Milestone 4 intentionally keeps automatic Codex handoff, GitHub write operations, pull request creation, branch creation, issue management, repository file browsing, GitHub Actions integration, OAuth, multi-account support, advanced sync, vector store/repo indexing, YouTube, external calendar integrations, cloud sync, and multi-user auth deferred.
 
 ## ChatGPT / Codex Bridge Context
 
@@ -52,11 +56,12 @@ Required Markdown context files:
 - `docs/MILESTONE_1.md`
 - `docs/MILESTONE_2.md`
 - `docs/MILESTONE_3.md`
+- `docs/MILESTONE_4.md`
 - `docs/PROJECT_PLAN.md`
 
 For future bridge prompts, instruct ChatGPT/Codex to read all `*.md` files in the project repo structure before making planning or implementation decisions.
 
-Milestone numbering note: use explicit milestone IDs from the Markdown files. Do not infer milestone numbers from numbered list positions. Milestone 3 is the OpenAI Planning Chat component and is complete, passed, and successful.
+Milestone numbering note: use explicit milestone IDs from the Markdown files. Do not infer milestone numbers from numbered list positions. Milestone 3 is the OpenAI Planning Chat component and is complete, passed, and successful. Milestone 4 is GitHub Integration and is complete, passed, and successful.
 
 ## Development
 
@@ -103,3 +108,13 @@ OPENAI_API_KEY
 ```
 
 The key is read only by the Rust/Tauri backend. It is not stored in SQLite and is not exposed to React source code. If the key is missing, Planning Chat shows a readable configuration error when a message is sent.
+
+## GitHub Integration
+
+Milestone 4 uses the backend environment variable:
+
+```text
+GITHUB_TOKEN
+```
+
+The token is read only by the Rust/Tauri backend. It is not stored in SQLite and is not exposed to React source code. SQLite stores project repository linkage and fetched metadata/status only. If the token is missing, the Projects GitHub section shows a readable configuration error when metadata fetch is attempted.

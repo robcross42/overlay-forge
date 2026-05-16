@@ -30,7 +30,7 @@ export default function App() {
       .then(setStatus)
       .catch(() => {
         setStatus({
-          milestone: "Milestone 2",
+          milestone: "Milestone 4",
           hotkey: "Ctrl+Shift+Space",
           databaseReady: false
         });
@@ -40,7 +40,7 @@ export default function App() {
   const activeMeta = useMemo(
     () => ({
       title: navItems.find((item) => item.id === activeComponent)?.label ?? "Scratchpad",
-      eyebrow: status?.milestone ?? "Milestone 2",
+      eyebrow: status?.milestone ?? "Milestone 4",
       hotkey: status?.hotkey ?? "Ctrl+Shift+Space"
     }),
     [activeComponent, status]

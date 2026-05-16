@@ -8,6 +8,8 @@ Milestone 2 project data model is complete, passed, and successful.
 
 Milestone 3 planning chat data model is complete, passed, and successful.
 
+Milestone 4 - GitHub Integration data model is complete, passed, and successful.
+
 ## Tables
 
 ### scratchpad
@@ -107,3 +109,52 @@ system
 ```
 
 Milestone 3 writes `user` and `assistant` messages during normal chat use. `system` is reserved for future workflow needs; the active planning instruction is backend-owned and not stored as a user-visible message.
+
+### project_github_repositories
+
+```text
+id
+project_id
+repository_full_name
+repository_url
+default_branch
+visibility
+last_fetched_at
+last_fetch_status
+created_at
+updated_at
+```
+
+Project-scoped GitHub repository linkage and metadata for Milestone 4. Each project can have one linked repository through the unique `project_id` field.
+
+Minimum required linkage fields:
+
+```text
+id
+project_id
+repository_full_name
+created_at
+updated_at
+```
+
+Fetched metadata fields are populated by the backend GitHub metadata command when `GITHUB_TOKEN` is configured:
+
+```text
+repository_url
+default_branch
+visibility
+last_fetched_at
+last_fetch_status
+```
+
+GitHub tokens are not stored in SQLite.
+
+## Migration Notes
+
+Milestone 4 uses non-destructive idempotent table initialization:
+
+```text
+CREATE TABLE IF NOT EXISTS project_github_repositories
+```
+
+Existing user data remains intact. Deleting a local project deletes that project's GitHub repository linkage record, but does not affect any GitHub remote repository.

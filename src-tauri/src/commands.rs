@@ -1,7 +1,8 @@
 use crate::db::{
     CalendarEventRecord, NoteRecord, PlanningConversationRecord, PlanningMessageRecord,
-    ProjectRecord, TaskRecord,
+    ProjectGitHubRepositoryRecord, ProjectRecord, TaskRecord,
 };
+use crate::github;
 use crate::openai;
 use crate::AppState;
 use serde::Serialize;
@@ -34,7 +35,7 @@ pub fn save_scratchpad(content: String, state: State<'_, AppState>) -> Result<()
 #[tauri::command]
 pub fn get_milestone_status(state: State<'_, AppState>) -> Result<MilestoneStatus, String> {
     Ok(MilestoneStatus {
-        milestone: "Milestone 3".to_string(),
+        milestone: "Milestone 4".to_string(),
         hotkey: "Ctrl+Shift+Space".to_string(),
         database_ready: state.database.is_ready(),
     })
@@ -254,6 +255,73 @@ pub fn delete_project(id: i64, state: State<'_, AppState>) -> Result<(), String>
         .database
         .delete_project(id)
         .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn get_project_github_repository(
+    project_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Option<ProjectGitHubRepositoryRecord>, String> {
+    state
+        .database
+        .get_project_github_repository(project_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn save_project_github_repository(
+    project_id: i64,
+    repository_full_name: String,
+    state: State<'_, AppState>,
+) -> Result<ProjectGitHubRepositoryRecord, String> {
+    let normalized = github::normalize_repository_full_name(&repository_full_name)?;
+    state
+        .database
+        .save_project_github_repository(project_id, &normalized)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn delete_project_github_repository(
+    project_id: i64,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .database
+        .delete_project_github_repository(project_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn fetch_project_github_metadata(
+    project_id: i64,
+    state: State<'_, AppState>,
+) -> Result<ProjectGitHubRepositoryRecord, String> {
+    let link = state
+        .database
+        .get_project_github_repository(project_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| "Link a GitHub repository before fetching metadata.".to_string())?;
+
+    match github::fetch_repository_metadata(&link.repository_full_name).await {
+        Ok(metadata) => state
+            .database
+            .update_project_github_metadata(
+                project_id,
+                &metadata.repository_full_name,
+                &metadata.repository_url,
+                &metadata.default_branch,
+                &metadata.visibility,
+                "Fetched GitHub repository metadata successfully",
+            )
+            .map_err(|error| error.to_string()),
+        Err(error) => {
+            let _ = state
+                .database
+                .update_project_github_fetch_status(project_id, &error);
+            Err(error)
+        }
+    }
 }
 
 #[tauri::command]

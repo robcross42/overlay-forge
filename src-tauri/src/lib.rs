@@ -1,15 +1,17 @@
 mod commands;
 mod db;
+mod github;
 mod hotkeys;
 mod openai;
 
 use commands::{
     create_calendar_event, create_note, create_planning_conversation, create_project, create_task,
-    delete_calendar_event, delete_note, delete_planning_conversation, delete_project, delete_task,
-    get_milestone_status, get_scratchpad, list_calendar_events, list_notes,
-    list_planning_conversations, list_planning_messages, list_projects, list_tasks,
-    save_scratchpad, send_planning_message, shutdown_app, update_calendar_event, update_note,
-    update_project, update_task,
+    delete_calendar_event, delete_note, delete_planning_conversation, delete_project,
+    delete_project_github_repository, delete_task, fetch_project_github_metadata,
+    get_milestone_status, get_project_github_repository, get_scratchpad, list_calendar_events,
+    list_notes, list_planning_conversations, list_planning_messages, list_projects, list_tasks,
+    save_project_github_repository, save_scratchpad, send_planning_message, shutdown_app,
+    update_calendar_event, update_note, update_project, update_task,
 };
 use db::AppDatabase;
 use tauri::Manager;
@@ -56,6 +58,10 @@ pub fn run() {
             create_project,
             update_project,
             delete_project,
+            get_project_github_repository,
+            save_project_github_repository,
+            delete_project_github_repository,
+            fetch_project_github_metadata,
             list_planning_conversations,
             create_planning_conversation,
             list_planning_messages,

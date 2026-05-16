@@ -8,11 +8,11 @@ Provide this file to ChatGPT or Codex when a new chat needs current project cont
 
 ## Current Milestone
 
-Milestone 3 - OpenAI Planning Chat component
+Milestone 4 - GitHub Integration
 
 Status: **Complete / Passed / Successful**
 
-Current project baseline: **Milestone 3**. Future bridge prompts, planning, and implementation should start from Milestone 3.
+Current project baseline: **Milestone 4**. Future bridge prompts, planning, and implementation should start from Milestone 4.
 
 Milestone 0 remains complete, passed, and successful. Milestone 1 adds component navigation plus SQLite-backed Tasks, Notes, and Calendar components. User validation is complete and Milestone 1 passed.
 
@@ -20,7 +20,9 @@ Milestone 2 adds the local Projects component with SQLite persistence. User vali
 
 Milestone 3 adds Planning Chat with backend OpenAI Responses API calls and local SQLite conversation/message persistence. User validation is complete and Milestone 3 passed.
 
-Milestone numbering note: Milestone 2 is the Local Projects component. Do not mistake roadmap list item positions for milestone IDs.
+Milestone 4 adds project-scoped GitHub repository linkage, SQLite-backed repository metadata/status, backend-only `GITHUB_TOKEN` handling, and a GitHub Repository section inside Projects. User validation is complete and Milestone 4 passed.
+
+Milestone numbering note: Milestone 2 is the Local Projects component. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Do not mistake roadmap list item positions for milestone IDs.
 
 ## Current Scope
 
@@ -41,6 +43,8 @@ Milestone numbering note: Milestone 2 is the Local Projects component. Do not mi
 - SQLite-backed planning conversation persistence
 - SQLite-backed planning message persistence
 - Backend-only OpenAI API calls through `OPENAI_API_KEY`
+- SQLite-backed project GitHub repository linkage
+- Backend-only GitHub metadata fetches through `GITHUB_TOKEN`
 
 ## Hotkey
 
@@ -50,7 +54,6 @@ Ctrl+Shift+Space
 
 ## Deferred
 
-- GitHub integration
 - YouTube component
 - Advanced calendar workflows
 - Advanced task workflows
@@ -60,6 +63,8 @@ Ctrl+Shift+Space
 - File upload/vector store workflows
 - Web search tooling
 - Automatic Codex handoff
+- GitHub write operations
+- Pull request, branch, commit, issue, Actions, webhook, OAuth, and multi-account workflows
 
 ## Latest Validation Notes
 
@@ -121,3 +126,17 @@ Update this section manually after each validation pass.
 - Passed: Milestone 3 manual validation checklist
 - Fixed: scrollable component lists show scrollbars when content exceeds visible space
 - Fixed: list item title/date rows keep stable spacing during overlay resizing
+- Implemented: Milestone 4 GitHub repository linkage inside Projects
+- Implemented: SQLite `project_github_repositories` table
+- Implemented: backend GitHub commands for get/save/delete/fetch metadata
+- Implemented: backend-only `GITHUB_TOKEN` handling
+- Implemented: readable missing-token, invalid repository name, and GitHub request error states
+- Verified: `npm install` passes after Milestone 4 implementation
+- Verified: `npm run build` passes after Milestone 4 implementation
+- Verified: `cargo build` passes after Milestone 4 implementation
+- Verified: `npm run tauri:dev` launches after Milestone 4 implementation when run outside the sandbox with app-data write access
+- Passed: Milestone 4 manual validation checklist
+
+## Milestone Validation Workflow
+
+When the user reports that a milestone validation is complete, Codex should update the relevant milestone/docs/changelog statuses to `Complete / Passed / Successful`, run a quick sanity check, review `git status`, commit only the intended milestone changes with a milestone-specific message, and push the current branch. Do not commit unrelated user changes.

@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**Current project baseline: Milestone 3.**
+**Current project baseline: Milestone 4.**
 
-Milestone 3 is the latest completed, tested, and user-validated milestone. Future planning and implementation should start from the Milestone 3 app state.
+Milestone 4 is the latest completed, tested, and user-validated milestone.
 
 **Milestone 0 - Overlay Shell Validation is complete, passed, and successful.**
 
@@ -24,6 +24,10 @@ Milestone 2 adds Projects navigation, a SQLite-backed local project table, Rust/
 
 Milestone 3 adds Planning Chat navigation, project-scoped planning conversations, SQLite-backed message persistence, and backend-only OpenAI Responses API calls through `OPENAI_API_KEY`.
 
+**Milestone 4 - GitHub Integration is complete, passed, and successful.**
+
+Milestone 4 adds project-scoped GitHub repository linkage, SQLite-backed repository metadata/status, backend-only `GITHUB_TOKEN` handling, and a GitHub Repository section in Projects.
+
 ## Product Direction
 
 Overlay Forge is a personal desktop command hub that floats above the user's workflow and eventually helps turn ideas, notes, tasks, and project plans into Codex-ready markdown bridge files.
@@ -36,9 +40,11 @@ Use explicit milestone IDs. Do not infer milestone numbers from this list's item
 - Milestone 1 - Calendar, to-do, notes, and scratchpad component - complete and passed
 - Milestone 2 - Local projects component - complete and passed
 - Milestone 3 - OpenAI planning chat component - complete and passed
-- Milestone 4 - GitHub integration - not started
+- Milestone 4 - GitHub integration - complete and passed
 - Milestone 5 - Controlled YouTube component - not started
 
 ## Scope Guard
 
-Milestone 3 is the current passed stable baseline for later work. Do not implement later milestone features by reverting to the Milestone 0, Milestone 1, or Milestone 2 code path; future work should begin from the completed overlay shell, hotkey behavior, always-on-top behavior, component host, local SQLite scratchpad, Tasks, Notes, Calendar, Projects, and Planning Chat components.
+Milestone 4 is the current passed stable baseline for later work. Do not implement later milestone features by reverting to the Milestone 0, Milestone 1, Milestone 2, or Milestone 3 code path; future work should begin from the completed overlay shell, hotkey behavior, always-on-top behavior, component host, local SQLite scratchpad, Tasks, Notes, Calendar, Projects, Planning Chat, and GitHub Integration components.
+
+Milestone 4 remains intentionally small. It does not include automatic Codex handoff, GitHub write operations, pull request creation, branch creation, issue management, full repository browsing, GitHub Actions integration, OAuth, multi-account support, advanced sync, vector store/repo indexing, YouTube integration, external calendar integration, cloud sync, or multi-user auth.

@@ -1,4 +1,4 @@
-use rusqlite::{params, Connection, Result};
+use rusqlite::{params, Connection, OptionalExtension, Result};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -82,6 +82,28 @@ pub struct PlanningConversationRecord {
     pub updated_at: String,
 }
 
+#[derive(Clone, Serialize)]
+pub struct ProjectGitHubRepositoryRecord {
+    pub id: i64,
+    #[serde(rename = "projectId")]
+    pub project_id: i64,
+    #[serde(rename = "repositoryFullName")]
+    pub repository_full_name: String,
+    #[serde(rename = "repositoryUrl")]
+    pub repository_url: String,
+    #[serde(rename = "defaultBranch")]
+    pub default_branch: String,
+    pub visibility: String,
+    #[serde(rename = "lastFetchedAt")]
+    pub last_fetched_at: String,
+    #[serde(rename = "lastFetchStatus")]
+    pub last_fetch_status: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
 pub struct AppDatabase {
     connection: Mutex<Connection>,
     ready: bool,
@@ -156,6 +178,19 @@ impl AppDatabase {
                 role TEXT NOT NULL,
                 content TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS project_github_repositories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL UNIQUE,
+                repository_full_name TEXT NOT NULL,
+                repository_url TEXT NOT NULL DEFAULT '',
+                default_branch TEXT NOT NULL DEFAULT '',
+                visibility TEXT NOT NULL DEFAULT '',
+                last_fetched_at TEXT NOT NULL DEFAULT '',
+                last_fetch_status TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
             ",
         )?;
@@ -508,6 +543,10 @@ impl AppDatabase {
 
     pub fn delete_project(&self, id: i64) -> Result<()> {
         let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute(
+            "DELETE FROM project_github_repositories WHERE project_id = ?1",
+            params![id],
+        )?;
         connection.execute("DELETE FROM projects WHERE id = ?1", params![id])?;
         Ok(())
     }
@@ -515,6 +554,115 @@ impl AppDatabase {
     pub fn get_project(&self, id: i64) -> Result<ProjectRecord> {
         let connection = self.connection.lock().expect("database mutex poisoned");
         Self::get_project_by_id(&connection, id)
+    }
+
+    pub fn get_project_github_repository(
+        &self,
+        project_id: i64,
+    ) -> Result<Option<ProjectGitHubRepositoryRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_project_by_id(&connection, project_id)?;
+        Self::get_project_github_repository_by_project_id(&connection, project_id).optional()
+    }
+
+    pub fn save_project_github_repository(
+        &self,
+        project_id: i64,
+        repository_full_name: &str,
+    ) -> Result<ProjectGitHubRepositoryRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_project_by_id(&connection, project_id)?;
+        connection.execute(
+            "
+            INSERT INTO project_github_repositories (
+                project_id,
+                repository_full_name,
+                repository_url,
+                default_branch,
+                visibility,
+                last_fetched_at,
+                last_fetch_status,
+                updated_at
+            )
+            VALUES (?1, ?2, '', '', '', '', 'Repository link saved', CURRENT_TIMESTAMP)
+            ON CONFLICT(project_id) DO UPDATE SET
+                repository_full_name = excluded.repository_full_name,
+                repository_url = '',
+                default_branch = '',
+                visibility = '',
+                last_fetched_at = '',
+                last_fetch_status = 'Repository link saved',
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![project_id, repository_full_name.trim()],
+        )?;
+
+        Self::get_project_github_repository_by_project_id(&connection, project_id)
+    }
+
+    pub fn delete_project_github_repository(&self, project_id: i64) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_project_by_id(&connection, project_id)?;
+        connection.execute(
+            "DELETE FROM project_github_repositories WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn update_project_github_metadata(
+        &self,
+        project_id: i64,
+        repository_full_name: &str,
+        repository_url: &str,
+        default_branch: &str,
+        visibility: &str,
+        last_fetch_status: &str,
+    ) -> Result<ProjectGitHubRepositoryRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute(
+            "
+            UPDATE project_github_repositories
+            SET repository_full_name = ?1,
+                repository_url = ?2,
+                default_branch = ?3,
+                visibility = ?4,
+                last_fetched_at = CURRENT_TIMESTAMP,
+                last_fetch_status = ?5,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE project_id = ?6
+            ",
+            params![
+                repository_full_name.trim(),
+                repository_url.trim(),
+                default_branch.trim(),
+                visibility.trim(),
+                last_fetch_status.trim(),
+                project_id
+            ],
+        )?;
+
+        Self::get_project_github_repository_by_project_id(&connection, project_id)
+    }
+
+    pub fn update_project_github_fetch_status(
+        &self,
+        project_id: i64,
+        last_fetch_status: &str,
+    ) -> Result<ProjectGitHubRepositoryRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute(
+            "
+            UPDATE project_github_repositories
+            SET last_fetched_at = CURRENT_TIMESTAMP,
+                last_fetch_status = ?1,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE project_id = ?2
+            ",
+            params![last_fetch_status.trim(), project_id],
+        )?;
+
+        Self::get_project_github_repository_by_project_id(&connection, project_id)
     }
 
     pub fn list_planning_conversations(
@@ -765,6 +913,44 @@ impl AppDatabase {
                     status: row.get(3)?,
                     created_at: row.get(4)?,
                     updated_at: row.get(5)?,
+                })
+            },
+        )
+    }
+
+    fn get_project_github_repository_by_project_id(
+        connection: &Connection,
+        project_id: i64,
+    ) -> Result<ProjectGitHubRepositoryRecord> {
+        connection.query_row(
+            "
+            SELECT
+                id,
+                project_id,
+                repository_full_name,
+                repository_url,
+                default_branch,
+                visibility,
+                last_fetched_at,
+                last_fetch_status,
+                created_at,
+                updated_at
+            FROM project_github_repositories
+            WHERE project_id = ?1
+            ",
+            params![project_id],
+            |row| {
+                Ok(ProjectGitHubRepositoryRecord {
+                    id: row.get(0)?,
+                    project_id: row.get(1)?,
+                    repository_full_name: row.get(2)?,
+                    repository_url: row.get(3)?,
+                    default_branch: row.get(4)?,
+                    visibility: row.get(5)?,
+                    last_fetched_at: row.get(6)?,
+                    last_fetch_status: row.get(7)?,
+                    created_at: row.get(8)?,
+                    updated_at: row.get(9)?,
                 })
             },
         )

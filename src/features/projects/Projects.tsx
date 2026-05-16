@@ -1,4 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  deleteProjectGitHubRepository,
+  fetchProjectGitHubMetadata,
+  getProjectGitHubRepository,
+  saveProjectGitHubRepository
+} from "../../services/github";
+import type { ProjectGitHubRepository } from "../../services/github";
 import { createProject, deleteProject, listProjects, updateProject } from "../../services/projects";
 import type { Project, ProjectInput, ProjectStatus } from "../../services/projects";
 
@@ -16,6 +23,10 @@ export function Projects() {
   const [projectMode, setProjectMode] = useState<ProjectMode>("idle");
   const [form, setForm] = useState<ProjectInput>(emptyProject);
   const [status, setStatus] = useState("Loading projects");
+  const [githubLink, setGithubLink] = useState<ProjectGitHubRepository | null>(null);
+  const [githubFullName, setGithubFullName] = useState("");
+  const [githubStatus, setGithubStatus] = useState("Select a project");
+  const [isFetchingGithub, setIsFetchingGithub] = useState(false);
 
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === selectedId) ?? null,
@@ -33,6 +44,29 @@ export function Projects() {
       .catch((error) => setStatus(formatError(error)));
   }, []);
 
+  useEffect(() => {
+    if (!selectedId) {
+      setGithubLink(null);
+      setGithubFullName("");
+      setGithubStatus("Select a project");
+      setIsFetchingGithub(false);
+      return;
+    }
+
+    setGithubStatus("Loading GitHub link");
+    getProjectGitHubRepository(selectedId)
+      .then((link) => {
+        setGithubLink(link);
+        setGithubFullName(link?.repositoryFullName ?? "");
+        setGithubStatus(link ? link.lastFetchStatus || "Repository linked" : "No repository linked");
+      })
+      .catch((error) => {
+        setGithubLink(null);
+        setGithubFullName("");
+        setGithubStatus(formatError(error));
+      });
+  }, [selectedId]);
+
   function selectProject(project: Project) {
     setSelectedId(project.id);
     setProjectMode("view");
@@ -48,6 +82,9 @@ export function Projects() {
     setProjectMode("create");
     setForm(emptyProject);
     setStatus("New project");
+    setGithubLink(null);
+    setGithubFullName("");
+    setGithubStatus("Save the project before linking GitHub");
   }
 
   async function onSaveProject() {
@@ -96,6 +133,9 @@ export function Projects() {
       setSelectedId(null);
       setProjectMode("idle");
       setForm(emptyProject);
+      setGithubLink(null);
+      setGithubFullName("");
+      setGithubStatus("Select a project");
       setStatus("Project deleted");
     } catch (error) {
       setStatus(formatError(error));
@@ -104,6 +144,70 @@ export function Projects() {
 
   function updateField<K extends keyof ProjectInput>(field: K, value: ProjectInput[K]) {
     setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function onSaveGitHubLink() {
+    if (!selectedProject) {
+      setGithubStatus("Select a project before linking GitHub");
+      return;
+    }
+
+    const repositoryFullName = githubFullName.trim();
+    if (!repositoryFullName) {
+      setGithubStatus("GitHub repository full name is required");
+      return;
+    }
+
+    try {
+      const saved = await saveProjectGitHubRepository(selectedProject.id, repositoryFullName);
+      setGithubLink(saved);
+      setGithubFullName(saved.repositoryFullName);
+      setGithubStatus("Repository link saved");
+    } catch (error) {
+      setGithubStatus(formatError(error));
+    }
+  }
+
+  async function onDeleteGitHubLink() {
+    if (!selectedProject) {
+      return;
+    }
+
+    try {
+      await deleteProjectGitHubRepository(selectedProject.id);
+      setGithubLink(null);
+      setGithubFullName("");
+      setGithubStatus("Repository link removed");
+    } catch (error) {
+      setGithubStatus(formatError(error));
+    }
+  }
+
+  async function onFetchGitHubMetadata() {
+    if (!selectedProject) {
+      setGithubStatus("Select a project before fetching GitHub metadata");
+      return;
+    }
+
+    setIsFetchingGithub(true);
+    setGithubStatus("Fetching GitHub metadata");
+    try {
+      const fetched = await fetchProjectGitHubMetadata(selectedProject.id);
+      setGithubLink(fetched);
+      setGithubFullName(fetched.repositoryFullName);
+      setGithubStatus(fetched.lastFetchStatus || "GitHub metadata fetched");
+    } catch (error) {
+      setGithubStatus(formatError(error));
+      try {
+        const link = await getProjectGitHubRepository(selectedProject.id);
+        setGithubLink(link);
+        setGithubFullName(link?.repositoryFullName ?? githubFullName);
+      } catch {
+        // Keep the visible error from the failed fetch.
+      }
+    } finally {
+      setIsFetchingGithub(false);
+    }
   }
 
   return (
@@ -135,7 +239,7 @@ export function Projects() {
         </aside>
 
         {selectedProject || projectMode === "create" ? (
-          <form className="editor-form">
+          <form className="editor-form project-editor-form">
             <input
               aria-label="Project name"
               className="text-input"
@@ -195,6 +299,90 @@ export function Projects() {
                 </button>
               )}
             </div>
+
+            {selectedProject && (
+              <section className="github-link-panel" aria-label="Project GitHub repository">
+                <div className="github-link-heading">
+                  <div>
+                    <p>GitHub Repository</p>
+                    <h4>Project Link</h4>
+                  </div>
+                  <span className={isFetchingGithub ? "save-pill save-pill-loading" : "save-pill"}>
+                    {githubStatus}
+                  </span>
+                </div>
+
+                <label className="field-label">
+                  <span>Repository full name</span>
+                  <input
+                    aria-label="GitHub repository full name"
+                    className="text-input"
+                    disabled={isFetchingGithub}
+                    onChange={(event) => setGithubFullName(event.target.value)}
+                    placeholder="owner/repository-name"
+                    value={githubFullName}
+                  />
+                </label>
+
+                <div className="form-actions">
+                  <button
+                    className="primary-button"
+                    disabled={isFetchingGithub}
+                    onClick={() => void onSaveGitHubLink()}
+                    type="button"
+                  >
+                    Save Link
+                  </button>
+                  <button
+                    className="primary-button"
+                    disabled={!githubLink || isFetchingGithub}
+                    onClick={() => void onFetchGitHubMetadata()}
+                    type="button"
+                  >
+                    Fetch Metadata
+                  </button>
+                  {githubLink && (
+                    <button
+                      className="ghost-button"
+                      disabled={isFetchingGithub}
+                      onClick={() => void onDeleteGitHubLink()}
+                      type="button"
+                    >
+                      Remove Link
+                    </button>
+                  )}
+                </div>
+
+                {githubLink && (
+                  <dl className="metadata-grid">
+                    <div>
+                      <dt>Repository</dt>
+                      <dd>{githubLink.repositoryFullName}</dd>
+                    </div>
+                    <div>
+                      <dt>Default branch</dt>
+                      <dd>{githubLink.defaultBranch || "Not fetched"}</dd>
+                    </div>
+                    <div>
+                      <dt>Visibility</dt>
+                      <dd>{githubLink.visibility || "Not fetched"}</dd>
+                    </div>
+                    <div>
+                      <dt>Repository URL</dt>
+                      <dd>{githubLink.repositoryUrl || "Not fetched"}</dd>
+                    </div>
+                    <div>
+                      <dt>Last fetched</dt>
+                      <dd>{githubLink.lastFetchedAt || "Not fetched"}</dd>
+                    </div>
+                    <div>
+                      <dt>Fetch status</dt>
+                      <dd>{githubLink.lastFetchStatus || "Not fetched"}</dd>
+                    </div>
+                  </dl>
+                )}
+              </section>
+            )}
           </form>
         ) : (
           <div className="empty-editor-state">
