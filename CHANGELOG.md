@@ -17,6 +17,7 @@ All notable changes to Overlay Forge will be documented in this file.
 - Milestone 5 - Controlled YouTube Component is complete, passed, and successful.
 - Milestone 6 - Project Workspace Chat is complete, passed, and successful.
 - Milestone 7 - Project Workspace Layout Refinement is complete, passed, and successful.
+- Milestone 8 - Projects Navigation Tree Actions is planned.
 
 ### Added
 
@@ -74,6 +75,7 @@ All notable changes to Overlay Forge will be documented in this file.
 - Added Overview, GitHub, Chat, and References workspace sections.
 - Added a minimal References section with project-local context category summaries.
 - Added `docs/MILESTONE_7.md` with setup validation and manual validation steps.
+- Added `docs/MILESTONE_8.md` as the planned Projects navigation tree actions milestone.
 
 ### Changed
 
@@ -109,6 +111,7 @@ All notable changes to Overlay Forge will be documented in this file.
 - Confirmed selected project context remains stable across Overview, GitHub, Chat, and References.
 - Preserved existing GitHub repository linkage behavior inside the selected project workspace.
 - Preserved existing project-scoped chat behavior inside the selected project workspace.
+- Documented the planned Projects navigation tree pattern with module-level `+` and item-level `...` actions.
 
 ### Validation
 

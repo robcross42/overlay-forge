@@ -30,7 +30,9 @@ User validation is complete and Milestone 6 passed.
 Milestone 7 refines the selected Projects workspace layout. The active project workspace now has a clear project header and Overview, GitHub, Chat, and References sections. References is intentionally minimal and summarizes project-local context categories without implementing manual attachments. YouTube remains a separate app-level component and is not part of the Projects References section.
 User validation is complete and Milestone 7 passed.
 
-Milestone numbering note: Milestone 2 is the Local Projects component. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Milestone 6 is Project Workspace Chat. Milestone 7 is Project Workspace Layout Refinement. Do not mistake roadmap list item positions for milestone IDs.
+Milestone 8 is planned as Projects Navigation Tree Actions. It should make Projects expandable in the left navigation, list saved projects as children, expose a compact `+` for new project flow, and expose compact `...` menus on project rows for edit/delete. Validate this on Projects before applying the pattern to other modules.
+
+Milestone numbering note: Milestone 2 is the Local Projects component. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Milestone 6 is Project Workspace Chat. Milestone 7 is Project Workspace Layout Refinement. Milestone 8 is Projects Navigation Tree Actions. Do not mistake roadmap list item positions for milestone IDs.
 
 ## Current Scope
 

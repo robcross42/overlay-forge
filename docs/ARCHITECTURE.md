@@ -34,6 +34,8 @@ Milestone 6 - Project Workspace Chat is complete, passed, and successful. It mak
 
 Milestone 7 - Project Workspace Layout Refinement is complete, passed, and successful. It refines Projects as the primary workspace shell by adding a stable active-project header and four selected-project workspace sections: Overview, GitHub, Chat, and References.
 
+Milestone 8 - Projects Navigation Tree Actions is planned. It should move Projects object-level actions toward the shell navigation by making Projects expandable in the left navigation and listing saved projects as children. This pattern should be validated on Projects before generalizing it to other modules.
+
 ## UI Consistency
 
 Organizer components should follow the same interaction pattern unless a milestone explicitly documents a reason to diverge:
@@ -44,6 +46,13 @@ Organizer components should follow the same interaction pattern unless a milesto
 - Selected existing items expose an explicit Edit action before fields become editable.
 - Destructive actions are available only inside an edit/selected-item context.
 - Active clickable actions use consistent enabled button styling across components.
+
+Milestone 8 should add navigation action consistency rules:
+
+- Module-level `+` actions create new items for that module.
+- Item-level `...` actions open item menus such as Edit and Delete.
+- Hover-revealed actions must also be visible or reachable by keyboard focus.
+- The workspace surface should prioritize selected item content while navigation owns object-level actions.
 
 ## Backend
 

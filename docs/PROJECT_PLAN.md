@@ -46,6 +46,12 @@ Status: **Complete / Passed / Successful**
 
 Milestone 7 refines Projects into a clearer selected-project workspace shell with Overview, GitHub, Chat, and References sections. References is intentionally minimal, project-local, and does not implement attachment workflows.
 
+**Milestone 8 - Projects Navigation Tree Actions**
+
+Status: **Planned**
+
+Milestone 8 should move project create/select/edit/delete entry points into the left navigation shell. Projects should become an expandable navigation tree with saved projects as children, a compact `+` action on the Projects module row, and compact `...` menus on project rows for edit/delete. This milestone should validate the Projects pattern before applying it to other modules.
+
 ## Product Direction
 
 Overlay Forge is a personal desktop command hub that floats above the user's workflow and eventually helps turn ideas, notes, tasks, and project plans into Codex-ready markdown bridge files.
@@ -62,6 +68,7 @@ Use explicit milestone IDs. Do not infer milestone numbers from this list's item
 - Milestone 5 - Controlled YouTube component - complete and passed
 - Milestone 6 - Project workspace chat - complete and passed
 - Milestone 7 - Project workspace layout refinement - complete and passed
+- Milestone 8 - Projects navigation tree actions - planned
 
 ## Scope Guard
 
@@ -74,3 +81,5 @@ Milestone 5 remains intentionally controlled. It does not include YouTube accoun
 Milestone 6 remains intentionally small. It does not include bridge-file generation, prompt preview, automatic context attachment, GitHub file reading, Codex handoff, ChatGPT import, conversation search/filtering, chat streaming, or model picker UI.
 
 Milestone 7 remains intentionally layout-focused. It does not include manual context attachments, prompt preview, bridge-file generation, GitHub file browsing, Codex handoff, ChatGPT import, conversation search/filtering, chat streaming, model picker UI, AI-generated project summaries, or advanced project dashboard analytics.
+
+Milestone 8 should remain intentionally focused on Projects navigation only. It should not refactor Tasks, Notes, Calendar, or YouTube until the Projects navigation tree pattern is validated.
