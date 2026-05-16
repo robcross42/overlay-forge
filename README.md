@@ -26,6 +26,24 @@ Future OpenAI, GitHub, YouTube, calendar, tasks, notes, and project-planning fea
 
 Milestone 1 intentionally keeps OpenAI, GitHub, YouTube, cloud sync, recurring events, calendar invites, and external calendar integrations deferred.
 
+## ChatGPT / Codex Bridge Context
+
+When using this repository as context in ChatGPT or Codex, do not rely only on this README. The bridge should explicitly reference every project Markdown file in the repo, including files under `docs/`, because chatgpt.com may not automatically discover nested documentation.
+
+Required Markdown context files:
+
+- `README.md`
+- `CHANGELOG.md`
+- `bridge-files/OPENAI_APP_BRIDGE.md`
+- `docs/ARCHITECTURE.md`
+- `docs/BRIDGE_FILES.md`
+- `docs/DATA_MODEL.md`
+- `docs/MILESTONE_0.md`
+- `docs/MILESTONE_1.md`
+- `docs/PROJECT_PLAN.md`
+
+For future bridge prompts, instruct ChatGPT/Codex to read all `*.md` files in the project repo structure before making planning or implementation decisions.
+
 ## Development
 
 Install dependencies:
