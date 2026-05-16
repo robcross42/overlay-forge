@@ -4,6 +4,8 @@ Overlay Forge is a local-first desktop overlay shell for planning, notes, tasks,
 
 **Milestone 0 is complete and passed.** The current app proves the overlay shell, local SQLite initialization, and scratchpad persistence workflow.
 
+**Milestone 1 is complete, passed, and successful.** It adds Tasks, Notes, and Calendar components beside the existing Scratchpad without replacing the Milestone 0 foundation.
+
 Completed Milestone 0 capabilities:
 
 - Tauri v2 desktop shell
@@ -21,6 +23,8 @@ Completed Milestone 0 capabilities:
 The scratchpad component is complete for Milestone 0: entered text saves locally and restores between app sessions.
 
 Future OpenAI, GitHub, YouTube, calendar, tasks, notes, and project-planning features are intentionally deferred.
+
+Milestone 1 intentionally keeps OpenAI, GitHub, YouTube, cloud sync, recurring events, calendar invites, and external calendar integrations deferred.
 
 ## Development
 

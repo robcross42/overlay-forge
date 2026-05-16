@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 type ResizeDirection =
@@ -36,3 +37,6 @@ export function hideOverlayWindow() {
   return overlayWindow.hide();
 }
 
+export function shutdownOverlayApp() {
+  return invoke<void>("shutdown_app");
+}

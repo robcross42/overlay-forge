@@ -32,6 +32,9 @@ pub fn register_toggle_hotkey(app: &mut App) -> Result<(), Box<dyn Error>> {
             .build(),
     )?;
 
-    app.global_shortcut().register(toggle_shortcut)?;
+    if let Err(error) = app.global_shortcut().register(toggle_shortcut) {
+        eprintln!("Overlay Forge hotkey was not registered: {error}");
+    }
+
     Ok(())
 }

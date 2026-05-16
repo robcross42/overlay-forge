@@ -1,21 +1,25 @@
 import { useEffect, useMemo, useState } from "react";
 import { ComponentHost } from "../components/ComponentHost";
 import { WindowResizeHandles, WindowTitlebar } from "../components/WindowControls";
+import { Calendar } from "../features/calendar/Calendar";
+import { Notes } from "../features/notes/Notes";
 import { Scratchpad } from "../features/scratchpad/Scratchpad";
+import { Tasks } from "../features/tasks/Tasks";
 import { getMilestoneStatus } from "../services/appStatus";
 import type { MilestoneStatus } from "../services/appStatus";
 
+type ComponentId = "scratchpad" | "tasks" | "notes" | "calendar";
+
 const navItems = [
-  { id: "scratchpad", label: "Scratchpad", enabled: true },
-  { id: "projects", label: "Projects", enabled: false },
-  { id: "calendar", label: "Calendar", enabled: false },
-  { id: "planning-chat", label: "Planning Chat", enabled: false },
-  { id: "youtube", label: "YouTube", enabled: false },
-  { id: "settings", label: "Settings", enabled: false }
-];
+  { id: "scratchpad", label: "Scratchpad" },
+  { id: "tasks", label: "Tasks" },
+  { id: "notes", label: "Notes" },
+  { id: "calendar", label: "Calendar" }
+] satisfies Array<{ id: ComponentId; label: string }>;
 
 export default function App() {
   const [status, setStatus] = useState<MilestoneStatus | null>(null);
+  const [activeComponent, setActiveComponent] = useState<ComponentId>("scratchpad");
 
   useEffect(() => {
     getMilestoneStatus()
@@ -31,11 +35,11 @@ export default function App() {
 
   const activeMeta = useMemo(
     () => ({
-      title: "Scratchpad",
-      eyebrow: status?.milestone ?? "Milestone 0",
+      title: navItems.find((item) => item.id === activeComponent)?.label ?? "Scratchpad",
+      eyebrow: status?.milestone ?? "Milestone 1",
       hotkey: status?.hotkey ?? "Ctrl+Shift+Space"
     }),
-    [status]
+    [activeComponent, status]
   );
 
   return (
@@ -56,9 +60,9 @@ export default function App() {
           <nav className="component-nav" aria-label="Components">
             {navItems.map((item) => (
               <button
-                className={item.enabled ? "nav-item nav-item-active" : "nav-item"}
-                disabled={!item.enabled}
+                className={item.id === activeComponent ? "nav-item nav-item-active" : "nav-item"}
                 key={item.id}
+                onClick={() => setActiveComponent(item.id)}
                 type="button"
               >
                 {item.label}
@@ -82,7 +86,10 @@ export default function App() {
           </header>
 
           <ComponentHost>
-            <Scratchpad />
+            {activeComponent === "scratchpad" && <Scratchpad />}
+            {activeComponent === "tasks" && <Tasks />}
+            {activeComponent === "notes" && <Notes />}
+            {activeComponent === "calendar" && <Calendar />}
           </ComponentHost>
         </section>
       </div>

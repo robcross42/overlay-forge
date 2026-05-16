@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   hideOverlayWindow,
   minimizeOverlayWindow,
+  shutdownOverlayApp,
   startOverlayDrag,
   startOverlayResize,
   toggleOverlayMaximize
@@ -76,6 +77,14 @@ export function WindowTitlebar() {
           type="button"
         >
           <span aria-hidden="true">x</span>
+        </button>
+        <button
+          aria-label="Shut down app"
+          className="window-control window-control-shutdown"
+          onClick={() => void shutdownOverlayApp()}
+          type="button"
+        >
+          <span aria-hidden="true">!</span>
         </button>
       </div>
     </header>

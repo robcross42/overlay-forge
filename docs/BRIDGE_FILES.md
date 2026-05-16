@@ -18,6 +18,8 @@ Milestone 0 is complete, passed, and successful.
 
 The Milestone 0 scratchpad component is complete and passed. Scratchpad content is persisted in SQLite and restored between sessions.
 
+Milestone 1 is complete, passed, and successful.
+
 ## Intended Future Workflow
 
 1. Select a local project in Overlay Forge.

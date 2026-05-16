@@ -18,7 +18,19 @@ src/
 └─ main.tsx
 ```
 
-Milestone 0 is complete and includes only the shell and scratchpad feature. The scratchpad feature passed Milestone 0 validation by saving content to SQLite and restoring it between app sessions.
+Milestone 0 is complete and includes the shell and scratchpad feature. The scratchpad feature passed Milestone 0 validation by saving content to SQLite and restoring it between app sessions.
+
+Milestone 1 is complete, passed, and successful. It adds feature folders for Tasks, Notes, and Calendar while keeping all feature modules inside the shell-owned component host.
+
+## UI Consistency
+
+Organizer components should follow the same interaction pattern unless a milestone explicitly documents a reason to diverge:
+
+- Empty components show the primary New action and keep editor fields hidden.
+- New actions reveal the editor for the first item.
+- Selecting an existing list item opens that item in edit mode.
+- Destructive actions are available only inside an edit/selected-item context.
+- Active clickable actions use consistent enabled button styling across components.
 
 ## Backend
 
@@ -26,12 +38,17 @@ The Tauri backend owns:
 
 - SQLite initialization
 - Scratchpad persistence commands
+- Task CRUD commands
+- Note CRUD commands
+- Calendar event CRUD commands
 - Global hotkey registration
 - Window show/hide behavior
 
 ## Persistence
 
-SQLite is the local source of truth. The first schema contains a single-row `scratchpad` table. This Milestone 0 scratchpad persistence path is complete and passed. Later milestones should add tables for tasks, notes, calendar events, projects, bridge files, and planning chat history.
+SQLite is the local source of truth. The first schema contains a single-row `scratchpad` table. This Milestone 0 scratchpad persistence path is complete and passed.
+
+Milestone 1 adds idempotent table initialization for `tasks`, `notes`, and `calendar_events`. Later milestones should add tables for projects, bridge files, and planning chat history.
 
 ## Bridge Files
 

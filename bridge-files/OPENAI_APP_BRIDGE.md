@@ -8,11 +8,11 @@ Provide this file to ChatGPT or Codex when a new chat needs current project cont
 
 ## Current Milestone
 
-Milestone 0 - Overlay Shell Validation
+Milestone 1 - Calendar, To-do, Notes, and Scratchpad Expansion
 
 Status: **Complete / Passed / Successful**
 
-The overlay shell, SQLite initialization, and scratchpad persistence path are validated. The scratchpad component is complete for Milestone 0: user-entered text saves locally and restores between app sessions.
+Milestone 0 remains complete, passed, and successful. Milestone 1 adds component navigation plus SQLite-backed Tasks, Notes, and Calendar components. User validation is complete and Milestone 1 passed.
 
 ## Current Scope
 
@@ -26,6 +26,9 @@ The overlay shell, SQLite initialization, and scratchpad persistence path are va
 - Edge and corner resize handles for borderless overlay resizing
 - Placeholder component host
 - SQLite-backed scratchpad persistence
+- SQLite-backed task persistence
+- SQLite-backed note persistence
+- SQLite-backed calendar event persistence
 
 ## Hotkey
 
@@ -63,3 +66,23 @@ Update this section manually after each validation pass.
 - Passed: Milestone 0 overlay shell validation
 - Passed: Milestone 0 scratchpad component validation
 - Passed: scratchpad save and restore between sessions
+- Implemented: Milestone 1 component navigation
+- Implemented: Tasks component and SQLite CRUD commands
+- Implemented: Notes component and SQLite CRUD commands
+- Implemented: Calendar component and SQLite CRUD commands
+- Implemented: hotkey registration guard so app startup survives an already-registered hotkey
+- Implemented: task body and deadline fields
+- Implemented: task list selection/edit mode with no main-list checkbox or delete button
+- Implemented: Notes empty state hides editor controls until a note exists
+- Implemented: Calendar date/time field click behavior and automatic end date/time updates
+- Implemented: Delete buttons visible only in edit/selected contexts with active styling
+- Implemented: Tasks and Calendar empty states now match Notes editor reveal behavior
+- Implemented: selected existing tasks show an explicit Edit button before fields become editable
+- Implemented: selected existing notes and calendar events show an explicit Edit button before fields become editable
+- Documented: organizer components should follow consistent empty-state/edit-mode/destructive-action patterns
+- Implemented: overlay starts hidden in the background and is shown with `Ctrl+Shift+Space`
+- Implemented: shutdown titlebar control exits the app process
+- Deferred cleanup: investigate benign Windows WebView2 shutdown log `Failed to unregister class Chrome_WidgetWin_0. Error = 1412`
+- Verified: `npm run tauri:build` passes after Milestone 1 implementation
+- Verified: rebuilt release app starts against the existing app-data SQLite database
+- Passed: Milestone 1 manual validation checklist

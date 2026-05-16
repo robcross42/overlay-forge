@@ -8,14 +8,18 @@ The app has proven a small, reliable desktop overlay shell before expansion into
 
 The Milestone 0 scratchpad component is also complete and passed. Scratchpad text persists locally in SQLite and restores between app sessions.
 
+**Milestone 1 - Calendar, To-do, Notes, and Scratchpad Expansion is complete, passed, and successful.**
+
+Milestone 1 adds component navigation for Scratchpad, Tasks, Notes, and Calendar, with local SQLite persistence for each data type.
+
 ## Product Direction
 
 Overlay Forge is a personal desktop command hub that floats above the user's workflow and eventually helps turn ideas, notes, tasks, and project plans into Codex-ready markdown bridge files.
 
 ## Milestone Order
 
-1. Overlay shell validation
-2. Calendar, to-do, notes, and scratchpad component
+1. Overlay shell validation - complete and passed
+2. Calendar, to-do, notes, and scratchpad component - complete and passed
 3. Local projects component
 4. OpenAI planning chat component
 5. GitHub integration
