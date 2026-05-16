@@ -10,11 +10,12 @@ All notable changes to Overlay Forge will be documented in this file.
 - The Milestone 0 scratchpad component is complete and passed.
 - Scratchpad content saves to SQLite and restores between app sessions.
 - Milestone 1 - Calendar, To-do, Notes, and Scratchpad Expansion is complete, passed, and successful.
-- Current project baseline is Milestone 4.
+- Current user-validated project baseline is Milestone 6.
 - Milestone 2 - Local Projects component is complete, passed, and successful.
 - Milestone 3 - OpenAI Planning Chat component is complete, passed, and successful.
 - Milestone 4 - GitHub Integration is complete, passed, and successful.
 - Milestone 5 - Controlled YouTube Component is complete, passed, and successful.
+- Milestone 6 - Project Workspace Chat is complete, passed, and successful.
 
 ### Added
 
@@ -64,6 +65,10 @@ All notable changes to Overlay Forge will be documented in this file.
 - Added YouTube URL validation for common watch, short link, and shorts URL forms.
 - Added external-open behavior for saved YouTube URLs through the system browser.
 - Added `docs/MILESTONE_5.md` with setup validation and manual validation steps.
+- Added Project workspace sections for Overview, GitHub, and Chat.
+- Added project-scoped Chat inside the selected project workspace.
+- Added a required conversation title field before creating a project workspace chat conversation.
+- Added `docs/MILESTONE_6.md` with setup validation and manual validation steps.
 
 ### Changed
 
@@ -93,6 +98,8 @@ All notable changes to Overlay Forge will be documented in this file.
 - Updated project documentation for Milestone 3 validation success.
 - Updated project documentation for Milestone 4 validation success.
 - Updated project documentation for Milestone 5 validation success.
+- Updated project documentation for Milestone 6 validation success.
+- Changed Planning Chat access so project-scoped chat is reached through Projects instead of standalone navigation during the workspace migration.
 
 ### Validation
 
@@ -131,3 +138,6 @@ All notable changes to Overlay Forge will be documented in this file.
 - Verified Rust backend compile after Milestone 5 implementation with `cargo build`.
 - Verified development launch after Milestone 5 implementation with `npm run tauri:dev` outside the sandbox; the app process started and was stopped after the validation timeout.
 - User manually validated Milestone 5 successfully.
+- Verified frontend build after Milestone 6 implementation with `npm run build`.
+- Verified Rust backend compile after Milestone 6 implementation with `cargo build`.
+- User manually validated Milestone 6 successfully.

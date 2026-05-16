@@ -6,7 +6,7 @@ Overlay Forge is a local-first desktop overlay shell for planning, notes, tasks,
 
 **Milestone 1 is complete, passed, and successful.** It adds Tasks, Notes, and Calendar components beside the existing Scratchpad without replacing the Milestone 0 foundation.
 
-**Current project baseline: Milestone 5.** Future bridge prompts, planning, and implementation should treat Milestone 5 as the latest completed and user-validated app state.
+**Current project baseline: Milestone 6.** Future bridge prompts, planning, and implementation should treat Milestone 6 as the latest completed and user-validated app state.
 
 **Milestone 2 is complete, passed, and successful.** It adds a local Projects component with SQLite persistence.
 
@@ -19,6 +19,12 @@ Overlay Forge is a local-first desktop overlay shell for planning, notes, tasks,
 Status: **Complete / Passed / Successful**
 
 Milestone 5 adds a local-first YouTube component for intentionally saved, user-curated video references. It stores references in SQLite, validates common YouTube URL shapes, and opens saved URLs externally in the system browser without requiring a YouTube API key or YouTube account login.
+
+**Milestone 6 - Project Workspace Chat**
+
+Status: **Complete / Passed / Successful**
+
+Milestone 6 moves project-scoped chat into the Projects section. Selecting a project now establishes the active project workspace, with Overview, GitHub, and Chat sections scoped to that selected project. The Chat section reuses existing `planning_conversations` and `planning_messages` data and no longer requires a second project selector.
 
 Completed Milestone 0 capabilities:
 
@@ -48,6 +54,8 @@ Milestone 4 intentionally keeps automatic Codex handoff, GitHub write operations
 
 Milestone 5 intentionally keeps YouTube account login, YouTube API integration, OAuth, subscription import, watch history import, recommendations, transcripts, summarization, video/audio downloads, playlist sync, comment sync, scraping, unrestricted embedded browsing, background crawlers, bridge-file generation from videos, cloud sync, and multi-user auth deferred.
 
+Milestone 6 intentionally keeps bridge-file generation, prompt preview, automatic context attachment, GitHub file reading, Codex handoff, ChatGPT import, conversation search/filtering, chat streaming, and model picker UI deferred.
+
 ## ChatGPT / Codex Bridge Context
 
 When using this repository as context in ChatGPT or Codex, do not rely only on this README. The bridge should explicitly reference every project Markdown file in the repo, including files under `docs/`, because chatgpt.com may not automatically discover nested documentation.
@@ -66,11 +74,12 @@ Required Markdown context files:
 - `docs/MILESTONE_3.md`
 - `docs/MILESTONE_4.md`
 - `docs/MILESTONE_5.md`
+- `docs/MILESTONE_6.md`
 - `docs/PROJECT_PLAN.md`
 
 For future bridge prompts, instruct ChatGPT/Codex to read all `*.md` files in the project repo structure before making planning or implementation decisions.
 
-Milestone numbering note: use explicit milestone IDs from the Markdown files. Do not infer milestone numbers from numbered list positions. Milestone 3 is the OpenAI Planning Chat component and is complete, passed, and successful. Milestone 4 is GitHub Integration and is complete, passed, and successful. Milestone 5 is the Controlled YouTube Component and is complete, passed, and successful.
+Milestone numbering note: use explicit milestone IDs from the Markdown files. Do not infer milestone numbers from numbered list positions. Milestone 3 is the OpenAI Planning Chat component and is complete, passed, and successful. Milestone 4 is GitHub Integration and is complete, passed, and successful. Milestone 5 is the Controlled YouTube Component and is complete, passed, and successful. Milestone 6 is Project Workspace Chat and is complete, passed, and successful.
 
 ## Development
 
@@ -108,9 +117,11 @@ The SQLite database is created automatically in the app data directory as:
 overlay-forge.sqlite3
 ```
 
-## OpenAI Planning Chat
+## Project Workspace Chat
 
-Milestone 3 uses the backend environment variable:
+Milestone 6 makes Projects the primary workspace for project-scoped chat. Open Projects, select a project, then use the Chat section inside that selected project workspace. Chat data continues to persist through the Milestone 3 planning chat tables.
+
+The OpenAI planning chat backend uses the environment variable:
 
 ```text
 OPENAI_API_KEY

@@ -6,6 +6,7 @@ import {
   saveProjectGitHubRepository
 } from "../../services/github";
 import type { ProjectGitHubRepository } from "../../services/github";
+import { PlanningChat } from "../planning-chat/PlanningChat";
 import { createProject, deleteProject, listProjects, updateProject } from "../../services/projects";
 import type { Project, ProjectInput, ProjectStatus } from "../../services/projects";
 
@@ -16,6 +17,7 @@ const emptyProject: ProjectInput = {
 };
 
 type ProjectMode = "idle" | "create" | "view" | "edit";
+type WorkspaceSection = "overview" | "github" | "chat";
 
 export function Projects() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -27,6 +29,7 @@ export function Projects() {
   const [githubFullName, setGithubFullName] = useState("");
   const [githubStatus, setGithubStatus] = useState("Select a project");
   const [isFetchingGithub, setIsFetchingGithub] = useState(false);
+  const [workspaceSection, setWorkspaceSection] = useState<WorkspaceSection>("overview");
 
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === selectedId) ?? null,
@@ -70,6 +73,7 @@ export function Projects() {
   function selectProject(project: Project) {
     setSelectedId(project.id);
     setProjectMode("view");
+    setWorkspaceSection("overview");
     setForm({
       name: project.name,
       description: project.description,
@@ -85,6 +89,7 @@ export function Projects() {
     setGithubLink(null);
     setGithubFullName("");
     setGithubStatus("Save the project before linking GitHub");
+    setWorkspaceSection("overview");
   }
 
   async function onSaveProject() {
@@ -136,6 +141,7 @@ export function Projects() {
       setGithubLink(null);
       setGithubFullName("");
       setGithubStatus("Select a project");
+      setWorkspaceSection("overview");
       setStatus("Project deleted");
     } catch (error) {
       setStatus(formatError(error));
@@ -239,151 +245,191 @@ export function Projects() {
         </aside>
 
         {selectedProject || projectMode === "create" ? (
-          <form className="editor-form project-editor-form">
-            <input
-              aria-label="Project name"
-              className="text-input"
-              readOnly={projectMode === "view"}
-              onChange={(event) => updateField("name", event.target.value)}
-              placeholder="Project name"
-              value={form.name}
-            />
-
-            <textarea
-              aria-label="Project description"
-              className="body-input"
-              readOnly={projectMode === "view"}
-              onChange={(event) => updateField("description", event.target.value)}
-              placeholder="Project description"
-              value={form.description}
-            />
-
-            <label className="field-label">
-              <span>Status</span>
-              <select
-                aria-label="Project status"
-                className="text-input"
-                disabled={projectMode === "view"}
-                onChange={(event) => updateField("status", event.target.value as ProjectStatus)}
-                value={form.status}
-              >
-                <option value="ACTIVE">Active</option>
-                <option value="ARCHIVED">Archived</option>
-              </select>
-            </label>
-
-            <div className="form-actions">
-              {projectMode === "view" ? (
-                <button
-                  className="primary-button"
-                  onClick={() => {
-                    setProjectMode("edit");
-                    setStatus("Editing project");
-                  }}
-                  type="button"
-                >
-                  Edit
-                </button>
-              ) : (
-                <button className="primary-button" onClick={() => void onSaveProject()} type="button">
-                  {selectedProject ? "Save" : "Add"}
-                </button>
-              )}
-              {selectedProject && (
-                <button
-                  className="primary-button"
-                  onClick={() => void onDeleteProject()}
-                  type="button"
-                >
-                  Delete
-                </button>
-              )}
-            </div>
-
+          <div className="project-workspace">
             {selectedProject && (
-              <section className="github-link-panel" aria-label="Project GitHub repository">
-                <div className="github-link-heading">
-                  <div>
-                    <p>GitHub Repository</p>
-                    <h4>Project Link</h4>
-                  </div>
-                  <span className={isFetchingGithub ? "save-pill save-pill-loading" : "save-pill"}>
-                    {githubStatus}
-                  </span>
-                </div>
+              <nav className="workspace-tabs" aria-label="Project workspace sections">
+                <button
+                  className={
+                    workspaceSection === "overview" ? "workspace-tab active" : "workspace-tab"
+                  }
+                  onClick={() => setWorkspaceSection("overview")}
+                  type="button"
+                >
+                  Overview
+                </button>
+                <button
+                  className={workspaceSection === "github" ? "workspace-tab active" : "workspace-tab"}
+                  onClick={() => setWorkspaceSection("github")}
+                  type="button"
+                >
+                  GitHub
+                </button>
+                <button
+                  className={workspaceSection === "chat" ? "workspace-tab active" : "workspace-tab"}
+                  onClick={() => setWorkspaceSection("chat")}
+                  type="button"
+                >
+                  Chat
+                </button>
+              </nav>
+            )}
 
-                <label className="field-label">
-                  <span>Repository full name</span>
+            <div className="project-workspace-content">
+              {(workspaceSection === "overview" || projectMode === "create") && (
+                <form className="editor-form project-editor-form">
                   <input
-                    aria-label="GitHub repository full name"
+                    aria-label="Project name"
                     className="text-input"
-                    disabled={isFetchingGithub}
-                    onChange={(event) => setGithubFullName(event.target.value)}
-                    placeholder="owner/repository-name"
-                    value={githubFullName}
+                    readOnly={projectMode === "view"}
+                    onChange={(event) => updateField("name", event.target.value)}
+                    placeholder="Project name"
+                    value={form.name}
                   />
-                </label>
 
-                <div className="form-actions">
-                  <button
-                    className="primary-button"
-                    disabled={isFetchingGithub}
-                    onClick={() => void onSaveGitHubLink()}
-                    type="button"
-                  >
-                    Save Link
-                  </button>
-                  <button
-                    className="primary-button"
-                    disabled={!githubLink || isFetchingGithub}
-                    onClick={() => void onFetchGitHubMetadata()}
-                    type="button"
-                  >
-                    Fetch Metadata
-                  </button>
-                  {githubLink && (
-                    <button
-                      className="ghost-button"
+                  <textarea
+                    aria-label="Project description"
+                    className="body-input"
+                    readOnly={projectMode === "view"}
+                    onChange={(event) => updateField("description", event.target.value)}
+                    placeholder="Project description"
+                    value={form.description}
+                  />
+
+                  <label className="field-label">
+                    <span>Status</span>
+                    <select
+                      aria-label="Project status"
+                      className="text-input"
+                      disabled={projectMode === "view"}
+                      onChange={(event) => updateField("status", event.target.value as ProjectStatus)}
+                      value={form.status}
+                    >
+                      <option value="ACTIVE">Active</option>
+                      <option value="ARCHIVED">Archived</option>
+                    </select>
+                  </label>
+
+                  <div className="form-actions">
+                    {projectMode === "view" ? (
+                      <button
+                        className="primary-button"
+                        onClick={() => {
+                          setProjectMode("edit");
+                          setStatus("Editing project");
+                        }}
+                        type="button"
+                      >
+                        Edit
+                      </button>
+                    ) : (
+                      <button
+                        className="primary-button"
+                        onClick={() => void onSaveProject()}
+                        type="button"
+                      >
+                        {selectedProject ? "Save" : "Add"}
+                      </button>
+                    )}
+                    {selectedProject && (
+                      <button
+                        className="primary-button"
+                        onClick={() => void onDeleteProject()}
+                        type="button"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                </form>
+              )}
+
+              {selectedProject && workspaceSection === "github" && (
+                <section className="github-link-panel" aria-label="Project GitHub repository">
+                  <div className="github-link-heading">
+                    <div>
+                      <p>GitHub Repository</p>
+                      <h4>Project Link</h4>
+                    </div>
+                    <span className={isFetchingGithub ? "save-pill save-pill-loading" : "save-pill"}>
+                      {githubStatus}
+                    </span>
+                  </div>
+
+                  <label className="field-label">
+                    <span>Repository full name</span>
+                    <input
+                      aria-label="GitHub repository full name"
+                      className="text-input"
                       disabled={isFetchingGithub}
-                      onClick={() => void onDeleteGitHubLink()}
+                      onChange={(event) => setGithubFullName(event.target.value)}
+                      placeholder="owner/repository-name"
+                      value={githubFullName}
+                    />
+                  </label>
+
+                  <div className="form-actions">
+                    <button
+                      className="primary-button"
+                      disabled={isFetchingGithub}
+                      onClick={() => void onSaveGitHubLink()}
                       type="button"
                     >
-                      Remove Link
+                      Save Link
                     </button>
-                  )}
-                </div>
+                    <button
+                      className="primary-button"
+                      disabled={!githubLink || isFetchingGithub}
+                      onClick={() => void onFetchGitHubMetadata()}
+                      type="button"
+                    >
+                      Fetch Metadata
+                    </button>
+                    {githubLink && (
+                      <button
+                        className="ghost-button"
+                        disabled={isFetchingGithub}
+                        onClick={() => void onDeleteGitHubLink()}
+                        type="button"
+                      >
+                        Remove Link
+                      </button>
+                    )}
+                  </div>
 
-                {githubLink && (
-                  <dl className="metadata-grid">
-                    <div>
-                      <dt>Repository</dt>
-                      <dd>{githubLink.repositoryFullName}</dd>
-                    </div>
-                    <div>
-                      <dt>Default branch</dt>
-                      <dd>{githubLink.defaultBranch || "Not fetched"}</dd>
-                    </div>
-                    <div>
-                      <dt>Visibility</dt>
-                      <dd>{githubLink.visibility || "Not fetched"}</dd>
-                    </div>
-                    <div>
-                      <dt>Repository URL</dt>
-                      <dd>{githubLink.repositoryUrl || "Not fetched"}</dd>
-                    </div>
-                    <div>
-                      <dt>Last fetched</dt>
-                      <dd>{githubLink.lastFetchedAt || "Not fetched"}</dd>
-                    </div>
-                    <div>
-                      <dt>Fetch status</dt>
-                      <dd>{githubLink.lastFetchStatus || "Not fetched"}</dd>
-                    </div>
-                  </dl>
-                )}
-              </section>
-            )}
-          </form>
+                  {githubLink && (
+                    <dl className="metadata-grid">
+                      <div>
+                        <dt>Repository</dt>
+                        <dd>{githubLink.repositoryFullName}</dd>
+                      </div>
+                      <div>
+                        <dt>Default branch</dt>
+                        <dd>{githubLink.defaultBranch || "Not fetched"}</dd>
+                      </div>
+                      <div>
+                        <dt>Visibility</dt>
+                        <dd>{githubLink.visibility || "Not fetched"}</dd>
+                      </div>
+                      <div>
+                        <dt>Repository URL</dt>
+                        <dd>{githubLink.repositoryUrl || "Not fetched"}</dd>
+                      </div>
+                      <div>
+                        <dt>Last fetched</dt>
+                        <dd>{githubLink.lastFetchedAt || "Not fetched"}</dd>
+                      </div>
+                      <div>
+                        <dt>Fetch status</dt>
+                        <dd>{githubLink.lastFetchStatus || "Not fetched"}</dd>
+                      </div>
+                    </dl>
+                  )}
+                </section>
+              )}
+
+              {selectedProject && workspaceSection === "chat" && <PlanningChat project={selectedProject} />}
+            </div>
+          </div>
         ) : (
           <div className="empty-editor-state">
             <p>Create or select a project to begin.</p>

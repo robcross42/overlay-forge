@@ -3,7 +3,6 @@ import { ComponentHost } from "../components/ComponentHost";
 import { WindowResizeHandles, WindowTitlebar } from "../components/WindowControls";
 import { Calendar } from "../features/calendar/Calendar";
 import { Notes } from "../features/notes/Notes";
-import { PlanningChat } from "../features/planning-chat/PlanningChat";
 import { Projects } from "../features/projects/Projects";
 import { Scratchpad } from "../features/scratchpad/Scratchpad";
 import { Tasks } from "../features/tasks/Tasks";
@@ -17,7 +16,6 @@ type ComponentId =
   | "notes"
   | "calendar"
   | "projects"
-  | "planning-chat"
   | "youtube";
 
 const navItems = [
@@ -26,7 +24,6 @@ const navItems = [
   { id: "notes", label: "Notes" },
   { id: "calendar", label: "Calendar" },
   { id: "projects", label: "Projects" },
-  { id: "planning-chat", label: "Planning Chat" },
   { id: "youtube", label: "YouTube" }
 ] satisfies Array<{ id: ComponentId; label: string }>;
 
@@ -39,7 +36,7 @@ export default function App() {
       .then(setStatus)
       .catch(() => {
         setStatus({
-          milestone: "Milestone 5",
+          milestone: "Milestone 6",
           hotkey: "Ctrl+Shift+Space",
           databaseReady: false
         });
@@ -49,7 +46,7 @@ export default function App() {
   const activeMeta = useMemo(
     () => ({
       title: navItems.find((item) => item.id === activeComponent)?.label ?? "Scratchpad",
-      eyebrow: status?.milestone ?? "Milestone 5",
+      eyebrow: status?.milestone ?? "Milestone 6",
       hotkey: status?.hotkey ?? "Ctrl+Shift+Space"
     }),
     [activeComponent, status]
@@ -104,7 +101,6 @@ export default function App() {
             {activeComponent === "notes" && <Notes />}
             {activeComponent === "calendar" && <Calendar />}
             {activeComponent === "projects" && <Projects />}
-            {activeComponent === "planning-chat" && <PlanningChat />}
             {activeComponent === "youtube" && <YouTube />}
           </ComponentHost>
         </section>

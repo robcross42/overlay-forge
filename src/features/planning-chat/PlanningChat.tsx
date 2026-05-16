@@ -10,14 +10,20 @@ import type { PlanningConversation, PlanningMessage } from "../../services/plann
 import { listProjects } from "../../services/projects";
 import type { Project } from "../../services/projects";
 
-export function PlanningChat() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+type PlanningChatProps = {
+  project?: Project;
+};
+
+export function PlanningChat({ project }: PlanningChatProps) {
+  const isWorkspaceChat = Boolean(project);
+  const [projects, setProjects] = useState<Project[]>(project ? [project] : []);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(project?.id ?? null);
   const [conversations, setConversations] = useState<PlanningConversation[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<number | null>(null);
   const [messages, setMessages] = useState<PlanningMessage[]>([]);
+  const [newConversationTitle, setNewConversationTitle] = useState("");
   const [draft, setDraft] = useState("");
-  const [status, setStatus] = useState("Loading");
+  const [status, setStatus] = useState(project ? "Select a conversation" : "Loading");
   const [isSending, setIsSending] = useState(false);
 
   const selectedProject = useMemo(
@@ -32,6 +38,13 @@ export function PlanningChat() {
   );
 
   useEffect(() => {
+    if (project) {
+      setProjects([project]);
+      setSelectedProjectId(project.id);
+      setStatus("Select a conversation");
+      return;
+    }
+
     listProjects()
       .then((nextProjects) => {
         setProjects(nextProjects);
@@ -39,7 +52,7 @@ export function PlanningChat() {
         setStatus(nextProjects.length === 0 ? "Create a project first" : "Select a conversation");
       })
       .catch((error) => setStatus(formatError(error)));
-  }, []);
+  }, [project]);
 
   useEffect(() => {
     if (!selectedProjectId) {
@@ -81,14 +94,18 @@ export function PlanningChat() {
       return;
     }
 
+    const title = newConversationTitle.trim();
+    if (!title) {
+      setStatus("Conversation title is required");
+      return;
+    }
+
     try {
-      const created = await createPlanningConversation(
-        selectedProject.id,
-        `${selectedProject.name} planning`
-      );
+      const created = await createPlanningConversation(selectedProject.id, title);
       setConversations((current) => [created, ...current]);
       setSelectedConversationId(created.id);
       setMessages([]);
+      setNewConversationTitle("");
       setStatus("Conversation created");
     } catch (error) {
       setStatus(formatError(error));
@@ -165,30 +182,49 @@ export function PlanningChat() {
 
       <div className="planning-layout">
         <aside className="planning-sidebar" aria-label="Planning chat controls">
+          {isWorkspaceChat ? (
+            <div className="workspace-project-context" aria-label="Workspace project">
+              <span>Workspace Project</span>
+              <strong>{selectedProject?.name ?? "No project selected"}</strong>
+            </div>
+          ) : (
+            <label className="field-label">
+              <span>Project</span>
+              <select
+                aria-label="Planning project"
+                className="text-input"
+                disabled={projects.length === 0 || isSending}
+                onChange={(event) => setSelectedProjectId(Number(event.target.value))}
+                value={selectedProjectId ?? ""}
+              >
+                {projects.length === 0 ? (
+                  <option value="">No projects available</option>
+                ) : (
+                  projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))
+                )}
+              </select>
+            </label>
+          )}
+
           <label className="field-label">
-            <span>Project</span>
-            <select
-              aria-label="Planning project"
+            <span>Conversation title</span>
+            <input
+              aria-label="Conversation title"
               className="text-input"
-              disabled={projects.length === 0 || isSending}
-              onChange={(event) => setSelectedProjectId(Number(event.target.value))}
-              value={selectedProjectId ?? ""}
-            >
-              {projects.length === 0 ? (
-                <option value="">No projects available</option>
-              ) : (
-                projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
-                ))
-              )}
-            </select>
+              disabled={!selectedProject || isSending}
+              onChange={(event) => setNewConversationTitle(event.target.value)}
+              placeholder="Planning topic"
+              value={newConversationTitle}
+            />
           </label>
 
           <button
             className="primary-button full-width"
-            disabled={!selectedProject || isSending}
+            disabled={!selectedProject || isSending || newConversationTitle.trim().length === 0}
             onClick={() => void onNewConversation()}
             type="button"
           >

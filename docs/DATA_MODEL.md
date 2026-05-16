@@ -12,6 +12,8 @@ Milestone 4 - GitHub Integration data model is complete, passed, and successful.
 
 Milestone 5 - Controlled YouTube Component data model is complete, passed, and successful.
 
+Milestone 6 - Project Workspace Chat data model is complete, passed, and successful. It adds no new tables and reuses the existing project-scoped planning chat tables.
+
 ## Tables
 
 ### scratchpad
@@ -91,6 +93,8 @@ updated_at
 ```
 
 Local planning chat conversation records for Milestone 3. Each conversation belongs to one local project.
+
+Milestone 6 continues to use this table for Chat inside the selected Projects workspace. The selected project supplies `project_id`; the chat UI no longer asks the user to select the project a second time.
 
 ### planning_messages
 
@@ -194,3 +198,5 @@ CREATE TABLE IF NOT EXISTS youtube_references
 ```
 
 Existing user data remains intact. Deleting a YouTube reference removes only that local SQLite row and does not affect YouTube or any external account.
+
+Milestone 6 does not change the SQLite schema. Existing `projects`, `planning_conversations`, and `planning_messages` rows remain intact.

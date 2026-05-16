@@ -2,7 +2,7 @@
 
 Bridge files are markdown handoff documents that describe project state, constraints, and implementation requests for Codex.
 
-Milestone 3 introduces an OpenAI Planning Chat foundation, Milestone 4 introduces a GitHub repository-link foundation, and Milestone 5 introduces a controlled local YouTube reference foundation. Full bridge-file generation is still deferred. Bridge files should still be created and updated manually, then pasted into ChatGPT or Codex chats when context needs to move between sessions.
+Milestone 3 introduces an OpenAI Planning Chat foundation, Milestone 4 introduces a GitHub repository-link foundation, Milestone 5 introduces a controlled local YouTube reference foundation, and Milestone 6 moves project-scoped chat into the selected Projects workspace. Full bridge-file generation is still deferred. Bridge files should still be created and updated manually, then pasted into ChatGPT or Codex chats when context needs to move between sessions.
 
 ## Current Manual Bridge
 
@@ -20,9 +20,11 @@ The Milestone 0 scratchpad component is complete and passed. Scratchpad content 
 
 Milestone 1 is complete, passed, and successful.
 
-Current project baseline is Milestone 4. Milestone 4 - GitHub Integration is complete, passed, and successful.
+Current user-validated project baseline is Milestone 6. Milestone 4 - GitHub Integration is complete, passed, and successful.
 
 Milestone 5 - Controlled YouTube Component is complete, passed, and successful.
+
+Milestone 6 - Project Workspace Chat is complete, passed, and successful.
 
 Milestone 3 is complete, passed, and successful. It adds local planning conversations/messages and backend OpenAI Responses API calls, but it does not generate bridge files yet.
 
@@ -30,12 +32,14 @@ Milestone 4 is complete, passed, and successful. It adds local project GitHub re
 
 Milestone 5 is complete, passed, and successful. It adds local user-curated YouTube references with SQLite persistence, backend URL validation, and external URL opening, but it does not use a YouTube API key, YouTube account login, scraping, transcripts, recommendations, downloads, or account sync.
 
-Milestone numbering note: Milestone 2 is the Local Projects component and is complete, passed, and successful. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Do not infer milestone IDs from numbered-list positions.
+Milestone 6 is complete, passed, and successful. It moves chat into Projects as a selected-project workspace section, while preserving the existing `planning_conversations` and `planning_messages` data.
+
+Milestone numbering note: Milestone 2 is the Local Projects component and is complete, passed, and successful. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Milestone 6 is Project Workspace Chat. Do not infer milestone IDs from numbered-list positions.
 
 ## Intended Future Workflow
 
 1. Select a local project in Overlay Forge.
-2. Plan with the in-app OpenAI chat component.
+2. Plan with the in-app Chat section inside the selected project workspace.
 3. Link the project to a GitHub repository in Projects when repository context is useful.
 4. Save user-curated YouTube references when video context is useful.
 5. Generate a Codex-ready markdown bridge file in a later milestone.

@@ -30,6 +30,8 @@ Milestone 4 - GitHub Integration is complete, passed, and successful. It extends
 
 Milestone 5 - Controlled YouTube Component is complete, passed, and successful. It adds a YouTube feature folder inside the shell-owned component host while preserving Scratchpad, Tasks, Notes, Calendar, Projects, Planning Chat, and GitHub Repository behavior.
 
+Milestone 6 - Project Workspace Chat is complete, passed, and successful. It makes Projects the workspace shell for selected-project planning chat by rendering Overview, GitHub, and Chat sections inside the selected project context. The existing Planning Chat feature is reused in project-bound mode so chat no longer needs a second project selector.
+
 ## UI Consistency
 
 Organizer components should follow the same interaction pattern unless a milestone explicitly documents a reason to diverge:
@@ -74,9 +76,13 @@ Milestone 4 adds idempotent table initialization for `project_github_repositorie
 
 Milestone 5 adds idempotent table initialization for `youtube_references`. The table stores only user-created YouTube references and user-entered metadata. Migrations are non-destructive and must not remove existing Scratchpad, Tasks, Notes, Calendar, Projects, Planning Chat, or GitHub repository data.
 
+Milestone 6 adds no new tables. It preserves existing `planning_conversations` and `planning_messages` records and scopes the frontend Chat section through the selected Projects workspace.
+
 ## OpenAI Boundary
 
 Planning Chat calls the OpenAI Responses API from the Rust/Tauri backend. React invokes local Tauri commands only and never reads `OPENAI_API_KEY`. Model selection, request shape, and the planning assistant instruction are centralized in the backend OpenAI service module so later bridge-file generation, tools, streaming, or model changes do not leak through the frontend.
+
+In Milestone 6, the primary UI path for Planning Chat is Projects -> selected project -> Chat. The selected project is passed directly into the chat surface, while the backend continues to enforce conversation ownership through `planning_conversations.project_id`.
 
 ## GitHub Boundary
 

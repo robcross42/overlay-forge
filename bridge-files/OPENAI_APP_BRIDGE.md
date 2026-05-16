@@ -8,11 +8,11 @@ Provide this file to ChatGPT or Codex when a new chat needs current project cont
 
 ## Current Milestone
 
-Milestone 5 - Controlled YouTube Component
+Milestone 6 - Project Workspace Chat
 
 Status: **Complete / Passed / Successful**
 
-Current project baseline: **Milestone 5**. Future bridge prompts, planning, and implementation should start from Milestone 5.
+Current user-validated project baseline: **Milestone 6**. Future bridge prompts, planning, and implementation should start from Milestone 6.
 
 Milestone 0 remains complete, passed, and successful. Milestone 1 adds component navigation plus SQLite-backed Tasks, Notes, and Calendar components. User validation is complete and Milestone 1 passed.
 
@@ -24,7 +24,10 @@ Milestone 4 adds project-scoped GitHub repository linkage, SQLite-backed reposit
 
 Milestone 5 adds controlled user-curated YouTube references, SQLite-backed reference persistence, backend YouTube URL validation, frontend YouTube reference CRUD UI, and external opening of saved URLs. User validation is complete and Milestone 5 passed.
 
-Milestone numbering note: Milestone 2 is the Local Projects component. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Do not mistake roadmap list item positions for milestone IDs.
+Milestone 6 moves project-scoped chat into the selected Projects workspace. Selecting a project now exposes Overview, GitHub, and Chat sections. The Chat section uses the selected project automatically, preserves existing planning conversation/message persistence, and does not require a separate project selector.
+User validation is complete and Milestone 6 passed.
+
+Milestone numbering note: Milestone 2 is the Local Projects component. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Milestone 6 is Project Workspace Chat. Do not mistake roadmap list item positions for milestone IDs.
 
 ## Current Scope
 
@@ -48,6 +51,7 @@ Milestone numbering note: Milestone 2 is the Local Projects component. Milestone
 - SQLite-backed project GitHub repository linkage
 - Backend-only GitHub metadata fetches through `GITHUB_TOKEN`
 - SQLite-backed controlled YouTube reference persistence
+- Project workspace Chat inside selected Projects context
 
 ## Hotkey
 
@@ -62,6 +66,10 @@ Ctrl+Shift+Space
 - Advanced task workflows
 - Advanced notes workflows
 - Bridge-file generation UI
+- Prompt preview
+- Automatic context attachment
+- GitHub file reading
+- ChatGPT import
 - Exclusive fullscreen game overlay support
 - File upload/vector store workflows
 - Web search tooling
@@ -150,6 +158,12 @@ Update this section manually after each validation pass.
 - Verified: `cargo build` passes after Milestone 5 implementation
 - Verified: `npm run tauri:dev` launches after Milestone 5 implementation when run outside the sandbox with app-data write access
 - Passed: Milestone 5 manual validation checklist
+- Implemented: Milestone 6 Project workspace sections for Overview, GitHub, and Chat
+- Implemented: project-scoped Chat inside the selected Projects workspace without a second project selector
+- Implemented: standalone Planning Chat navigation hidden during the workspace migration
+- Verified: `npm run build` passes after Milestone 6 implementation
+- Verified: `cargo build` passes after Milestone 6 implementation
+- Passed: Milestone 6 manual validation checklist
 
 ## Milestone Validation Workflow
 
