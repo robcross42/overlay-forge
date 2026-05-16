@@ -12,7 +12,11 @@ Milestone 1 - Calendar, To-do, Notes, and Scratchpad Expansion
 
 Status: **Complete / Passed / Successful**
 
+Current project baseline: **Milestone 1**. Future bridge prompts, planning, and implementation should start from Milestone 1.
+
 Milestone 0 remains complete, passed, and successful. Milestone 1 adds component navigation plus SQLite-backed Tasks, Notes, and Calendar components. User validation is complete and Milestone 1 passed.
+
+Milestone numbering note: Milestone 2 is the Local Projects component and has not started. Do not mistake roadmap list item positions for milestone IDs.
 
 ## Current Scope
 

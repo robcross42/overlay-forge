@@ -2,6 +2,10 @@
 
 ## Current Status
 
+**Current project baseline: Milestone 1.**
+
+Milestone 1 is the latest completed, tested, and validated milestone. Future planning and implementation should start from the Milestone 1 app state, not from Milestone 0.
+
 **Milestone 0 - Overlay Shell Validation is complete, passed, and successful.**
 
 The app has proven a small, reliable desktop overlay shell before expansion into calendar, notes, project planning, OpenAI, GitHub, or YouTube workflows.
@@ -18,13 +22,15 @@ Overlay Forge is a personal desktop command hub that floats above the user's wor
 
 ## Milestone Order
 
-1. Overlay shell validation - complete and passed
-2. Calendar, to-do, notes, and scratchpad component - complete and passed
-3. Local projects component
-4. OpenAI planning chat component
-5. GitHub integration
-6. Controlled YouTube component
+Use explicit milestone IDs. Do not infer milestone numbers from this list's item positions.
+
+- Milestone 0 - Overlay shell validation - complete and passed
+- Milestone 1 - Calendar, to-do, notes, and scratchpad component - complete and passed
+- Milestone 2 - Local projects component - not started
+- Milestone 3 - OpenAI planning chat component - not started
+- Milestone 4 - GitHub integration - not started
+- Milestone 5 - Controlled YouTube component - not started
 
 ## Scope Guard
 
-Milestone 0 is stable enough to serve as the foundation for later work. Do not implement later milestone features in the Milestone 0 code path; future work should begin from the completed shell, hotkey behavior, always-on-top behavior, component host, and local SQLite scratchpad.
+Milestone 1 is the stable baseline for later work. Do not implement later milestone features by reverting to the Milestone 0 code path; future work should begin from the completed overlay shell, hotkey behavior, always-on-top behavior, component host, local SQLite scratchpad, Tasks, Notes, and Calendar components.

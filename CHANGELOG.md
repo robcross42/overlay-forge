@@ -10,6 +10,7 @@ All notable changes to Overlay Forge will be documented in this file.
 - The Milestone 0 scratchpad component is complete and passed.
 - Scratchpad content saves to SQLite and restores between app sessions.
 - Milestone 1 - Calendar, To-do, Notes, and Scratchpad Expansion is complete, passed, and successful.
+- Current project baseline is Milestone 1. Milestone 2 has not started.
 
 ### Added
 
@@ -59,6 +60,7 @@ All notable changes to Overlay Forge will be documented in this file.
 - Added an explicit Edit button for selected existing tasks.
 - Added explicit Edit buttons for selected existing notes and calendar events.
 - Documented the Windows WebView2 shutdown class-unregister log as deferred cleanup.
+- Clarified milestone numbering in project docs so Milestone 2 is not confused with the second item in the roadmap.
 
 ### Validation
 

@@ -6,6 +6,8 @@ Overlay Forge is a local-first desktop overlay shell for planning, notes, tasks,
 
 **Milestone 1 is complete, passed, and successful.** It adds Tasks, Notes, and Calendar components beside the existing Scratchpad without replacing the Milestone 0 foundation.
 
+**Current project baseline: Milestone 1.** Future bridge prompts, planning, and implementation should treat Milestone 1 as the latest completed app state. Milestone 0 is historical foundation, not the current starting point.
+
 Completed Milestone 0 capabilities:
 
 - Tauri v2 desktop shell
@@ -43,6 +45,8 @@ Required Markdown context files:
 - `docs/PROJECT_PLAN.md`
 
 For future bridge prompts, instruct ChatGPT/Codex to read all `*.md` files in the project repo structure before making planning or implementation decisions.
+
+Milestone numbering note: use explicit milestone IDs from the Markdown files. Do not infer milestone numbers from numbered list positions. Milestone 2 is the Local Projects component and has not started.
 
 ## Development
 
