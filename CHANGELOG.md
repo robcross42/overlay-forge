@@ -10,7 +10,8 @@ All notable changes to Overlay Forge will be documented in this file.
 - The Milestone 0 scratchpad component is complete and passed.
 - Scratchpad content saves to SQLite and restores between app sessions.
 - Milestone 1 - Calendar, To-do, Notes, and Scratchpad Expansion is complete, passed, and successful.
-- Current project baseline is Milestone 1. Milestone 2 has not started.
+- Current project baseline is Milestone 2.
+- Milestone 2 - Local Projects component is complete, passed, and successful.
 
 ### Added
 
@@ -36,6 +37,11 @@ All notable changes to Overlay Forge will be documented in this file.
 - Added Calendar component with create, edit, delete, list, and restart restore support.
 - Added `docs/MILESTONE_1.md` with user validation steps.
 - Added `docs/DATA_MODEL.md` for the current SQLite schema.
+- Added Projects component navigation.
+- Added SQLite `projects` table.
+- Added Tauri CRUD commands for local projects.
+- Added Projects component with create, select, read-only view, edit, delete, list, status, and restart restore support.
+- Added `docs/MILESTONE_2.md` with setup validation and manual validation steps.
 
 ### Changed
 
@@ -61,6 +67,7 @@ All notable changes to Overlay Forge will be documented in this file.
 - Added explicit Edit buttons for selected existing notes and calendar events.
 - Documented the Windows WebView2 shutdown class-unregister log as deferred cleanup.
 - Clarified milestone numbering in project docs so Milestone 2 is not confused with the second item in the roadmap.
+- Updated project documentation for Milestone 2 validation success.
 
 ### Validation
 
@@ -79,3 +86,9 @@ All notable changes to Overlay Forge will be documented in this file.
 - Verified production Tauri build after Milestone 1 implementation with `npm run tauri:build`.
 - Verified rebuilt release app starts against the existing app-data SQLite database.
 - User completed remaining Milestone 1 validation and reported it finished.
+- Verified frontend build after Milestone 2 implementation with `npm run build`.
+- Verified Rust backend compile after Milestone 2 implementation with `cargo build`.
+- Verified production Tauri build after Milestone 2 implementation with `npm run tauri:build`.
+- Verified rebuilt release app starts hidden in the background after Milestone 2 implementation.
+- Fixed Projects status dropdown option readability.
+- User manually validated Milestone 2 successfully.

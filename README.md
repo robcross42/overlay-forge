@@ -6,7 +6,9 @@ Overlay Forge is a local-first desktop overlay shell for planning, notes, tasks,
 
 **Milestone 1 is complete, passed, and successful.** It adds Tasks, Notes, and Calendar components beside the existing Scratchpad without replacing the Milestone 0 foundation.
 
-**Current project baseline: Milestone 1.** Future bridge prompts, planning, and implementation should treat Milestone 1 as the latest completed app state. Milestone 0 is historical foundation, not the current starting point.
+**Current project baseline: Milestone 2.** Future bridge prompts, planning, and implementation should treat Milestone 2 as the latest completed app state. Milestone 0 and Milestone 1 are historical foundations, not the current starting point.
+
+**Milestone 2 is complete, passed, and successful.** It adds a local Projects component with SQLite persistence.
 
 Completed Milestone 0 capabilities:
 
@@ -24,9 +26,11 @@ Completed Milestone 0 capabilities:
 
 The scratchpad component is complete for Milestone 0: entered text saves locally and restores between app sessions.
 
-Future OpenAI, GitHub, YouTube, calendar, tasks, notes, and project-planning features are intentionally deferred.
+Future OpenAI, GitHub, YouTube, advanced calendar/tasks/notes, and full project-planning features are intentionally deferred.
 
 Milestone 1 intentionally keeps OpenAI, GitHub, YouTube, cloud sync, recurring events, calendar invites, and external calendar integrations deferred.
+
+Milestone 2 intentionally keeps OpenAI, GitHub, project import/export, planning chat, bridge-file generation UI, cloud sync, and advanced project lifecycle workflows deferred.
 
 ## ChatGPT / Codex Bridge Context
 
@@ -42,11 +46,12 @@ Required Markdown context files:
 - `docs/DATA_MODEL.md`
 - `docs/MILESTONE_0.md`
 - `docs/MILESTONE_1.md`
+- `docs/MILESTONE_2.md`
 - `docs/PROJECT_PLAN.md`
 
 For future bridge prompts, instruct ChatGPT/Codex to read all `*.md` files in the project repo structure before making planning or implementation decisions.
 
-Milestone numbering note: use explicit milestone IDs from the Markdown files. Do not infer milestone numbers from numbered list positions. Milestone 2 is the Local Projects component and has not started.
+Milestone numbering note: use explicit milestone IDs from the Markdown files. Do not infer milestone numbers from numbered list positions. Milestone 2 is the Local Projects component and is complete, passed, and successful.
 
 ## Development
 

@@ -3,18 +3,20 @@ import { ComponentHost } from "../components/ComponentHost";
 import { WindowResizeHandles, WindowTitlebar } from "../components/WindowControls";
 import { Calendar } from "../features/calendar/Calendar";
 import { Notes } from "../features/notes/Notes";
+import { Projects } from "../features/projects/Projects";
 import { Scratchpad } from "../features/scratchpad/Scratchpad";
 import { Tasks } from "../features/tasks/Tasks";
 import { getMilestoneStatus } from "../services/appStatus";
 import type { MilestoneStatus } from "../services/appStatus";
 
-type ComponentId = "scratchpad" | "tasks" | "notes" | "calendar";
+type ComponentId = "scratchpad" | "tasks" | "notes" | "calendar" | "projects";
 
 const navItems = [
   { id: "scratchpad", label: "Scratchpad" },
   { id: "tasks", label: "Tasks" },
   { id: "notes", label: "Notes" },
-  { id: "calendar", label: "Calendar" }
+  { id: "calendar", label: "Calendar" },
+  { id: "projects", label: "Projects" }
 ] satisfies Array<{ id: ComponentId; label: string }>;
 
 export default function App() {
@@ -26,7 +28,7 @@ export default function App() {
       .then(setStatus)
       .catch(() => {
         setStatus({
-          milestone: "Milestone 0",
+          milestone: "Milestone 2",
           hotkey: "Ctrl+Shift+Space",
           databaseReady: false
         });
@@ -36,7 +38,7 @@ export default function App() {
   const activeMeta = useMemo(
     () => ({
       title: navItems.find((item) => item.id === activeComponent)?.label ?? "Scratchpad",
-      eyebrow: status?.milestone ?? "Milestone 1",
+      eyebrow: status?.milestone ?? "Milestone 2",
       hotkey: status?.hotkey ?? "Ctrl+Shift+Space"
     }),
     [activeComponent, status]
@@ -90,6 +92,7 @@ export default function App() {
             {activeComponent === "tasks" && <Tasks />}
             {activeComponent === "notes" && <Notes />}
             {activeComponent === "calendar" && <Calendar />}
+            {activeComponent === "projects" && <Projects />}
           </ComponentHost>
         </section>
       </div>

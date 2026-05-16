@@ -47,6 +47,18 @@ pub struct CalendarEventRecord {
     pub updated_at: String,
 }
 
+#[derive(Serialize)]
+pub struct ProjectRecord {
+    pub id: i64,
+    pub name: String,
+    pub description: String,
+    pub status: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
 pub struct AppDatabase {
     connection: Mutex<Connection>,
     ready: bool,
@@ -94,6 +106,15 @@ impl AppDatabase {
                 end_date TEXT NOT NULL,
                 end_time TEXT NOT NULL,
                 notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS projects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'ACTIVE',
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
@@ -382,6 +403,76 @@ impl AppDatabase {
         Ok(())
     }
 
+    pub fn list_projects(&self) -> Result<Vec<ProjectRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        let mut statement = connection.prepare(
+            "
+            SELECT id, name, description, status, created_at, updated_at
+            FROM projects
+            ORDER BY updated_at DESC, id DESC
+            ",
+        )?;
+
+        let projects = statement
+            .query_map([], |row| {
+                Ok(ProjectRecord {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    description: row.get(2)?,
+                    status: row.get(3)?,
+                    created_at: row.get(4)?,
+                    updated_at: row.get(5)?,
+                })
+            })?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(projects)
+    }
+
+    pub fn create_project(
+        &self,
+        name: &str,
+        description: &str,
+        status: &str,
+    ) -> Result<ProjectRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute(
+            "INSERT INTO projects (name, description, status) VALUES (?1, ?2, ?3)",
+            params![name.trim(), description, status.trim()],
+        )?;
+        let id = connection.last_insert_rowid();
+        Self::get_project_by_id(&connection, id)
+    }
+
+    pub fn update_project(
+        &self,
+        id: i64,
+        name: &str,
+        description: &str,
+        status: &str,
+    ) -> Result<ProjectRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute(
+            "
+            UPDATE projects
+            SET name = ?1,
+                description = ?2,
+                status = ?3,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?4
+            ",
+            params![name.trim(), description, status.trim(), id],
+        )?;
+
+        Self::get_project_by_id(&connection, id)
+    }
+
+    pub fn delete_project(&self, id: i64) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute("DELETE FROM projects WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
     fn get_task_by_id(connection: &Connection, id: i64) -> Result<TaskRecord> {
         connection.query_row(
             "
@@ -466,6 +557,27 @@ impl AppDatabase {
                     notes: row.get(6)?,
                     created_at: row.get(7)?,
                     updated_at: row.get(8)?,
+                })
+            },
+        )
+    }
+
+    fn get_project_by_id(connection: &Connection, id: i64) -> Result<ProjectRecord> {
+        connection.query_row(
+            "
+            SELECT id, name, description, status, created_at, updated_at
+            FROM projects
+            WHERE id = ?1
+            ",
+            params![id],
+            |row| {
+                Ok(ProjectRecord {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    description: row.get(2)?,
+                    status: row.get(3)?,
+                    created_at: row.get(4)?,
+                    updated_at: row.get(5)?,
                 })
             },
         )

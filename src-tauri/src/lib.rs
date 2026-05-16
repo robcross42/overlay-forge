@@ -3,9 +3,10 @@ mod db;
 mod hotkeys;
 
 use commands::{
-    create_calendar_event, create_note, create_task, delete_calendar_event, delete_note,
-    delete_task, get_milestone_status, get_scratchpad, list_calendar_events, list_notes,
-    list_tasks, save_scratchpad, shutdown_app, update_calendar_event, update_note, update_task,
+    create_calendar_event, create_note, create_project, create_task, delete_calendar_event,
+    delete_note, delete_project, delete_task, get_milestone_status, get_scratchpad,
+    list_calendar_events, list_notes, list_projects, list_tasks, save_scratchpad, shutdown_app,
+    update_calendar_event, update_note, update_project, update_task,
 };
 use db::AppDatabase;
 use tauri::Manager;
@@ -47,7 +48,11 @@ pub fn run() {
             list_calendar_events,
             create_calendar_event,
             update_calendar_event,
-            delete_calendar_event
+            delete_calendar_event,
+            list_projects,
+            create_project,
+            update_project,
+            delete_project
         ])
         .run(tauri::generate_context!())
         .expect("error while running Overlay Forge");

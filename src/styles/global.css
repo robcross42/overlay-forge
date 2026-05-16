@@ -35,6 +35,7 @@ body {
 }
 
 button,
+select,
 textarea {
   font: inherit;
 }
@@ -443,6 +444,18 @@ kbd {
   padding: 0 12px;
 }
 
+select.text-input,
+select.text-input option {
+  background: #19202a;
+  color: var(--text);
+}
+
+select.text-input option:checked,
+select.text-input option:hover {
+  background: rgba(79, 208, 165, 0.22);
+  color: var(--text);
+}
+
 .body-input {
   min-height: 0;
   padding: 12px;
@@ -452,6 +465,15 @@ kbd {
 
 .body-input.compact {
   min-height: 92px;
+}
+
+.text-input:disabled,
+.body-input:disabled,
+.text-input:read-only,
+.body-input:read-only,
+.primary-button:disabled,
+.ghost-button:disabled {
+  opacity: 0.72;
 }
 
 .text-input:disabled,

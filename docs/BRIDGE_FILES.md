@@ -20,9 +20,9 @@ The Milestone 0 scratchpad component is complete and passed. Scratchpad content 
 
 Milestone 1 is complete, passed, and successful.
 
-Current project baseline is Milestone 1. Future bridge files should instruct ChatGPT/Codex to start from the Milestone 1 app state.
+Current project baseline is Milestone 2. Future bridge files should instruct ChatGPT/Codex to start from the Milestone 2 app state.
 
-Milestone numbering note: Milestone 2 is the Local Projects component and has not started. Do not infer milestone IDs from numbered-list positions.
+Milestone numbering note: Milestone 2 is the Local Projects component and is complete, passed, and successful. Do not infer milestone IDs from numbered-list positions.
 
 ## Intended Future Workflow
 

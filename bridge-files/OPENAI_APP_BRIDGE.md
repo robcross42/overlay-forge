@@ -8,15 +8,17 @@ Provide this file to ChatGPT or Codex when a new chat needs current project cont
 
 ## Current Milestone
 
-Milestone 1 - Calendar, To-do, Notes, and Scratchpad Expansion
+Milestone 2 - Local Projects component
 
 Status: **Complete / Passed / Successful**
 
-Current project baseline: **Milestone 1**. Future bridge prompts, planning, and implementation should start from Milestone 1.
+Current project baseline: **Milestone 2**. Future bridge prompts, planning, and implementation should start from Milestone 2.
 
 Milestone 0 remains complete, passed, and successful. Milestone 1 adds component navigation plus SQLite-backed Tasks, Notes, and Calendar components. User validation is complete and Milestone 1 passed.
 
-Milestone numbering note: Milestone 2 is the Local Projects component and has not started. Do not mistake roadmap list item positions for milestone IDs.
+Milestone 2 adds the local Projects component with SQLite persistence. User validation is complete and Milestone 2 passed.
+
+Milestone numbering note: Milestone 2 is the Local Projects component. Do not mistake roadmap list item positions for milestone IDs.
 
 ## Current Scope
 
@@ -33,6 +35,7 @@ Milestone numbering note: Milestone 2 is the Local Projects component and has no
 - SQLite-backed task persistence
 - SQLite-backed note persistence
 - SQLite-backed calendar event persistence
+- SQLite-backed local project persistence
 
 ## Hotkey
 
@@ -45,10 +48,11 @@ Ctrl+Shift+Space
 - OpenAI API integration
 - GitHub integration
 - YouTube component
-- Calendar UI
-- To-do system
-- Full notes system
-- Local projects component
+- Advanced calendar workflows
+- Advanced task workflows
+- Advanced notes workflows
+- OpenAI planning chat
+- Bridge-file generation UI
 - Exclusive fullscreen game overlay support
 
 ## Latest Validation Notes
@@ -90,3 +94,12 @@ Update this section manually after each validation pass.
 - Verified: `npm run tauri:build` passes after Milestone 1 implementation
 - Verified: rebuilt release app starts against the existing app-data SQLite database
 - Passed: Milestone 1 manual validation checklist
+- Implemented: Milestone 2 Projects navigation entry
+- Implemented: local Projects component with create, select, read-only view, edit, delete, status, and list behavior
+- Implemented: SQLite `projects` table and project CRUD commands
+- Verified: `npm run build` passes after Milestone 2 implementation
+- Verified: `cargo build` passes after Milestone 2 implementation
+- Verified: `npm run tauri:build` passes after Milestone 2 implementation
+- Verified: rebuilt release app starts hidden in the background after Milestone 2 implementation
+- Fixed: Projects status dropdown option readability
+- Passed: Milestone 2 manual validation checklist

@@ -1,4 +1,4 @@
-use crate::db::{CalendarEventRecord, NoteRecord, TaskRecord};
+use crate::db::{CalendarEventRecord, NoteRecord, ProjectRecord, TaskRecord};
 use crate::AppState;
 use serde::Serialize;
 use tauri::{AppHandle, State};
@@ -30,7 +30,7 @@ pub fn save_scratchpad(content: String, state: State<'_, AppState>) -> Result<()
 #[tauri::command]
 pub fn get_milestone_status(state: State<'_, AppState>) -> Result<MilestoneStatus, String> {
     Ok(MilestoneStatus {
-        milestone: "Milestone 1".to_string(),
+        milestone: "Milestone 2".to_string(),
         hotkey: "Ctrl+Shift+Space".to_string(),
         database_ready: state.database.is_ready(),
     })
@@ -207,6 +207,51 @@ pub fn delete_calendar_event(id: i64, state: State<'_, AppState>) -> Result<(), 
         .map_err(|error| error.to_string())
 }
 
+#[tauri::command]
+pub fn list_projects(state: State<'_, AppState>) -> Result<Vec<ProjectRecord>, String> {
+    state
+        .database
+        .list_projects()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn create_project(
+    name: String,
+    description: String,
+    status: String,
+    state: State<'_, AppState>,
+) -> Result<ProjectRecord, String> {
+    validate_project(&name, &status)?;
+    state
+        .database
+        .create_project(&name, &description, &status)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn update_project(
+    id: i64,
+    name: String,
+    description: String,
+    status: String,
+    state: State<'_, AppState>,
+) -> Result<ProjectRecord, String> {
+    validate_project(&name, &status)?;
+    state
+        .database
+        .update_project(id, &name, &description, &status)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn delete_project(id: i64, state: State<'_, AppState>) -> Result<(), String> {
+    state
+        .database
+        .delete_project(id)
+        .map_err(|error| error.to_string())
+}
+
 fn validate_calendar_event(
     title: &str,
     start_date: &str,
@@ -220,6 +265,14 @@ fn validate_calendar_event(
     require_text(end_date, "End date")?;
     require_text(end_time, "End time")?;
     Ok(())
+}
+
+fn validate_project(name: &str, status: &str) -> Result<(), String> {
+    require_text(name, "Project name")?;
+    match status.trim() {
+        "ACTIVE" | "ARCHIVED" => Ok(()),
+        _ => Err("Project status must be ACTIVE or ARCHIVED".to_string()),
+    }
 }
 
 fn require_text(value: &str, field_name: &str) -> Result<(), String> {

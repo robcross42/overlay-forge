@@ -4,6 +4,8 @@
 
 Milestone 1 data model is complete, passed, and successful.
 
+Milestone 2 project data model is complete, passed, and successful.
+
 ## Tables
 
 ### scratchpad
@@ -58,3 +60,16 @@ updated_at
 ```
 
 Simple local event list for Milestone 1. Recurrence, invites, and external calendar sync are deferred.
+
+### projects
+
+```text
+id
+name
+description
+status
+created_at
+updated_at
+```
+
+Local project records for Milestone 2. Valid Milestone 2 status values are `ACTIVE` and `ARCHIVED`; complex project lifecycle workflows are deferred.
