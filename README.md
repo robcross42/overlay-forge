@@ -6,7 +6,7 @@ Overlay Forge is a local-first desktop overlay shell for planning, notes, tasks,
 
 **Milestone 1 is complete, passed, and successful.** It adds Tasks, Notes, and Calendar components beside the existing Scratchpad without replacing the Milestone 0 foundation.
 
-**Current project baseline: Milestone 7.** Future bridge prompts, planning, and implementation should treat Milestone 7 as the latest completed and user-validated app state.
+**Current project baseline: Milestone 8.** Future bridge prompts, planning, and implementation should treat Milestone 8 as the latest completed and user-validated app state.
 
 **Milestone 2 is complete, passed, and successful.** It adds a local Projects component with SQLite persistence.
 
@@ -34,9 +34,9 @@ Milestone 7 refines the selected Projects workspace layout. The active project w
 
 **Milestone 8 - Projects Navigation Tree Actions**
 
-Status: **Planned**
+Status: **Complete / Passed / Successful**
 
-Milestone 8 should move project create/select/edit/delete entry points toward the left navigation shell. Projects should become an expandable module tree with saved projects as children, a compact `+` action for creating projects, and compact `...` project item menus for edit/delete. This milestone should prove the pattern on Projects only before applying it to other modules.
+Milestone 8 moves project create/select/edit/delete entry points toward the left navigation shell. Projects is now an expandable module tree with saved projects as children, a compact `+` action for creating projects, and compact `...` project item menus for edit/delete. User validation is complete and Milestone 8 passed.
 
 Completed Milestone 0 capabilities:
 
@@ -70,7 +70,7 @@ Milestone 6 intentionally keeps bridge-file generation, prompt preview, automati
 
 Milestone 7 intentionally keeps manual context attachments, prompt preview, bridge-file generation, GitHub file browsing, Codex handoff, ChatGPT import, conversation search/filtering, chat streaming, model picker UI, AI-generated project summaries, and advanced project dashboard analytics deferred.
 
-Milestone 8 should intentionally keep Tasks, Notes, Calendar, and YouTube navigation refactors deferred until the Projects navigation tree pattern is validated.
+Milestone 8 intentionally keeps Tasks, Notes, Calendar, and YouTube navigation refactors deferred until the Projects navigation tree pattern is validated.
 
 ## ChatGPT / Codex Bridge Context
 
@@ -97,7 +97,7 @@ Required Markdown context files:
 
 For future bridge prompts, instruct ChatGPT/Codex to read all `*.md` files in the project repo structure before making planning or implementation decisions.
 
-Milestone numbering note: use explicit milestone IDs from the Markdown files. Do not infer milestone numbers from numbered list positions. Milestone 3 is the OpenAI Planning Chat component and is complete, passed, and successful. Milestone 4 is GitHub Integration and is complete, passed, and successful. Milestone 5 is the Controlled YouTube Component and is complete, passed, and successful. Milestone 6 is Project Workspace Chat and is complete, passed, and successful. Milestone 7 is Project Workspace Layout Refinement and is complete, passed, and successful. Milestone 8 is Projects Navigation Tree Actions and is planned.
+Milestone numbering note: use explicit milestone IDs from the Markdown files. Do not infer milestone numbers from numbered list positions. Milestone 3 is the OpenAI Planning Chat component and is complete, passed, and successful. Milestone 4 is GitHub Integration and is complete, passed, and successful. Milestone 5 is the Controlled YouTube Component and is complete, passed, and successful. Milestone 6 is Project Workspace Chat and is complete, passed, and successful. Milestone 7 is Project Workspace Layout Refinement and is complete, passed, and successful. Milestone 8 is Projects Navigation Tree Actions and is complete, passed, and successful.
 
 ## Development
 

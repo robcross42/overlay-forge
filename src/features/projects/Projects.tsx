@@ -7,7 +7,7 @@ import {
 } from "../../services/github";
 import type { ProjectGitHubRepository } from "../../services/github";
 import { PlanningChat } from "../planning-chat/PlanningChat";
-import { createProject, deleteProject, listProjects, updateProject } from "../../services/projects";
+import { createProject, deleteProject, updateProject } from "../../services/projects";
 import type { Project, ProjectInput, ProjectStatus } from "../../services/projects";
 
 const emptyProject: ProjectInput = {
@@ -19,9 +19,31 @@ const emptyProject: ProjectInput = {
 type ProjectMode = "idle" | "create" | "view" | "edit";
 type WorkspaceSection = "overview" | "github" | "chat" | "references";
 
-export function Projects() {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+type ProjectNavAction = {
+  type: "create" | "edit";
+  projectId?: number;
+  nonce: number;
+};
+
+type ProjectsProps = {
+  projects: Project[];
+  selectedProjectId: number | null;
+  navAction: ProjectNavAction | null;
+  onSelectProject: (projectId: number | null) => void;
+  onProjectCreated: (project: Project) => void;
+  onProjectUpdated: (project: Project) => void;
+  onProjectDeleted: (projectId: number) => void;
+};
+
+export function Projects({
+  projects,
+  selectedProjectId,
+  navAction,
+  onSelectProject,
+  onProjectCreated,
+  onProjectUpdated,
+  onProjectDeleted
+}: ProjectsProps) {
   const [projectMode, setProjectMode] = useState<ProjectMode>("idle");
   const [form, setForm] = useState<ProjectInput>(emptyProject);
   const [status, setStatus] = useState("Loading projects");
@@ -32,23 +54,50 @@ export function Projects() {
   const [workspaceSection, setWorkspaceSection] = useState<WorkspaceSection>("overview");
 
   const selectedProject = useMemo(
-    () => projects.find((project) => project.id === selectedId) ?? null,
-    [projects, selectedId]
+    () => projects.find((project) => project.id === selectedProjectId) ?? null,
+    [projects, selectedProjectId]
   );
 
   useEffect(() => {
-    listProjects()
-      .then((nextProjects) => {
-        setProjects(nextProjects);
-        setStatus(
-          nextProjects.length === 0 ? "No projects yet" : `${nextProjects.length} project(s)`
-        );
-      })
-      .catch((error) => setStatus(formatError(error)));
-  }, []);
+    setStatus(projects.length === 0 ? "No projects yet" : `${projects.length} project(s)`);
+  }, [projects.length]);
 
   useEffect(() => {
-    if (!selectedId) {
+    if (!selectedProject) {
+      if (projectMode === "view" || projectMode === "edit") {
+        setProjectMode("idle");
+        setForm(emptyProject);
+      }
+      return;
+    }
+
+    if (projectMode === "idle") {
+      selectProject(selectedProject);
+    }
+  }, [selectedProject?.id]);
+
+  useEffect(() => {
+    if (!navAction) {
+      return;
+    }
+
+    if (navAction.type === "create") {
+      newProject();
+      return;
+    }
+
+    if (navAction.type === "edit" && navAction.projectId) {
+      const project = projects.find((item) => item.id === navAction.projectId);
+      if (project) {
+        selectProject(project);
+        setProjectMode("edit");
+        setStatus("Editing project");
+      }
+    }
+  }, [navAction?.nonce]);
+
+  useEffect(() => {
+    if (!selectedProjectId) {
       setGithubLink(null);
       setGithubFullName("");
       setGithubStatus("Select a project");
@@ -57,7 +106,7 @@ export function Projects() {
     }
 
     setGithubStatus("Loading GitHub link");
-    getProjectGitHubRepository(selectedId)
+    getProjectGitHubRepository(selectedProjectId)
       .then((link) => {
         setGithubLink(link);
         setGithubFullName(link?.repositoryFullName ?? "");
@@ -68,10 +117,10 @@ export function Projects() {
         setGithubFullName("");
         setGithubStatus(formatError(error));
       });
-  }, [selectedId]);
+  }, [selectedProjectId]);
 
   function selectProject(project: Project) {
-    setSelectedId(project.id);
+    onSelectProject(project.id);
     setProjectMode("view");
     setWorkspaceSection("overview");
     setForm({
@@ -82,7 +131,7 @@ export function Projects() {
   }
 
   function newProject() {
-    setSelectedId(null);
+    onSelectProject(null);
     setProjectMode("create");
     setForm(emptyProject);
     setStatus("New project");
@@ -107,9 +156,7 @@ export function Projects() {
           description: form.description,
           status: form.status
         });
-        setProjects((current) =>
-          current.map((project) => (project.id === updated.id ? updated : project))
-        );
+        onProjectUpdated(updated);
         selectProject(updated);
         setStatus("Project saved");
       } else {
@@ -118,7 +165,7 @@ export function Projects() {
           description: form.description,
           status: form.status
         });
-        setProjects((current) => [created, ...current]);
+        onProjectCreated(created);
         selectProject(created);
         setStatus("Project added");
       }
@@ -132,10 +179,17 @@ export function Projects() {
       return;
     }
 
+    const confirmed = window.confirm(
+      `Delete "${selectedProject.name}"? This removes the local project only.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
     try {
       await deleteProject(selectedProject.id);
-      setProjects((current) => current.filter((project) => project.id !== selectedProject.id));
-      setSelectedId(null);
+      onProjectDeleted(selectedProject.id);
+      onSelectProject(null);
       setProjectMode("idle");
       setForm(emptyProject);
       setGithubLink(null);
@@ -226,24 +280,7 @@ export function Projects() {
         <span className="save-pill">{status}</span>
       </div>
 
-      <div className="split-feature-body">
-        <aside className="sub-list" aria-label="Projects list">
-          <button className="primary-button full-width" onClick={newProject} type="button">
-            New Project
-          </button>
-          {projects.map((project) => (
-            <button
-              className={project.id === selectedId ? "sub-list-item active" : "sub-list-item"}
-              key={project.id}
-              onClick={() => selectProject(project)}
-              type="button"
-            >
-              <strong>{project.name}</strong>
-              <span>{formatProjectStatus(project.status)}</span>
-            </button>
-          ))}
-        </aside>
-
+      <div className="split-feature-body project-feature-body">
         {selectedProject || projectMode === "create" ? (
           <div className="project-workspace">
             {selectedProject && (
@@ -472,12 +509,12 @@ export function Projects() {
                     <article className="reference-summary-item">
                       <span>Attachments</span>
                       <strong>Planned later</strong>
-                      <p>Manual context attachment workflows are deferred beyond Milestone 7.</p>
+                      <p>Manual context attachment workflows are deferred beyond Milestone 8.</p>
                     </article>
                     <article className="reference-summary-item">
                       <span>Prompt Context</span>
                       <strong>Planned later</strong>
-                      <p>Prompt preview and context inclusion are deferred beyond Milestone 7.</p>
+                      <p>Prompt preview and context inclusion are deferred beyond Milestone 8.</p>
                     </article>
                   </div>
                 </section>

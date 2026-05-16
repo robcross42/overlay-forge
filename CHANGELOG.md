@@ -10,14 +10,14 @@ All notable changes to Overlay Forge will be documented in this file.
 - The Milestone 0 scratchpad component is complete and passed.
 - Scratchpad content saves to SQLite and restores between app sessions.
 - Milestone 1 - Calendar, To-do, Notes, and Scratchpad Expansion is complete, passed, and successful.
-- Current user-validated project baseline is Milestone 7.
+- Current user-validated project baseline is Milestone 8.
 - Milestone 2 - Local Projects component is complete, passed, and successful.
 - Milestone 3 - OpenAI Planning Chat component is complete, passed, and successful.
 - Milestone 4 - GitHub Integration is complete, passed, and successful.
 - Milestone 5 - Controlled YouTube Component is complete, passed, and successful.
 - Milestone 6 - Project Workspace Chat is complete, passed, and successful.
 - Milestone 7 - Project Workspace Layout Refinement is complete, passed, and successful.
-- Milestone 8 - Projects Navigation Tree Actions is planned.
+- Milestone 8 - Projects Navigation Tree Actions is complete, passed, and successful.
 
 ### Added
 
@@ -75,7 +75,12 @@ All notable changes to Overlay Forge will be documented in this file.
 - Added Overview, GitHub, Chat, and References workspace sections.
 - Added a minimal References section with project-local context category summaries.
 - Added `docs/MILESTONE_7.md` with setup validation and manual validation steps.
-- Added `docs/MILESTONE_8.md` as the planned Projects navigation tree actions milestone.
+- Added `docs/MILESTONE_8.md` for Projects navigation tree actions.
+- Added the Projects navigation tree pattern in the left navigation shell.
+- Added an expandable Projects module row.
+- Added saved project child rows under Projects.
+- Added a compact Projects `+` creation action.
+- Added compact project row `...` edit/delete actions.
 
 ### Changed
 
@@ -111,7 +116,10 @@ All notable changes to Overlay Forge will be documented in this file.
 - Confirmed selected project context remains stable across Overview, GitHub, Chat, and References.
 - Preserved existing GitHub repository linkage behavior inside the selected project workspace.
 - Preserved existing project-scoped chat behavior inside the selected project workspace.
-- Documented the planned Projects navigation tree pattern with module-level `+` and item-level `...` actions.
+- Implemented the Projects navigation tree pattern with module-level `+` and item-level `...` actions.
+- Confirmed selected project workspace behavior is preserved.
+- Confirmed existing project-scoped chat behavior is preserved.
+- Confirmed existing GitHub behavior is preserved.
 
 ### Validation
 
@@ -158,3 +166,8 @@ All notable changes to Overlay Forge will be documented in this file.
 - Verified Rust backend compile after Milestone 7 implementation with `cargo build`.
 - Verified development launch after Milestone 7 implementation with `npm run tauri:dev`; the app process started and was stopped after the validation timeout.
 - User manually validated Milestone 7 successfully.
+- Verified `npm install` completes successfully after Milestone 8 implementation.
+- Verified frontend build after Milestone 8 implementation with `npm run build`.
+- Verified Rust backend compile after Milestone 8 implementation with `cargo build`.
+- Verified development launch after Milestone 8 implementation with `npm run tauri:dev`; the app process started and was stopped after the validation timeout.
+- User manually validated Milestone 8 successfully.

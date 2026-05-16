@@ -8,11 +8,11 @@ Provide this file to ChatGPT or Codex when a new chat needs current project cont
 
 ## Current Milestone
 
-Milestone 7 - Project Workspace Layout Refinement
+Milestone 8 - Projects Navigation Tree Actions
 
 Status: **Complete / Passed / Successful**
 
-Current user-validated project baseline: **Milestone 7**. Future bridge prompts, planning, and implementation should start from Milestone 7.
+Current user-validated project baseline: **Milestone 8**. Future bridge prompts, planning, and implementation should start from Milestone 8.
 
 Milestone 0 remains complete, passed, and successful. Milestone 1 adds component navigation plus SQLite-backed Tasks, Notes, and Calendar components. User validation is complete and Milestone 1 passed.
 
@@ -30,9 +30,9 @@ User validation is complete and Milestone 6 passed.
 Milestone 7 refines the selected Projects workspace layout. The active project workspace now has a clear project header and Overview, GitHub, Chat, and References sections. References is intentionally minimal and summarizes project-local context categories without implementing manual attachments. YouTube remains a separate app-level component and is not part of the Projects References section.
 User validation is complete and Milestone 7 passed.
 
-Milestone 8 is planned as Projects Navigation Tree Actions. It should make Projects expandable in the left navigation, list saved projects as children, expose a compact `+` for new project flow, and expose compact `...` menus on project rows for edit/delete. Validate this on Projects before applying the pattern to other modules.
+Milestone 8 is complete, passed, and successful as Projects Navigation Tree Actions. It makes Projects expandable in the left navigation, lists saved projects as children, exposes a compact `+` for new project flow, and exposes compact `...` menus on project rows for edit/delete. This pattern was validated on Projects before applying the pattern to other modules.
 
-Milestone numbering note: Milestone 2 is the Local Projects component. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Milestone 6 is Project Workspace Chat. Milestone 7 is Project Workspace Layout Refinement. Milestone 8 is Projects Navigation Tree Actions. Do not mistake roadmap list item positions for milestone IDs.
+Milestone numbering note: Milestone 2 is the Local Projects component. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Milestone 6 is Project Workspace Chat. Milestone 7 is Project Workspace Layout Refinement. Milestone 8 is Projects Navigation Tree Actions and is complete, passed, and successful. Do not mistake roadmap list item positions for milestone IDs.
 
 ## Current Scope
 
@@ -180,6 +180,14 @@ Update this section manually after each validation pass.
 - Verified: `cargo build` passes after Milestone 7 implementation
 - Verified: `npm run tauri:dev` launches after Milestone 7 implementation
 - Passed: Milestone 7 manual validation checklist
+- Implemented: Milestone 8 Projects navigation tree actions
+- Implemented: expandable Projects row, saved project child rows, compact `+` create action, and compact `...` edit/delete menus
+- Preserved: selected-project Overview, GitHub, Chat, and References workspace sections
+- Verified: `npm install` passes after Milestone 8 implementation
+- Verified: `npm run build` passes after Milestone 8 implementation
+- Verified: `cargo build` passes after Milestone 8 implementation
+- Verified: `npm run tauri:dev` launches after Milestone 8 implementation
+- Passed: Milestone 8 manual validation checklist
 
 ## Milestone Validation Workflow
 

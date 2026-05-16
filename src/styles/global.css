@@ -269,6 +269,119 @@ button {
   text-align: left;
 }
 
+.nav-tree-group {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.nav-tree-parent {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+}
+
+.nav-label-button,
+.nav-icon-button,
+.nav-child-label,
+.nav-project-menu button {
+  min-width: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.nav-label-button {
+  height: 100%;
+  padding: 0 6px;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-icon-button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.nav-icon-button:hover,
+.nav-icon-button:focus-visible,
+.nav-label-button:hover,
+.nav-label-button:focus-visible,
+.nav-child-label:hover,
+.nav-child-label:focus-visible,
+.nav-project-menu button:hover,
+.nav-project-menu button:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  outline: 0;
+}
+
+.nav-tree-children {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding-left: 22px;
+}
+
+.nav-child-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 3px 4px 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--muted);
+}
+
+.nav-child-row-active {
+  border-color: rgba(79, 208, 165, 0.38);
+  background: rgba(79, 208, 165, 0.1);
+  color: var(--text);
+}
+
+.nav-child-label {
+  height: 28px;
+  padding: 0 7px;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-project-menu {
+  position: absolute;
+  top: 32px;
+  right: 4px;
+  z-index: 20;
+  display: grid;
+  min-width: 92px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #19202a;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.34);
+}
+
+.nav-project-menu button {
+  min-height: 30px;
+  padding: 0 9px;
+  text-align: left;
+}
+
 .nav-item:not(:disabled) {
   cursor: pointer;
 }
@@ -426,6 +539,10 @@ kbd {
   display: grid;
   grid-template-columns: 250px minmax(0, 1fr);
   gap: 16px;
+}
+
+.project-feature-body {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .split-feature-body > .sub-list,

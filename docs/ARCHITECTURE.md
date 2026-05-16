@@ -34,7 +34,7 @@ Milestone 6 - Project Workspace Chat is complete, passed, and successful. It mak
 
 Milestone 7 - Project Workspace Layout Refinement is complete, passed, and successful. It refines Projects as the primary workspace shell by adding a stable active-project header and four selected-project workspace sections: Overview, GitHub, Chat, and References.
 
-Milestone 8 - Projects Navigation Tree Actions is planned. It should move Projects object-level actions toward the shell navigation by making Projects expandable in the left navigation and listing saved projects as children. This pattern should be validated on Projects before generalizing it to other modules.
+Milestone 8 - Projects Navigation Tree Actions is complete, passed, and successful. It moves Projects object-level actions toward the shell navigation by making Projects expandable in the left navigation and listing saved projects as children. This pattern was validated on Projects before generalizing it to other modules.
 
 ## UI Consistency
 
@@ -47,12 +47,14 @@ Organizer components should follow the same interaction pattern unless a milesto
 - Destructive actions are available only inside an edit/selected-item context.
 - Active clickable actions use consistent enabled button styling across components.
 
-Milestone 8 should add navigation action consistency rules:
+Milestone 8 adds navigation action consistency rules:
 
 - Module-level `+` actions create new items for that module.
 - Item-level `...` actions open item menus such as Edit and Delete.
 - Hover-revealed actions must also be visible or reachable by keyboard focus.
 - The workspace surface should prioritize selected item content while navigation owns object-level actions.
+
+Milestone 8 applies these rules to Projects only. The Projects row is expandable/collapsible, the row-level `+` starts project creation, and project child rows can select the active workspace project or open an item menu for Edit/Delete. The main panel remains the selected-project workspace with Overview, GitHub, Chat, and References sections.
 
 ## Backend
 
@@ -91,6 +93,8 @@ Milestone 6 adds no new tables. It preserves existing `planning_conversations` a
 
 Milestone 7 adds no new tables. Overview continues to use `projects`, GitHub continues to use `project_github_repositories`, Chat continues to use `planning_conversations` and `planning_messages`, and References only summarizes existing local context categories.
 
+Milestone 8 adds no new tables. The shell-owned Projects navigation tree reads existing `projects` rows and continues to use the same project CRUD commands. Chat and GitHub behavior continue to use the existing selected-project data paths.
+
 ## OpenAI Boundary
 
 Planning Chat calls the OpenAI Responses API from the Rust/Tauri backend. React invokes local Tauri commands only and never reads `OPENAI_API_KEY`. Model selection, request shape, and the planning assistant instruction are centralized in the backend OpenAI service module so later bridge-file generation, tools, streaming, or model changes do not leak through the frontend.
@@ -118,6 +122,8 @@ last_fetch_status
 The integration is project-scoped and read-only. Milestone 4 does not perform Codex handoff, GitHub write operations, branch creation, commit creation, pull request creation, issue management, repository file browsing, GitHub Actions integration, OAuth, or multi-account workflows.
 
 In Milestone 7, GitHub remains a selected-project workspace section backed by the existing project GitHub repository table. No token exposure or GitHub write behavior is added.
+
+Milestone 8 preserves this boundary. Project selection can now happen from the left navigation tree, but GitHub repository linkage and metadata fetches still happen inside the selected-project GitHub workspace section.
 
 ## YouTube Boundary
 

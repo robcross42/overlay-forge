@@ -2,64 +2,93 @@
 
 ## Status
 
-Planned
+Complete / Passed / Successful
 
 ## Goal
 
-Move project create/select/edit/delete entry points toward the left navigation shell so Projects behaves like an expandable workspace tree.
+Move project create, select, edit, and delete entry points into the left navigation shell while preserving the Milestone 7 selected-project workspace.
 
-This milestone should prove the pattern on Projects only before applying it to Tasks, Notes, Calendar, YouTube, or other app modules.
+Milestone 8 validates the navigation-tree pattern on Projects only before applying similar patterns to Tasks, Notes, Calendar, YouTube, or other modules.
 
-## Design Direction
+## Implemented Capabilities
 
-The left module navigation should become a navigable tree for modules that own saved records.
+- Projects is now an expandable and collapsible module row in the left navigation shell.
+- Saved projects appear as child rows under Projects.
+- The Projects module row includes a compact `+` action for starting the new project flow.
+- Project child rows include compact `...` action menus with Edit and Delete actions.
+- Selecting a project child row sets the active workspace project.
+- The selected project remains visually clear in the nav tree.
+- Project delete actions use confirmation before deleting local project data.
+- Deleting the active project clears the active workspace cleanly.
+- The Milestone 7 selected-project workspace layout is preserved.
+- Overview, GitHub, Chat, and References remain selected-project workspace sections.
+- Project-scoped Chat continues to use existing planning conversation and message persistence.
+- Project-scoped GitHub repository linkage and metadata behavior remain unchanged.
+- Existing Scratchpad, Tasks, Notes, Calendar, and YouTube navigation remains unchanged.
 
-For Projects:
+## Data Tables
 
-- The Projects module row can expand and collapse.
-- Saved projects appear as children under Projects.
-- Selecting a project child opens that project workspace.
-- Hovering or focusing the Projects module row reveals a compact `+` action for creating a project.
-- Hovering or focusing a project child reveals a compact `...` action for project-specific actions.
-- The `...` action opens an action menu with Edit and Delete.
-- The same actions must remain keyboard reachable; hover-only controls are not sufficient.
+Milestone 8 does not add or change SQLite tables.
 
-## In Scope
+It continues to use the existing tables:
 
-- Refine the left shell navigation for Projects only.
-- Load saved projects into the navigation tree.
-- Add a Projects module `+` action that starts the new project flow.
-- Add per-project `...` actions for Edit and Delete.
-- Keep selected project context stable when selecting projects from the nav tree.
-- Keep the selected project workspace sections from Milestone 7: Overview, GitHub, Chat, References.
-- Move project create/edit/delete triggers out of the main workspace surface where practical.
-- Preserve existing SQLite project data and behavior.
+```text
+projects
+project_github_repositories
+planning_conversations
+planning_messages
+```
 
-## Out Of Scope
+## Setup Validation
 
-- Applying the pattern to Tasks, Notes, Calendar, or YouTube.
-- Redesigning the YouTube component.
-- Moving task/note/calendar create/edit/delete actions.
-- Manual context attachments.
-- Prompt preview.
-- Bridge-file generation.
-- GitHub file browsing.
-- Codex handoff.
-- ChatGPT import.
-- Chat streaming.
-- Model picker UI.
-- Advanced navigation customization.
+Run:
 
-## UX Notes
+```powershell
+npm install
+```
 
-Milestone 8 should use compact symbolic actions in the navigation:
+Result:
 
-- `+` for creating a new project.
-- `...` for project item actions.
+```text
+Passed. Dependencies install successfully.
+```
 
-Actions should appear on hover and keyboard focus, similar to modern chat/workspace navigation patterns, but they must also be usable without a mouse.
+Run:
 
-The workspace area should focus on selected project content and section workflows. The navigation tree should own object-level project actions.
+```powershell
+npm run build
+```
+
+Result:
+
+```text
+Passed. Frontend builds successfully.
+```
+
+Run:
+
+```powershell
+cd src-tauri
+cargo build
+```
+
+Result:
+
+```text
+Passed. Rust backend compiles successfully.
+```
+
+Run:
+
+```powershell
+npm run tauri:dev
+```
+
+Result:
+
+```text
+Passed. App launches successfully in development mode. The app process started and was stopped after the validation timeout.
+```
 
 ## Manual Validation Checklist
 
@@ -78,115 +107,139 @@ Overlay appears using existing hotkey behavior.
 Validate:
 
 ```text
-Navigate to Projects in the left navigation.
+Navigate to the left navigation shell.
 ```
 
 Pass criteria:
 
 ```text
-Projects expands to show saved projects.
+Projects appears as a module row with an expandable tree pattern.
 ```
 
 Validate:
 
 ```text
-Hover or focus the Projects navigation row.
+Expand Projects.
 ```
 
 Pass criteria:
 
 ```text
-A compact New Project action appears and can be activated.
+Saved projects appear as child rows.
 ```
 
 Validate:
 
 ```text
-Create a project from the Projects navigation action.
+Select a project child row.
 ```
 
 Pass criteria:
 
 ```text
-The project creation flow starts and the saved project appears under Projects.
+The selected project becomes the active workspace and its workspace sections appear.
 ```
 
 Validate:
 
 ```text
-Select a project from the navigation tree.
+Switch between Overview, GitHub, Chat, and References for the selected project.
 ```
 
 Pass criteria:
 
 ```text
-The selected project workspace opens with Overview, GitHub, Chat, and References.
+Each section works and selected project context remains stable.
 ```
 
 Validate:
 
 ```text
-Hover or focus a project row.
+Click the Projects + action and create a new project.
 ```
 
 Pass criteria:
 
 ```text
-A compact project action menu appears.
+The project saves successfully and appears as a child row under Projects.
 ```
 
 Validate:
 
 ```text
-Use the project action menu to edit a project.
+Use a project row ... menu to edit a project.
 ```
 
 Pass criteria:
 
 ```text
-The edit flow opens for the selected project and saved changes persist.
+Project changes save successfully and the nav tree updates.
 ```
 
 Validate:
 
 ```text
-Use the project action menu to delete a project.
+Use a project row ... menu to delete a project.
 ```
 
 Pass criteria:
 
 ```text
-The project is deleted locally and removed from the navigation tree.
+Delete uses confirmation, the project is removed, and the app remains stable.
 ```
 
 Validate:
 
 ```text
-Switch between several projects from the navigation tree.
+Select different projects from the nav tree.
 ```
 
 Pass criteria:
 
 ```text
-Selected project context updates correctly and workspace sections remain stable.
+Each project loads its own workspace context.
 ```
 
 Validate:
 
 ```text
-Use keyboard navigation to reach New Project and project action menus.
+Open Chat for two different projects.
 ```
 
 Pass criteria:
 
 ```text
-Project actions are usable without relying on mouse hover only.
+Each project keeps separate chat conversations/messages.
 ```
 
 Validate:
 
 ```text
-Return to Scratchpad, Tasks, Notes, Calendar, YouTube, and existing window controls.
+Open GitHub for a linked project.
+```
+
+Pass criteria:
+
+```text
+Existing GitHub repository linkage and metadata behavior still works.
+```
+
+Validate:
+
+```text
+Restart the app and return to Projects.
+```
+
+Pass criteria:
+
+```text
+Project list, selected-project behavior, workspace layout, GitHub data, and Chat data restore correctly.
+```
+
+Validate:
+
+```text
+Return to Scratchpad, Tasks, Notes, Calendar, YouTube, and existing app controls.
 ```
 
 Pass criteria:
@@ -195,13 +248,43 @@ Pass criteria:
 Existing Milestone 0 through Milestone 7 behavior still works.
 ```
 
-## Deferred Follow-Up
+## Deferred Items
 
-After Projects navigation tree actions are validated, later milestones can consider extending the same pattern to:
+- Navigation tree refactor for Tasks
+- Navigation tree refactor for Notes
+- Navigation tree refactor for Calendar
+- Navigation tree refactor for YouTube
+- Manual context attachments
+- Prompt preview
+- Bridge-file generation
+- Bridge-file editor
+- Bridge-file export
+- GitHub file browsing
+- GitHub write operations
+- Codex handoff
+- ChatGPT import
+- Conversation search/filtering
+- Chat streaming
+- Model picker UI
+- AI-generated project summaries
+- Advanced project dashboard analytics
 
-- Notes
-- Tasks
-- Calendar events
-- YouTube library groups or playlists
+## User Pass/Fail Reporting Format
 
-Do not generalize until the Projects version feels correct.
+```markdown
+# Milestone 8 Validation Results
+
+## Overall Result
+
+Pass or Fail
+
+## Failed Items
+
+- Item:
+  - Expected:
+  - Actual:
+
+## Notes
+
+Any extra observations.
+```
