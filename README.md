@@ -6,7 +6,7 @@ Overlay Forge is a local-first desktop overlay shell for planning, notes, tasks,
 
 **Milestone 1 is complete, passed, and successful.** It adds Tasks, Notes, and Calendar components beside the existing Scratchpad without replacing the Milestone 0 foundation.
 
-**Current project baseline: Milestone 11.** Future bridge prompts, planning, and implementation should treat Milestone 11 as the latest completed and user-validated app state. Milestone 12 is tentatively validated and needs a UI follow-up pass after Milestone 13.
+**Current project baseline: Milestone 13.** Future bridge prompts, planning, and implementation should treat Milestone 13 as the latest completed and user-validated app state.
 
 **Milestone 2 is complete, passed, and successful.** It adds a local Projects component with SQLite persistence.
 
@@ -58,15 +58,15 @@ Milestone 11 adds local bridge-file draft generation from selected project chat 
 
 **Milestone 12 - Project Markdown Context**
 
-Status: **Tentatively Validated / Needs UI Follow-up After Milestone 13**
+Status: **Complete / Passed / Successful**
 
 Milestone 12 adds project-level local Markdown context. A configured local project root provides a fresh `README.md` and referenced Markdown files whenever project chat starts or loads, so chat, Prompt Preview, and bridge drafts can use repository documentation without per-conversation attachment. It reads only local Markdown files that resolve inside the configured project root.
 
 **Milestone 13 - Project Workspace UI Consolidation**
 
-Status: **Planned / Not Started**
+Status: **Complete / Passed / Successful**
 
-Milestone 13 will consolidate the Projects workspace UI so project/conversation selection lives in the left navigation hierarchy and the main panel gives most of its space to the selected chat conversation. Project Edit will become the home for project details, GitHub integration, local Markdown context configuration, and local repo/context settings.
+Milestone 13 consolidates the Projects workspace UI so project/conversation selection lives in the left navigation hierarchy and the main panel gives most of its space to the selected chat conversation. The project row menu uses `New Chat` for new conversations, while existing conversations are opened from their left-nav child rows. Project Edit is now the home for project details, GitHub integration, local Markdown context configuration, and local repo/context settings. Conversation attached context and local Markdown bridge drafts live in a collapsible right-hand pane.
 
 Completed Milestone 0 capabilities:
 
@@ -110,7 +110,7 @@ Milestone 11 intentionally keeps full bridge-file editing, approval/obsolete wor
 
 Milestone 12 stays local-first. It does not read arbitrary files outside the configured project root, use GitHub file APIs, add vector stores, add semantic search, export bridge files, or directly hand off to Codex.
 
-Milestone 13 is planned as a UI consolidation milestone. It should not change context data models, convert manual conversation attachments into project-level records, add GitHub file reading, export bridge files, or hand off directly to Codex.
+Milestone 13 is a UI consolidation milestone. It does not change context data models, convert manual conversation attachments into project-level records, add GitHub file reading, export bridge files, or hand off directly to Codex.
 
 ## ChatGPT / Codex Bridge Context
 
@@ -142,7 +142,7 @@ Required Markdown context files:
 
 For future bridge prompts, instruct ChatGPT/Codex to read all `*.md` files in the project repo structure before making planning or implementation decisions.
 
-Milestone numbering note: use explicit milestone IDs from the Markdown files. Do not infer milestone numbers from numbered list positions. Milestone 3 is the OpenAI Planning Chat component and is complete, passed, and successful. Milestone 4 is GitHub Integration and is complete, passed, and successful. Milestone 5 is the Controlled YouTube Component and is complete, passed, and successful. Milestone 6 is Project Workspace Chat and is complete, passed, and successful. Milestone 7 is Project Workspace Layout Refinement and is complete, passed, and successful. Milestone 8 is Projects Navigation Tree Actions and is complete, passed, and successful. Milestone 9 is Manual Context Attachments and is complete, passed, and successful. Milestone 10 is Prompt Preview and is complete, passed, and successful. Milestone 11 is Bridge File Drafting and is complete, passed, and successful. Milestone 12 is Project Markdown Context and is tentatively validated pending Milestone 13 UI follow-up. Milestone 13 is Project Workspace UI Consolidation and is planned.
+Milestone numbering note: use explicit milestone IDs from the Markdown files. Do not infer milestone numbers from numbered list positions. Milestone 3 is the OpenAI Planning Chat component and is complete, passed, and successful. Milestone 4 is GitHub Integration and is complete, passed, and successful. Milestone 5 is the Controlled YouTube Component and is complete, passed, and successful. Milestone 6 is Project Workspace Chat and is complete, passed, and successful. Milestone 7 is Project Workspace Layout Refinement and is complete, passed, and successful. Milestone 8 is Projects Navigation Tree Actions and is complete, passed, and successful. Milestone 9 is Manual Context Attachments and is complete, passed, and successful. Milestone 10 is Prompt Preview and is complete, passed, and successful. Milestone 11 is Bridge File Drafting and is complete, passed, and successful. Milestone 12 is Project Markdown Context and is complete, passed, and successful. Milestone 13 is Project Workspace UI Consolidation and is complete, passed, and successful.
 
 ## Development
 

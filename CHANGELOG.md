@@ -10,7 +10,7 @@ All notable changes to Overlay Forge will be documented in this file.
 - The Milestone 0 scratchpad component is complete and passed.
 - Scratchpad content saves to SQLite and restores between app sessions.
 - Milestone 1 - Calendar, To-do, Notes, and Scratchpad Expansion is complete, passed, and successful.
-- Current user-validated project baseline is Milestone 11.
+- Current user-validated project baseline is Milestone 13.
 - Milestone 2 - Local Projects component is complete, passed, and successful.
 - Milestone 3 - OpenAI Planning Chat component is complete, passed, and successful.
 - Milestone 4 - GitHub Integration is complete, passed, and successful.
@@ -21,8 +21,10 @@ All notable changes to Overlay Forge will be documented in this file.
 - Milestone 9 - Manual Context Attachments is complete, passed, and successful.
 - Milestone 10 - Prompt Preview is complete, passed, and successful.
 - Milestone 11 - Bridge File Drafting is complete, passed, and successful.
-- Milestone 12 - Project Markdown Context is tentatively validated and needs a UI follow-up pass after Milestone 13.
-- Milestone 13 - Project Workspace UI Consolidation is planned and not started.
+- Milestone 12 - Project Markdown Context is complete, passed, and successful.
+- Milestone 13 - Project Workspace UI Consolidation is complete, passed, and successful.
+- Milestone 13 refinement moves conversation attached context and local Markdown bridge drafts into a collapsible right-hand chat pane.
+- Milestone 13 refinement changes the project row `...` Chat action to `New Chat`, which opens a new-conversation area instead of auto-selecting an existing chat.
 
 ### Added
 
@@ -112,6 +114,12 @@ All notable changes to Overlay Forge will be documented in this file.
 - Added Project Markdown context display in selected-project Chat.
 - Added project Markdown context inclusion for Prompt Preview, project chat sends, and bridge draft generation.
 - Added `docs/MILESTONE_13.md` as the baseline plan for Project Workspace UI Consolidation.
+- Added planning conversation child rows under project rows in the left navigation hierarchy.
+- Added compact chat markers for conversation rows.
+- Added direct conversation-row navigation into the focused project chat surface.
+- Added project row `...` menu routing for Overview, Chat, References, Edit, and Delete.
+- Added a focused chat surface that removes redundant Projects, Active Workspace, tab, and Planning Chat headings.
+- Added Project Edit as the consolidated surface for project details, GitHub repository linkage, and project Markdown context configuration.
 
 ### Changed
 
@@ -163,8 +171,13 @@ All notable changes to Overlay Forge will be documented in this file.
 - Confirmed project Markdown context is project-scoped, local-first, and not stored as per-conversation manual attachments.
 - Confirmed conversation manual attachments remain an additional context layer after project Markdown context.
 - Confirmed GitHub file APIs, broad repository indexing, bridge export, and direct Codex handoff remain deferred beyond Milestone 12.
-- Clarified that Milestone 12 is tentatively validated functionally, but needs a second validation pass after Milestone 13 removes redundant workspace UI.
+- Confirmed that Milestone 12 is complete, passed, and successful after the Milestone 13 UI consolidation pass.
 - Clarified that Milestone 13 should preserve conversation-scoped manual attachment data semantics while moving attachment controls out of the primary chat surface.
+- Added the Milestone 13 right-hand pane for conversation attached context and local Markdown bridge drafts.
+- Added a `New Chat` project action that starts on an empty new-conversation area.
+- Preserved left-navigation conversation child-row selection as the only path for opening existing chats directly.
+- Confirmed Milestone 13 did not require schema changes.
+- Confirmed conversation manual attachments remain conversation-scoped after UI consolidation.
 
 ### Validation
 
@@ -235,4 +248,9 @@ All notable changes to Overlay Forge will be documented in this file.
 - Verified frontend build after Milestone 12 implementation with `npm run build`.
 - Verified Rust backend compile after Milestone 12 implementation with `cargo build`.
 - Verified development launch after Milestone 12 implementation with `npm run tauri:dev`; the app process started and was stopped after the validation timeout.
-- Manual validation for Milestone 12 is tentatively successful for context ingestion and pending a second UI-focused validation pass after Milestone 13.
+- Manual validation for Milestone 12 is complete, passed, and successful.
+- Verified frontend build after Milestone 13 implementation with `npm run build`.
+- Verified `npm install` completes successfully after Milestone 13 implementation.
+- Verified Rust backend compile after Milestone 13 implementation with `cargo build`.
+- Verified development launch after Milestone 13 implementation with `npm run tauri:dev`; the app process started and was stopped after the validation timeout.
+- Manual validation for Milestone 13 is complete, passed, and successful.

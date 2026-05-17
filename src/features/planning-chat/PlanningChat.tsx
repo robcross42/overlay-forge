@@ -19,7 +19,6 @@ import {
   listPlanningConversations,
   listPlanningMessages,
   loadProjectMarkdownContext,
-  previewPlanningChatPrompt,
   removePlanningConversationContext,
   saveProjectMarkdownContext,
   sendPlanningMessage
@@ -30,7 +29,6 @@ import type {
   PlanningConversation,
   PlanningConversationContext,
   PlanningMessage,
-  PlanningPromptPreview,
   ProjectMarkdownContext,
   ProjectMarkdownContextPayload
 } from "../../services/planningChat";
@@ -44,6 +42,10 @@ import type { YouTubeReference } from "../../services/youtube";
 
 type PlanningChatProps = {
   project?: Project;
+  focused?: boolean;
+  initialConversationId?: number | null;
+  onConversationsChanged?: (conversations: PlanningConversation[]) => void;
+  startInNewConversation?: boolean;
 };
 
 type AttachableOption = {
@@ -62,7 +64,13 @@ const contextTypes = [
   { value: "scratchpad", label: "Scratchpad" }
 ] satisfies Array<{ value: PlanningContextType; label: string }>;
 
-export function PlanningChat({ project }: PlanningChatProps) {
+export function PlanningChat({
+  project,
+  focused = false,
+  initialConversationId,
+  onConversationsChanged,
+  startInNewConversation = false
+}: PlanningChatProps) {
   const isWorkspaceChat = Boolean(project);
   const [projects, setProjects] = useState<Project[]>(project ? [project] : []);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(project?.id ?? null);
@@ -83,10 +91,7 @@ export function PlanningChat({ project }: PlanningChatProps) {
   const [youtubeReferences, setYouTubeReferences] = useState<YouTubeReference[]>([]);
   const [githubLink, setGithubLink] = useState<ProjectGitHubRepository | null>(null);
   const [scratchpadContent, setScratchpadContent] = useState("");
-  const [autoAttachedGitHubKeys, setAutoAttachedGitHubKeys] = useState<string[]>([]);
-  const [promptPreview, setPromptPreview] = useState<PlanningPromptPreview | null>(null);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [contextItemsConversationId, setContextItemsConversationId] = useState<number | null>(null);
   const [bridgeDrafts, setBridgeDrafts] = useState<BridgeFileDraft[]>([]);
   const [selectedBridgeDraft, setSelectedBridgeDraft] = useState<BridgeFileDraft | null>(null);
   const [isDraftingBridgeFile, setIsDraftingBridgeFile] = useState(false);
@@ -98,6 +103,10 @@ export function PlanningChat({ project }: PlanningChatProps) {
     warnings: []
   });
   const [isSavingMarkdownContext, setIsSavingMarkdownContext] = useState(false);
+  const [isRightPaneOpen, setIsRightPaneOpen] = useState(true);
+  const [isMarkdownPaneSectionOpen, setIsMarkdownPaneSectionOpen] = useState(true);
+  const [isConversationContextPaneSectionOpen, setIsConversationContextPaneSectionOpen] = useState(true);
+  const [isBridgeDraftsPaneSectionOpen, setIsBridgeDraftsPaneSectionOpen] = useState(false);
 
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === selectedProjectId) ?? null,
@@ -109,6 +118,8 @@ export function PlanningChat({ project }: PlanningChatProps) {
       conversations.find((conversation) => conversation.id === selectedConversationId) ?? null,
     [conversations, selectedConversationId]
   );
+
+  const showConversationSidebar = !focused;
 
   useEffect(() => {
     if (project) {
@@ -149,7 +160,14 @@ export function PlanningChat({ project }: PlanningChatProps) {
     ])
       .then(([nextConversations, nextDrafts, nextMarkdownContext, nextMarkdownPayload]) => {
         setConversations(nextConversations);
-        setSelectedConversationId(nextConversations[0]?.id ?? null);
+        const requestedConversation = initialConversationId
+          ? nextConversations.find((conversation) => conversation.id === initialConversationId)
+          : null;
+        setSelectedConversationId(
+          startInNewConversation
+            ? null
+            : requestedConversation?.id ?? nextConversations[0]?.id ?? null
+        );
         setMessages([]);
         setBridgeDrafts(nextDrafts);
         setSelectedBridgeDraft(nextDrafts[0] ?? null);
@@ -160,18 +178,42 @@ export function PlanningChat({ project }: PlanningChatProps) {
         setStatus(
           nextConversations.length === 0 ? "No planning conversations yet" : "Ready"
         );
+        onConversationsChanged?.(nextConversations);
       })
       .catch((error) => setStatus(formatError(error)));
-  }, [selectedProjectId]);
+  }, [selectedProjectId, initialConversationId, startInNewConversation]);
+
+  useEffect(() => {
+    if (!initialConversationId) {
+      return;
+    }
+
+    const conversation = conversations.find((item) => item.id === initialConversationId);
+    if (conversation) {
+      setSelectedConversationId(conversation.id);
+    }
+  }, [initialConversationId, conversations]);
+
+  useEffect(() => {
+    if (startInNewConversation) {
+      setSelectedConversationId(null);
+      setMessages([]);
+      setContextItems([]);
+      setContextItemsConversationId(null);
+      setStatus("Ready for a new conversation");
+    }
+  }, [startInNewConversation]);
 
   useEffect(() => {
     if (!selectedConversationId) {
       setMessages([]);
       setContextItems([]);
-      setPromptPreview(null);
-      setIsPreviewOpen(false);
+      setContextItemsConversationId(null);
       return;
     }
+
+    setContextItems([]);
+    setContextItemsConversationId(null);
 
     Promise.all([
       listPlanningMessages(selectedConversationId),
@@ -183,6 +225,7 @@ export function PlanningChat({ project }: PlanningChatProps) {
       .then(([nextMessages, nextContext, nextMarkdownPayload]) => {
         setMessages(nextMessages);
         setContextItems(dedupeContextItems(nextContext));
+        setContextItemsConversationId(selectedConversationId);
         setMarkdownPayload(nextMarkdownPayload);
         setStatus(nextMessages.length === 0 ? "Conversation ready" : "Ready");
       })
@@ -239,8 +282,7 @@ export function PlanningChat({ project }: PlanningChatProps) {
       return;
     }
 
-    const autoKey = `${selectedConversation.id}:${githubLink.id}`;
-    if (autoAttachedGitHubKeys.includes(autoKey)) {
+    if (contextItemsConversationId !== selectedConversation.id) {
       return;
     }
 
@@ -250,9 +292,6 @@ export function PlanningChat({ project }: PlanningChatProps) {
         (item.sourceId === githubLink.id || item.label === githubLink.repositoryFullName)
     );
     if (alreadyAttached) {
-      setAutoAttachedGitHubKeys((current) =>
-        current.includes(autoKey) ? current : [...current, autoKey]
-      );
       return;
     }
 
@@ -271,12 +310,9 @@ export function PlanningChat({ project }: PlanningChatProps) {
           );
           return exists ? dedupeContextItems(current) : dedupeContextItems([...current, attached]);
         });
-        setAutoAttachedGitHubKeys((current) =>
-          current.includes(autoKey) ? current : [...current, autoKey]
-        );
       })
       .catch((error) => setStatus(formatError(error)));
-  }, [selectedConversation?.id, githubLink?.id, contextItems, autoAttachedGitHubKeys]);
+  }, [selectedConversation?.id, githubLink?.id, contextItems, contextItemsConversationId]);
 
   async function onNewConversation() {
     if (!selectedProject) {
@@ -292,12 +328,13 @@ export function PlanningChat({ project }: PlanningChatProps) {
 
     try {
       const created = await createPlanningConversation(selectedProject.id, title);
-      setConversations((current) => [created, ...current]);
+      const nextConversations = [created, ...conversations];
+      setConversations(nextConversations);
+      onConversationsChanged?.(nextConversations);
       setSelectedConversationId(created.id);
       setMessages([]);
       setContextItems([]);
-      setPromptPreview(null);
-      setIsPreviewOpen(false);
+      setContextItemsConversationId(null);
       setNewConversationTitle("");
       setStatus("Conversation created");
     } catch (error) {
@@ -335,6 +372,7 @@ export function PlanningChat({ project }: PlanningChatProps) {
       setMessages(nextMessages);
       const nextConversations = await listPlanningConversations(selectedConversation.projectId);
       setConversations(nextConversations);
+      onConversationsChanged?.(nextConversations);
       setStatus("Response saved");
     } catch (error) {
       setMessages((current) => current.filter((message) => message.id !== pendingMessage.id));
@@ -358,6 +396,7 @@ export function PlanningChat({ project }: PlanningChatProps) {
         (draft) => draft.conversationId !== selectedConversation.id
       );
       setConversations(nextConversations);
+      onConversationsChanged?.(nextConversations);
       setSelectedConversationId(nextConversations[0]?.id ?? null);
       setBridgeDrafts(nextDrafts);
       setSelectedBridgeDraft((current) =>
@@ -365,8 +404,7 @@ export function PlanningChat({ project }: PlanningChatProps) {
       );
       setMessages([]);
       setContextItems([]);
-      setPromptPreview(null);
-      setIsPreviewOpen(false);
+      setContextItemsConversationId(null);
       setStatus("Conversation deleted");
     } catch (error) {
       setStatus(formatError(error));
@@ -481,26 +519,6 @@ export function PlanningChat({ project }: PlanningChatProps) {
     }
   }
 
-  async function onPreviewPrompt() {
-    if (!selectedConversation) {
-      setStatus("Create or select a conversation before previewing the prompt");
-      return;
-    }
-
-    setIsPreviewLoading(true);
-    setStatus("Building prompt preview");
-    try {
-      const preview = await previewPlanningChatPrompt(selectedConversation.id, draft);
-      setPromptPreview(preview);
-      setIsPreviewOpen(true);
-      setStatus("Prompt preview ready");
-    } catch (error) {
-      setStatus(formatError(error));
-    } finally {
-      setIsPreviewLoading(false);
-    }
-  }
-
   async function onDraftBridgeFile() {
     if (!selectedConversation) {
       setStatus("Create or select a conversation before drafting a bridge file");
@@ -548,16 +566,19 @@ export function PlanningChat({ project }: PlanningChatProps) {
   }
 
   return (
-    <section className="feature-panel planning-panel">
-      <div className="panel-heading">
-        <div>
-          <p>OpenAI Planning</p>
-          <h3>Planning Chat</h3>
+    <section className={focused ? "planning-panel planning-panel-focused" : "feature-panel planning-panel"}>
+      {!focused && (
+        <div className="panel-heading">
+          <div>
+            <p>OpenAI Planning</p>
+            <h3>Planning Chat</h3>
+          </div>
+          <span className={isSending ? "save-pill save-pill-loading" : "save-pill"}>{status}</span>
         </div>
-        <span className={isSending ? "save-pill save-pill-loading" : "save-pill"}>{status}</span>
-      </div>
+      )}
 
-      <div className="planning-layout">
+      <div className={focused ? "planning-layout planning-layout-focused" : "planning-layout"}>
+        {showConversationSidebar && (
         <aside className="planning-sidebar" aria-label="Planning chat controls">
           {isWorkspaceChat ? (
             <div className="workspace-project-context" aria-label="Workspace project">
@@ -705,8 +726,49 @@ export function PlanningChat({ project }: PlanningChatProps) {
             </button>
           )}
         </aside>
+        )}
 
+        <div
+          className={
+            focused
+              ? isRightPaneOpen
+                ? "planning-chat-shell planning-chat-shell-with-right"
+                : "planning-chat-shell planning-chat-shell-with-right planning-chat-shell-right-collapsed"
+              : "planning-chat-shell"
+          }
+        >
         <div className="planning-chat-surface">
+          {focused && (
+            <div className="focused-chat-toolbar">
+              <div>
+                <p>{selectedProject?.name ?? "Project"}</p>
+                <h3>{selectedConversation?.title ?? "Select or create a conversation"}</h3>
+              </div>
+              <span className={isSending ? "save-pill save-pill-loading" : "save-pill"}>{status}</span>
+            </div>
+          )}
+
+          {focused && !selectedConversation && (
+            <div className="focused-conversation-controls">
+              <input
+                aria-label="Conversation title"
+                className="text-input"
+                disabled={!selectedProject || isSending}
+                onChange={(event) => setNewConversationTitle(event.target.value)}
+                placeholder="New conversation title"
+                value={newConversationTitle}
+              />
+              <button
+                className="primary-button"
+                disabled={!selectedProject || isSending || newConversationTitle.trim().length === 0}
+                onClick={() => void onNewConversation()}
+                type="button"
+              >
+                New
+              </button>
+            </div>
+          )}
+
           <div className="message-list" aria-label="Planning messages">
             {projects.length === 0 && (
               <div className="empty-editor-state">
@@ -738,6 +800,7 @@ export function PlanningChat({ project }: PlanningChatProps) {
             )}
           </div>
 
+          {!focused && (
           <section className="project-markdown-panel" aria-label="Project Markdown context sources">
             <div className="project-markdown-heading">
               <div>
@@ -783,7 +846,9 @@ export function PlanningChat({ project }: PlanningChatProps) {
               </div>
             )}
           </section>
+          )}
 
+          {!focused && (
           <section className="attached-context-panel" aria-label="Attached context">
             <div className="attached-context-heading">
               <div>
@@ -796,7 +861,7 @@ export function PlanningChat({ project }: PlanningChatProps) {
                 onClick={() => setIsAttachOpen((current) => !current)}
                 type="button"
               >
-                + Attach Context
+                {isAttachOpen ? "Close Context" : "Conversation Context"}
               </button>
             </div>
 
@@ -851,6 +916,7 @@ export function PlanningChat({ project }: PlanningChatProps) {
               </div>
             )}
 
+            {isAttachOpen && (
             <div className="attached-context-list">
               {contextItems.length === 0 ? (
                 <p>No context attached to this conversation.</p>
@@ -872,7 +938,9 @@ export function PlanningChat({ project }: PlanningChatProps) {
                 ))
               )}
             </div>
+            )}
           </section>
+          )}
 
           <form className="chat-input-row">
             <textarea
@@ -884,14 +952,6 @@ export function PlanningChat({ project }: PlanningChatProps) {
               value={draft}
             />
             <button
-              className="ghost-button"
-              disabled={!selectedConversation || isSending || isPreviewLoading}
-              onClick={() => void onPreviewPrompt()}
-              type="button"
-            >
-              Preview Prompt
-            </button>
-            <button
               className="primary-button"
               disabled={!selectedConversation || isSending || draft.trim().length === 0}
               onClick={() => void onSendMessage()}
@@ -901,156 +961,347 @@ export function PlanningChat({ project }: PlanningChatProps) {
             </button>
           </form>
 
-          {isPreviewOpen && promptPreview && (
-            <section className="prompt-preview-panel" aria-label="Prompt preview">
-              <div className="prompt-preview-heading">
+          {!focused && (
+            <section className="bridge-drafts-panel" aria-label="Bridge drafts">
+              <div className="bridge-drafts-heading">
                 <div>
-                  <p>Prompt Preview</p>
-                  <h4>Read-only Context Package</h4>
+                  <p>Bridge Drafts</p>
+                  <h4>Local Markdown Drafts</h4>
                 </div>
                 <button
                   className="ghost-button"
-                  onClick={() => setIsPreviewOpen(false)}
+                  disabled={!selectedConversation || isSending || isDraftingBridgeFile}
+                  onClick={() => void onDraftBridgeFile()}
                   type="button"
                 >
-                  Close
+                  Draft Bridge File
                 </button>
               </div>
 
-              <div className="prompt-preview-grid">
-                <article className="prompt-preview-card">
-                  <span>Project</span>
-                  <strong>{promptPreview.projectLabel}</strong>
-                  <p>Status: {formatProjectStatus(promptPreview.projectStatus)}</p>
-                  <p>{promptPreview.projectDescription || "No description"}</p>
-                </article>
-
-                <article className="prompt-preview-card">
-                  <span>Conversation</span>
-                  <strong>{promptPreview.conversationLabel}</strong>
-                  <p>{promptPreview.messageCount} existing message(s)</p>
-                </article>
-
-                <article className="prompt-preview-card prompt-preview-wide">
-                  <span>User Message</span>
-                  <pre>{promptPreview.draftMessage || "No draft message entered."}</pre>
-                </article>
-
-                <article className="prompt-preview-card prompt-preview-wide">
-                  <span>Project Markdown Context</span>
-                  {promptPreview.projectMarkdownContextItems.length === 0 ? (
-                    <p>No project Markdown context loaded.</p>
+              <div className="bridge-drafts-layout">
+                <div className="bridge-drafts-list">
+                  {bridgeDrafts.length === 0 ? (
+                    <p>No bridge drafts saved for this project.</p>
                   ) : (
-                    <div className="prompt-preview-context-list">
-                      {promptPreview.projectMarkdownContextItems.map((item) => (
-                        <div className="prompt-preview-context-item" key={item.relativePath}>
-                          <strong>{item.relativePath}</strong>
-                          <p>Included: {item.included ? "Yes" : "No"}</p>
-                          {item.warning && <p>{item.warning}</p>}
+                    bridgeDrafts.map((draft) => (
+                      <button
+                        className={
+                          selectedBridgeDraft?.id === draft.id
+                            ? "bridge-draft-list-item active"
+                            : "bridge-draft-list-item"
+                        }
+                        key={draft.id}
+                        onClick={() => void onSelectBridgeDraft(draft.id)}
+                        type="button"
+                      >
+                        <strong>{draft.title}</strong>
+                        <span>{formatDate(draft.updatedAt)}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+
+                <article className="bridge-draft-view">
+                  {selectedBridgeDraft ? (
+                    <>
+                      <div className="bridge-draft-view-heading">
+                        <div>
+                          <span>{selectedBridgeDraft.status}</span>
+                          <strong>{selectedBridgeDraft.title}</strong>
                         </div>
-                      ))}
-                    </div>
+                        <button
+                          className="ghost-button"
+                          onClick={() => void onDeleteBridgeDraft()}
+                          type="button"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                      <pre>{selectedBridgeDraft.content}</pre>
+                    </>
+                  ) : (
+                    <p>Select or generate a bridge draft to view its Markdown content.</p>
                   )}
                 </article>
-
-                <article className="prompt-preview-card prompt-preview-wide">
-                  <span>Attached Context</span>
-                  {promptPreview.attachedContextItems.length === 0 ? (
-                    <p>No attached context.</p>
-                  ) : (
-                    <div className="prompt-preview-context-list">
-                      {promptPreview.attachedContextItems.map((item) => (
-                        <div className="prompt-preview-context-item" key={item.id}>
-                          <strong>{formatContextType(item.contextType)}</strong>
-                          <p>Label: {item.label}</p>
-                          <p>Included: {item.included ? "Yes" : "No"}</p>
-                          {item.warning && <p>{item.warning}</p>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </article>
-
-                <article className="prompt-preview-card prompt-preview-wide">
-                  <span>Assembled Prompt Preview</span>
-                  <pre>{promptPreview.assembledPrompt}</pre>
-                </article>
-
-                {promptPreview.warnings.length > 0 && (
-                  <article className="prompt-preview-card prompt-preview-wide">
-                    <span>Warnings</span>
-                    {promptPreview.warnings.map((warning) => (
-                      <p key={warning}>{warning}</p>
-                    ))}
-                  </article>
-                )}
               </div>
             </section>
           )}
+        </div>
 
-          <section className="bridge-drafts-panel" aria-label="Bridge drafts">
-            <div className="bridge-drafts-heading">
-              <div>
-                <p>Bridge Drafts</p>
-                <h4>Local Markdown Drafts</h4>
-              </div>
-              <button
-                className="ghost-button"
-                disabled={!selectedConversation || isSending || isDraftingBridgeFile}
-                onClick={() => void onDraftBridgeFile()}
-                type="button"
-              >
-                Draft Bridge File
-              </button>
-            </div>
+        {focused && (
+          <aside
+            className={
+              isRightPaneOpen
+                ? "chat-right-pane"
+                : "chat-right-pane chat-right-pane-collapsed"
+            }
+            aria-label="Chat context and drafts"
+          >
+            <button
+              className="chat-right-pane-toggle"
+              onClick={() => setIsRightPaneOpen((current) => !current)}
+              type="button"
+            >
+              {isRightPaneOpen ? ">" : "<"}
+            </button>
 
-            <div className="bridge-drafts-layout">
-              <div className="bridge-drafts-list">
-                {bridgeDrafts.length === 0 ? (
-                  <p>No bridge drafts saved for this project.</p>
-                ) : (
-                  bridgeDrafts.map((draft) => (
-                    <button
-                      className={
-                        selectedBridgeDraft?.id === draft.id
-                          ? "bridge-draft-list-item active"
-                          : "bridge-draft-list-item"
-                      }
-                      key={draft.id}
-                      onClick={() => void onSelectBridgeDraft(draft.id)}
-                      type="button"
-                    >
-                      <strong>{draft.title}</strong>
-                      <span>{formatDate(draft.updatedAt)}</span>
-                    </button>
-                  ))
-                )}
-              </div>
+            {isRightPaneOpen && (
+              <div className="chat-right-pane-content">
+                <div className="chat-right-pane-title">
+                  <p>Context References</p>
+                  <h4>{selectedProject?.name ?? "Selected Project"}</h4>
+                </div>
 
-              <article className="bridge-draft-view">
-                {selectedBridgeDraft ? (
-                  <>
-                    <div className="bridge-draft-view-heading">
-                      <div>
-                        <span>{selectedBridgeDraft.status}</span>
-                        <strong>{selectedBridgeDraft.title}</strong>
-                      </div>
+                <section className="project-markdown-panel" aria-label="Project Markdown context sources">
+                  <div className="project-markdown-heading">
+                    <div>
+                      <p>Project Markdown</p>
+                      <h4>Local Repo Context</h4>
+                    </div>
+                    <div className="right-pane-section-actions">
                       <button
                         className="ghost-button"
-                        onClick={() => void onDeleteBridgeDraft()}
+                        disabled={!selectedProject}
+                        onClick={() => void onReloadMarkdownContext()}
                         type="button"
                       >
-                        Delete
+                        Reload
+                      </button>
+                      <button
+                        className="ghost-button icon-button"
+                        onClick={() => setIsMarkdownPaneSectionOpen((current) => !current)}
+                        type="button"
+                      >
+                        {isMarkdownPaneSectionOpen ? "-" : "+"}
                       </button>
                     </div>
-                    <pre>{selectedBridgeDraft.content}</pre>
-                  </>
-                ) : (
-                  <p>Select or generate a bridge draft to view its Markdown content.</p>
-                )}
-              </article>
-            </div>
-          </section>
+                  </div>
+
+                  {isMarkdownPaneSectionOpen ? (
+                    <>
+                      <div className="project-markdown-list project-markdown-list-stacked">
+                        {markdownPayload.files.length === 0 ? (
+                          <p>No project Markdown context loaded.</p>
+                        ) : (
+                          markdownPayload.files.map((file) => (
+                            <div
+                              className={
+                                file.included
+                                  ? "project-markdown-item"
+                                  : "project-markdown-item project-markdown-item-warning"
+                              }
+                              key={file.relativePath}
+                            >
+                              <span>{file.relativePath}</span>
+                              <strong>{file.included ? "Included" : "Skipped"}</strong>
+                              {file.warning && <p>{file.warning}</p>}
+                            </div>
+                          ))
+                        )}
+                      </div>
+
+                      {markdownPayload.warnings.length > 0 && (
+                        <div className="project-markdown-warnings">
+                          {markdownPayload.warnings.slice(0, 3).map((warning) => (
+                            <p key={warning}>{warning}</p>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="right-pane-section-summary">
+                      {markdownPayload.files.filter((file) => file.included).length} included,
+                      {" "}
+                      {markdownPayload.files.filter((file) => !file.included).length} skipped
+                    </p>
+                  )}
+                </section>
+
+                <section className="attached-context-panel" aria-label="Attached context">
+                  <div className="attached-context-heading">
+                    <div>
+                      <p>Attached Context</p>
+                      <h4>Conversation Links</h4>
+                    </div>
+                    <div className="right-pane-section-actions">
+                      <button
+                        className="ghost-button"
+                        disabled={!selectedConversation || isSending}
+                        onClick={() => setIsAttachOpen((current) => !current)}
+                        type="button"
+                      >
+                        {isAttachOpen ? "Close" : "+ Attach"}
+                      </button>
+                      <button
+                        className="ghost-button icon-button"
+                        onClick={() =>
+                          setIsConversationContextPaneSectionOpen((current) => !current)
+                        }
+                        type="button"
+                      >
+                        {isConversationContextPaneSectionOpen ? "-" : "+"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {isConversationContextPaneSectionOpen && isAttachOpen && (
+                    <div className="attach-context-form right-pane-attach-form">
+                      <label className="field-label">
+                        <span>Type</span>
+                        <select
+                          aria-label="Context type"
+                          className="text-input"
+                          disabled={!selectedConversation || isSending}
+                          onChange={(event) => setAttachType(event.target.value as PlanningContextType)}
+                          value={attachType}
+                        >
+                          {contextTypes.map((item) => (
+                            <option key={item.value} value={item.value}>
+                              {item.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="field-label">
+                        <span>Item</span>
+                        <select
+                          aria-label="Context item"
+                          className="text-input"
+                          disabled={activeAttachOptions.length === 0 || !selectedConversation || isSending}
+                          onChange={(event) => setAttachSourceKey(event.target.value)}
+                          value={attachSourceKey}
+                        >
+                          {activeAttachOptions.length === 0 ? (
+                            <option value="">No items available</option>
+                          ) : (
+                            activeAttachOptions.map((option) => (
+                              <option key={optionKey(option)} value={optionKey(option)}>
+                                {option.label}
+                              </option>
+                            ))
+                          )}
+                        </select>
+                      </label>
+
+                      <button
+                        className="primary-button"
+                        disabled={!selectedConversation || activeAttachOptions.length === 0 || isSending}
+                        onClick={() => void onAttachContext()}
+                        type="button"
+                      >
+                        Attach
+                      </button>
+                    </div>
+                  )}
+
+                  {isConversationContextPaneSectionOpen ? (
+                    <div className="attached-context-list">
+                      {contextItems.length === 0 ? (
+                        <p>No context attached to this conversation.</p>
+                      ) : (
+                        contextItems.map((contextItem) => (
+                          <div className="attached-context-item" key={contextItem.id}>
+                            <span>
+                              {formatContextType(contextItem.contextType)}: {contextItem.label}
+                            </span>
+                            <button
+                              className="ghost-button"
+                              disabled={isSending}
+                              onClick={() => void onRemoveContext(contextItem)}
+                              type="button"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  ) : (
+                    <p className="right-pane-section-summary">{contextItems.length} attached</p>
+                  )}
+                </section>
+
+                <section className="bridge-drafts-panel" aria-label="Bridge drafts">
+                  <div className="bridge-drafts-heading">
+                    <div>
+                      <p>Markdown Drafts</p>
+                      <h4>Local Bridge Drafts</h4>
+                    </div>
+                    <div className="right-pane-section-actions">
+                      <button
+                        className="ghost-button"
+                        disabled={!selectedConversation || isSending || isDraftingBridgeFile}
+                        onClick={() => void onDraftBridgeFile()}
+                        type="button"
+                      >
+                        Draft
+                      </button>
+                      <button
+                        className="ghost-button icon-button"
+                        onClick={() => setIsBridgeDraftsPaneSectionOpen((current) => !current)}
+                        type="button"
+                      >
+                        {isBridgeDraftsPaneSectionOpen ? "-" : "+"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {isBridgeDraftsPaneSectionOpen ? (
+                    <div className="bridge-drafts-layout bridge-drafts-layout-stacked">
+                    <div className="bridge-drafts-list">
+                      {bridgeDrafts.length === 0 ? (
+                        <p>No bridge drafts saved for this project.</p>
+                      ) : (
+                        bridgeDrafts.map((draft) => (
+                          <button
+                            className={
+                              selectedBridgeDraft?.id === draft.id
+                                ? "bridge-draft-list-item active"
+                                : "bridge-draft-list-item"
+                            }
+                            key={draft.id}
+                            onClick={() => void onSelectBridgeDraft(draft.id)}
+                            type="button"
+                          >
+                            <strong>{draft.title}</strong>
+                            <span>{formatDate(draft.updatedAt)}</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+
+                    <article className="bridge-draft-view">
+                      {selectedBridgeDraft ? (
+                        <>
+                          <div className="bridge-draft-view-heading">
+                            <div>
+                              <span>{selectedBridgeDraft.status}</span>
+                              <strong>{selectedBridgeDraft.title}</strong>
+                            </div>
+                            <button
+                              className="ghost-button"
+                              onClick={() => void onDeleteBridgeDraft()}
+                              type="button"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                          <pre>{selectedBridgeDraft.content}</pre>
+                        </>
+                      ) : (
+                        <p>Select or generate a bridge draft to view its Markdown content.</p>
+                      )}
+                    </article>
+                    </div>
+                  ) : (
+                    <p className="right-pane-section-summary">{bridgeDrafts.length} saved draft(s)</p>
+                  )}
+                </section>
+              </div>
+            )}
+          </aside>
+        )}
         </div>
       </div>
     </section>

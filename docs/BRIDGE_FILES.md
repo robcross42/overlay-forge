@@ -2,7 +2,7 @@
 
 Bridge files are markdown handoff documents that describe project state, constraints, and implementation requests for Codex.
 
-Milestone 3 introduces an OpenAI Planning Chat foundation, Milestone 4 introduces a GitHub repository-link foundation, Milestone 5 introduces a controlled local YouTube reference foundation, Milestone 6 moves project-scoped chat into the selected Projects workspace, Milestone 7 refines the selected-project workspace layout, Milestone 8 completes Projects navigation tree actions, Milestone 9 completes manual context attachments, Milestone 10 completes Prompt Preview, Milestone 11 completes local Bridge File Drafting, Milestone 12 implements project-level local Markdown context with tentative validation, and Milestone 13 is planned for Project Workspace UI Consolidation. Export and Codex handoff are still deferred.
+Milestone 3 introduces an OpenAI Planning Chat foundation, Milestone 4 introduces a GitHub repository-link foundation, Milestone 5 introduces a controlled local YouTube reference foundation, Milestone 6 moves project-scoped chat into the selected Projects workspace, Milestone 7 refines the selected-project workspace layout, Milestone 8 completes Projects navigation tree actions, Milestone 9 completes manual context attachments, Milestone 10 completes Prompt Preview, Milestone 11 completes local Bridge File Drafting, Milestone 12 completes project-level local Markdown context, and Milestone 13 completes Project Workspace UI Consolidation. Export and Codex handoff are still deferred.
 
 ## Current Manual Bridge
 
@@ -20,7 +20,7 @@ The Milestone 0 scratchpad component is complete and passed. Scratchpad content 
 
 Milestone 1 is complete, passed, and successful.
 
-Current user-validated project baseline is Milestone 11. Milestone 4 - GitHub Integration is complete, passed, and successful.
+Current user-validated project baseline is Milestone 13. Milestone 4 - GitHub Integration is complete, passed, and successful.
 
 Milestone 5 - Controlled YouTube Component is complete, passed, and successful.
 
@@ -36,9 +36,9 @@ Milestone 10 - Prompt Preview is complete, passed, and successful.
 
 Milestone 11 - Bridge File Drafting is complete, passed, and successful.
 
-Milestone 12 - Project Markdown Context is tentatively validated and needs a UI follow-up pass after Milestone 13.
+Milestone 12 - Project Markdown Context is complete, passed, and successful.
 
-Milestone 13 - Project Workspace UI Consolidation is planned and not started.
+Milestone 13 - Project Workspace UI Consolidation is complete, passed, and successful.
 
 Milestone 3 is complete, passed, and successful. It adds local planning conversations/messages and backend OpenAI Responses API calls, but it does not generate bridge files yet.
 
@@ -58,11 +58,11 @@ Milestone 10 is complete, passed, and successful. It adds a read-only Prompt Pre
 
 Milestone 11 is complete, passed, and successful. It adds local SQLite bridge draft generation from selected project Chat conversations. Drafts use resolved attached context, including linked GitHub repository metadata. Project chat sends also include resolved attached context. Drafts remain in-app and read-only; export, editor, approval workflow, and Codex handoff are deferred.
 
-Milestone 12 is tentatively validated for context ingestion. It adds project-level local Markdown context by loading a fresh `README.md` from a configured project root whenever project chat starts or loads, then resolving referenced Markdown files inside that project root for chat, Prompt Preview, and bridge drafts. It needs a second validation pass after Milestone 13 removes redundant workspace UI.
+Milestone 12 is complete, passed, and successful for context ingestion. It adds project-level local Markdown context by loading a fresh `README.md` from a configured project root whenever project chat starts or loads, then resolving referenced Markdown files inside that project root for chat and bridge drafts.
 
-Milestone 13 is planned. It should consolidate the Projects workspace UI so project and conversation selection live in the left navigation hierarchy, while Project Edit owns project details, GitHub integration, local Markdown context configuration, and local repo/context settings.
+Milestone 13 is complete, passed, and successful. It consolidates the Projects workspace UI so project and conversation selection live in the left navigation hierarchy, while Project Edit owns project details, GitHub integration, local Markdown context configuration, and local repo/context settings. Conversation attached context and local Markdown bridge drafts now live in a collapsible right-hand chat pane. The project row menu uses `New Chat` for new conversations; existing conversations open from their left-nav child rows.
 
-Milestone numbering note: Milestone 2 is the Local Projects component and is complete, passed, and successful. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Milestone 6 is Project Workspace Chat. Milestone 7 is Project Workspace Layout Refinement. Milestone 8 is Projects Navigation Tree Actions and is complete, passed, and successful. Milestone 9 is Manual Context Attachments and is complete, passed, and successful. Milestone 10 is Prompt Preview and is complete, passed, and successful. Milestone 11 is Bridge File Drafting and is complete, passed, and successful. Milestone 12 is Project Markdown Context and is tentatively validated pending Milestone 13 UI follow-up. Milestone 13 is Project Workspace UI Consolidation and is planned. Do not infer milestone IDs from numbered-list positions.
+Milestone numbering note: Milestone 2 is the Local Projects component and is complete, passed, and successful. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Milestone 6 is Project Workspace Chat. Milestone 7 is Project Workspace Layout Refinement. Milestone 8 is Projects Navigation Tree Actions and is complete, passed, and successful. Milestone 9 is Manual Context Attachments and is complete, passed, and successful. Milestone 10 is Prompt Preview and is complete, passed, and successful. Milestone 11 is Bridge File Drafting and is complete, passed, and successful. Milestone 12 is Project Markdown Context and is complete, passed, and successful. Milestone 13 is Project Workspace UI Consolidation and is complete, passed, and successful. Do not infer milestone IDs from numbered-list positions.
 
 ## Intended Future Workflow
 

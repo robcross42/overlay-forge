@@ -2191,7 +2191,8 @@ fn build_planning_context_payload(
         String::new()
     } else {
         format!(
-            "Project Markdown Context:\n\n{}\n\nConversation manual attachments:\n\n{}",
+            "Local repository Markdown context:\n\
+The following Markdown files were read from the selected project's configured local repository root and are available as source context for this chat. Use them when answering questions about the project files, README, docs, bridge files, project plan, or milestone state.\n\n{}\n\nConversation manual attachments:\n\n{}",
             markdown_text, attachment_text
         )
     };

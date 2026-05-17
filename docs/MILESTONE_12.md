@@ -2,7 +2,7 @@
 
 ## Status
 
-Tentatively Validated / Needs UI Follow-up After Milestone 13
+Complete / Passed / Successful
 
 ## Goal
 
@@ -18,7 +18,7 @@ Milestone 12 is project-scoped, not conversation-scoped. The user should not nee
 
 Milestone 12 remains local-first. It reads Markdown documentation from a configured local project root only.
 
-Validation note: Milestone 12 context ingestion is tentatively validated. Project Markdown files are being loaded and used, but the current project workspace and Chat UI are too cramped for a full validation pass. Milestone 13 will consolidate the Projects workspace UI, after which Milestone 12 should receive one more validation pass.
+Validation note: Milestone 12 context ingestion is validated. Project Markdown files load from the configured local root and are used by chat and bridge draft workflows after the Milestone 13 UI consolidation pass.
 
 ## Implemented Capabilities
 

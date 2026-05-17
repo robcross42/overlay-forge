@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**Current project baseline: Milestone 11.**
+**Current project baseline: Milestone 13.**
 
-Milestone 11 is the latest completed, tested, and user-validated milestone. Milestone 12 is tentatively validated for context ingestion and needs a UI follow-up pass after Milestone 13.
+Milestone 13 is the latest completed, tested, and user-validated milestone.
 
 **Milestone 0 - Overlay Shell Validation is complete, passed, and successful.**
 
@@ -72,15 +72,15 @@ Milestone 11 adds local bridge-file draft generation from selected project chat 
 
 **Milestone 12 - Project Markdown Context**
 
-Status: **Tentatively Validated / Needs UI Follow-up After Milestone 13**
+Status: **Complete / Passed / Successful**
 
 Milestone 12 adds project-level local Markdown context. Project chat loads a fresh `README.md` from the configured local project root whenever a new chat starts or an existing chat loads, then includes referenced local Markdown files as project context sources for chat, Prompt Preview, and bridge drafts.
 
 **Milestone 13 - Project Workspace UI Consolidation**
 
-Status: **Planned / Not Started**
+Status: **Complete / Passed / Successful**
 
-Milestone 13 will consolidate the Projects workspace UI around the left navigation hierarchy and a focused main chat surface. Project conversations should appear as child rows under projects, while project editing should contain project details, GitHub integration, local Markdown context configuration, and local repo/context settings.
+Milestone 13 consolidates the Projects workspace UI around the left navigation hierarchy, a focused main chat surface, and a collapsible right-hand chat pane. Project conversations appear as child rows under projects, `New Chat` opens an empty new-conversation area from the project row menu, and project editing contains project details, GitHub integration, local Markdown context configuration, and local repo/context settings.
 
 ## Product Direction
 
@@ -102,12 +102,12 @@ Use explicit milestone IDs. Do not infer milestone numbers from this list's item
 - Milestone 9 - Manual context attachments - complete and passed
 - Milestone 10 - Prompt preview - complete, passed, successful
 - Milestone 11 - Bridge file drafting - complete, passed, successful
-- Milestone 12 - Project markdown context - tentatively validated, needs UI follow-up
-- Milestone 13 - Project workspace UI consolidation - planned
+- Milestone 12 - Project markdown context - complete, passed, successful
+- Milestone 13 - Project workspace UI consolidation - complete, passed, successful
 
 ## Scope Guard
 
-Milestone 11 is the current passed stable baseline for later work. Do not implement later milestone features by reverting to an earlier code path; future work should begin from the completed overlay shell, hotkey behavior, always-on-top behavior, component host, local SQLite scratchpad, Tasks, Notes, Calendar, Projects navigation tree/workspace, Planning Chat persistence, manual context attachments, Prompt Preview, Bridge File Drafting, GitHub Integration, and YouTube components.
+Milestone 13 is the current passed stable baseline for later work. Do not implement later milestone features by reverting to an earlier code path; future work should begin from the completed overlay shell, hotkey behavior, always-on-top behavior, component host, local SQLite scratchpad, Tasks, Notes, Calendar, Projects navigation tree/workspace, focused Planning Chat persistence, manual context attachments, project Markdown context, Bridge File Drafting, GitHub Integration, YouTube components, and Project Workspace UI Consolidation.
 
 Milestone 4 remains intentionally small. It does not include automatic Codex handoff, GitHub write operations, pull request creation, branch creation, issue management, full repository browsing, GitHub Actions integration, OAuth, multi-account support, advanced sync, vector store/repo indexing, YouTube integration, external calendar integration, cloud sync, or multi-user auth.
 
@@ -127,4 +127,4 @@ Milestone 11 remains intentionally focused on local bridge draft creation and at
 
 Milestone 12 is a local-first project Markdown context milestone. It loads `README.md` and referenced local Markdown files from a configured project root as project-level context, not as per-conversation manual attachments. It does not read arbitrary filesystem paths outside the project root, read GitHub files through the GitHub API, add vector stores, add semantic search, export bridge files, or hand off directly to Codex.
 
-Milestone 13 is a UI consolidation milestone. It should remove redundant Projects workspace framing, move project configuration into a clean Project Edit screen, show conversations in the left navigation hierarchy, and keep the main chat surface focused. It should not change context data models, convert manual conversation attachments into project-level records, add GitHub file reading, export bridge files, or hand off directly to Codex.
+Milestone 13 is a UI consolidation milestone. It removes redundant Projects workspace framing, moves project configuration into a clean Project Edit screen, shows conversations in the left navigation hierarchy, moves attached context and local Markdown bridge drafts into a collapsible right-hand pane, and keeps the main chat surface focused. It does not change context data models, convert manual conversation attachments into project-level records, add GitHub file reading, export bridge files, or hand off directly to Codex.

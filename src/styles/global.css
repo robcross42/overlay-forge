@@ -199,8 +199,11 @@ button {
 .overlay-shell {
   display: grid;
   grid-template-columns: 260px minmax(0, 1fr);
+  height: calc(100vh - 38px);
+  max-height: calc(100vh - 38px);
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
 .sidebar {
@@ -333,6 +336,12 @@ button {
   padding-left: 22px;
 }
 
+.nav-project-branch {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
 .nav-child-row {
   position: relative;
   display: grid;
@@ -345,6 +354,75 @@ button {
   border: 1px solid transparent;
   border-radius: 8px;
   color: var(--muted);
+}
+
+.nav-conversation-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 30px;
+  margin-left: 12px;
+  padding: 3px 4px 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  text-align: left;
+}
+
+.nav-conversation-label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 26px;
+  padding: 0;
+  overflow: hidden;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.nav-conversation-row .nav-icon-button {
+  background: transparent;
+  color: inherit;
+}
+
+.nav-conversation-label span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav-conversation-row:hover,
+.nav-conversation-row:focus-visible,
+.nav-conversation-row-active {
+  border-color: rgba(79, 208, 165, 0.28);
+  background: rgba(79, 208, 165, 0.08);
+  color: var(--text);
+  outline: 0;
+}
+
+.nav-conversation-label:hover,
+.nav-conversation-label:focus-visible {
+  color: var(--text);
+  outline: 0;
+}
+
+.nav-chat-icon {
+  padding: 2px 5px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--accent-strong);
+  font-size: 0.58rem;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .nav-child-row-active {
@@ -380,6 +458,10 @@ button {
   min-height: 30px;
   padding: 0 9px;
   text-align: left;
+}
+
+.nav-conversation-menu {
+  top: 30px;
 }
 
 .nav-item:not(:disabled) {
@@ -418,10 +500,30 @@ button {
 .workspace {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
+  height: 100%;
+  max-height: 100%;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
   padding: 24px;
+}
+
+.workspace-projects {
+  grid-template-rows: minmax(0, 1fr);
+  height: calc(100vh - 38px);
+  max-height: calc(100vh - 38px);
+  padding: 12px;
+}
+
+.workspace-projects .component-host,
+.workspace-projects .project-focus-panel,
+.workspace-projects .planning-panel-focused,
+.workspace-projects .planning-layout-focused,
+.workspace-projects .planning-chat-shell {
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .workspace-header {
@@ -451,6 +553,14 @@ kbd {
 
 .component-host {
   height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.workspace-projects .component-host {
+  height: 100%;
+  max-height: 100%;
   min-height: 0;
   overflow: hidden;
 }
@@ -804,6 +914,82 @@ select.text-input option:hover {
   scrollbar-width: thin;
 }
 
+.project-focus-panel {
+  display: grid;
+  height: 100%;
+  max-height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.project-focus-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding-bottom: 12px;
+}
+
+.project-focus-heading p,
+.project-focus-heading h3 {
+  margin: 0;
+}
+
+.project-focus-heading p {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.project-focus-heading h3 {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-overview-panel,
+.project-edit-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.project-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+  scrollbar-color: rgba(79, 208, 165, 0.48) rgba(255, 255, 255, 0.06);
+  scrollbar-width: thin;
+}
+
+.project-edit-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.project-edit-card.project-editor-form {
+  min-height: 360px;
+}
+
 .project-workspace {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -1089,14 +1275,171 @@ select.text-input option:hover {
   min-width: 0;
 }
 
+.planning-panel-focused {
+  display: grid;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+}
+
 .planning-layout {
   display: grid;
   grid-template-columns: 270px minmax(0, 1fr);
   gap: 16px;
   height: 100%;
+  max-height: 100%;
   min-height: 0;
   overflow: hidden;
   padding: 18px;
+}
+
+.planning-layout-focused {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  padding: 0;
+}
+
+.planning-chat-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  height: 100%;
+  max-height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.planning-chat-shell-with-right {
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  --focused-composer-right: 354px;
+}
+
+.planning-chat-shell-right-collapsed {
+  grid-template-columns: minmax(0, 1fr) 36px;
+  --focused-composer-right: 70px;
+}
+
+.chat-right-pane {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  overflow: hidden;
+}
+
+.chat-right-pane-collapsed {
+  width: 36px;
+  justify-self: end;
+  background: transparent;
+}
+
+.chat-right-pane-toggle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.chat-right-pane-content {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 38px 10px 10px;
+  scrollbar-color: rgba(79, 208, 165, 0.48) rgba(255, 255, 255, 0.06);
+  scrollbar-width: thin;
+}
+
+.chat-right-pane-content::-webkit-scrollbar {
+  width: 10px;
+}
+
+.chat-right-pane-content::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+}
+
+.chat-right-pane-content::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(79, 208, 165, 0.48);
+  background-clip: content-box;
+}
+
+.right-pane-attach-form,
+.bridge-drafts-layout-stacked,
+.project-markdown-list-stacked {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.chat-right-pane-title {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 0 2px 2px;
+}
+
+.chat-right-pane-title p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.chat-right-pane-title h4 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.96rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.right-pane-section-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.right-pane-section-actions .icon-button {
+  width: 32px;
+  min-width: 32px;
+  padding: 0;
+}
+
+.right-pane-section-summary {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.chat-right-pane .bridge-drafts-panel,
+.chat-right-pane .attached-context-panel,
+.chat-right-pane .project-markdown-panel {
+  padding: 10px;
+}
+
+.chat-right-pane .bridge-draft-view {
+  min-height: 220px;
 }
 
 .planning-sidebar {
@@ -1107,6 +1450,47 @@ select.text-input option:hover {
   min-width: 0;
   min-height: 0;
   overflow: auto;
+}
+
+.focused-chat-toolbar,
+.focused-conversation-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.focused-chat-toolbar p,
+.focused-chat-toolbar h3 {
+  margin: 0;
+}
+
+.focused-chat-toolbar p {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.focused-chat-toolbar h3 {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.focused-conversation-controls {
+  justify-content: stretch;
+}
+
+.focused-conversation-controls .text-input {
+  flex: 1;
+  min-width: 0;
 }
 
 .workspace-project-context {
@@ -1139,6 +1523,46 @@ select.text-input option:hover {
   min-width: 0;
   min-height: 0;
   overflow: auto;
+}
+
+.planning-panel-focused .planning-chat-surface {
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  height: 100%;
+  max-height: 100%;
+  padding: 0;
+  overflow: hidden;
+}
+
+.planning-panel-focused .message-list {
+  min-height: 0;
+  padding: 2px 2px 116px;
+}
+
+.planning-panel-focused .chat-input-row {
+  align-items: end;
+  position: fixed;
+  right: var(--focused-composer-right, 24px);
+  bottom: 14px;
+  left: 272px;
+  z-index: 40;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(13, 18, 24, 0.98);
+  box-shadow: 0 -12px 28px rgba(0, 0, 0, 0.24);
+}
+
+.planning-panel-focused .body-input.compact {
+  min-height: 74px;
+  max-height: 22vh;
+}
+
+.attached-context-panel-collapsed {
+  padding: 8px 10px;
+}
+
+.attached-context-panel-collapsed .attached-context-heading {
+  align-items: center;
 }
 
 .markdown-context-config,
@@ -1289,128 +1713,10 @@ select.text-input option:hover {
 
 .chat-input-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
   gap: 10px;
   min-width: 0;
-}
-
-.prompt-preview-panel {
-  display: grid;
-  gap: 12px;
-  min-width: 0;
-  max-height: 42vh;
-  overflow: auto;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(10, 15, 20, 0.72);
-  scrollbar-color: rgba(79, 208, 165, 0.48) rgba(255, 255, 255, 0.06);
-  scrollbar-width: thin;
-}
-
-.prompt-preview-panel::-webkit-scrollbar {
-  width: 10px;
-}
-
-.prompt-preview-panel::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 999px;
-}
-
-.prompt-preview-panel::-webkit-scrollbar-thumb {
-  border: 2px solid transparent;
-  border-radius: 999px;
-  background: rgba(79, 208, 165, 0.48);
-  background-clip: content-box;
-}
-
-.prompt-preview-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-width: 0;
-}
-
-.prompt-preview-heading p,
-.prompt-preview-heading h4,
-.prompt-preview-card p {
-  margin: 0;
-}
-
-.prompt-preview-heading p,
-.prompt-preview-card span {
-  color: var(--muted);
-  font-size: 0.76rem;
-}
-
-.prompt-preview-heading h4 {
-  margin-top: 3px;
-  font-size: 0.92rem;
-}
-
-.prompt-preview-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  min-width: 0;
-}
-
-.prompt-preview-card {
-  display: grid;
-  gap: 7px;
-  min-width: 0;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.prompt-preview-wide {
-  grid-column: 1 / -1;
-}
-
-.prompt-preview-card strong {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--text);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.prompt-preview-card p {
-  color: var(--muted);
-  font-size: 0.82rem;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-}
-
-.prompt-preview-card pre {
-  max-height: 220px;
-  margin: 0;
-  overflow: auto;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  color: var(--text);
-  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
-  font-size: 0.78rem;
-  line-height: 1.45;
-}
-
-.prompt-preview-context-list {
-  display: grid;
-  gap: 8px;
-}
-
-.prompt-preview-context-item {
-  display: grid;
-  gap: 5px;
-  min-width: 0;
-  padding: 8px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
 }
 
 .attached-context-panel {
@@ -1675,6 +1981,12 @@ select.text-input option:hover {
     grid-template-columns: 1fr;
   }
 
+  .planning-panel-focused .chat-input-row {
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+  }
+
   .attach-context-form {
     grid-template-columns: 1fr;
   }
@@ -1688,10 +2000,6 @@ select.text-input option:hover {
   }
 
   .reference-summary-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .prompt-preview-grid {
     grid-template-columns: 1fr;
   }
 

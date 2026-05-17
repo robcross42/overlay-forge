@@ -37,7 +37,7 @@ pub fn save_scratchpad(content: String, state: State<'_, AppState>) -> Result<()
 #[tauri::command]
 pub fn get_milestone_status(state: State<'_, AppState>) -> Result<MilestoneStatus, String> {
     Ok(MilestoneStatus {
-        milestone: "Milestone 12".to_string(),
+        milestone: "Milestone 13".to_string(),
         hotkey: "Ctrl+Shift+Space".to_string(),
         database_ready: state.database.is_ready(),
     })

@@ -42,9 +42,9 @@ Milestone 10 - Prompt Preview is complete, passed, and successful. It adds a rea
 
 Milestone 11 - Bridge File Drafting is complete, passed, and successful. It adds a read-only bridge draft generation surface inside selected-project Chat and backend commands that store generated Markdown drafts locally in SQLite.
 
-Milestone 12 - Project Markdown Context is tentatively validated and needs a UI follow-up pass after Milestone 13. It adds a project-scoped local Markdown context configuration inside selected-project Chat so README-driven project documentation can feed project chat, Prompt Preview, and bridge draft generation without per-conversation attachment.
+Milestone 12 - Project Markdown Context is complete, passed, and successful. It adds a project-scoped local Markdown context configuration so README-driven project documentation can feed project chat and bridge draft generation without per-conversation attachment.
 
-Milestone 13 - Project Workspace UI Consolidation is planned and not started. It should remove redundant project workspace framing, move project configuration into a clean Project Edit surface, show conversations in the left navigation hierarchy, and keep the primary chat surface focused.
+Milestone 13 - Project Workspace UI Consolidation is complete, passed, and successful. It removes redundant project workspace framing, moves project configuration into a clean Project Edit surface, shows conversations in the left navigation hierarchy, keeps the primary chat surface focused, and moves conversation attached context plus local Markdown bridge drafts into a collapsible right-hand chat pane.
 
 ## UI Consistency
 
@@ -65,6 +65,8 @@ Milestone 8 adds navigation action consistency rules:
 - The workspace surface should prioritize selected item content while navigation owns object-level actions.
 
 Milestone 8 applies these rules to Projects only. The Projects row is expandable/collapsible, the row-level `+` starts project creation, and project child rows can select the active workspace project or open an item menu for Edit/Delete. The main panel remains the selected-project workspace with Overview, GitHub, Chat, and References sections.
+
+Milestone 13 consolidates these rules further for Projects. Conversation rows appear under project rows in the left navigation hierarchy, project row menus route to Overview, New Chat, References, Edit, and Delete, and the main chat surface removes redundant workspace headers so message history and input receive most of the available space. Existing conversations open from their left-nav child rows; `New Chat` opens an empty new-conversation area.
 
 ## Backend
 
@@ -186,6 +188,12 @@ Markdown resolution is constrained to the configured local project root. Unsafe 
 Project Markdown context is assembled before conversation manual attachments for project chat sends, Prompt Preview, and bridge draft generation. Manual attachments remain conversation-scoped and continue to act as an additional context layer.
 
 Milestone 12 does not read GitHub repository file contents through the GitHub API, upload files, add vector stores, add semantic search, broadly index repositories, export bridge files, or hand off directly to Codex.
+
+## Project Workspace UI Boundary
+
+Milestone 13 is a frontend workspace consolidation. It does not add tables or change context ownership. Project Markdown context remains project-scoped. Manual context attachments remain conversation-scoped through `planning_conversation_context`.
+
+GitHub repository linkage and project Markdown context configuration now live in Project Edit instead of occupying the primary chat path. The focused chat surface keeps message history and message input close to the selected conversation while moving manual attachment controls and local Markdown bridge drafts into a collapsible right-hand pane.
 
 ## YouTube Boundary
 

@@ -8,11 +8,11 @@ Provide this file to ChatGPT or Codex when a new chat needs current project cont
 
 ## Current Milestone
 
-Milestone 11 - Bridge File Drafting
+Milestone 13 - Project Workspace UI Consolidation
 
 Status: **Complete / Passed / Successful**
 
-Current user-validated project baseline: **Milestone 11**. Milestone 11 is complete, passed, and successful. Milestone 12 is tentatively validated for context ingestion and needs a UI follow-up pass after Milestone 13.
+Current user-validated project baseline: **Milestone 13**. Milestone 13 is complete, passed, and successful.
 
 Milestone 0 remains complete, passed, and successful. Milestone 1 adds component navigation plus SQLite-backed Tasks, Notes, and Calendar components. User validation is complete and Milestone 1 passed.
 
@@ -38,11 +38,11 @@ Milestone 10 is complete, passed, and successful. It adds read-only Prompt Previ
 
 Milestone 11 is complete, passed, and successful. It adds local bridge-file draft generation from selected project chat conversations. Drafts are stored in SQLite as `bridge_file_drafts`, displayed read-only in the Chat section, and remain local. Resolved attached context, including linked GitHub repository metadata, is used by bridge drafts and normal project chat sends. Export, full editing, approval workflow, GitHub writes, and direct Codex handoff remain deferred.
 
-Milestone 12 is tentatively validated and needs a UI follow-up pass after Milestone 13. It adds project-level local Markdown context by loading a fresh `README.md` from a configured local project root whenever a project chat starts or loads, then resolving referenced Markdown files inside that project root for chat, Prompt Preview, and bridge drafts. This is project-scoped, not per-conversation attachment.
+Milestone 12 is complete, passed, and successful. It adds project-level local Markdown context by loading a fresh `README.md` from a configured local project root whenever a project chat starts or loads, then resolving referenced Markdown files inside that project root for chat and bridge drafts. This is project-scoped, not per-conversation attachment.
 
-Milestone 13 is planned and not started. It should consolidate the Projects workspace UI by moving project/conversation navigation into the left hierarchy, moving GitHub and project Markdown configuration into Project Edit, and giving the selected chat conversation most of the main panel.
+Milestone 13 is complete, passed, and successful. It consolidates the Projects workspace UI by moving project/conversation navigation into the left hierarchy, moving GitHub and project Markdown configuration into Project Edit, giving the selected chat conversation most of the main panel, and placing conversation attached context plus local Markdown bridge drafts in a collapsible right-hand chat pane. The project row action is `New Chat`; existing chats open from conversation child rows in the left navigation.
 
-Milestone numbering note: Milestone 2 is the Local Projects component. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Milestone 6 is Project Workspace Chat. Milestone 7 is Project Workspace Layout Refinement. Milestone 8 is Projects Navigation Tree Actions and is complete, passed, and successful. Milestone 9 is Manual Context Attachments and is complete, passed, and successful. Milestone 10 is Prompt Preview and is complete, passed, and successful. Milestone 11 is Bridge File Drafting and is complete, passed, and successful. Milestone 12 is Project Markdown Context and is tentatively validated pending Milestone 13 UI follow-up. Milestone 13 is Project Workspace UI Consolidation and is planned. Do not mistake roadmap list item positions for milestone IDs.
+Milestone numbering note: Milestone 2 is the Local Projects component. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Milestone 6 is Project Workspace Chat. Milestone 7 is Project Workspace Layout Refinement. Milestone 8 is Projects Navigation Tree Actions and is complete, passed, and successful. Milestone 9 is Manual Context Attachments and is complete, passed, and successful. Milestone 10 is Prompt Preview and is complete, passed, and successful. Milestone 11 is Bridge File Drafting and is complete, passed, and successful. Milestone 12 is Project Markdown Context and is complete, passed, and successful. Milestone 13 is Project Workspace UI Consolidation and is complete, passed, and successful. Do not mistake roadmap list item positions for milestone IDs.
 
 ## Current Scope
 
@@ -72,7 +72,7 @@ Milestone numbering note: Milestone 2 is the Local Projects component. Milestone
 - Read-only Prompt Preview for project chat conversations
 - SQLite-backed local bridge-file drafts for project chat conversations
 - Project-level local Markdown context from README and referenced Markdown files
-- Planned Project Workspace UI Consolidation for focused chat layout
+- Implemented Project Workspace UI Consolidation for focused chat layout
 
 ## Hotkey
 
@@ -245,8 +245,18 @@ Update this section manually after each validation pass.
 - Verified: `npm run build` passes after Milestone 12 implementation
 - Verified: `cargo build` passes after Milestone 12 implementation
 - Verified: `npm run tauri:dev` launches after Milestone 12 implementation
-- Tentatively validated: Milestone 12 context ingestion works, but needs another validation pass after Milestone 13 UI consolidation
-- Planned: Milestone 13 Project Workspace UI Consolidation
+- Validated: Milestone 12 context ingestion works after Milestone 13 UI consolidation
+- Implemented: Milestone 13 Project Workspace UI Consolidation
+- Implemented: conversation child rows in the Projects left navigation hierarchy
+- Implemented: Project Edit owns GitHub linkage and project Markdown context configuration
+- Implemented: focused chat surface removes redundant workspace and Planning Chat headers
+- Implemented: collapsible right-hand pane for attached context and local Markdown bridge drafts
+- Implemented: `New Chat` project menu action that does not auto-select an existing conversation
+- Verified: `npm install` passes after Milestone 13 implementation
+- Verified: `npm run build` passes after Milestone 13 implementation
+- Verified: `cargo build` passes after Milestone 13 implementation
+- Verified: `npm run tauri:dev` launches after Milestone 13 implementation
+- Validated: Milestone 13 Project Workspace UI Consolidation is complete, passed, and successful
 
 ## Milestone Validation Workflow
 
