@@ -16,7 +16,7 @@ Milestone 6 - Project Workspace Chat data model is complete, passed, and success
 
 Milestone 9 - Manual Context Attachments data model is complete, passed, and successful. It adds a conversation-scoped context attachment table with a non-destructive migration.
 
-Milestone 11 - Bridge File Drafting data model is implemented and pending user validation. It adds a project-scoped bridge draft table with a non-destructive migration.
+Milestone 11 - Bridge File Drafting data model is complete, passed, and successful. It adds a project-scoped bridge draft table with a non-destructive migration.
 
 ## Tables
 

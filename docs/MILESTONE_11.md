@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented / Pending User Validation
+Complete / Passed / Successful
 
 ## Goal
 

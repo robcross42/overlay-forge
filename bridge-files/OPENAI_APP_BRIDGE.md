@@ -10,9 +10,9 @@ Provide this file to ChatGPT or Codex when a new chat needs current project cont
 
 Milestone 11 - Bridge File Drafting
 
-Status: **Implemented / Pending User Validation**
+Status: **Complete / Passed / Successful**
 
-Current user-validated project baseline: **Milestone 10**. Milestone 11 is implemented and pending user validation.
+Current user-validated project baseline: **Milestone 11**. Milestone 11 is complete, passed, and successful.
 
 Milestone 0 remains complete, passed, and successful. Milestone 1 adds component navigation plus SQLite-backed Tasks, Notes, and Calendar components. User validation is complete and Milestone 1 passed.
 
@@ -36,11 +36,11 @@ Milestone 9 is complete, passed, and successful. It adds manual context attachme
 
 Milestone 10 is complete, passed, and successful. It adds read-only Prompt Preview inside selected-project Chat. The preview is assembled by the backend from existing local project, conversation, draft message, and attached context data without calling OpenAI. Actual OpenAI sends remain unchanged in Milestone 10; Milestone 11 adds attached context inclusion for project chat sends.
 
-Milestone 11 is implemented and pending user validation. It adds local bridge-file draft generation from selected project chat conversations. Drafts are stored in SQLite as `bridge_file_drafts`, displayed read-only in the Chat section, and remain local. Resolved attached context, including linked GitHub repository metadata, is used by bridge drafts and normal project chat sends. Export, full editing, approval workflow, GitHub writes, and direct Codex handoff remain deferred.
+Milestone 11 is complete, passed, and successful. It adds local bridge-file draft generation from selected project chat conversations. Drafts are stored in SQLite as `bridge_file_drafts`, displayed read-only in the Chat section, and remain local. Resolved attached context, including linked GitHub repository metadata, is used by bridge drafts and normal project chat sends. Export, full editing, approval workflow, GitHub writes, and direct Codex handoff remain deferred.
 
 Milestone 12 is planned and not started. It should add project-level local Markdown context by loading a fresh `README.md` from a configured local project root whenever a project chat starts or loads, then resolving referenced Markdown files inside that project root for chat, Prompt Preview, and bridge drafts. This should be project-scoped, not per-conversation attachment.
 
-Milestone numbering note: Milestone 2 is the Local Projects component. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Milestone 6 is Project Workspace Chat. Milestone 7 is Project Workspace Layout Refinement. Milestone 8 is Projects Navigation Tree Actions and is complete, passed, and successful. Milestone 9 is Manual Context Attachments and is complete, passed, and successful. Milestone 10 is Prompt Preview and is complete, passed, and successful. Milestone 11 is Bridge File Drafting and is implemented pending user validation. Milestone 12 is Project Markdown Context and is planned. Do not mistake roadmap list item positions for milestone IDs.
+Milestone numbering note: Milestone 2 is the Local Projects component. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Milestone 6 is Project Workspace Chat. Milestone 7 is Project Workspace Layout Refinement. Milestone 8 is Projects Navigation Tree Actions and is complete, passed, and successful. Milestone 9 is Manual Context Attachments and is complete, passed, and successful. Milestone 10 is Prompt Preview and is complete, passed, and successful. Milestone 11 is Bridge File Drafting and is complete, passed, and successful. Milestone 12 is Project Markdown Context and is planned. Do not mistake roadmap list item positions for milestone IDs.
 
 ## Current Scope
 
@@ -233,7 +233,7 @@ Update this section manually after each validation pass.
 - Verified: `npm run build` passes after Milestone 11 implementation
 - Verified: `cargo build` passes after Milestone 11 implementation
 - Verified: `npm run tauri:dev` launches after Milestone 11 implementation
-- Pending: Milestone 11 manual validation checklist
+- Complete: Milestone 11 manual validation checklist passed successfully
 
 ## Milestone Validation Workflow
 

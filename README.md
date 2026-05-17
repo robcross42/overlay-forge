@@ -6,7 +6,7 @@ Overlay Forge is a local-first desktop overlay shell for planning, notes, tasks,
 
 **Milestone 1 is complete, passed, and successful.** It adds Tasks, Notes, and Calendar components beside the existing Scratchpad without replacing the Milestone 0 foundation.
 
-**Current project baseline: Milestone 10.** Future bridge prompts, planning, and implementation should treat Milestone 10 as the latest completed and user-validated app state.
+**Current project baseline: Milestone 11.** Future bridge prompts, planning, and implementation should treat Milestone 11 as the latest completed and user-validated app state.
 
 **Milestone 2 is complete, passed, and successful.** It adds a local Projects component with SQLite persistence.
 
@@ -52,7 +52,7 @@ Milestone 10 adds a read-only Prompt Preview action inside selected-project Chat
 
 **Milestone 11 - Bridge File Drafting**
 
-Status: **Implemented / Pending User Validation**
+Status: **Complete / Passed / Successful**
 
 Milestone 11 adds local bridge-file draft generation from selected project chat conversations. The Chat section now has a `Draft Bridge File` action and a read-only Bridge Drafts panel for generated Markdown drafts stored in SQLite. Resolved attached context, including linked GitHub repository metadata, is now used by bridge drafts and normal project chat sends. Draft export, full editing, approval workflow, and direct Codex handoff remain deferred.
 
@@ -133,7 +133,7 @@ Required Markdown context files:
 
 For future bridge prompts, instruct ChatGPT/Codex to read all `*.md` files in the project repo structure before making planning or implementation decisions.
 
-Milestone numbering note: use explicit milestone IDs from the Markdown files. Do not infer milestone numbers from numbered list positions. Milestone 3 is the OpenAI Planning Chat component and is complete, passed, and successful. Milestone 4 is GitHub Integration and is complete, passed, and successful. Milestone 5 is the Controlled YouTube Component and is complete, passed, and successful. Milestone 6 is Project Workspace Chat and is complete, passed, and successful. Milestone 7 is Project Workspace Layout Refinement and is complete, passed, and successful. Milestone 8 is Projects Navigation Tree Actions and is complete, passed, and successful. Milestone 9 is Manual Context Attachments and is complete, passed, and successful. Milestone 10 is Prompt Preview and is complete, passed, and successful. Milestone 11 is Bridge File Drafting and is implemented pending user validation. Milestone 12 is Project Markdown Context and is planned.
+Milestone numbering note: use explicit milestone IDs from the Markdown files. Do not infer milestone numbers from numbered list positions. Milestone 3 is the OpenAI Planning Chat component and is complete, passed, and successful. Milestone 4 is GitHub Integration and is complete, passed, and successful. Milestone 5 is the Controlled YouTube Component and is complete, passed, and successful. Milestone 6 is Project Workspace Chat and is complete, passed, and successful. Milestone 7 is Project Workspace Layout Refinement and is complete, passed, and successful. Milestone 8 is Projects Navigation Tree Actions and is complete, passed, and successful. Milestone 9 is Manual Context Attachments and is complete, passed, and successful. Milestone 10 is Prompt Preview and is complete, passed, and successful. Milestone 11 is Bridge File Drafting and is complete, passed, and successful. Milestone 12 is Project Markdown Context and is planned.
 
 ## Development
 

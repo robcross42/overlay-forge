@@ -40,7 +40,7 @@ Milestone 9 - Manual Context Attachments is complete, passed, and successful. It
 
 Milestone 10 - Prompt Preview is complete, passed, and successful. It adds a read-only Prompt Preview surface inside selected-project Chat and a backend preview command that assembles local preview data without calling OpenAI.
 
-Milestone 11 - Bridge File Drafting is implemented and pending user validation. It adds a read-only bridge draft generation surface inside selected-project Chat and backend commands that store generated Markdown drafts locally in SQLite.
+Milestone 11 - Bridge File Drafting is complete, passed, and successful. It adds a read-only bridge draft generation surface inside selected-project Chat and backend commands that store generated Markdown drafts locally in SQLite.
 
 ## UI Consistency
 

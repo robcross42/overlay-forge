@@ -10,7 +10,7 @@ All notable changes to Overlay Forge will be documented in this file.
 - The Milestone 0 scratchpad component is complete and passed.
 - Scratchpad content saves to SQLite and restores between app sessions.
 - Milestone 1 - Calendar, To-do, Notes, and Scratchpad Expansion is complete, passed, and successful.
-- Current user-validated project baseline is Milestone 10.
+- Current user-validated project baseline is Milestone 11.
 - Milestone 2 - Local Projects component is complete, passed, and successful.
 - Milestone 3 - OpenAI Planning Chat component is complete, passed, and successful.
 - Milestone 4 - GitHub Integration is complete, passed, and successful.
@@ -20,7 +20,7 @@ All notable changes to Overlay Forge will be documented in this file.
 - Milestone 8 - Projects Navigation Tree Actions is complete, passed, and successful.
 - Milestone 9 - Manual Context Attachments is complete, passed, and successful.
 - Milestone 10 - Prompt Preview is complete, passed, and successful.
-- Milestone 11 - Bridge File Drafting is implemented and pending user validation.
+- Milestone 11 - Bridge File Drafting is complete, passed, and successful.
 
 ### Added
 
@@ -215,4 +215,4 @@ All notable changes to Overlay Forge will be documented in this file.
 - Verified frontend build after Milestone 11 implementation with `npm run build`.
 - Verified Rust backend compile after Milestone 11 implementation with `cargo build`.
 - Verified development launch after Milestone 11 implementation with `npm run tauri:dev`; the app process started and was stopped after the validation timeout.
-- Manual validation for Milestone 11 is pending user validation.
+- Manual validation for Milestone 11 is complete, passed, and successful.

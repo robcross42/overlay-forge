@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**Current project baseline: Milestone 10.**
+**Current project baseline: Milestone 11.**
 
-Milestone 10 is the latest completed, tested, and user-validated milestone.
+Milestone 11 is the latest completed, tested, and user-validated milestone.
 
 **Milestone 0 - Overlay Shell Validation is complete, passed, and successful.**
 
@@ -66,7 +66,7 @@ Milestone 10 adds a read-only Prompt Preview action inside selected-project Chat
 
 **Milestone 11 - Bridge File Drafting**
 
-Status: **Implemented / Pending User Validation**
+Status: **Complete / Passed / Successful**
 
 Milestone 11 adds local bridge-file draft generation from selected project chat conversations. Generated Markdown drafts are stored in SQLite, displayed read-only in the Chat section, and remain local until a later export or Codex handoff milestone. Resolved attached context, including linked GitHub repository metadata, is now used by bridge drafts and normal project chat sends.
 
@@ -95,12 +95,12 @@ Use explicit milestone IDs. Do not infer milestone numbers from this list's item
 - Milestone 8 - Projects navigation tree actions - complete and passed
 - Milestone 9 - Manual context attachments - complete and passed
 - Milestone 10 - Prompt preview - complete, passed, successful
-- Milestone 11 - Bridge file drafting - implemented pending user validation
+- Milestone 11 - Bridge file drafting - complete, passed, successful
 - Milestone 12 - Project markdown context - planned
 
 ## Scope Guard
 
-Milestone 10 is the current passed stable baseline for later work. Do not implement later milestone features by reverting to an earlier code path; future work should begin from the completed overlay shell, hotkey behavior, always-on-top behavior, component host, local SQLite scratchpad, Tasks, Notes, Calendar, Projects navigation tree/workspace, Planning Chat persistence, manual context attachments, Prompt Preview, GitHub Integration, and YouTube components.
+Milestone 11 is the current passed stable baseline for later work. Do not implement later milestone features by reverting to an earlier code path; future work should begin from the completed overlay shell, hotkey behavior, always-on-top behavior, component host, local SQLite scratchpad, Tasks, Notes, Calendar, Projects navigation tree/workspace, Planning Chat persistence, manual context attachments, Prompt Preview, Bridge File Drafting, GitHub Integration, and YouTube components.
 
 Milestone 4 remains intentionally small. It does not include automatic Codex handoff, GitHub write operations, pull request creation, branch creation, issue management, full repository browsing, GitHub Actions integration, OAuth, multi-account support, advanced sync, vector store/repo indexing, YouTube integration, external calendar integration, cloud sync, or multi-user auth.
 
