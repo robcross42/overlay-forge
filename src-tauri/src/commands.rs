@@ -1,6 +1,7 @@
 use crate::db::{
-    CalendarEventRecord, NoteRecord, PlanningConversationRecord, PlanningMessageRecord,
-    ProjectGitHubRepositoryRecord, ProjectRecord, TaskRecord, YouTubeReferenceRecord,
+    CalendarEventRecord, NoteRecord, PlanningConversationContextRecord, PlanningConversationRecord,
+    PlanningMessageRecord, ProjectGitHubRepositoryRecord, ProjectRecord, TaskRecord,
+    YouTubeReferenceRecord,
 };
 use crate::github;
 use crate::openai;
@@ -35,7 +36,7 @@ pub fn save_scratchpad(content: String, state: State<'_, AppState>) -> Result<()
 #[tauri::command]
 pub fn get_milestone_status(state: State<'_, AppState>) -> Result<MilestoneStatus, String> {
     Ok(MilestoneStatus {
-        milestone: "Milestone 8".to_string(),
+        milestone: "Milestone 9".to_string(),
         hotkey: "Ctrl+Shift+Space".to_string(),
         database_ready: state.database.is_ready(),
     })
@@ -408,6 +409,44 @@ pub fn delete_planning_conversation(
 }
 
 #[tauri::command]
+pub fn list_planning_conversation_context(
+    conversation_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<PlanningConversationContextRecord>, String> {
+    state
+        .database
+        .list_planning_conversation_context(conversation_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn attach_planning_conversation_context(
+    conversation_id: i64,
+    context_type: String,
+    source_id: Option<i64>,
+    label: String,
+    state: State<'_, AppState>,
+) -> Result<PlanningConversationContextRecord, String> {
+    validate_context_type(&context_type)?;
+    require_text(&label, "Context label")?;
+    state
+        .database
+        .attach_planning_conversation_context(conversation_id, &context_type, source_id, &label)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn remove_planning_conversation_context(
+    id: i64,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .database
+        .remove_planning_conversation_context(id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 pub fn list_youtube_references(
     state: State<'_, AppState>,
 ) -> Result<Vec<YouTubeReferenceRecord>, String> {
@@ -500,6 +539,14 @@ fn validate_project(name: &str, status: &str) -> Result<(), String> {
     match status.trim() {
         "ACTIVE" | "ARCHIVED" => Ok(()),
         _ => Err("Project status must be ACTIVE or ARCHIVED".to_string()),
+    }
+}
+
+fn validate_context_type(context_type: &str) -> Result<(), String> {
+    match context_type.trim() {
+        "project" | "github_repository" | "note" | "task" | "calendar_event"
+        | "youtube_reference" | "scratchpad" => Ok(()),
+        _ => Err("Unsupported context type".to_string()),
     }
 }
 

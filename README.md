@@ -6,7 +6,7 @@ Overlay Forge is a local-first desktop overlay shell for planning, notes, tasks,
 
 **Milestone 1 is complete, passed, and successful.** It adds Tasks, Notes, and Calendar components beside the existing Scratchpad without replacing the Milestone 0 foundation.
 
-**Current project baseline: Milestone 8.** Future bridge prompts, planning, and implementation should treat Milestone 8 as the latest completed and user-validated app state.
+**Current project baseline: Milestone 9.** Future bridge prompts, planning, and implementation should treat Milestone 9 as the latest completed and user-validated app state.
 
 **Milestone 2 is complete, passed, and successful.** It adds a local Projects component with SQLite persistence.
 
@@ -37,6 +37,12 @@ Milestone 7 refines the selected Projects workspace layout. The active project w
 Status: **Complete / Passed / Successful**
 
 Milestone 8 moves project create/select/edit/delete entry points toward the left navigation shell. Projects is now an expandable module tree with saved projects as children, a compact `+` action for creating projects, and compact `...` project item menus for edit/delete. User validation is complete and Milestone 8 passed.
+
+**Milestone 9 - Manual Context Attachments**
+
+Status: **Complete / Passed / Successful**
+
+Milestone 9 adds manual context attachments for selected project chat conversations. The Chat section now has an Attached Context area where users can link existing local project, note, task, calendar event, YouTube reference, and scratchpad context to the selected conversation. If the selected project has a linked GitHub repository, that repository metadata is automatically added to the conversation context list. Attachments are stored as SQLite links and removing an attachment does not delete the source record. User validation is complete and Milestone 9 passed.
 
 Completed Milestone 0 capabilities:
 
@@ -72,6 +78,8 @@ Milestone 7 intentionally keeps manual context attachments, prompt preview, brid
 
 Milestone 8 intentionally keeps Tasks, Notes, Calendar, and YouTube navigation refactors deferred until the Projects navigation tree pattern is validated.
 
+Milestone 9 intentionally keeps automatic context attachment, prompt preview, token counting, bridge-file generation, GitHub file reading, YouTube transcript extraction, Codex handoff, ChatGPT import, conversation search/filtering, chat streaming, and model picker UI deferred.
+
 ## ChatGPT / Codex Bridge Context
 
 When using this repository as context in ChatGPT or Codex, do not rely only on this README. The bridge should explicitly reference every project Markdown file in the repo, including files under `docs/`, because chatgpt.com may not automatically discover nested documentation.
@@ -93,11 +101,12 @@ Required Markdown context files:
 - `docs/MILESTONE_6.md`
 - `docs/MILESTONE_7.md`
 - `docs/MILESTONE_8.md`
+- `docs/MILESTONE_9.md`
 - `docs/PROJECT_PLAN.md`
 
 For future bridge prompts, instruct ChatGPT/Codex to read all `*.md` files in the project repo structure before making planning or implementation decisions.
 
-Milestone numbering note: use explicit milestone IDs from the Markdown files. Do not infer milestone numbers from numbered list positions. Milestone 3 is the OpenAI Planning Chat component and is complete, passed, and successful. Milestone 4 is GitHub Integration and is complete, passed, and successful. Milestone 5 is the Controlled YouTube Component and is complete, passed, and successful. Milestone 6 is Project Workspace Chat and is complete, passed, and successful. Milestone 7 is Project Workspace Layout Refinement and is complete, passed, and successful. Milestone 8 is Projects Navigation Tree Actions and is complete, passed, and successful.
+Milestone numbering note: use explicit milestone IDs from the Markdown files. Do not infer milestone numbers from numbered list positions. Milestone 3 is the OpenAI Planning Chat component and is complete, passed, and successful. Milestone 4 is GitHub Integration and is complete, passed, and successful. Milestone 5 is the Controlled YouTube Component and is complete, passed, and successful. Milestone 6 is Project Workspace Chat and is complete, passed, and successful. Milestone 7 is Project Workspace Layout Refinement and is complete, passed, and successful. Milestone 8 is Projects Navigation Tree Actions and is complete, passed, and successful. Milestone 9 is Manual Context Attachments and is complete, passed, and successful.
 
 ## Development
 

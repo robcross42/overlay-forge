@@ -36,6 +36,8 @@ Milestone 7 - Project Workspace Layout Refinement is complete, passed, and succe
 
 Milestone 8 - Projects Navigation Tree Actions is complete, passed, and successful. It moves Projects object-level actions toward the shell navigation by making Projects expandable in the left navigation and listing saved projects as children. This pattern was validated on Projects before generalizing it to other modules.
 
+Milestone 9 - Manual Context Attachments is complete, passed, and successful. It adds a conversation-scoped Attached Context area inside selected-project Chat. Attachments link to existing local app records and store only the link metadata needed to display those attachments.
+
 ## UI Consistency
 
 Organizer components should follow the same interaction pattern unless a milestone explicitly documents a reason to diverge:
@@ -72,6 +74,7 @@ The Tauri backend owns:
 - Backend-only GitHub repository metadata fetch handling
 - YouTube reference CRUD commands
 - YouTube URL validation and external-open handling
+- Planning conversation context attachment commands
 - Global hotkey registration
 - Window show/hide behavior
 
@@ -94,6 +97,8 @@ Milestone 6 adds no new tables. It preserves existing `planning_conversations` a
 Milestone 7 adds no new tables. Overview continues to use `projects`, GitHub continues to use `project_github_repositories`, Chat continues to use `planning_conversations` and `planning_messages`, and References only summarizes existing local context categories.
 
 Milestone 8 adds no new tables. The shell-owned Projects navigation tree reads existing `projects` rows and continues to use the same project CRUD commands. Chat and GitHub behavior continue to use the existing selected-project data paths.
+
+Milestone 9 adds idempotent table initialization for `planning_conversation_context`. Attachments are scoped to a single planning conversation, link to existing local records by `context_type` and `source_id`, and store a readable label. Removing an attachment deletes only the attachment link and does not delete the source record.
 
 ## OpenAI Boundary
 
@@ -124,6 +129,16 @@ The integration is project-scoped and read-only. Milestone 4 does not perform Co
 In Milestone 7, GitHub remains a selected-project workspace section backed by the existing project GitHub repository table. No token exposure or GitHub write behavior is added.
 
 Milestone 8 preserves this boundary. Project selection can now happen from the left navigation tree, but GitHub repository linkage and metadata fetches still happen inside the selected-project GitHub workspace section.
+
+## Context Attachment Boundary
+
+Milestone 9 context attachments are manual and conversation-scoped. The user chooses existing local app context from the selected project Chat section. Supported source types are project details, project GitHub repository metadata, notes, tasks, calendar events, YouTube references, and scratchpad content.
+
+GitHub repository context is the only Milestone 9 automatic attachment path: when a selected project has a repository link defined in the GitHub section, the Chat section adds that repository metadata link to the selected conversation's Attached Context list with a duplicate guard. The repository link is still configured once per project in the GitHub workspace section.
+
+The attachment layer stores links only. It does not copy full source bodies into prompts, automatically assemble context, preview prompts, count tokens, read GitHub files, fetch YouTube transcripts, generate bridge files, or send attached context to OpenAI. Prompt inclusion and prompt preview are deferred to a later milestone.
+
+Projects remains the primary workspace shell, and the Projects navigation tree remains unchanged from Milestone 8.
 
 ## YouTube Boundary
 

@@ -18,6 +18,24 @@ export type PlanningMessage = {
   createdAt: string;
 };
 
+export type PlanningContextType =
+  | "project"
+  | "github_repository"
+  | "note"
+  | "task"
+  | "calendar_event"
+  | "youtube_reference"
+  | "scratchpad";
+
+export type PlanningConversationContext = {
+  id: number;
+  conversationId: number;
+  contextType: PlanningContextType;
+  sourceId: number | null;
+  label: string;
+  createdAt: string;
+};
+
 export function listPlanningConversations(projectId?: number) {
   return invoke<PlanningConversation[]>("list_planning_conversations", {
     projectId: projectId ?? null
@@ -41,4 +59,28 @@ export function sendPlanningMessage(conversationId: number, content: string) {
 
 export function deletePlanningConversation(conversationId: number) {
   return invoke<void>("delete_planning_conversation", { conversationId });
+}
+
+export function listPlanningConversationContext(conversationId: number) {
+  return invoke<PlanningConversationContext[]>("list_planning_conversation_context", {
+    conversationId
+  });
+}
+
+export function attachPlanningConversationContext(input: {
+  conversationId: number;
+  contextType: PlanningContextType;
+  sourceId?: number | null;
+  label: string;
+}) {
+  return invoke<PlanningConversationContext>("attach_planning_conversation_context", {
+    conversationId: input.conversationId,
+    contextType: input.contextType,
+    sourceId: input.sourceId ?? null,
+    label: input.label
+  });
+}
+
+export function removePlanningConversationContext(id: number) {
+  return invoke<void>("remove_planning_conversation_context", { id });
 }

@@ -14,6 +14,8 @@ Milestone 5 - Controlled YouTube Component data model is complete, passed, and s
 
 Milestone 6 - Project Workspace Chat data model is complete, passed, and successful. It adds no new tables and reuses the existing project-scoped planning chat tables.
 
+Milestone 9 - Manual Context Attachments data model is complete, passed, and successful. It adds a conversation-scoped context attachment table with a non-destructive migration.
+
 ## Tables
 
 ### scratchpad
@@ -116,6 +118,35 @@ system
 
 Milestone 3 writes `user` and `assistant` messages during normal chat use. `system` is reserved for future workflow needs; the active planning instruction is backend-owned and not stored as a user-visible message.
 
+### planning_conversation_context
+
+```text
+id
+conversation_id
+context_type
+source_id
+label
+created_at
+```
+
+Manual context attachment records for Milestone 9. Each row belongs to one `planning_conversations.id` value through `conversation_id`.
+
+Supported `context_type` values are:
+
+```text
+project
+github_repository
+note
+task
+calendar_event
+youtube_reference
+scratchpad
+```
+
+`source_id` stores the source record ID for local records when applicable. It may be null for singleton context such as Scratchpad. `label` stores the display label captured when the context is attached.
+
+Deleting an attachment removes only the `planning_conversation_context` row. It does not delete the source project, GitHub repository link, note, task, calendar event, YouTube reference, or scratchpad content.
+
 ### project_github_repositories
 
 ```text
@@ -200,3 +231,11 @@ CREATE TABLE IF NOT EXISTS youtube_references
 Existing user data remains intact. Deleting a YouTube reference removes only that local SQLite row and does not affect YouTube or any external account.
 
 Milestone 6 does not change the SQLite schema. Existing `projects`, `planning_conversations`, and `planning_messages` rows remain intact.
+
+Milestone 9 uses non-destructive idempotent table initialization:
+
+```text
+CREATE TABLE IF NOT EXISTS planning_conversation_context
+```
+
+Existing user data remains intact. Deleting a planning conversation deletes that conversation's attachment links along with its messages.

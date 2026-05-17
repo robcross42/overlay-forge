@@ -2,7 +2,7 @@
 
 Bridge files are markdown handoff documents that describe project state, constraints, and implementation requests for Codex.
 
-Milestone 3 introduces an OpenAI Planning Chat foundation, Milestone 4 introduces a GitHub repository-link foundation, Milestone 5 introduces a controlled local YouTube reference foundation, Milestone 6 moves project-scoped chat into the selected Projects workspace, Milestone 7 refines the selected-project workspace layout, and Milestone 8 completes Projects navigation tree actions. Full bridge-file generation is still deferred. Bridge files should still be created and updated manually, then pasted into ChatGPT or Codex chats when context needs to move between sessions.
+Milestone 3 introduces an OpenAI Planning Chat foundation, Milestone 4 introduces a GitHub repository-link foundation, Milestone 5 introduces a controlled local YouTube reference foundation, Milestone 6 moves project-scoped chat into the selected Projects workspace, Milestone 7 refines the selected-project workspace layout, Milestone 8 completes Projects navigation tree actions, and Milestone 9 completes manual context attachments. Full bridge-file generation is still deferred. Bridge files should still be created and updated manually, then pasted into ChatGPT or Codex chats when context needs to move between sessions.
 
 ## Current Manual Bridge
 
@@ -20,7 +20,7 @@ The Milestone 0 scratchpad component is complete and passed. Scratchpad content 
 
 Milestone 1 is complete, passed, and successful.
 
-Current user-validated project baseline is Milestone 8. Milestone 4 - GitHub Integration is complete, passed, and successful.
+Current user-validated project baseline is Milestone 9. Milestone 4 - GitHub Integration is complete, passed, and successful.
 
 Milestone 5 - Controlled YouTube Component is complete, passed, and successful.
 
@@ -29,6 +29,8 @@ Milestone 6 - Project Workspace Chat is complete, passed, and successful.
 Milestone 7 - Project Workspace Layout Refinement is complete, passed, and successful.
 
 Milestone 8 - Projects Navigation Tree Actions is complete, passed, and successful.
+
+Milestone 9 - Manual Context Attachments is complete, passed, and successful.
 
 Milestone 3 is complete, passed, and successful. It adds local planning conversations/messages and backend OpenAI Responses API calls, but it does not generate bridge files yet.
 
@@ -42,7 +44,9 @@ Milestone 7 is complete, passed, and successful. It refines the selected project
 
 Milestone 8 is complete, passed, and successful. It makes Projects expandable in the left navigation, lists saved projects as children, exposes a compact `+` action for new project flow, and exposes compact `...` menus on project rows for edit/delete. The pattern was validated on Projects before applying it to other modules.
 
-Milestone numbering note: Milestone 2 is the Local Projects component and is complete, passed, and successful. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Milestone 6 is Project Workspace Chat. Milestone 7 is Project Workspace Layout Refinement. Milestone 8 is Projects Navigation Tree Actions and is complete, passed, and successful. Do not infer milestone IDs from numbered-list positions.
+Milestone 9 is complete, passed, and successful. It adds manual, conversation-scoped context attachment links inside selected-project Chat. Attachments can link existing local project, note, task, calendar event, YouTube reference, and scratchpad context without deleting source records when attachments are removed. Linked GitHub repository metadata is automatically attached when a selected project has a repository defined in the GitHub section.
+
+Milestone numbering note: Milestone 2 is the Local Projects component and is complete, passed, and successful. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Milestone 6 is Project Workspace Chat. Milestone 7 is Project Workspace Layout Refinement. Milestone 8 is Projects Navigation Tree Actions and is complete, passed, and successful. Milestone 9 is Manual Context Attachments and is complete, passed, and successful. Do not infer milestone IDs from numbered-list positions.
 
 ## Intended Future Workflow
 

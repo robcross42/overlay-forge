@@ -1134,7 +1134,7 @@ select.text-input option:hover {
 
 .planning-chat-surface {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto auto;
   gap: 12px;
   min-width: 0;
   min-height: 0;
@@ -1195,6 +1195,96 @@ select.text-input option:hover {
   min-width: 0;
 }
 
+.attached-context-panel {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  max-height: 210px;
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  scrollbar-color: rgba(79, 208, 165, 0.48) rgba(255, 255, 255, 0.06);
+  scrollbar-width: thin;
+}
+
+.attached-context-panel::-webkit-scrollbar {
+  width: 10px;
+}
+
+.attached-context-panel::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+}
+
+.attached-context-panel::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(79, 208, 165, 0.48);
+  background-clip: content-box;
+}
+
+.attached-context-heading,
+.attached-context-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.attached-context-heading p,
+.attached-context-heading h4 {
+  margin: 0;
+}
+
+.attached-context-heading p,
+.attached-context-list p {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.attached-context-heading h4 {
+  margin-top: 3px;
+  font-size: 0.92rem;
+}
+
+.attach-context-form {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.2fr) auto;
+  align-items: end;
+  gap: 10px;
+  min-width: 0;
+}
+
+.attached-context-list {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.attached-context-list p {
+  margin: 0;
+}
+
+.attached-context-item {
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.attached-context-item span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.82rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @media (max-width: 780px) {
   .overlay-shell {
     grid-template-columns: 1fr;
@@ -1245,6 +1335,10 @@ select.text-input option:hover {
   }
 
   .chat-input-row {
+    grid-template-columns: 1fr;
+  }
+
+  .attach-context-form {
     grid-template-columns: 1fr;
   }
 

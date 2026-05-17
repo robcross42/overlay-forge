@@ -82,6 +82,20 @@ pub struct PlanningConversationRecord {
     pub updated_at: String,
 }
 
+#[derive(Serialize)]
+pub struct PlanningConversationContextRecord {
+    pub id: i64,
+    #[serde(rename = "conversationId")]
+    pub conversation_id: i64,
+    #[serde(rename = "contextType")]
+    pub context_type: String,
+    #[serde(rename = "sourceId")]
+    pub source_id: Option<i64>,
+    pub label: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+}
+
 #[derive(Clone, Serialize)]
 pub struct ProjectGitHubRepositoryRecord {
     pub id: i64,
@@ -194,6 +208,15 @@ impl AppDatabase {
                 conversation_id INTEGER NOT NULL,
                 role TEXT NOT NULL,
                 content TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS planning_conversation_context (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                conversation_id INTEGER NOT NULL,
+                context_type TEXT NOT NULL,
+                source_id INTEGER,
+                label TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
@@ -827,12 +850,65 @@ impl AppDatabase {
     pub fn delete_planning_conversation(&self, conversation_id: i64) -> Result<()> {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
+            "DELETE FROM planning_conversation_context WHERE conversation_id = ?1",
+            params![conversation_id],
+        )?;
+        connection.execute(
             "DELETE FROM planning_messages WHERE conversation_id = ?1",
             params![conversation_id],
         )?;
         connection.execute(
             "DELETE FROM planning_conversations WHERE id = ?1",
             params![conversation_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn list_planning_conversation_context(
+        &self,
+        conversation_id: i64,
+    ) -> Result<Vec<PlanningConversationContextRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_planning_conversation_by_id(&connection, conversation_id)?;
+        Self::list_planning_conversation_context_for_connection(&connection, conversation_id)
+    }
+
+    pub fn attach_planning_conversation_context(
+        &self,
+        conversation_id: i64,
+        context_type: &str,
+        source_id: Option<i64>,
+        label: &str,
+    ) -> Result<PlanningConversationContextRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_planning_conversation_by_id(&connection, conversation_id)?;
+        connection.execute(
+            "
+            INSERT INTO planning_conversation_context (
+                conversation_id,
+                context_type,
+                source_id,
+                label
+            )
+            VALUES (?1, ?2, ?3, ?4)
+            ",
+            params![
+                conversation_id,
+                context_type.trim(),
+                source_id,
+                label.trim()
+            ],
+        )?;
+
+        let id = connection.last_insert_rowid();
+        Self::get_planning_conversation_context_by_id(&connection, id)
+    }
+
+    pub fn remove_planning_conversation_context(&self, id: i64) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute(
+            "DELETE FROM planning_conversation_context WHERE id = ?1",
+            params![id],
         )?;
         Ok(())
     }
@@ -1128,6 +1204,44 @@ impl AppDatabase {
         Ok(messages)
     }
 
+    fn get_planning_conversation_context_by_id(
+        connection: &Connection,
+        id: i64,
+    ) -> Result<PlanningConversationContextRecord> {
+        connection.query_row(
+            "
+            SELECT id, conversation_id, context_type, source_id, label, created_at
+            FROM planning_conversation_context
+            WHERE id = ?1
+            ",
+            params![id],
+            planning_conversation_context_from_row,
+        )
+    }
+
+    fn list_planning_conversation_context_for_connection(
+        connection: &Connection,
+        conversation_id: i64,
+    ) -> Result<Vec<PlanningConversationContextRecord>> {
+        let mut statement = connection.prepare(
+            "
+            SELECT id, conversation_id, context_type, source_id, label, created_at
+            FROM planning_conversation_context
+            WHERE conversation_id = ?1
+            ORDER BY created_at ASC, id ASC
+            ",
+        )?;
+
+        let context = statement
+            .query_map(
+                params![conversation_id],
+                planning_conversation_context_from_row,
+            )?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(context)
+    }
+
     fn get_youtube_reference_by_id(
         connection: &Connection,
         id: i64,
@@ -1161,6 +1275,19 @@ fn planning_message_from_row(row: &rusqlite::Row<'_>) -> Result<PlanningMessageR
         role: row.get(2)?,
         content: row.get(3)?,
         created_at: row.get(4)?,
+    })
+}
+
+fn planning_conversation_context_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<PlanningConversationContextRecord> {
+    Ok(PlanningConversationContextRecord {
+        id: row.get(0)?,
+        conversation_id: row.get(1)?,
+        context_type: row.get(2)?,
+        source_id: row.get(3)?,
+        label: row.get(4)?,
+        created_at: row.get(5)?,
     })
 }
 

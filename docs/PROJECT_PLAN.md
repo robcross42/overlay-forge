@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**Current project baseline: Milestone 8.**
+**Current project baseline: Milestone 9.**
 
-Milestone 8 is the latest completed, tested, and user-validated milestone.
+Milestone 9 is the latest completed, tested, and user-validated milestone.
 
 **Milestone 0 - Overlay Shell Validation is complete, passed, and successful.**
 
@@ -52,6 +52,12 @@ Status: **Complete / Passed / Successful**
 
 Milestone 8 moves project create/select/edit/delete entry points into the left navigation shell. Projects is now an expandable navigation tree with saved projects as children, a compact `+` action on the Projects module row, and compact `...` menus on project rows for edit/delete. User validation is complete and Milestone 8 passed.
 
+**Milestone 9 - Manual Context Attachments**
+
+Status: **Complete / Passed / Successful**
+
+Milestone 9 adds manual context attachments for selected project chat conversations. Attachments are conversation-scoped links to existing local app records and are visible in the Chat section's Attached Context area. Linked GitHub repository metadata is automatically added when a selected project has a repository defined in the GitHub section. User validation is complete and Milestone 9 passed.
+
 ## Product Direction
 
 Overlay Forge is a personal desktop command hub that floats above the user's workflow and eventually helps turn ideas, notes, tasks, and project plans into Codex-ready markdown bridge files.
@@ -69,10 +75,11 @@ Use explicit milestone IDs. Do not infer milestone numbers from this list's item
 - Milestone 6 - Project workspace chat - complete and passed
 - Milestone 7 - Project workspace layout refinement - complete and passed
 - Milestone 8 - Projects navigation tree actions - complete and passed
+- Milestone 9 - Manual context attachments - complete and passed
 
 ## Scope Guard
 
-Milestone 8 is the current passed stable baseline for later work. Do not implement later milestone features by reverting to an earlier code path; future work should begin from the completed overlay shell, hotkey behavior, always-on-top behavior, component host, local SQLite scratchpad, Tasks, Notes, Calendar, Projects navigation tree/workspace, Planning Chat persistence, GitHub Integration, and YouTube components.
+Milestone 9 is the current passed stable baseline for later work. Do not implement later milestone features by reverting to an earlier code path; future work should begin from the completed overlay shell, hotkey behavior, always-on-top behavior, component host, local SQLite scratchpad, Tasks, Notes, Calendar, Projects navigation tree/workspace, Planning Chat persistence, manual context attachments, GitHub Integration, and YouTube components.
 
 Milestone 4 remains intentionally small. It does not include automatic Codex handoff, GitHub write operations, pull request creation, branch creation, issue management, full repository browsing, GitHub Actions integration, OAuth, multi-account support, advanced sync, vector store/repo indexing, YouTube integration, external calendar integration, cloud sync, or multi-user auth.
 
@@ -83,3 +90,5 @@ Milestone 6 remains intentionally small. It does not include bridge-file generat
 Milestone 7 remains intentionally layout-focused. It does not include manual context attachments, prompt preview, bridge-file generation, GitHub file browsing, Codex handoff, ChatGPT import, conversation search/filtering, chat streaming, model picker UI, AI-generated project summaries, or advanced project dashboard analytics.
 
 Milestone 8 remains intentionally focused on Projects navigation only. It does not refactor Tasks, Notes, Calendar, or YouTube until the Projects navigation tree pattern is validated.
+
+Milestone 9 remains intentionally focused on manual attachment links only. It does not implement automatic context attachment, semantic search, vector stores, file uploads, GitHub file reading, YouTube transcript extraction, prompt preview, token counting, bridge-file generation, Codex handoff, ChatGPT import, chat streaming, or model picker UI.

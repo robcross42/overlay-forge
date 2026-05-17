@@ -10,7 +10,7 @@ All notable changes to Overlay Forge will be documented in this file.
 - The Milestone 0 scratchpad component is complete and passed.
 - Scratchpad content saves to SQLite and restores between app sessions.
 - Milestone 1 - Calendar, To-do, Notes, and Scratchpad Expansion is complete, passed, and successful.
-- Current user-validated project baseline is Milestone 8.
+- Current user-validated project baseline is Milestone 9.
 - Milestone 2 - Local Projects component is complete, passed, and successful.
 - Milestone 3 - OpenAI Planning Chat component is complete, passed, and successful.
 - Milestone 4 - GitHub Integration is complete, passed, and successful.
@@ -18,6 +18,7 @@ All notable changes to Overlay Forge will be documented in this file.
 - Milestone 6 - Project Workspace Chat is complete, passed, and successful.
 - Milestone 7 - Project Workspace Layout Refinement is complete, passed, and successful.
 - Milestone 8 - Projects Navigation Tree Actions is complete, passed, and successful.
+- Milestone 9 - Manual Context Attachments is complete, passed, and successful.
 
 ### Added
 
@@ -81,6 +82,13 @@ All notable changes to Overlay Forge will be documented in this file.
 - Added saved project child rows under Projects.
 - Added a compact Projects `+` creation action.
 - Added compact project row `...` edit/delete actions.
+- Added `docs/MILESTONE_9.md` for Manual Context Attachments.
+- Added manual context attachment support for project chat conversations.
+- Added SQLite `planning_conversation_context` table initialization for conversation-scoped context attachment links.
+- Added backend commands for listing, adding, and removing planning conversation context attachments.
+- Added a frontend Attached Context area inside project Chat.
+- Added support for attaching project, GitHub repository, note, task, calendar event, YouTube reference, and scratchpad context.
+- Added automatic GitHub repository context attachment for selected project chat conversations when a repository is linked in the GitHub section.
 
 ### Changed
 
@@ -120,6 +128,9 @@ All notable changes to Overlay Forge will be documented in this file.
 - Confirmed selected project workspace behavior is preserved.
 - Confirmed existing project-scoped chat behavior is preserved.
 - Confirmed existing GitHub behavior is preserved.
+- Confirmed attachment removal deletes only the attachment link and does not delete source records.
+- Confirmed existing project-scoped chat behavior is preserved after adding manual context attachments.
+- Confirmed linked GitHub repository metadata only needs to be defined once per project before it appears in project chat Attached Context.
 
 ### Validation
 
@@ -171,3 +182,8 @@ All notable changes to Overlay Forge will be documented in this file.
 - Verified Rust backend compile after Milestone 8 implementation with `cargo build`.
 - Verified development launch after Milestone 8 implementation with `npm run tauri:dev`; the app process started and was stopped after the validation timeout.
 - User manually validated Milestone 8 successfully.
+- Verified `npm install` completes successfully after Milestone 9 implementation.
+- Verified frontend build after Milestone 9 implementation with `npm run build`.
+- Verified Rust backend compile after Milestone 9 implementation with `cargo build`.
+- Verified development launch after Milestone 9 implementation with `npm run tauri:dev`; the app process started and was stopped after the validation timeout.
+- User manually validated Milestone 9 successfully.

@@ -8,11 +8,11 @@ Provide this file to ChatGPT or Codex when a new chat needs current project cont
 
 ## Current Milestone
 
-Milestone 8 - Projects Navigation Tree Actions
+Milestone 9 - Manual Context Attachments
 
 Status: **Complete / Passed / Successful**
 
-Current user-validated project baseline: **Milestone 8**. Future bridge prompts, planning, and implementation should start from Milestone 8.
+Current user-validated project baseline: **Milestone 9**. Future bridge prompts, planning, and implementation should start from Milestone 9.
 
 Milestone 0 remains complete, passed, and successful. Milestone 1 adds component navigation plus SQLite-backed Tasks, Notes, and Calendar components. User validation is complete and Milestone 1 passed.
 
@@ -32,7 +32,9 @@ User validation is complete and Milestone 7 passed.
 
 Milestone 8 is complete, passed, and successful as Projects Navigation Tree Actions. It makes Projects expandable in the left navigation, lists saved projects as children, exposes a compact `+` for new project flow, and exposes compact `...` menus on project rows for edit/delete. This pattern was validated on Projects before applying the pattern to other modules.
 
-Milestone numbering note: Milestone 2 is the Local Projects component. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Milestone 6 is Project Workspace Chat. Milestone 7 is Project Workspace Layout Refinement. Milestone 8 is Projects Navigation Tree Actions and is complete, passed, and successful. Do not mistake roadmap list item positions for milestone IDs.
+Milestone 9 is complete, passed, and successful. It adds manual context attachments for selected project chat conversations. Attachments are stored as conversation-scoped SQLite links in `planning_conversation_context`, can point to project, note, task, calendar event, YouTube reference, or scratchpad context, and can be removed without deleting source records. Linked GitHub repository metadata is automatically attached when a selected project has a repository defined in the GitHub section. Prompt inclusion and prompt preview are still deferred.
+
+Milestone numbering note: Milestone 2 is the Local Projects component. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Milestone 6 is Project Workspace Chat. Milestone 7 is Project Workspace Layout Refinement. Milestone 8 is Projects Navigation Tree Actions and is complete, passed, and successful. Milestone 9 is Manual Context Attachments and is complete, passed, and successful. Do not mistake roadmap list item positions for milestone IDs.
 
 ## Current Scope
 
@@ -58,6 +60,7 @@ Milestone numbering note: Milestone 2 is the Local Projects component. Milestone
 - SQLite-backed controlled YouTube reference persistence
 - Project workspace Chat inside selected Projects context
 - Selected-project workspace sections for Overview, GitHub, Chat, and References
+- SQLite-backed manual context attachments for project chat conversations
 
 ## Hotkey
 
@@ -74,6 +77,7 @@ Ctrl+Shift+Space
 - Bridge-file generation UI
 - Prompt preview
 - Automatic context attachment
+- Automatic context assembly from manual attachments
 - GitHub file reading
 - ChatGPT import
 - AI-generated project summaries
@@ -188,6 +192,17 @@ Update this section manually after each validation pass.
 - Verified: `cargo build` passes after Milestone 8 implementation
 - Verified: `npm run tauri:dev` launches after Milestone 8 implementation
 - Passed: Milestone 8 manual validation checklist
+- Implemented: Milestone 9 Manual Context Attachments
+- Implemented: SQLite `planning_conversation_context` table
+- Implemented: backend list/add/remove context attachment commands
+- Implemented: Attached Context area inside selected-project Chat
+- Implemented: automatic GitHub repository metadata attachment from the selected project's linked repository
+- Preserved: existing project-scoped chat and Projects navigation tree behavior
+- Verified: `npm install` passes after Milestone 9 implementation
+- Verified: `npm run build` passes after Milestone 9 implementation
+- Verified: `cargo build` passes after Milestone 9 implementation
+- Verified: `npm run tauri:dev` launches after Milestone 9 implementation
+- Passed: Milestone 9 manual validation checklist
 
 ## Milestone Validation Workflow
 
