@@ -64,6 +64,18 @@ Status: **Complete / Passed / Successful**
 
 Milestone 10 adds a read-only Prompt Preview action inside selected-project Chat. It uses existing project, conversation, draft message, and attached context data to show an assembled prompt preview without calling OpenAI. Attached context inclusion in actual sends remains deferred.
 
+**Milestone 11 - Bridge File Drafting**
+
+Status: **Implemented / Pending User Validation**
+
+Milestone 11 adds local bridge-file draft generation from selected project chat conversations. Generated Markdown drafts are stored in SQLite, displayed read-only in the Chat section, and remain local until a later export or Codex handoff milestone. Resolved attached context, including linked GitHub repository metadata, is now used by bridge drafts and normal project chat sends.
+
+**Milestone 12 - Project Markdown Context**
+
+Status: **Planned / Not Started**
+
+Milestone 12 will add project-level local Markdown context. Project chat should load a fresh `README.md` from the configured local project root whenever a new chat starts or an existing chat loads, then include referenced local Markdown files as project context sources for chat, Prompt Preview, and bridge drafts.
+
 ## Product Direction
 
 Overlay Forge is a personal desktop command hub that floats above the user's workflow and eventually helps turn ideas, notes, tasks, and project plans into Codex-ready markdown bridge files.
@@ -83,6 +95,8 @@ Use explicit milestone IDs. Do not infer milestone numbers from this list's item
 - Milestone 8 - Projects navigation tree actions - complete and passed
 - Milestone 9 - Manual context attachments - complete and passed
 - Milestone 10 - Prompt preview - complete, passed, successful
+- Milestone 11 - Bridge file drafting - implemented pending user validation
+- Milestone 12 - Project markdown context - planned
 
 ## Scope Guard
 
@@ -101,3 +115,7 @@ Milestone 8 remains intentionally focused on Projects navigation only. It does n
 Milestone 9 remains intentionally focused on manual attachment links only. It does not implement automatic context attachment, semantic search, vector stores, file uploads, GitHub file reading, YouTube transcript extraction, prompt preview, token counting, bridge-file generation, Codex handoff, ChatGPT import, chat streaming, or model picker UI.
 
 Milestone 10 remains intentionally focused on read-only prompt visibility only. It does not implement bridge-file generation, bridge-file editing/export, Codex handoff, GitHub file reading, YouTube transcript extraction, semantic search, vector stores, file uploads, automatic context attachment, token counting/budgeting, model picker UI, chat streaming, ChatGPT import, automatic prompt rewriting, long-term prompt templates, or attached context inclusion in actual OpenAI sends.
+
+Milestone 11 remains intentionally focused on local bridge draft creation and attached-context inclusion for project chat sends. It does not implement full bridge-file editing, approval/obsolete workflows, export to local Markdown files, copy-to-clipboard, direct Codex handoff, GitHub writes, chat streaming, model picker UI, token budgeting, vector stores, semantic search, or ChatGPT import.
+
+Milestone 12 is planned as a local-first project Markdown context milestone. It should load `README.md` and referenced local Markdown files from a configured project root as project-level context, not as per-conversation manual attachments. It should not read arbitrary filesystem paths outside the project root, read GitHub files through the GitHub API, add vector stores, add semantic search, export bridge files, or hand off directly to Codex.

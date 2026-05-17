@@ -7,8 +7,12 @@ import { listNotes } from "../../services/notes";
 import type { Note } from "../../services/notes";
 import {
   attachPlanningConversationContext,
+  createBridgeFileDraftFromConversation,
   createPlanningConversation,
+  deleteBridgeFileDraft,
   deletePlanningConversation,
+  getBridgeFileDraft,
+  listBridgeFileDrafts,
   listPlanningConversationContext,
   listPlanningConversations,
   listPlanningMessages,
@@ -17,6 +21,7 @@ import {
   sendPlanningMessage
 } from "../../services/planningChat";
 import type {
+  BridgeFileDraft,
   PlanningContextType,
   PlanningConversation,
   PlanningConversationContext,
@@ -76,6 +81,9 @@ export function PlanningChat({ project }: PlanningChatProps) {
   const [promptPreview, setPromptPreview] = useState<PlanningPromptPreview | null>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [bridgeDrafts, setBridgeDrafts] = useState<BridgeFileDraft[]>([]);
+  const [selectedBridgeDraft, setSelectedBridgeDraft] = useState<BridgeFileDraft | null>(null);
+  const [isDraftingBridgeFile, setIsDraftingBridgeFile] = useState(false);
 
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === selectedProjectId) ?? null,
@@ -110,14 +118,21 @@ export function PlanningChat({ project }: PlanningChatProps) {
       setConversations([]);
       setSelectedConversationId(null);
       setMessages([]);
+      setBridgeDrafts([]);
+      setSelectedBridgeDraft(null);
       return;
     }
 
-    listPlanningConversations(selectedProjectId)
-      .then((nextConversations) => {
+    Promise.all([
+      listPlanningConversations(selectedProjectId),
+      listBridgeFileDrafts(selectedProjectId)
+    ])
+      .then(([nextConversations, nextDrafts]) => {
         setConversations(nextConversations);
         setSelectedConversationId(nextConversations[0]?.id ?? null);
         setMessages([]);
+        setBridgeDrafts(nextDrafts);
+        setSelectedBridgeDraft(nextDrafts[0] ?? null);
         setStatus(
           nextConversations.length === 0 ? "No planning conversations yet" : "Ready"
         );
@@ -311,8 +326,15 @@ export function PlanningChat({ project }: PlanningChatProps) {
       const nextConversations = conversations.filter(
         (conversation) => conversation.id !== selectedConversation.id
       );
+      const nextDrafts = bridgeDrafts.filter(
+        (draft) => draft.conversationId !== selectedConversation.id
+      );
       setConversations(nextConversations);
       setSelectedConversationId(nextConversations[0]?.id ?? null);
+      setBridgeDrafts(nextDrafts);
+      setSelectedBridgeDraft((current) =>
+        current?.conversationId === selectedConversation.id ? nextDrafts[0] ?? null : current
+      );
       setMessages([]);
       setContextItems([]);
       setPromptPreview(null);
@@ -379,6 +401,52 @@ export function PlanningChat({ project }: PlanningChatProps) {
       setStatus(formatError(error));
     } finally {
       setIsPreviewLoading(false);
+    }
+  }
+
+  async function onDraftBridgeFile() {
+    if (!selectedConversation) {
+      setStatus("Create or select a conversation before drafting a bridge file");
+      return;
+    }
+
+    setIsDraftingBridgeFile(true);
+    setStatus("Drafting bridge file");
+    try {
+      const draft = await createBridgeFileDraftFromConversation(selectedConversation.id);
+      setBridgeDrafts((current) => [draft, ...current]);
+      setSelectedBridgeDraft(draft);
+      setStatus("Bridge draft saved");
+    } catch (error) {
+      setStatus(formatError(error));
+    } finally {
+      setIsDraftingBridgeFile(false);
+    }
+  }
+
+  async function onSelectBridgeDraft(id: number) {
+    try {
+      const draft = await getBridgeFileDraft(id);
+      setSelectedBridgeDraft(draft);
+      setStatus("Bridge draft loaded");
+    } catch (error) {
+      setStatus(formatError(error));
+    }
+  }
+
+  async function onDeleteBridgeDraft() {
+    if (!selectedBridgeDraft) {
+      return;
+    }
+
+    try {
+      await deleteBridgeFileDraft(selectedBridgeDraft.id);
+      const nextDrafts = bridgeDrafts.filter((draft) => draft.id !== selectedBridgeDraft.id);
+      setBridgeDrafts(nextDrafts);
+      setSelectedBridgeDraft(nextDrafts[0] ?? null);
+      setStatus("Bridge draft deleted");
+    } catch (error) {
+      setStatus(formatError(error));
     }
   }
 
@@ -692,6 +760,70 @@ export function PlanningChat({ project }: PlanningChatProps) {
               </div>
             </section>
           )}
+
+          <section className="bridge-drafts-panel" aria-label="Bridge drafts">
+            <div className="bridge-drafts-heading">
+              <div>
+                <p>Bridge Drafts</p>
+                <h4>Local Markdown Drafts</h4>
+              </div>
+              <button
+                className="ghost-button"
+                disabled={!selectedConversation || isSending || isDraftingBridgeFile}
+                onClick={() => void onDraftBridgeFile()}
+                type="button"
+              >
+                Draft Bridge File
+              </button>
+            </div>
+
+            <div className="bridge-drafts-layout">
+              <div className="bridge-drafts-list">
+                {bridgeDrafts.length === 0 ? (
+                  <p>No bridge drafts saved for this project.</p>
+                ) : (
+                  bridgeDrafts.map((draft) => (
+                    <button
+                      className={
+                        selectedBridgeDraft?.id === draft.id
+                          ? "bridge-draft-list-item active"
+                          : "bridge-draft-list-item"
+                      }
+                      key={draft.id}
+                      onClick={() => void onSelectBridgeDraft(draft.id)}
+                      type="button"
+                    >
+                      <strong>{draft.title}</strong>
+                      <span>{formatDate(draft.updatedAt)}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+
+              <article className="bridge-draft-view">
+                {selectedBridgeDraft ? (
+                  <>
+                    <div className="bridge-draft-view-heading">
+                      <div>
+                        <span>{selectedBridgeDraft.status}</span>
+                        <strong>{selectedBridgeDraft.title}</strong>
+                      </div>
+                      <button
+                        className="ghost-button"
+                        onClick={() => void onDeleteBridgeDraft()}
+                        type="button"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                    <pre>{selectedBridgeDraft.content}</pre>
+                  </>
+                ) : (
+                  <p>Select or generate a bridge draft to view its Markdown content.</p>
+                )}
+              </article>
+            </div>
+          </section>
         </div>
       </div>
     </section>

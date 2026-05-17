@@ -16,6 +16,8 @@ Milestone 6 - Project Workspace Chat data model is complete, passed, and success
 
 Milestone 9 - Manual Context Attachments data model is complete, passed, and successful. It adds a conversation-scoped context attachment table with a non-destructive migration.
 
+Milestone 11 - Bridge File Drafting data model is implemented and pending user validation. It adds a project-scoped bridge draft table with a non-destructive migration.
+
 ## Tables
 
 ### scratchpad
@@ -147,6 +149,35 @@ scratchpad
 
 Deleting an attachment removes only the `planning_conversation_context` row. It does not delete the source project, GitHub repository link, note, task, calendar event, YouTube reference, or scratchpad content.
 
+### bridge_file_drafts
+
+```text
+id
+project_id
+conversation_id
+title
+content
+status
+created_at
+updated_at
+```
+
+Local bridge-file draft records for Milestone 11. Each row belongs to one `projects.id` value through `project_id` and links to a source `planning_conversations.id` value through `conversation_id`.
+
+`title` stores a readable draft title.
+
+`content` stores the generated Markdown bridge draft.
+
+`status` defaults to:
+
+```text
+draft
+```
+
+Milestone 11 only uses `draft`. Approval, obsolete, sent, implemented, validated, and archived workflows are deferred.
+
+Deleting a bridge draft removes only the `bridge_file_drafts` row. It does not delete the source project, planning conversation, planning messages, or attached context.
+
 ### project_github_repositories
 
 ```text
@@ -239,3 +270,11 @@ CREATE TABLE IF NOT EXISTS planning_conversation_context
 ```
 
 Existing user data remains intact. Deleting a planning conversation deletes that conversation's attachment links along with its messages.
+
+Milestone 11 uses non-destructive idempotent table initialization:
+
+```text
+CREATE TABLE IF NOT EXISTS bridge_file_drafts
+```
+
+Existing user data remains intact. Bridge drafts are stored locally in SQLite and are not exported to disk by Milestone 11.

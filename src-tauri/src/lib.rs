@@ -5,17 +5,18 @@ mod hotkeys;
 mod openai;
 
 use commands::{
-    attach_planning_conversation_context, create_calendar_event, create_note,
-    create_planning_conversation, create_project, create_task, create_youtube_reference,
-    delete_calendar_event, delete_note, delete_planning_conversation, delete_project,
-    delete_project_github_repository, delete_task, delete_youtube_reference,
-    fetch_project_github_metadata, get_milestone_status, get_project_github_repository,
-    get_scratchpad, get_youtube_reference, list_calendar_events, list_notes,
-    list_planning_conversation_context, list_planning_conversations, list_planning_messages,
-    list_projects, list_tasks, list_youtube_references, open_youtube_reference,
-    preview_planning_chat_prompt, remove_planning_conversation_context,
-    save_project_github_repository, save_scratchpad, send_planning_message, shutdown_app,
-    update_calendar_event, update_note, update_project, update_task, update_youtube_reference,
+    attach_planning_conversation_context, create_bridge_file_draft_from_conversation,
+    create_calendar_event, create_note, create_planning_conversation, create_project, create_task,
+    create_youtube_reference, delete_bridge_file_draft, delete_calendar_event, delete_note,
+    delete_planning_conversation, delete_project, delete_project_github_repository, delete_task,
+    delete_youtube_reference, fetch_project_github_metadata, get_bridge_file_draft,
+    get_milestone_status, get_project_github_repository, get_scratchpad, get_youtube_reference,
+    list_bridge_file_drafts, list_calendar_events, list_notes, list_planning_conversation_context,
+    list_planning_conversations, list_planning_messages, list_projects, list_tasks,
+    list_youtube_references, open_youtube_reference, preview_planning_chat_prompt,
+    remove_planning_conversation_context, save_project_github_repository, save_scratchpad,
+    send_planning_message, shutdown_app, update_calendar_event, update_note, update_project,
+    update_task, update_youtube_reference,
 };
 use db::AppDatabase;
 use tauri::Manager;
@@ -75,6 +76,10 @@ pub fn run() {
             attach_planning_conversation_context,
             remove_planning_conversation_context,
             preview_planning_chat_prompt,
+            list_bridge_file_drafts,
+            get_bridge_file_draft,
+            create_bridge_file_draft_from_conversation,
+            delete_bridge_file_draft,
             list_youtube_references,
             get_youtube_reference,
             create_youtube_reference,

@@ -33,6 +33,7 @@ struct ResponsesError {
 pub async fn create_planning_response(
     project: &ProjectRecord,
     messages: &[PlanningMessageRecord],
+    attached_context: &str,
 ) -> Result<String, String> {
     let api_key = std::env::var("OPENAI_API_KEY")
         .map(|value| value.trim().to_string())
@@ -48,7 +49,7 @@ pub async fn create_planning_response(
     let request = ResponsesRequest {
         model: DEFAULT_MODEL,
         instructions: PLANNING_SYSTEM_INSTRUCTION,
-        input: build_input(project, messages),
+        input: build_input(project, messages, attached_context),
         store: false,
     };
 
@@ -83,6 +84,7 @@ pub async fn create_planning_response(
 fn build_input(
     project: &ProjectRecord,
     messages: &[PlanningMessageRecord],
+    attached_context: &str,
 ) -> Vec<ResponsesInputMessage> {
     let mut input = vec![ResponsesInputMessage {
         role: "user".to_string(),
@@ -91,6 +93,13 @@ fn build_input(
             project.name, project.status, project.description
         ),
     }];
+
+    if !attached_context.trim().is_empty() {
+        input.push(ResponsesInputMessage {
+            role: "user".to_string(),
+            content: attached_context.to_string(),
+        });
+    }
 
     input.extend(messages.iter().map(|message| ResponsesInputMessage {
         role: message.role.clone(),

@@ -1,7 +1,7 @@
 use crate::db::{
-    CalendarEventRecord, NoteRecord, PlanningConversationContextRecord, PlanningConversationRecord,
-    PlanningMessageRecord, PlanningPromptPreviewRecord, ProjectGitHubRepositoryRecord,
-    ProjectRecord, TaskRecord, YouTubeReferenceRecord,
+    BridgeFileDraftRecord, CalendarEventRecord, NoteRecord, PlanningConversationContextRecord,
+    PlanningConversationRecord, PlanningMessageRecord, PlanningPromptPreviewRecord,
+    ProjectGitHubRepositoryRecord, ProjectRecord, TaskRecord, YouTubeReferenceRecord,
 };
 use crate::github;
 use crate::openai;
@@ -36,7 +36,7 @@ pub fn save_scratchpad(content: String, state: State<'_, AppState>) -> Result<()
 #[tauri::command]
 pub fn get_milestone_status(state: State<'_, AppState>) -> Result<MilestoneStatus, String> {
     Ok(MilestoneStatus {
-        milestone: "Milestone 10".to_string(),
+        milestone: "Milestone 11".to_string(),
         hotkey: "Ctrl+Shift+Space".to_string(),
         database_ready: state.database.is_ready(),
     })
@@ -384,7 +384,13 @@ pub async fn send_planning_message(
         .database
         .recent_planning_messages(conversation_id, 20)
         .map_err(|error| error.to_string())?;
-    let assistant_content = openai::create_planning_response(&project, &recent_messages).await?;
+    let context_payload = state
+        .database
+        .planning_conversation_context_payload(conversation_id)
+        .map_err(|error| error.to_string())?;
+    let assistant_content =
+        openai::create_planning_response(&project, &recent_messages, &context_payload.content)
+            .await?;
 
     state
         .database
@@ -459,6 +465,47 @@ pub fn preview_planning_chat_prompt(
             &draft_message,
             openai::PLANNING_SYSTEM_INSTRUCTION,
         )
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn list_bridge_file_drafts(
+    project_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<BridgeFileDraftRecord>, String> {
+    state
+        .database
+        .list_bridge_file_drafts(project_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn get_bridge_file_draft(
+    id: i64,
+    state: State<'_, AppState>,
+) -> Result<BridgeFileDraftRecord, String> {
+    state
+        .database
+        .get_bridge_file_draft(id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn create_bridge_file_draft_from_conversation(
+    conversation_id: i64,
+    state: State<'_, AppState>,
+) -> Result<BridgeFileDraftRecord, String> {
+    state
+        .database
+        .create_bridge_file_draft_from_conversation(conversation_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn delete_bridge_file_draft(id: i64, state: State<'_, AppState>) -> Result<(), String> {
+    state
+        .database
+        .delete_bridge_file_draft(id)
         .map_err(|error| error.to_string())
 }
 

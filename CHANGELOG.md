@@ -20,6 +20,7 @@ All notable changes to Overlay Forge will be documented in this file.
 - Milestone 8 - Projects Navigation Tree Actions is complete, passed, and successful.
 - Milestone 9 - Manual Context Attachments is complete, passed, and successful.
 - Milestone 10 - Prompt Preview is complete, passed, and successful.
+- Milestone 11 - Bridge File Drafting is implemented and pending user validation.
 
 ### Added
 
@@ -94,6 +95,13 @@ All notable changes to Overlay Forge will be documented in this file.
 - Added backend prompt preview command that assembles local preview data without calling OpenAI.
 - Added display of selected project, selected conversation, draft message, and attached context in Prompt Preview.
 - Added display of assembled prompt preview.
+- Added bridge-file draft generation from selected project chat conversations.
+- Added SQLite `bridge_file_drafts` table initialization for local bridge draft persistence.
+- Added backend commands for bridge draft creation, listing, retrieval, and deletion.
+- Added frontend `Draft Bridge File` action in project workspace Chat.
+- Added read-only Bridge Drafts panel with saved draft list and generated Markdown content display.
+- Added generated Markdown draft structure with project, conversation source, goal, relevant context, implementation instructions, validation checklist, deferred items, and notes.
+- Added attached context inclusion for project chat sends, including linked GitHub repository metadata when available.
 
 ### Changed
 
@@ -138,6 +146,10 @@ All notable changes to Overlay Forge will be documented in this file.
 - Confirmed linked GitHub repository metadata only needs to be defined once per project before it appears in project chat Attached Context.
 - Confirmed Prompt Preview does not send to OpenAI.
 - Clarified attached context is included in Prompt Preview only; actual OpenAI sends remain unchanged in Milestone 10.
+- Confirmed bridge drafts persist locally in SQLite.
+- Confirmed bridge draft deletion removes only the selected draft and does not delete source conversations, messages, or context records.
+- Confirmed linked GitHub repository metadata is resolved from the selected project for bridge drafts, prompt previews, and project chat sends.
+- Confirmed export, full editor workflows, and direct Codex handoff remain deferred beyond Milestone 11.
 
 ### Validation
 
@@ -199,3 +211,8 @@ All notable changes to Overlay Forge will be documented in this file.
 - Verified Rust backend compile after Milestone 10 implementation with `cargo build`.
 - Verified development launch after Milestone 10 implementation with `npm run tauri:dev`; the app process started and was stopped after the validation timeout.
 - Manual validation for Milestone 10 is complete, passed, and successful.
+- Verified `npm install` completes successfully after Milestone 11 implementation.
+- Verified frontend build after Milestone 11 implementation with `npm run build`.
+- Verified Rust backend compile after Milestone 11 implementation with `cargo build`.
+- Verified development launch after Milestone 11 implementation with `npm run tauri:dev`; the app process started and was stopped after the validation timeout.
+- Manual validation for Milestone 11 is pending user validation.

@@ -147,6 +147,12 @@ pub struct PromptPreviewContextItem {
     pub warning: String,
 }
 
+#[derive(Clone)]
+pub struct PlanningContextPayload {
+    pub content: String,
+    pub warnings: Vec<String>,
+}
+
 #[derive(Serialize)]
 pub struct PlanningPromptPreviewRecord {
     #[serde(rename = "projectLabel")]
@@ -166,6 +172,22 @@ pub struct PlanningPromptPreviewRecord {
     #[serde(rename = "assembledPrompt")]
     pub assembled_prompt: String,
     pub warnings: Vec<String>,
+}
+
+#[derive(Serialize)]
+pub struct BridgeFileDraftRecord {
+    pub id: i64,
+    #[serde(rename = "projectId")]
+    pub project_id: i64,
+    #[serde(rename = "conversationId")]
+    pub conversation_id: i64,
+    pub title: String,
+    pub content: String,
+    pub status: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
 }
 
 pub struct AppDatabase {
@@ -274,6 +296,17 @@ impl AppDatabase {
                 channel_name TEXT NOT NULL DEFAULT '',
                 notes TEXT NOT NULL DEFAULT '',
                 tags TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS bridge_file_drafts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                conversation_id INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                content TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'draft',
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
@@ -629,6 +662,10 @@ impl AppDatabase {
     pub fn delete_project(&self, id: i64) -> Result<()> {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
+            "DELETE FROM bridge_file_drafts WHERE project_id = ?1",
+            params![id],
+        )?;
+        connection.execute(
             "DELETE FROM project_github_repositories WHERE project_id = ?1",
             params![id],
         )?;
@@ -883,6 +920,10 @@ impl AppDatabase {
     pub fn delete_planning_conversation(&self, conversation_id: i64) -> Result<()> {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
+            "DELETE FROM bridge_file_drafts WHERE conversation_id = ?1",
+            params![conversation_id],
+        )?;
+        connection.execute(
             "DELETE FROM planning_conversation_context WHERE conversation_id = ?1",
             params![conversation_id],
         )?;
@@ -991,6 +1032,11 @@ impl AppDatabase {
             }
             attached_context_items.push(resolved);
         }
+        Self::add_project_github_context_if_missing(
+            &connection,
+            &project,
+            &mut attached_context_items,
+        )?;
 
         let attached_context_text = if attached_context_items.is_empty() {
             "No attached context.".to_string()
@@ -1044,6 +1090,116 @@ impl AppDatabase {
             assembled_prompt,
             warnings,
         })
+    }
+
+    pub fn planning_conversation_context_payload(
+        &self,
+        conversation_id: i64,
+    ) -> Result<PlanningContextPayload> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        let conversation = Self::get_planning_conversation_by_id(&connection, conversation_id)?;
+        let project = Self::get_project_by_id(&connection, conversation.project_id)?;
+        let contexts =
+            Self::list_planning_conversation_context_for_connection(&connection, conversation_id)?;
+        let mut attached_context_items = Vec::new();
+
+        for context in contexts {
+            attached_context_items.push(Self::resolve_context_preview_content(
+                &connection,
+                &context,
+                &project,
+            )?);
+        }
+        Self::add_project_github_context_if_missing(
+            &connection,
+            &project,
+            &mut attached_context_items,
+        )?;
+
+        Ok(build_planning_context_payload(&attached_context_items))
+    }
+
+    pub fn list_bridge_file_drafts(&self, project_id: i64) -> Result<Vec<BridgeFileDraftRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_project_by_id(&connection, project_id)?;
+        let mut statement = connection.prepare(
+            "
+            SELECT id, project_id, conversation_id, title, content, status, created_at, updated_at
+            FROM bridge_file_drafts
+            WHERE project_id = ?1
+            ORDER BY updated_at DESC, id DESC
+            ",
+        )?;
+
+        let drafts = statement
+            .query_map(params![project_id], bridge_file_draft_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(drafts)
+    }
+
+    pub fn get_bridge_file_draft(&self, id: i64) -> Result<BridgeFileDraftRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_bridge_file_draft_by_id(&connection, id)
+    }
+
+    pub fn create_bridge_file_draft_from_conversation(
+        &self,
+        conversation_id: i64,
+    ) -> Result<BridgeFileDraftRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        let conversation = Self::get_planning_conversation_by_id(&connection, conversation_id)?;
+        let project = Self::get_project_by_id(&connection, conversation.project_id)?;
+        let messages = Self::list_planning_messages_for_connection(&connection, conversation_id)?;
+        let contexts =
+            Self::list_planning_conversation_context_for_connection(&connection, conversation_id)?;
+
+        let mut attached_context_items = Vec::new();
+        for context in contexts {
+            attached_context_items.push(Self::resolve_context_preview_content(
+                &connection,
+                &context,
+                &project,
+            )?);
+        }
+        Self::add_project_github_context_if_missing(
+            &connection,
+            &project,
+            &mut attached_context_items,
+        )?;
+
+        let generated_at: String =
+            connection.query_row("SELECT CURRENT_TIMESTAMP", [], |row| row.get(0))?;
+        let title = format!("Bridge Draft - {} - {}", conversation.title, generated_at);
+        let content = build_bridge_file_draft_markdown(
+            &project,
+            &conversation,
+            &messages,
+            &attached_context_items,
+        );
+
+        connection.execute(
+            "
+            INSERT INTO bridge_file_drafts (
+                project_id,
+                conversation_id,
+                title,
+                content,
+                status
+            )
+            VALUES (?1, ?2, ?3, ?4, 'draft')
+            ",
+            params![project.id, conversation.id, title, content],
+        )?;
+
+        let id = connection.last_insert_rowid();
+        Self::get_bridge_file_draft_by_id(&connection, id)
+    }
+
+    pub fn delete_bridge_file_draft(&self, id: i64) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute("DELETE FROM bridge_file_drafts WHERE id = ?1", params![id])?;
+        Ok(())
     }
 
     pub fn list_youtube_references(&self) -> Result<Vec<YouTubeReferenceRecord>> {
@@ -1427,6 +1583,21 @@ impl AppDatabase {
         )
     }
 
+    fn get_bridge_file_draft_by_id(
+        connection: &Connection,
+        id: i64,
+    ) -> Result<BridgeFileDraftRecord> {
+        connection.query_row(
+            "
+            SELECT id, project_id, conversation_id, title, content, status, created_at, updated_at
+            FROM bridge_file_drafts
+            WHERE id = ?1
+            ",
+            params![id],
+            bridge_file_draft_from_row,
+        )
+    }
+
     fn resolve_context_preview_content(
         connection: &Connection,
         context: &PlanningConversationContextRecord,
@@ -1459,25 +1630,39 @@ impl AppDatabase {
                 }
             }
             "github_repository" => match context.source_id {
-                Some(id) => match Self::get_project_github_repository_by_id(connection, id)
-                    .optional()?
+                Some(id) => {
+                    let repository =
+                        Self::get_project_github_repository_by_id(connection, id).optional()?;
+                    let repository = match repository {
+                        Some(repository) => Some(repository),
+                        None => Self::get_project_github_repository_by_project_id(
+                            connection,
+                            conversation_project.id,
+                        )
+                        .optional()?,
+                    };
+                    match repository {
+                        Some(repository) => (
+                            true,
+                            github_repository_context_content(&repository),
+                            String::new(),
+                        ),
+                        None => (false, String::new(), missing_warning),
+                    }
+                }
+                None => match Self::get_project_github_repository_by_project_id(
+                    connection,
+                    conversation_project.id,
+                )
+                .optional()?
                 {
                     Some(repository) => (
                         true,
-                        format!(
-                            "Repository: {}\nURL: {}\nDefault branch: {}\nVisibility: {}\nLast fetched: {}\nFetch status: {}",
-                            repository.repository_full_name,
-                            repository.repository_url,
-                            repository.default_branch,
-                            repository.visibility,
-                            repository.last_fetched_at,
-                            repository.last_fetch_status
-                        ),
+                        github_repository_context_content(&repository),
                         String::new(),
                     ),
                     None => (false, String::new(), missing_warning),
                 },
-                None => (false, String::new(), missing_warning),
             },
             "note" => match context.source_id {
                 Some(id) => match Self::get_note_by_id(connection, id).optional()? {
@@ -1543,16 +1728,13 @@ impl AppDatabase {
                 None => (false, String::new(), missing_warning),
             },
             "scratchpad" => {
-                let content: String =
-                    connection.query_row("SELECT content FROM scratchpad WHERE id = 1", [], |row| {
-                        row.get(0)
-                    })?;
+                let content: String = connection.query_row(
+                    "SELECT content FROM scratchpad WHERE id = 1",
+                    [],
+                    |row| row.get(0),
+                )?;
                 if content.trim().is_empty() {
-                    (
-                        false,
-                        String::new(),
-                        "Scratchpad is empty.".to_string(),
-                    )
+                    (false, String::new(), "Scratchpad is empty.".to_string())
                 } else {
                     (true, content, String::new())
                 }
@@ -1572,6 +1754,37 @@ impl AppDatabase {
             content,
             warning,
         })
+    }
+
+    fn add_project_github_context_if_missing(
+        connection: &Connection,
+        project: &ProjectRecord,
+        context_items: &mut Vec<PromptPreviewContextItem>,
+    ) -> Result<()> {
+        let repository =
+            Self::get_project_github_repository_by_project_id(connection, project.id).optional()?;
+        let Some(repository) = repository else {
+            return Ok(());
+        };
+
+        let already_present = context_items.iter().any(|item| {
+            item.context_type == "github_repository"
+                && item.label == repository.repository_full_name
+        });
+        if already_present {
+            return Ok(());
+        }
+
+        context_items.push(PromptPreviewContextItem {
+            id: -repository.id,
+            context_type: "github_repository".to_string(),
+            label: repository.repository_full_name.clone(),
+            included: true,
+            content: github_repository_context_content(&repository),
+            warning: String::new(),
+        });
+
+        Ok(())
     }
 
     fn get_project_github_repository_by_id(
@@ -1644,6 +1857,196 @@ fn planning_conversation_context_from_row(
         label: row.get(4)?,
         created_at: row.get(5)?,
     })
+}
+
+fn bridge_file_draft_from_row(row: &rusqlite::Row<'_>) -> Result<BridgeFileDraftRecord> {
+    Ok(BridgeFileDraftRecord {
+        id: row.get(0)?,
+        project_id: row.get(1)?,
+        conversation_id: row.get(2)?,
+        title: row.get(3)?,
+        content: row.get(4)?,
+        status: row.get(5)?,
+        created_at: row.get(6)?,
+        updated_at: row.get(7)?,
+    })
+}
+
+fn build_bridge_file_draft_markdown(
+    project: &ProjectRecord,
+    conversation: &PlanningConversationRecord,
+    messages: &[PlanningMessageRecord],
+    context_items: &[PromptPreviewContextItem],
+) -> String {
+    let description = if project.description.trim().is_empty() {
+        "No description provided."
+    } else {
+        project.description.as_str()
+    };
+    let goal = first_user_message(messages)
+        .map(|message| {
+            format!("Review and refine this inferred goal from the conversation:\n\n{message}")
+        })
+        .unwrap_or_else(|| "TODO: User review required.".to_string());
+    let transcript = if messages.is_empty() {
+        "No conversation messages were saved when this draft was generated.".to_string()
+    } else {
+        messages
+            .iter()
+            .map(|message| {
+                format!(
+                    "### {}\n\n{}\n",
+                    message.role.to_uppercase(),
+                    message.content.trim()
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let relevant_context = if context_items.is_empty() {
+        "No attached context was linked to this conversation.".to_string()
+    } else {
+        context_items
+            .iter()
+            .map(|item| {
+                let included = if item.included { "Yes" } else { "No" };
+                let body = if !item.content.trim().is_empty() {
+                    item.content.as_str()
+                } else if !item.warning.trim().is_empty() {
+                    item.warning.as_str()
+                } else {
+                    "TODO: User review required."
+                };
+                format!(
+                    "### {}: {}\n\nIncluded: {}\n\n{}\n",
+                    bridge_context_type_label(&item.context_type),
+                    item.label,
+                    included,
+                    body
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+
+    format!(
+        "# Project Bridge Draft\n\n\
+## Project\n\n\
+- Name: {}\n\
+- Status: {}\n\
+- Description: {}\n\n\
+## Conversation Source\n\n\
+- Conversation: {}\n\
+- Conversation ID: {}\n\
+- Message count: {}\n\n\
+{}\n\n\
+## Goal\n\n\
+{}\n\n\
+## Relevant Context\n\n\
+{}\n\n\
+## Implementation Instructions\n\n\
+TODO: User review required.\n\n\
+Use the project, conversation transcript, and attached context above as source material. Do not invent repository files, external services, or implementation details that are not present in the provided context.\n\n\
+## Validation Checklist\n\n\
+- Review this bridge draft for accuracy before using it in Codex.\n\
+- Confirm the selected project and conversation are correct.\n\
+- Confirm attached context is relevant and safe to include.\n\
+- Run the repository's normal validation commands after implementation.\n\
+- Manually validate the changed app workflow.\n\n\
+## Deferred Items\n\n\
+- Full bridge-file editor\n\
+- Approval workflow\n\
+- Obsolete status workflow\n\
+- Export to local Markdown files\n\
+- Direct Codex handoff\n\
+- GitHub write operations\n\
+- Chat streaming\n\
+- Model picker UI\n\
+- Token budgeting\n\
+- Vector stores or semantic search\n\
+- ChatGPT import\n\n\
+## Notes\n\n\
+- This is a local SQLite bridge draft generated by Overlay Forge.\n\
+- User review remains required before using this draft as an implementation prompt.\n\
+- TODO: Add any unresolved questions or assumptions before handoff.\n",
+        project.name,
+        project.status,
+        description,
+        conversation.title,
+        conversation.id,
+        messages.len(),
+        transcript,
+        goal,
+        relevant_context
+    )
+}
+
+fn build_planning_context_payload(
+    context_items: &[PromptPreviewContextItem],
+) -> PlanningContextPayload {
+    let mut warnings = Vec::new();
+    let included_context = context_items
+        .iter()
+        .filter_map(|item| {
+            if !item.warning.trim().is_empty() {
+                warnings.push(format!("{}: {}", item.label, item.warning));
+            }
+
+            if !item.included || item.content.trim().is_empty() {
+                return None;
+            }
+
+            Some(format!(
+                "Type: {}\nLabel: {}\nContent:\n{}",
+                bridge_context_type_label(&item.context_type),
+                item.label,
+                item.content
+            ))
+        })
+        .collect::<Vec<_>>();
+
+    let content = if included_context.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "Attached local context for this conversation:\n\n{}",
+            included_context.join("\n\n---\n\n")
+        )
+    };
+
+    PlanningContextPayload { content, warnings }
+}
+
+fn first_user_message(messages: &[PlanningMessageRecord]) -> Option<String> {
+    messages
+        .iter()
+        .find(|message| message.role == "user" && !message.content.trim().is_empty())
+        .map(|message| message.content.trim().to_string())
+}
+
+fn github_repository_context_content(repository: &ProjectGitHubRepositoryRecord) -> String {
+    format!(
+        "Repository: {}\nURL: {}\nDefault branch: {}\nVisibility: {}\nLast fetched: {}\nFetch status: {}",
+        repository.repository_full_name,
+        repository.repository_url,
+        repository.default_branch,
+        repository.visibility,
+        repository.last_fetched_at,
+        repository.last_fetch_status
+    )
+}
+
+fn bridge_context_type_label(context_type: &str) -> &'static str {
+    match context_type {
+        "project" => "Project",
+        "github_repository" => "GitHub Repository",
+        "note" => "Note",
+        "task" => "Task",
+        "calendar_event" => "Calendar Event",
+        "youtube_reference" => "YouTube Reference",
+        "scratchpad" => "Scratchpad",
+        _ => "Context",
+    }
 }
 
 fn planning_context_dedupe_key(context: &PlanningConversationContextRecord) -> String {

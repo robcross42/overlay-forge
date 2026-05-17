@@ -57,6 +57,17 @@ export type PlanningPromptPreview = {
   warnings: string[];
 };
 
+export type BridgeFileDraft = {
+  id: number;
+  projectId: number;
+  conversationId: number;
+  title: string;
+  content: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export function listPlanningConversations(projectId?: number) {
   return invoke<PlanningConversation[]>("list_planning_conversations", {
     projectId: projectId ?? null
@@ -111,4 +122,22 @@ export function previewPlanningChatPrompt(conversationId: number, draftMessage: 
     conversationId,
     draftMessage
   });
+}
+
+export function listBridgeFileDrafts(projectId: number) {
+  return invoke<BridgeFileDraft[]>("list_bridge_file_drafts", { projectId });
+}
+
+export function getBridgeFileDraft(id: number) {
+  return invoke<BridgeFileDraft>("get_bridge_file_draft", { id });
+}
+
+export function createBridgeFileDraftFromConversation(conversationId: number) {
+  return invoke<BridgeFileDraft>("create_bridge_file_draft_from_conversation", {
+    conversationId
+  });
+}
+
+export function deleteBridgeFileDraft(id: number) {
+  return invoke<void>("delete_bridge_file_draft", { id });
 }

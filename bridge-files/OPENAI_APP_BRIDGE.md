@@ -8,11 +8,11 @@ Provide this file to ChatGPT or Codex when a new chat needs current project cont
 
 ## Current Milestone
 
-Milestone 10 - Prompt Preview
+Milestone 11 - Bridge File Drafting
 
-Status: **Complete / Passed / Successful**
+Status: **Implemented / Pending User Validation**
 
-Current user-validated project baseline: **Milestone 10**. Milestone 10 is complete, passed, and successful.
+Current user-validated project baseline: **Milestone 10**. Milestone 11 is implemented and pending user validation.
 
 Milestone 0 remains complete, passed, and successful. Milestone 1 adds component navigation plus SQLite-backed Tasks, Notes, and Calendar components. User validation is complete and Milestone 1 passed.
 
@@ -32,11 +32,15 @@ User validation is complete and Milestone 7 passed.
 
 Milestone 8 is complete, passed, and successful as Projects Navigation Tree Actions. It makes Projects expandable in the left navigation, lists saved projects as children, exposes a compact `+` for new project flow, and exposes compact `...` menus on project rows for edit/delete. This pattern was validated on Projects before applying the pattern to other modules.
 
-Milestone 9 is complete, passed, and successful. It adds manual context attachments for selected project chat conversations. Attachments are stored as conversation-scoped SQLite links in `planning_conversation_context`, can point to project, note, task, calendar event, YouTube reference, or scratchpad context, and can be removed without deleting source records. Linked GitHub repository metadata is automatically attached when a selected project has a repository defined in the GitHub section. Prompt Preview is complete in Milestone 10; attached context inclusion in actual OpenAI sends remains deferred.
+Milestone 9 is complete, passed, and successful. It adds manual context attachments for selected project chat conversations. Attachments are stored as conversation-scoped SQLite links in `planning_conversation_context`, can point to project, note, task, calendar event, YouTube reference, or scratchpad context, and can be removed without deleting source records. Linked GitHub repository metadata is automatically attached when a selected project has a repository defined in the GitHub section. Prompt Preview is complete in Milestone 10; attached context inclusion in project chat sends is implemented in Milestone 11.
 
-Milestone 10 is complete, passed, and successful. It adds read-only Prompt Preview inside selected-project Chat. The preview is assembled by the backend from existing local project, conversation, draft message, and attached context data without calling OpenAI. Actual OpenAI sends remain unchanged in Milestone 10; attached context inclusion in sends is deferred.
+Milestone 10 is complete, passed, and successful. It adds read-only Prompt Preview inside selected-project Chat. The preview is assembled by the backend from existing local project, conversation, draft message, and attached context data without calling OpenAI. Actual OpenAI sends remain unchanged in Milestone 10; Milestone 11 adds attached context inclusion for project chat sends.
 
-Milestone numbering note: Milestone 2 is the Local Projects component. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Milestone 6 is Project Workspace Chat. Milestone 7 is Project Workspace Layout Refinement. Milestone 8 is Projects Navigation Tree Actions and is complete, passed, and successful. Milestone 9 is Manual Context Attachments and is complete, passed, and successful. Milestone 10 is Prompt Preview and is complete, passed, and successful. Do not mistake roadmap list item positions for milestone IDs.
+Milestone 11 is implemented and pending user validation. It adds local bridge-file draft generation from selected project chat conversations. Drafts are stored in SQLite as `bridge_file_drafts`, displayed read-only in the Chat section, and remain local. Resolved attached context, including linked GitHub repository metadata, is used by bridge drafts and normal project chat sends. Export, full editing, approval workflow, GitHub writes, and direct Codex handoff remain deferred.
+
+Milestone 12 is planned and not started. It should add project-level local Markdown context by loading a fresh `README.md` from a configured local project root whenever a project chat starts or loads, then resolving referenced Markdown files inside that project root for chat, Prompt Preview, and bridge drafts. This should be project-scoped, not per-conversation attachment.
+
+Milestone numbering note: Milestone 2 is the Local Projects component. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Milestone 6 is Project Workspace Chat. Milestone 7 is Project Workspace Layout Refinement. Milestone 8 is Projects Navigation Tree Actions and is complete, passed, and successful. Milestone 9 is Manual Context Attachments and is complete, passed, and successful. Milestone 10 is Prompt Preview and is complete, passed, and successful. Milestone 11 is Bridge File Drafting and is implemented pending user validation. Milestone 12 is Project Markdown Context and is planned. Do not mistake roadmap list item positions for milestone IDs.
 
 ## Current Scope
 
@@ -64,6 +68,8 @@ Milestone numbering note: Milestone 2 is the Local Projects component. Milestone
 - Selected-project workspace sections for Overview, GitHub, Chat, and References
 - SQLite-backed manual context attachments for project chat conversations
 - Read-only Prompt Preview for project chat conversations
+- SQLite-backed local bridge-file drafts for project chat conversations
+- Planned project-level local Markdown context from README and referenced Markdown files
 
 ## Hotkey
 
@@ -77,11 +83,14 @@ Ctrl+Shift+Space
 - Advanced calendar workflows
 - Advanced task workflows
 - Advanced notes workflows
-- Bridge-file generation UI
+- Bridge-file export UI
+- Full bridge-file editor
+- Bridge-file approval workflow
 - Bridge-file prompt export
 - Automatic context attachment
 - Automatic context assembly from manual attachments
 - GitHub file reading
+- Local arbitrary filesystem reads outside configured project root
 - ChatGPT import
 - AI-generated project summaries
 - Advanced project dashboard analytics
@@ -209,12 +218,22 @@ Update this section manually after each validation pass.
 - Implemented: Milestone 10 Prompt Preview
 - Implemented: backend preview command that does not call OpenAI
 - Implemented: read-only Prompt Preview panel inside selected-project Chat
-- Preserved: existing OpenAI send behavior without attached context inclusion
+- Implemented: attached context inclusion for project chat sends
 - Verified: `npm install` passes after Milestone 10 implementation
 - Verified: `npm run build` passes after Milestone 10 implementation
 - Verified: `cargo build` passes after Milestone 10 implementation
 - Verified: `npm run tauri:dev` launches after Milestone 10 implementation
 - Complete: Milestone 10 manual validation checklist passed successfully
+- Implemented: Milestone 11 Bridge File Drafting
+- Implemented: SQLite `bridge_file_drafts` table
+- Implemented: backend bridge draft creation/list/retrieve/delete commands
+- Implemented: read-only Bridge Drafts panel inside selected-project Chat
+- Preserved: Prompt Preview, manual attachments, project chat, and Projects navigation behavior
+- Verified: `npm install` passes after Milestone 11 implementation
+- Verified: `npm run build` passes after Milestone 11 implementation
+- Verified: `cargo build` passes after Milestone 11 implementation
+- Verified: `npm run tauri:dev` launches after Milestone 11 implementation
+- Pending: Milestone 11 manual validation checklist
 
 ## Milestone Validation Workflow
 
