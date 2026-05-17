@@ -58,6 +58,12 @@ Status: **Complete / Passed / Successful**
 
 Milestone 9 adds manual context attachments for selected project chat conversations. Attachments are conversation-scoped links to existing local app records and are visible in the Chat section's Attached Context area. Linked GitHub repository metadata is automatically added when a selected project has a repository defined in the GitHub section. User validation is complete and Milestone 9 passed.
 
+**Milestone 10 - Prompt Preview**
+
+Status: **Complete / Passed / Successful**
+
+Milestone 10 adds a read-only Prompt Preview action inside selected-project Chat. It uses existing project, conversation, draft message, and attached context data to show an assembled prompt preview without calling OpenAI. Attached context inclusion in actual sends remains deferred.
+
 ## Product Direction
 
 Overlay Forge is a personal desktop command hub that floats above the user's workflow and eventually helps turn ideas, notes, tasks, and project plans into Codex-ready markdown bridge files.
@@ -76,6 +82,7 @@ Use explicit milestone IDs. Do not infer milestone numbers from this list's item
 - Milestone 7 - Project workspace layout refinement - complete and passed
 - Milestone 8 - Projects navigation tree actions - complete and passed
 - Milestone 9 - Manual context attachments - complete and passed
+- Milestone 10 - Prompt preview - complete, passed, successful
 
 ## Scope Guard
 
@@ -92,3 +99,5 @@ Milestone 7 remains intentionally layout-focused. It does not include manual con
 Milestone 8 remains intentionally focused on Projects navigation only. It does not refactor Tasks, Notes, Calendar, or YouTube until the Projects navigation tree pattern is validated.
 
 Milestone 9 remains intentionally focused on manual attachment links only. It does not implement automatic context attachment, semantic search, vector stores, file uploads, GitHub file reading, YouTube transcript extraction, prompt preview, token counting, bridge-file generation, Codex handoff, ChatGPT import, chat streaming, or model picker UI.
+
+Milestone 10 remains intentionally focused on read-only prompt visibility only. It does not implement bridge-file generation, bridge-file editing/export, Codex handoff, GitHub file reading, YouTube transcript extraction, semantic search, vector stores, file uploads, automatic context attachment, token counting/budgeting, model picker UI, chat streaming, ChatGPT import, automatic prompt rewriting, long-term prompt templates, or attached context inclusion in actual OpenAI sends.

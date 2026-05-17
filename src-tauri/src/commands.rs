@@ -1,7 +1,7 @@
 use crate::db::{
     CalendarEventRecord, NoteRecord, PlanningConversationContextRecord, PlanningConversationRecord,
-    PlanningMessageRecord, ProjectGitHubRepositoryRecord, ProjectRecord, TaskRecord,
-    YouTubeReferenceRecord,
+    PlanningMessageRecord, PlanningPromptPreviewRecord, ProjectGitHubRepositoryRecord,
+    ProjectRecord, TaskRecord, YouTubeReferenceRecord,
 };
 use crate::github;
 use crate::openai;
@@ -36,7 +36,7 @@ pub fn save_scratchpad(content: String, state: State<'_, AppState>) -> Result<()
 #[tauri::command]
 pub fn get_milestone_status(state: State<'_, AppState>) -> Result<MilestoneStatus, String> {
     Ok(MilestoneStatus {
-        milestone: "Milestone 9".to_string(),
+        milestone: "Milestone 10".to_string(),
         hotkey: "Ctrl+Shift+Space".to_string(),
         database_ready: state.database.is_ready(),
     })
@@ -443,6 +443,22 @@ pub fn remove_planning_conversation_context(
     state
         .database
         .remove_planning_conversation_context(id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn preview_planning_chat_prompt(
+    conversation_id: i64,
+    draft_message: String,
+    state: State<'_, AppState>,
+) -> Result<PlanningPromptPreviewRecord, String> {
+    state
+        .database
+        .preview_planning_chat_prompt(
+            conversation_id,
+            &draft_message,
+            openai::PLANNING_SYSTEM_INSTRUCTION,
+        )
         .map_err(|error| error.to_string())
 }
 

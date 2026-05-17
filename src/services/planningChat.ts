@@ -36,6 +36,27 @@ export type PlanningConversationContext = {
   createdAt: string;
 };
 
+export type PromptPreviewContextItem = {
+  id: number;
+  contextType: PlanningContextType;
+  label: string;
+  included: boolean;
+  content: string;
+  warning: string;
+};
+
+export type PlanningPromptPreview = {
+  projectLabel: string;
+  projectStatus: string;
+  projectDescription: string;
+  conversationLabel: string;
+  messageCount: number;
+  draftMessage: string;
+  attachedContextItems: PromptPreviewContextItem[];
+  assembledPrompt: string;
+  warnings: string[];
+};
+
 export function listPlanningConversations(projectId?: number) {
   return invoke<PlanningConversation[]>("list_planning_conversations", {
     projectId: projectId ?? null
@@ -83,4 +104,11 @@ export function attachPlanningConversationContext(input: {
 
 export function removePlanningConversationContext(id: number) {
   return invoke<void>("remove_planning_conversation_context", { id });
+}
+
+export function previewPlanningChatPrompt(conversationId: number, draftMessage: string) {
+  return invoke<PlanningPromptPreview>("preview_planning_chat_prompt", {
+    conversationId,
+    draftMessage
+  });
 }

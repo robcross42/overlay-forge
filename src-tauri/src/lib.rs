@@ -13,9 +13,9 @@ use commands::{
     get_scratchpad, get_youtube_reference, list_calendar_events, list_notes,
     list_planning_conversation_context, list_planning_conversations, list_planning_messages,
     list_projects, list_tasks, list_youtube_references, open_youtube_reference,
-    remove_planning_conversation_context, save_project_github_repository, save_scratchpad,
-    send_planning_message, shutdown_app, update_calendar_event, update_note, update_project,
-    update_task, update_youtube_reference,
+    preview_planning_chat_prompt, remove_planning_conversation_context,
+    save_project_github_repository, save_scratchpad, send_planning_message, shutdown_app,
+    update_calendar_event, update_note, update_project, update_task, update_youtube_reference,
 };
 use db::AppDatabase;
 use tauri::Manager;
@@ -74,6 +74,7 @@ pub fn run() {
             list_planning_conversation_context,
             attach_planning_conversation_context,
             remove_planning_conversation_context,
+            preview_planning_chat_prompt,
             list_youtube_references,
             get_youtube_reference,
             create_youtube_reference,

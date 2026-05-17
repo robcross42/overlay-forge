@@ -38,6 +38,8 @@ Milestone 8 - Projects Navigation Tree Actions is complete, passed, and successf
 
 Milestone 9 - Manual Context Attachments is complete, passed, and successful. It adds a conversation-scoped Attached Context area inside selected-project Chat. Attachments link to existing local app records and store only the link metadata needed to display those attachments.
 
+Milestone 10 - Prompt Preview is complete, passed, and successful. It adds a read-only Prompt Preview surface inside selected-project Chat and a backend preview command that assembles local preview data without calling OpenAI.
+
 ## UI Consistency
 
 Organizer components should follow the same interaction pattern unless a milestone explicitly documents a reason to diverge:
@@ -75,6 +77,7 @@ The Tauri backend owns:
 - YouTube reference CRUD commands
 - YouTube URL validation and external-open handling
 - Planning conversation context attachment commands
+- Planning prompt preview command
 - Global hotkey registration
 - Window show/hide behavior
 
@@ -99,6 +102,8 @@ Milestone 7 adds no new tables. Overview continues to use `projects`, GitHub con
 Milestone 8 adds no new tables. The shell-owned Projects navigation tree reads existing `projects` rows and continues to use the same project CRUD commands. Chat and GitHub behavior continue to use the existing selected-project data paths.
 
 Milestone 9 adds idempotent table initialization for `planning_conversation_context`. Attachments are scoped to a single planning conversation, link to existing local records by `context_type` and `source_id`, and store a readable label. Removing an attachment deletes only the attachment link and does not delete the source record.
+
+Milestone 10 adds no new tables. Prompt Preview uses existing project, planning conversation, planning message, and context attachment data.
 
 ## OpenAI Boundary
 
@@ -136,9 +141,19 @@ Milestone 9 context attachments are manual and conversation-scoped. The user cho
 
 GitHub repository context is the only Milestone 9 automatic attachment path: when a selected project has a repository link defined in the GitHub section, the Chat section adds that repository metadata link to the selected conversation's Attached Context list with a duplicate guard. The repository link is still configured once per project in the GitHub workspace section.
 
-The attachment layer stores links only. It does not copy full source bodies into prompts, automatically assemble context, preview prompts, count tokens, read GitHub files, fetch YouTube transcripts, generate bridge files, or send attached context to OpenAI. Prompt inclusion and prompt preview are deferred to a later milestone.
+The attachment layer stores links only. It does not copy full source bodies into actual OpenAI sends, count tokens, read GitHub files, fetch YouTube transcripts, generate bridge files, or send attached context to OpenAI. Milestone 10 adds read-only Prompt Preview for these links, while prompt inclusion in actual OpenAI sends remains deferred.
 
 Projects remains the primary workspace shell, and the Projects navigation tree remains unchanged from Milestone 8.
+
+## Prompt Preview Boundary
+
+Milestone 10 Prompt Preview is scoped to selected-project Chat. It uses existing local project, conversation, message, and context attachment data to show a read-only preview of the intended prompt/context package.
+
+Prompt Preview must not call OpenAI. It does not send messages, mutate chat history, generate bridge files, count tokens, rewrite prompts, or change the model request path.
+
+In Milestone 10, attached context appears in the preview only. Existing OpenAI sends remain unchanged and continue to use the selected project plus recent conversation messages. Full attached-context inclusion in actual sends is deferred.
+
+Projects remains the primary workspace shell.
 
 ## YouTube Boundary
 

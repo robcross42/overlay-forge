@@ -12,6 +12,7 @@ import {
   listPlanningConversationContext,
   listPlanningConversations,
   listPlanningMessages,
+  previewPlanningChatPrompt,
   removePlanningConversationContext,
   sendPlanningMessage
 } from "../../services/planningChat";
@@ -19,7 +20,8 @@ import type {
   PlanningContextType,
   PlanningConversation,
   PlanningConversationContext,
-  PlanningMessage
+  PlanningMessage,
+  PlanningPromptPreview
 } from "../../services/planningChat";
 import { listProjects } from "../../services/projects";
 import type { Project } from "../../services/projects";
@@ -71,6 +73,9 @@ export function PlanningChat({ project }: PlanningChatProps) {
   const [githubLink, setGithubLink] = useState<ProjectGitHubRepository | null>(null);
   const [scratchpadContent, setScratchpadContent] = useState("");
   const [autoAttachedGitHubKeys, setAutoAttachedGitHubKeys] = useState<string[]>([]);
+  const [promptPreview, setPromptPreview] = useState<PlanningPromptPreview | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === selectedProjectId) ?? null,
@@ -124,6 +129,8 @@ export function PlanningChat({ project }: PlanningChatProps) {
     if (!selectedConversationId) {
       setMessages([]);
       setContextItems([]);
+      setPromptPreview(null);
+      setIsPreviewOpen(false);
       return;
     }
 
@@ -133,7 +140,7 @@ export function PlanningChat({ project }: PlanningChatProps) {
     ])
       .then(([nextMessages, nextContext]) => {
         setMessages(nextMessages);
-        setContextItems(nextContext);
+        setContextItems(dedupeContextItems(nextContext));
         setStatus(nextMessages.length === 0 ? "Conversation ready" : "Ready");
       })
       .catch((error) => setStatus(formatError(error)));
@@ -219,7 +226,7 @@ export function PlanningChat({ project }: PlanningChatProps) {
               item.contextType === "github_repository" &&
               (item.sourceId === attached.sourceId || item.label === attached.label)
           );
-          return exists ? current : [...current, attached];
+          return exists ? dedupeContextItems(current) : dedupeContextItems([...current, attached]);
         });
         setAutoAttachedGitHubKeys((current) =>
           current.includes(autoKey) ? current : [...current, autoKey]
@@ -246,6 +253,8 @@ export function PlanningChat({ project }: PlanningChatProps) {
       setSelectedConversationId(created.id);
       setMessages([]);
       setContextItems([]);
+      setPromptPreview(null);
+      setIsPreviewOpen(false);
       setNewConversationTitle("");
       setStatus("Conversation created");
     } catch (error) {
@@ -306,6 +315,8 @@ export function PlanningChat({ project }: PlanningChatProps) {
       setSelectedConversationId(nextConversations[0]?.id ?? null);
       setMessages([]);
       setContextItems([]);
+      setPromptPreview(null);
+      setIsPreviewOpen(false);
       setStatus("Conversation deleted");
     } catch (error) {
       setStatus(formatError(error));
@@ -333,7 +344,7 @@ export function PlanningChat({ project }: PlanningChatProps) {
         sourceId: selectedOption.sourceId,
         label: selectedOption.label
       });
-      setContextItems((current) => [...current, attached]);
+      setContextItems((current) => dedupeContextItems([...current, attached]));
       setIsAttachOpen(false);
       setStatus("Context attached");
     } catch (error) {
@@ -348,6 +359,26 @@ export function PlanningChat({ project }: PlanningChatProps) {
       setStatus("Context attachment removed");
     } catch (error) {
       setStatus(formatError(error));
+    }
+  }
+
+  async function onPreviewPrompt() {
+    if (!selectedConversation) {
+      setStatus("Create or select a conversation before previewing the prompt");
+      return;
+    }
+
+    setIsPreviewLoading(true);
+    setStatus("Building prompt preview");
+    try {
+      const preview = await previewPlanningChatPrompt(selectedConversation.id, draft);
+      setPromptPreview(preview);
+      setIsPreviewOpen(true);
+      setStatus("Prompt preview ready");
+    } catch (error) {
+      setStatus(formatError(error));
+    } finally {
+      setIsPreviewLoading(false);
     }
   }
 
@@ -575,6 +606,14 @@ export function PlanningChat({ project }: PlanningChatProps) {
               value={draft}
             />
             <button
+              className="ghost-button"
+              disabled={!selectedConversation || isSending || isPreviewLoading}
+              onClick={() => void onPreviewPrompt()}
+              type="button"
+            >
+              Preview Prompt
+            </button>
+            <button
               className="primary-button"
               disabled={!selectedConversation || isSending || draft.trim().length === 0}
               onClick={() => void onSendMessage()}
@@ -583,6 +622,76 @@ export function PlanningChat({ project }: PlanningChatProps) {
               Send
             </button>
           </form>
+
+          {isPreviewOpen && promptPreview && (
+            <section className="prompt-preview-panel" aria-label="Prompt preview">
+              <div className="prompt-preview-heading">
+                <div>
+                  <p>Prompt Preview</p>
+                  <h4>Read-only Context Package</h4>
+                </div>
+                <button
+                  className="ghost-button"
+                  onClick={() => setIsPreviewOpen(false)}
+                  type="button"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="prompt-preview-grid">
+                <article className="prompt-preview-card">
+                  <span>Project</span>
+                  <strong>{promptPreview.projectLabel}</strong>
+                  <p>Status: {formatProjectStatus(promptPreview.projectStatus)}</p>
+                  <p>{promptPreview.projectDescription || "No description"}</p>
+                </article>
+
+                <article className="prompt-preview-card">
+                  <span>Conversation</span>
+                  <strong>{promptPreview.conversationLabel}</strong>
+                  <p>{promptPreview.messageCount} existing message(s)</p>
+                </article>
+
+                <article className="prompt-preview-card prompt-preview-wide">
+                  <span>User Message</span>
+                  <pre>{promptPreview.draftMessage || "No draft message entered."}</pre>
+                </article>
+
+                <article className="prompt-preview-card prompt-preview-wide">
+                  <span>Attached Context</span>
+                  {promptPreview.attachedContextItems.length === 0 ? (
+                    <p>No attached context.</p>
+                  ) : (
+                    <div className="prompt-preview-context-list">
+                      {promptPreview.attachedContextItems.map((item) => (
+                        <div className="prompt-preview-context-item" key={item.id}>
+                          <strong>{formatContextType(item.contextType)}</strong>
+                          <p>Label: {item.label}</p>
+                          <p>Included: {item.included ? "Yes" : "No"}</p>
+                          {item.warning && <p>{item.warning}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </article>
+
+                <article className="prompt-preview-card prompt-preview-wide">
+                  <span>Assembled Prompt Preview</span>
+                  <pre>{promptPreview.assembledPrompt}</pre>
+                </article>
+
+                {promptPreview.warnings.length > 0 && (
+                  <article className="prompt-preview-card prompt-preview-wide">
+                    <span>Warnings</span>
+                    {promptPreview.warnings.map((warning) => (
+                      <p key={warning}>{warning}</p>
+                    ))}
+                  </article>
+                )}
+              </div>
+            </section>
+          )}
         </div>
       </div>
     </section>
@@ -651,6 +760,28 @@ function optionKey(option: AttachableOption) {
   return `${option.contextType}:${option.sourceId ?? "singleton"}`;
 }
 
+function contextAttachmentKey(item: PlanningConversationContext) {
+  if (item.contextType === "github_repository") {
+    return `${item.contextType}:label:${item.label.trim().toLowerCase()}`;
+  }
+
+  return item.sourceId === null
+    ? `${item.contextType}:label:${item.label.trim().toLowerCase()}`
+    : `${item.contextType}:source:${item.sourceId}`;
+}
+
+function dedupeContextItems(items: PlanningConversationContext[]) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = contextAttachmentKey(item);
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
 function formatContextType(contextType: PlanningContextType) {
   switch (contextType) {
     case "project":
@@ -670,6 +801,10 @@ function formatContextType(contextType: PlanningContextType) {
     default:
       return contextType;
   }
+}
+
+function formatProjectStatus(status: string) {
+  return status === "ARCHIVED" ? "Archived" : "Active";
 }
 
 function formatDate(value: string) {

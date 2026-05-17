@@ -1,5 +1,6 @@
 use rusqlite::{params, Connection, OptionalExtension, Result};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -133,6 +134,38 @@ pub struct YouTubeReferenceRecord {
     pub created_at: String,
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
+}
+
+#[derive(Serialize)]
+pub struct PromptPreviewContextItem {
+    pub id: i64,
+    #[serde(rename = "contextType")]
+    pub context_type: String,
+    pub label: String,
+    pub included: bool,
+    pub content: String,
+    pub warning: String,
+}
+
+#[derive(Serialize)]
+pub struct PlanningPromptPreviewRecord {
+    #[serde(rename = "projectLabel")]
+    pub project_label: String,
+    #[serde(rename = "projectStatus")]
+    pub project_status: String,
+    #[serde(rename = "projectDescription")]
+    pub project_description: String,
+    #[serde(rename = "conversationLabel")]
+    pub conversation_label: String,
+    #[serde(rename = "messageCount")]
+    pub message_count: i64,
+    #[serde(rename = "draftMessage")]
+    pub draft_message: String,
+    #[serde(rename = "attachedContextItems")]
+    pub attached_context_items: Vec<PromptPreviewContextItem>,
+    #[serde(rename = "assembledPrompt")]
+    pub assembled_prompt: String,
+    pub warnings: Vec<String>,
 }
 
 pub struct AppDatabase {
@@ -882,6 +915,20 @@ impl AppDatabase {
     ) -> Result<PlanningConversationContextRecord> {
         let connection = self.connection.lock().expect("database mutex poisoned");
         Self::get_planning_conversation_by_id(&connection, conversation_id)?;
+
+        let normalized_context_type = context_type.trim();
+        let normalized_label = label.trim();
+        let existing = Self::find_existing_planning_conversation_context(
+            &connection,
+            conversation_id,
+            normalized_context_type,
+            source_id,
+            normalized_label,
+        )?;
+        if let Some(existing) = existing {
+            return Ok(existing);
+        }
+
         connection.execute(
             "
             INSERT INTO planning_conversation_context (
@@ -894,9 +941,9 @@ impl AppDatabase {
             ",
             params![
                 conversation_id,
-                context_type.trim(),
+                normalized_context_type,
                 source_id,
-                label.trim()
+                normalized_label
             ],
         )?;
 
@@ -911,6 +958,92 @@ impl AppDatabase {
             params![id],
         )?;
         Ok(())
+    }
+
+    pub fn preview_planning_chat_prompt(
+        &self,
+        conversation_id: i64,
+        draft_message: &str,
+        system_instruction: &str,
+    ) -> Result<PlanningPromptPreviewRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        let conversation = Self::get_planning_conversation_by_id(&connection, conversation_id)?;
+        let project = Self::get_project_by_id(&connection, conversation.project_id)?;
+        let contexts =
+            Self::list_planning_conversation_context_for_connection(&connection, conversation_id)?;
+        let message_count: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM planning_messages WHERE conversation_id = ?1",
+            params![conversation_id],
+            |row| row.get(0),
+        )?;
+
+        let mut warnings = vec![
+            "Prompt Preview does not call OpenAI.".to_string(),
+            "Attached context inclusion in actual OpenAI sends is deferred beyond Milestone 10."
+                .to_string(),
+        ];
+        let mut attached_context_items = Vec::new();
+
+        for context in contexts {
+            let resolved = Self::resolve_context_preview_content(&connection, &context, &project)?;
+            if !resolved.warning.is_empty() {
+                warnings.push(format!("{}: {}", context.label, resolved.warning));
+            }
+            attached_context_items.push(resolved);
+        }
+
+        let attached_context_text = if attached_context_items.is_empty() {
+            "No attached context.".to_string()
+        } else {
+            attached_context_items
+                .iter()
+                .map(|item| {
+                    let status = if item.included {
+                        "Included: Yes"
+                    } else {
+                        "Included: No"
+                    };
+                    let body = if item.content.trim().is_empty() {
+                        item.warning.as_str()
+                    } else {
+                        item.content.as_str()
+                    };
+                    format!(
+                        "Type: {}\nLabel: {}\n{}\nContent:\n{}",
+                        item.context_type, item.label, status, body
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n\n---\n\n")
+        };
+
+        let assembled_prompt = format!(
+            "System intent:\n{}\n\nProject context:\nName: {}\nStatus: {}\nDescription: {}\n\nConversation:\nTitle: {}\nExisting message count: {}\n\nAttached context:\n{}\n\nCurrent user message:\n{}",
+            system_instruction,
+            project.name,
+            project.status,
+            if project.description.trim().is_empty() {
+                "No description"
+            } else {
+                project.description.as_str()
+            },
+            conversation.title,
+            message_count,
+            attached_context_text,
+            draft_message
+        );
+
+        Ok(PlanningPromptPreviewRecord {
+            project_label: project.name,
+            project_status: project.status,
+            project_description: project.description,
+            conversation_label: conversation.title,
+            message_count,
+            draft_message: draft_message.to_string(),
+            attached_context_items,
+            assembled_prompt,
+            warnings,
+        })
     }
 
     pub fn list_youtube_references(&self) -> Result<Vec<YouTubeReferenceRecord>> {
@@ -1239,7 +1372,44 @@ impl AppDatabase {
             )?
             .collect::<Result<Vec<_>>>()?;
 
-        Ok(context)
+        let mut seen = HashSet::new();
+        let deduped = context
+            .into_iter()
+            .filter(|item| seen.insert(planning_context_dedupe_key(item)))
+            .collect();
+
+        Ok(deduped)
+    }
+
+    fn find_existing_planning_conversation_context(
+        connection: &Connection,
+        conversation_id: i64,
+        context_type: &str,
+        source_id: Option<i64>,
+        label: &str,
+    ) -> Result<Option<PlanningConversationContextRecord>> {
+        let mut statement = connection.prepare(
+            "
+            SELECT id, conversation_id, context_type, source_id, label, created_at
+            FROM planning_conversation_context
+            WHERE conversation_id = ?1
+              AND context_type = ?2
+              AND (
+                source_id = ?3
+                OR (source_id IS NULL AND ?3 IS NULL AND label = ?4)
+                OR (?2 = 'github_repository' AND label = ?4)
+              )
+            ORDER BY created_at ASC, id ASC
+            LIMIT 1
+            ",
+        )?;
+
+        statement
+            .query_row(
+                params![conversation_id, context_type, source_id, label],
+                planning_conversation_context_from_row,
+            )
+            .optional()
     }
 
     fn get_youtube_reference_by_id(
@@ -1254,6 +1424,191 @@ impl AppDatabase {
             ",
             params![id],
             youtube_reference_from_row,
+        )
+    }
+
+    fn resolve_context_preview_content(
+        connection: &Connection,
+        context: &PlanningConversationContextRecord,
+        conversation_project: &ProjectRecord,
+    ) -> Result<PromptPreviewContextItem> {
+        let missing_warning = "Attached source could not be resolved.".to_string();
+        let (included, content, warning) = match context.context_type.as_str() {
+            "project" => {
+                let project = match context.source_id {
+                    Some(id) => Self::get_project_by_id(connection, id).optional()?,
+                    None => Some(ProjectRecord {
+                        id: conversation_project.id,
+                        name: conversation_project.name.clone(),
+                        description: conversation_project.description.clone(),
+                        status: conversation_project.status.clone(),
+                        created_at: conversation_project.created_at.clone(),
+                        updated_at: conversation_project.updated_at.clone(),
+                    }),
+                };
+                match project {
+                    Some(project) => (
+                        true,
+                        format!(
+                            "Name: {}\nStatus: {}\nDescription: {}",
+                            project.name, project.status, project.description
+                        ),
+                        String::new(),
+                    ),
+                    None => (false, String::new(), missing_warning),
+                }
+            }
+            "github_repository" => match context.source_id {
+                Some(id) => match Self::get_project_github_repository_by_id(connection, id)
+                    .optional()?
+                {
+                    Some(repository) => (
+                        true,
+                        format!(
+                            "Repository: {}\nURL: {}\nDefault branch: {}\nVisibility: {}\nLast fetched: {}\nFetch status: {}",
+                            repository.repository_full_name,
+                            repository.repository_url,
+                            repository.default_branch,
+                            repository.visibility,
+                            repository.last_fetched_at,
+                            repository.last_fetch_status
+                        ),
+                        String::new(),
+                    ),
+                    None => (false, String::new(), missing_warning),
+                },
+                None => (false, String::new(), missing_warning),
+            },
+            "note" => match context.source_id {
+                Some(id) => match Self::get_note_by_id(connection, id).optional()? {
+                    Some(note) => (
+                        true,
+                        format!("Title: {}\nBody:\n{}", note.title, note.body),
+                        String::new(),
+                    ),
+                    None => (false, String::new(), missing_warning),
+                },
+                None => (false, String::new(), missing_warning),
+            },
+            "task" => match context.source_id {
+                Some(id) => match Self::get_task_by_id(connection, id).optional()? {
+                    Some(task) => (
+                        true,
+                        format!(
+                            "Title: {}\nBody:\n{}\nDeadline: {}\nCompleted: {}",
+                            task.title, task.body, task.deadline, task.is_completed
+                        ),
+                        String::new(),
+                    ),
+                    None => (false, String::new(), missing_warning),
+                },
+                None => (false, String::new(), missing_warning),
+            },
+            "calendar_event" => match context.source_id {
+                Some(id) => match Self::get_calendar_event_by_id(connection, id).optional()? {
+                    Some(event) => (
+                        true,
+                        format!(
+                            "Title: {}\nStart: {} {}\nEnd: {} {}\nNotes:\n{}",
+                            event.title,
+                            event.start_date,
+                            event.start_time,
+                            event.end_date,
+                            event.end_time,
+                            event.notes
+                        ),
+                        String::new(),
+                    ),
+                    None => (false, String::new(), missing_warning),
+                },
+                None => (false, String::new(), missing_warning),
+            },
+            "youtube_reference" => match context.source_id {
+                Some(id) => match Self::get_youtube_reference_by_id(connection, id).optional()? {
+                    Some(reference) => (
+                        true,
+                        format!(
+                            "Title: {}\nURL: {}\nVideo ID: {}\nChannel: {}\nTags: {}\nNotes:\n{}",
+                            reference.title,
+                            reference.url,
+                            reference.video_id,
+                            reference.channel_name,
+                            reference.tags,
+                            reference.notes
+                        ),
+                        String::new(),
+                    ),
+                    None => (false, String::new(), missing_warning),
+                },
+                None => (false, String::new(), missing_warning),
+            },
+            "scratchpad" => {
+                let content: String =
+                    connection.query_row("SELECT content FROM scratchpad WHERE id = 1", [], |row| {
+                        row.get(0)
+                    })?;
+                if content.trim().is_empty() {
+                    (
+                        false,
+                        String::new(),
+                        "Scratchpad is empty.".to_string(),
+                    )
+                } else {
+                    (true, content, String::new())
+                }
+            }
+            _ => (
+                false,
+                String::new(),
+                "Unsupported context type.".to_string(),
+            ),
+        };
+
+        Ok(PromptPreviewContextItem {
+            id: context.id,
+            context_type: context.context_type.clone(),
+            label: context.label.clone(),
+            included,
+            content,
+            warning,
+        })
+    }
+
+    fn get_project_github_repository_by_id(
+        connection: &Connection,
+        id: i64,
+    ) -> Result<ProjectGitHubRepositoryRecord> {
+        connection.query_row(
+            "
+            SELECT
+                id,
+                project_id,
+                repository_full_name,
+                repository_url,
+                default_branch,
+                visibility,
+                last_fetched_at,
+                last_fetch_status,
+                created_at,
+                updated_at
+            FROM project_github_repositories
+            WHERE id = ?1
+            ",
+            params![id],
+            |row| {
+                Ok(ProjectGitHubRepositoryRecord {
+                    id: row.get(0)?,
+                    project_id: row.get(1)?,
+                    repository_full_name: row.get(2)?,
+                    repository_url: row.get(3)?,
+                    default_branch: row.get(4)?,
+                    visibility: row.get(5)?,
+                    last_fetched_at: row.get(6)?,
+                    last_fetch_status: row.get(7)?,
+                    created_at: row.get(8)?,
+                    updated_at: row.get(9)?,
+                })
+            },
         )
     }
 }
@@ -1289,6 +1644,25 @@ fn planning_conversation_context_from_row(
         label: row.get(4)?,
         created_at: row.get(5)?,
     })
+}
+
+fn planning_context_dedupe_key(context: &PlanningConversationContextRecord) -> String {
+    if context.context_type == "github_repository" {
+        return format!(
+            "{}:label:{}",
+            context.context_type,
+            context.label.trim().to_lowercase()
+        );
+    }
+
+    match context.source_id {
+        Some(source_id) => format!("{}:source:{}", context.context_type, source_id),
+        None => format!(
+            "{}:label:{}",
+            context.context_type,
+            context.label.trim().to_lowercase()
+        ),
+    }
 }
 
 fn youtube_reference_from_row(row: &rusqlite::Row<'_>) -> Result<YouTubeReferenceRecord> {

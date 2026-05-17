@@ -1134,10 +1134,11 @@ select.text-input option:hover {
 
 .planning-chat-surface {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto auto;
+  grid-template-rows: minmax(0, 1fr) auto auto auto;
   gap: 12px;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
 .message-list {
@@ -1189,10 +1190,128 @@ select.text-input option:hover {
 
 .chat-input-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: end;
   gap: 10px;
   min-width: 0;
+}
+
+.prompt-preview-panel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  max-height: 42vh;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(10, 15, 20, 0.72);
+  scrollbar-color: rgba(79, 208, 165, 0.48) rgba(255, 255, 255, 0.06);
+  scrollbar-width: thin;
+}
+
+.prompt-preview-panel::-webkit-scrollbar {
+  width: 10px;
+}
+
+.prompt-preview-panel::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+}
+
+.prompt-preview-panel::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(79, 208, 165, 0.48);
+  background-clip: content-box;
+}
+
+.prompt-preview-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.prompt-preview-heading p,
+.prompt-preview-heading h4,
+.prompt-preview-card p {
+  margin: 0;
+}
+
+.prompt-preview-heading p,
+.prompt-preview-card span {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.prompt-preview-heading h4 {
+  margin-top: 3px;
+  font-size: 0.92rem;
+}
+
+.prompt-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.prompt-preview-card {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.prompt-preview-wide {
+  grid-column: 1 / -1;
+}
+
+.prompt-preview-card strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prompt-preview-card p {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.prompt-preview-card pre {
+  max-height: 220px;
+  margin: 0;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.prompt-preview-context-list {
+  display: grid;
+  gap: 8px;
+}
+
+.prompt-preview-context-item {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .attached-context-panel {
@@ -1351,6 +1470,10 @@ select.text-input option:hover {
   }
 
   .reference-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .prompt-preview-grid {
     grid-template-columns: 1fr;
   }
 }
