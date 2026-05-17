@@ -2,7 +2,7 @@
 
 ## Status
 
-Planned / Not Started
+Tentatively Validated / Needs UI Follow-up After Milestone 13
 
 ## Goal
 
@@ -18,7 +18,9 @@ Milestone 12 is project-scoped, not conversation-scoped. The user should not nee
 
 Milestone 12 remains local-first. It reads Markdown documentation from a configured local project root only.
 
-## Planned Capabilities
+Validation note: Milestone 12 context ingestion is tentatively validated. Project Markdown files are being loaded and used, but the current project workspace and Chat UI are too cramped for a full validation pass. Milestone 13 will consolidate the Projects workspace UI, after which Milestone 12 should receive one more validation pass.
+
+## Implemented Capabilities
 
 - Add a project-level local Markdown context configuration.
 - Allow a project to store or configure a local documentation root path.
@@ -33,6 +35,16 @@ Milestone 12 remains local-first. It reads Markdown documentation from a configu
 - Show readable warnings for missing, unreadable, or skipped Markdown files.
 - Prevent crashes when configured files are missing or invalid.
 - Preserve existing Milestone 0 through Milestone 11 behavior.
+
+## Implementation Notes
+
+- Project Chat now includes a Project Markdown configuration panel for the selected project.
+- The backend stores one Markdown context root per project in SQLite.
+- Markdown context is loaded from disk on project chat load, conversation selection, explicit reload, Prompt Preview, project chat send, and bridge draft generation.
+- Prompt Preview displays project Markdown sources separately from conversation manual attachments.
+- Project chat sends include project Markdown context before conversation manual attachments.
+- Bridge drafts include project Markdown context before conversation manual attachments.
+- Missing, unreadable, skipped, unsafe, or truncated Markdown sources produce readable warnings instead of crashing the app.
 
 ## Initial Markdown Sources
 
@@ -130,7 +142,7 @@ npm install
 Expected result:
 
 ```text
-Dependencies install successfully.
+Passed. Dependencies install successfully.
 ```
 
 Run:
@@ -142,7 +154,7 @@ npm run build
 Expected result:
 
 ```text
-Frontend builds successfully.
+Passed. Frontend builds successfully.
 ```
 
 Run:
@@ -155,7 +167,7 @@ cargo build
 Expected result:
 
 ```text
-Rust backend compiles successfully.
+Passed. Rust backend compiles successfully.
 ```
 
 Run:
@@ -167,7 +179,7 @@ npm run tauri:dev
 Expected result:
 
 ```text
-App launches successfully in development mode.
+Passed. App launches successfully in development mode. The app process started and was stopped after the validation timeout.
 ```
 
 ## Manual Validation Checklist

@@ -18,6 +18,8 @@ Milestone 9 - Manual Context Attachments data model is complete, passed, and suc
 
 Milestone 11 - Bridge File Drafting data model is complete, passed, and successful. It adds a project-scoped bridge draft table with a non-destructive migration.
 
+Milestone 12 - Project Markdown Context data model is tentatively validated and needs a UI follow-up pass after Milestone 13. It adds a project-scoped Markdown context configuration table with a non-destructive migration.
+
 ## Tables
 
 ### scratchpad
@@ -178,6 +180,31 @@ Milestone 11 only uses `draft`. Approval, obsolete, sent, implemented, validated
 
 Deleting a bridge draft removes only the `bridge_file_drafts` row. It does not delete the source project, planning conversation, planning messages, or attached context.
 
+### project_markdown_context
+
+```text
+id
+project_id
+root_path
+readme_path
+created_at
+updated_at
+```
+
+Project Markdown context configuration records for Milestone 12. Each row belongs to one `projects.id` value through `project_id`.
+
+`root_path` stores the configured local project documentation root.
+
+`readme_path` stores the README path relative to the configured root. The default is:
+
+```text
+README.md
+```
+
+Milestone 12 stores configuration only. It does not cache Markdown file snapshots in SQLite. Markdown files are read freshly from disk when project chat loads, Prompt Preview opens, a project chat message is sent, or a bridge draft is generated.
+
+Deleting a project deletes that project's Markdown context configuration. It does not delete any local filesystem files.
+
 ### project_github_repositories
 
 ```text
@@ -278,3 +305,11 @@ CREATE TABLE IF NOT EXISTS bridge_file_drafts
 ```
 
 Existing user data remains intact. Bridge drafts are stored locally in SQLite and are not exported to disk by Milestone 11.
+
+Milestone 12 uses non-destructive idempotent table initialization:
+
+```text
+CREATE TABLE IF NOT EXISTS project_markdown_context
+```
+
+Existing user data remains intact. The table stores only the configured local root and README path for each project. It does not store Markdown file contents.

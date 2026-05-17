@@ -45,6 +45,27 @@ export type PromptPreviewContextItem = {
   warning: string;
 };
 
+export type ProjectMarkdownContext = {
+  id: number;
+  projectId: number;
+  rootPath: string;
+  readmePath: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProjectMarkdownContextFile = {
+  relativePath: string;
+  included: boolean;
+  content: string;
+  warning: string;
+};
+
+export type ProjectMarkdownContextPayload = {
+  files: ProjectMarkdownContextFile[];
+  warnings: string[];
+};
+
 export type PlanningPromptPreview = {
   projectLabel: string;
   projectStatus: string;
@@ -52,6 +73,7 @@ export type PlanningPromptPreview = {
   conversationLabel: string;
   messageCount: number;
   draftMessage: string;
+  projectMarkdownContextItems: ProjectMarkdownContextFile[];
   attachedContextItems: PromptPreviewContextItem[];
   assembledPrompt: string;
   warnings: string[];
@@ -91,6 +113,30 @@ export function sendPlanningMessage(conversationId: number, content: string) {
 
 export function deletePlanningConversation(conversationId: number) {
   return invoke<void>("delete_planning_conversation", { conversationId });
+}
+
+export function getProjectMarkdownContext(projectId: number) {
+  return invoke<ProjectMarkdownContext | null>("get_project_markdown_context", { projectId });
+}
+
+export function saveProjectMarkdownContext(input: {
+  projectId: number;
+  rootPath: string;
+  readmePath?: string;
+}) {
+  return invoke<ProjectMarkdownContext>("save_project_markdown_context", {
+    projectId: input.projectId,
+    rootPath: input.rootPath,
+    readmePath: input.readmePath ?? "README.md"
+  });
+}
+
+export function deleteProjectMarkdownContext(projectId: number) {
+  return invoke<void>("delete_project_markdown_context", { projectId });
+}
+
+export function loadProjectMarkdownContext(projectId: number) {
+  return invoke<ProjectMarkdownContextPayload>("load_project_markdown_context", { projectId });
 }
 
 export function listPlanningConversationContext(conversationId: number) {

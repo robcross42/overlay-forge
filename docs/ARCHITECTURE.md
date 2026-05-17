@@ -42,6 +42,10 @@ Milestone 10 - Prompt Preview is complete, passed, and successful. It adds a rea
 
 Milestone 11 - Bridge File Drafting is complete, passed, and successful. It adds a read-only bridge draft generation surface inside selected-project Chat and backend commands that store generated Markdown drafts locally in SQLite.
 
+Milestone 12 - Project Markdown Context is tentatively validated and needs a UI follow-up pass after Milestone 13. It adds a project-scoped local Markdown context configuration inside selected-project Chat so README-driven project documentation can feed project chat, Prompt Preview, and bridge draft generation without per-conversation attachment.
+
+Milestone 13 - Project Workspace UI Consolidation is planned and not started. It should remove redundant project workspace framing, move project configuration into a clean Project Edit surface, show conversations in the left navigation hierarchy, and keep the primary chat surface focused.
+
 ## UI Consistency
 
 Organizer components should follow the same interaction pattern unless a milestone explicitly documents a reason to diverge:
@@ -81,6 +85,7 @@ The Tauri backend owns:
 - Planning conversation context attachment commands
 - Planning prompt preview command
 - Bridge file draft commands
+- Project Markdown context configuration and loading commands
 - Global hotkey registration
 - Window show/hide behavior
 
@@ -109,6 +114,8 @@ Milestone 9 adds idempotent table initialization for `planning_conversation_cont
 Milestone 10 adds no new tables. Prompt Preview uses existing project, planning conversation, planning message, and context attachment data.
 
 Milestone 11 adds idempotent table initialization for `bridge_file_drafts`. Drafts are project-scoped, may link to a source planning conversation, and store generated Markdown content locally. Migrations are non-destructive and must not remove existing user data.
+
+Milestone 12 adds idempotent table initialization for `project_markdown_context`. Each row stores one configured local Markdown root per project. Markdown file content is read freshly from disk for chat load, Prompt Preview, project chat sends, and bridge draft generation; file snapshots are not cached in SQLite.
 
 ## OpenAI Boundary
 
@@ -167,6 +174,18 @@ Milestone 11 bridge drafts are local SQLite records generated from selected-proj
 Bridge drafts are project-scoped through `project_id` and may link to the source conversation through `conversation_id`. Deleting a bridge draft removes only the draft row; it does not delete the project, conversation, messages, or attached context.
 
 Milestone 11 does not export Markdown files, copy drafts to the clipboard, open Codex, send content to Codex, write to GitHub, create commits, create pull requests, or approve generated drafts. User review remains required before a draft is used outside Overlay Forge.
+
+Milestone 12 extends bridge draft generation by adding project Markdown context before conversation manual attachments. Drafts may include local README-driven project documentation, but they remain local SQLite records and still require user review.
+
+## Project Markdown Context Boundary
+
+Milestone 12 project Markdown context is project-scoped. A selected project can store a configured local documentation root and README path in SQLite. The backend reads a fresh copy of `README.md`, known local documentation paths, and explicit Markdown references found in README whenever the context is loaded.
+
+Markdown resolution is constrained to the configured local project root. Unsafe path traversal, absolute paths, external URLs, missing files, unreadable files, non-Markdown files, and files that resolve outside the root are skipped or warned about instead of crashing the app.
+
+Project Markdown context is assembled before conversation manual attachments for project chat sends, Prompt Preview, and bridge draft generation. Manual attachments remain conversation-scoped and continue to act as an additional context layer.
+
+Milestone 12 does not read GitHub repository file contents through the GitHub API, upload files, add vector stores, add semantic search, broadly index repositories, export bridge files, or hand off directly to Codex.
 
 ## YouTube Boundary
 

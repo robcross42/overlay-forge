@@ -1,7 +1,8 @@
 use crate::db::{
     BridgeFileDraftRecord, CalendarEventRecord, NoteRecord, PlanningConversationContextRecord,
     PlanningConversationRecord, PlanningMessageRecord, PlanningPromptPreviewRecord,
-    ProjectGitHubRepositoryRecord, ProjectRecord, TaskRecord, YouTubeReferenceRecord,
+    ProjectGitHubRepositoryRecord, ProjectMarkdownContextPayload, ProjectMarkdownContextRecord,
+    ProjectRecord, TaskRecord, YouTubeReferenceRecord,
 };
 use crate::github;
 use crate::openai;
@@ -36,7 +37,7 @@ pub fn save_scratchpad(content: String, state: State<'_, AppState>) -> Result<()
 #[tauri::command]
 pub fn get_milestone_status(state: State<'_, AppState>) -> Result<MilestoneStatus, String> {
     Ok(MilestoneStatus {
-        milestone: "Milestone 11".to_string(),
+        milestone: "Milestone 12".to_string(),
         hotkey: "Ctrl+Shift+Space".to_string(),
         database_ready: state.database.is_ready(),
     })
@@ -323,6 +324,53 @@ pub async fn fetch_project_github_metadata(
             Err(error)
         }
     }
+}
+
+#[tauri::command]
+pub fn get_project_markdown_context(
+    project_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Option<ProjectMarkdownContextRecord>, String> {
+    state
+        .database
+        .get_project_markdown_context(project_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn save_project_markdown_context(
+    project_id: i64,
+    root_path: String,
+    readme_path: String,
+    state: State<'_, AppState>,
+) -> Result<ProjectMarkdownContextRecord, String> {
+    require_text(&root_path, "Markdown context root")?;
+    state
+        .database
+        .save_project_markdown_context(project_id, &root_path, &readme_path)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn delete_project_markdown_context(
+    project_id: i64,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .database
+        .delete_project_markdown_context(project_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn load_project_markdown_context(
+    project_id: i64,
+    state: State<'_, AppState>,
+) -> Result<ProjectMarkdownContextPayload, String> {
+    state
+        .database
+        .load_project_markdown_context(project_id)
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]

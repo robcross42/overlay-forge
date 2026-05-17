@@ -10,14 +10,18 @@ import {
   createBridgeFileDraftFromConversation,
   createPlanningConversation,
   deleteBridgeFileDraft,
+  deleteProjectMarkdownContext,
   deletePlanningConversation,
   getBridgeFileDraft,
+  getProjectMarkdownContext,
   listBridgeFileDrafts,
   listPlanningConversationContext,
   listPlanningConversations,
   listPlanningMessages,
+  loadProjectMarkdownContext,
   previewPlanningChatPrompt,
   removePlanningConversationContext,
+  saveProjectMarkdownContext,
   sendPlanningMessage
 } from "../../services/planningChat";
 import type {
@@ -26,7 +30,9 @@ import type {
   PlanningConversation,
   PlanningConversationContext,
   PlanningMessage,
-  PlanningPromptPreview
+  PlanningPromptPreview,
+  ProjectMarkdownContext,
+  ProjectMarkdownContextPayload
 } from "../../services/planningChat";
 import { listProjects } from "../../services/projects";
 import type { Project } from "../../services/projects";
@@ -84,6 +90,14 @@ export function PlanningChat({ project }: PlanningChatProps) {
   const [bridgeDrafts, setBridgeDrafts] = useState<BridgeFileDraft[]>([]);
   const [selectedBridgeDraft, setSelectedBridgeDraft] = useState<BridgeFileDraft | null>(null);
   const [isDraftingBridgeFile, setIsDraftingBridgeFile] = useState(false);
+  const [markdownContext, setMarkdownContext] = useState<ProjectMarkdownContext | null>(null);
+  const [markdownRootPath, setMarkdownRootPath] = useState("");
+  const [markdownReadmePath, setMarkdownReadmePath] = useState("README.md");
+  const [markdownPayload, setMarkdownPayload] = useState<ProjectMarkdownContextPayload>({
+    files: [],
+    warnings: []
+  });
+  const [isSavingMarkdownContext, setIsSavingMarkdownContext] = useState(false);
 
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === selectedProjectId) ?? null,
@@ -120,19 +134,29 @@ export function PlanningChat({ project }: PlanningChatProps) {
       setMessages([]);
       setBridgeDrafts([]);
       setSelectedBridgeDraft(null);
+      setMarkdownContext(null);
+      setMarkdownRootPath("");
+      setMarkdownReadmePath("README.md");
+      setMarkdownPayload({ files: [], warnings: [] });
       return;
     }
 
     Promise.all([
       listPlanningConversations(selectedProjectId),
-      listBridgeFileDrafts(selectedProjectId)
+      listBridgeFileDrafts(selectedProjectId),
+      getProjectMarkdownContext(selectedProjectId),
+      loadProjectMarkdownContext(selectedProjectId)
     ])
-      .then(([nextConversations, nextDrafts]) => {
+      .then(([nextConversations, nextDrafts, nextMarkdownContext, nextMarkdownPayload]) => {
         setConversations(nextConversations);
         setSelectedConversationId(nextConversations[0]?.id ?? null);
         setMessages([]);
         setBridgeDrafts(nextDrafts);
         setSelectedBridgeDraft(nextDrafts[0] ?? null);
+        setMarkdownContext(nextMarkdownContext);
+        setMarkdownRootPath(nextMarkdownContext?.rootPath ?? "");
+        setMarkdownReadmePath(nextMarkdownContext?.readmePath ?? "README.md");
+        setMarkdownPayload(nextMarkdownPayload);
         setStatus(
           nextConversations.length === 0 ? "No planning conversations yet" : "Ready"
         );
@@ -151,15 +175,19 @@ export function PlanningChat({ project }: PlanningChatProps) {
 
     Promise.all([
       listPlanningMessages(selectedConversationId),
-      listPlanningConversationContext(selectedConversationId)
+      listPlanningConversationContext(selectedConversationId),
+      selectedProjectId
+        ? loadProjectMarkdownContext(selectedProjectId)
+        : Promise.resolve({ files: [], warnings: [] })
     ])
-      .then(([nextMessages, nextContext]) => {
+      .then(([nextMessages, nextContext, nextMarkdownPayload]) => {
         setMessages(nextMessages);
         setContextItems(dedupeContextItems(nextContext));
+        setMarkdownPayload(nextMarkdownPayload);
         setStatus(nextMessages.length === 0 ? "Conversation ready" : "Ready");
       })
       .catch((error) => setStatus(formatError(error)));
-  }, [selectedConversationId]);
+  }, [selectedConversationId, selectedProjectId]);
 
   useEffect(() => {
     Promise.all([listNotes(), listTasks(), listCalendarEvents(), listYouTubeReferences(), loadScratchpad()])
@@ -384,6 +412,75 @@ export function PlanningChat({ project }: PlanningChatProps) {
     }
   }
 
+  async function onSaveMarkdownContext() {
+    if (!selectedProject) {
+      setStatus("Select a project before configuring Markdown context");
+      return;
+    }
+
+    const rootPath = markdownRootPath.trim();
+    if (!rootPath) {
+      setStatus("Markdown context root is required");
+      return;
+    }
+
+    setIsSavingMarkdownContext(true);
+    setStatus("Saving Markdown context root");
+    try {
+      const saved = await saveProjectMarkdownContext({
+        projectId: selectedProject.id,
+        rootPath,
+        readmePath: markdownReadmePath.trim() || "README.md"
+      });
+      const payload = await loadProjectMarkdownContext(selectedProject.id);
+      setMarkdownContext(saved);
+      setMarkdownRootPath(saved.rootPath);
+      setMarkdownReadmePath(saved.readmePath);
+      setMarkdownPayload(payload);
+      setStatus("Markdown context root saved");
+    } catch (error) {
+      setStatus(formatError(error));
+    } finally {
+      setIsSavingMarkdownContext(false);
+    }
+  }
+
+  async function onClearMarkdownContext() {
+    if (!selectedProject) {
+      return;
+    }
+
+    setIsSavingMarkdownContext(true);
+    setStatus("Clearing Markdown context root");
+    try {
+      await deleteProjectMarkdownContext(selectedProject.id);
+      setMarkdownContext(null);
+      setMarkdownRootPath("");
+      setMarkdownReadmePath("README.md");
+      setMarkdownPayload({ files: [], warnings: [] });
+      setStatus("Markdown context root cleared");
+    } catch (error) {
+      setStatus(formatError(error));
+    } finally {
+      setIsSavingMarkdownContext(false);
+    }
+  }
+
+  async function onReloadMarkdownContext() {
+    if (!selectedProject) {
+      return;
+    }
+
+    setStatus("Reloading Markdown context");
+    try {
+      const payload = await loadProjectMarkdownContext(selectedProject.id);
+      setMarkdownPayload(payload);
+      setStatus("Markdown context reloaded");
+    } catch (error) {
+      setStatus(formatError(error));
+    }
+  }
+
   async function onPreviewPrompt() {
     if (!selectedConversation) {
       setStatus("Create or select a conversation before previewing the prompt");
@@ -490,6 +587,73 @@ export function PlanningChat({ project }: PlanningChatProps) {
             </label>
           )}
 
+          <section className="markdown-context-config" aria-label="Project Markdown context">
+            <div className="markdown-context-heading">
+              <div>
+                <p>Project Markdown</p>
+                <h4>{markdownContext ? "Configured" : "Not configured"}</h4>
+              </div>
+              <button
+                className="ghost-button"
+                disabled={!selectedProject || isSavingMarkdownContext}
+                onClick={() => void onReloadMarkdownContext()}
+                type="button"
+              >
+                Reload
+              </button>
+            </div>
+
+            <label className="field-label">
+              <span>Root path</span>
+              <input
+                aria-label="Markdown context root path"
+                className="text-input"
+                disabled={!selectedProject || isSavingMarkdownContext}
+                onChange={(event) => setMarkdownRootPath(event.target.value)}
+                placeholder="C:\\Dev\\repos\\overlay-forge"
+                value={markdownRootPath}
+              />
+            </label>
+
+            <label className="field-label">
+              <span>README path</span>
+              <input
+                aria-label="Markdown context README path"
+                className="text-input"
+                disabled={!selectedProject || isSavingMarkdownContext}
+                onChange={(event) => setMarkdownReadmePath(event.target.value)}
+                placeholder="README.md"
+                value={markdownReadmePath}
+              />
+            </label>
+
+            <div className="markdown-context-actions">
+              <button
+                className="primary-button"
+                disabled={!selectedProject || isSavingMarkdownContext || markdownRootPath.trim().length === 0}
+                onClick={() => void onSaveMarkdownContext()}
+                type="button"
+              >
+                Save
+              </button>
+              <button
+                className="ghost-button"
+                disabled={!markdownContext || isSavingMarkdownContext}
+                onClick={() => void onClearMarkdownContext()}
+                type="button"
+              >
+                Clear
+              </button>
+            </div>
+
+            <div className="markdown-context-summary">
+              <span>{markdownPayload.files.filter((file) => file.included).length} file(s) loaded</span>
+              {markdownPayload.warnings.length > 0 && (
+                <span>{markdownPayload.warnings.length} warning(s)</span>
+              )}
+            </div>
+          </section>
+
           <label className="field-label">
             <span>Conversation title</span>
             <input
@@ -573,6 +737,52 @@ export function PlanningChat({ project }: PlanningChatProps) {
               </article>
             )}
           </div>
+
+          <section className="project-markdown-panel" aria-label="Project Markdown context sources">
+            <div className="project-markdown-heading">
+              <div>
+                <p>Project Markdown Context</p>
+                <h4>Fresh Local Sources</h4>
+              </div>
+              <button
+                className="ghost-button"
+                disabled={!selectedProject}
+                onClick={() => void onReloadMarkdownContext()}
+                type="button"
+              >
+                Reload
+              </button>
+            </div>
+
+            <div className="project-markdown-list">
+              {markdownPayload.files.length === 0 ? (
+                <p>No project Markdown context loaded.</p>
+              ) : (
+                markdownPayload.files.map((file) => (
+                  <div
+                    className={
+                      file.included
+                        ? "project-markdown-item"
+                        : "project-markdown-item project-markdown-item-warning"
+                    }
+                    key={file.relativePath}
+                  >
+                    <span>{file.relativePath}</span>
+                    <strong>{file.included ? "Included" : "Skipped"}</strong>
+                    {file.warning && <p>{file.warning}</p>}
+                  </div>
+                ))
+              )}
+            </div>
+
+            {markdownPayload.warnings.length > 0 && (
+              <div className="project-markdown-warnings">
+                {markdownPayload.warnings.slice(0, 3).map((warning) => (
+                  <p key={warning}>{warning}</p>
+                ))}
+              </div>
+            )}
+          </section>
 
           <section className="attached-context-panel" aria-label="Attached context">
             <div className="attached-context-heading">
@@ -724,6 +934,23 @@ export function PlanningChat({ project }: PlanningChatProps) {
                 <article className="prompt-preview-card prompt-preview-wide">
                   <span>User Message</span>
                   <pre>{promptPreview.draftMessage || "No draft message entered."}</pre>
+                </article>
+
+                <article className="prompt-preview-card prompt-preview-wide">
+                  <span>Project Markdown Context</span>
+                  {promptPreview.projectMarkdownContextItems.length === 0 ? (
+                    <p>No project Markdown context loaded.</p>
+                  ) : (
+                    <div className="prompt-preview-context-list">
+                      {promptPreview.projectMarkdownContextItems.map((item) => (
+                        <div className="prompt-preview-context-item" key={item.relativePath}>
+                          <strong>{item.relativePath}</strong>
+                          <p>Included: {item.included ? "Yes" : "No"}</p>
+                          {item.warning && <p>{item.warning}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </article>
 
                 <article className="prompt-preview-card prompt-preview-wide">

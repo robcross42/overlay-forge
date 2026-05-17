@@ -1,8 +1,12 @@
 use rusqlite::{params, Connection, OptionalExtension, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+
+const MARKDOWN_CONTEXT_PER_FILE_LIMIT: usize = 200_000;
+const MARKDOWN_CONTEXT_TOTAL_LIMIT: usize = 650_000;
 
 #[derive(Serialize)]
 pub struct TaskRecord {
@@ -119,6 +123,36 @@ pub struct ProjectGitHubRepositoryRecord {
     pub updated_at: String,
 }
 
+#[derive(Clone, Serialize)]
+pub struct ProjectMarkdownContextRecord {
+    pub id: i64,
+    #[serde(rename = "projectId")]
+    pub project_id: i64,
+    #[serde(rename = "rootPath")]
+    pub root_path: String,
+    #[serde(rename = "readmePath")]
+    pub readme_path: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct ProjectMarkdownContextFile {
+    #[serde(rename = "relativePath")]
+    pub relative_path: String,
+    pub included: bool,
+    pub content: String,
+    pub warning: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct ProjectMarkdownContextPayload {
+    pub files: Vec<ProjectMarkdownContextFile>,
+    pub warnings: Vec<String>,
+}
+
 #[derive(Serialize)]
 pub struct YouTubeReferenceRecord {
     pub id: i64,
@@ -167,6 +201,8 @@ pub struct PlanningPromptPreviewRecord {
     pub message_count: i64,
     #[serde(rename = "draftMessage")]
     pub draft_message: String,
+    #[serde(rename = "projectMarkdownContextItems")]
+    pub project_markdown_context_items: Vec<ProjectMarkdownContextFile>,
     #[serde(rename = "attachedContextItems")]
     pub attached_context_items: Vec<PromptPreviewContextItem>,
     #[serde(rename = "assembledPrompt")]
@@ -284,6 +320,15 @@ impl AppDatabase {
                 visibility TEXT NOT NULL DEFAULT '',
                 last_fetched_at TEXT NOT NULL DEFAULT '',
                 last_fetch_status TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS project_markdown_context (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL UNIQUE,
+                root_path TEXT NOT NULL,
+                readme_path TEXT NOT NULL DEFAULT 'README.md',
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
@@ -666,6 +711,10 @@ impl AppDatabase {
             params![id],
         )?;
         connection.execute(
+            "DELETE FROM project_markdown_context WHERE project_id = ?1",
+            params![id],
+        )?;
+        connection.execute(
             "DELETE FROM project_github_repositories WHERE project_id = ?1",
             params![id],
         )?;
@@ -785,6 +834,68 @@ impl AppDatabase {
         )?;
 
         Self::get_project_github_repository_by_project_id(&connection, project_id)
+    }
+
+    pub fn get_project_markdown_context(
+        &self,
+        project_id: i64,
+    ) -> Result<Option<ProjectMarkdownContextRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_project_by_id(&connection, project_id)?;
+        Self::get_project_markdown_context_by_project_id(&connection, project_id).optional()
+    }
+
+    pub fn save_project_markdown_context(
+        &self,
+        project_id: i64,
+        root_path: &str,
+        readme_path: &str,
+    ) -> Result<ProjectMarkdownContextRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_project_by_id(&connection, project_id)?;
+        let clean_readme_path = if readme_path.trim().is_empty() {
+            "README.md"
+        } else {
+            readme_path.trim()
+        };
+
+        connection.execute(
+            "
+            INSERT INTO project_markdown_context (
+                project_id,
+                root_path,
+                readme_path,
+                updated_at
+            )
+            VALUES (?1, ?2, ?3, CURRENT_TIMESTAMP)
+            ON CONFLICT(project_id) DO UPDATE SET
+                root_path = excluded.root_path,
+                readme_path = excluded.readme_path,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![project_id, root_path.trim(), clean_readme_path],
+        )?;
+
+        Self::get_project_markdown_context_by_project_id(&connection, project_id)
+    }
+
+    pub fn delete_project_markdown_context(&self, project_id: i64) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_project_by_id(&connection, project_id)?;
+        connection.execute(
+            "DELETE FROM project_markdown_context WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn load_project_markdown_context(
+        &self,
+        project_id: i64,
+    ) -> Result<ProjectMarkdownContextPayload> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_project_by_id(&connection, project_id)?;
+        Self::load_project_markdown_context_for_project(&connection, project_id)
     }
 
     pub fn list_planning_conversations(
@@ -1012,6 +1123,8 @@ impl AppDatabase {
         let project = Self::get_project_by_id(&connection, conversation.project_id)?;
         let contexts =
             Self::list_planning_conversation_context_for_connection(&connection, conversation_id)?;
+        let markdown_context =
+            Self::load_project_markdown_context_for_project(&connection, project.id)?;
         let message_count: i64 = connection.query_row(
             "SELECT COUNT(*) FROM planning_messages WHERE conversation_id = ?1",
             params![conversation_id],
@@ -1020,9 +1133,10 @@ impl AppDatabase {
 
         let mut warnings = vec![
             "Prompt Preview does not call OpenAI.".to_string(),
-            "Attached context inclusion in actual OpenAI sends is deferred beyond Milestone 10."
+            "Project Markdown context and manual attachments are included in actual project chat sends."
                 .to_string(),
         ];
+        warnings.extend(markdown_context.warnings.clone());
         let mut attached_context_items = Vec::new();
 
         for context in contexts {
@@ -1062,10 +1176,13 @@ impl AppDatabase {
                 .collect::<Vec<_>>()
                 .join("\n\n---\n\n")
         };
+        let markdown_context_text = build_project_markdown_context_text(&markdown_context.files);
 
         let assembled_prompt = format!(
-            "System intent:\n{}\n\nProject context:\nName: {}\nStatus: {}\nDescription: {}\n\nConversation:\nTitle: {}\nExisting message count: {}\n\nAttached context:\n{}\n\nCurrent user message:\n{}",
+            "System intent:\n{}\n\nProject Markdown Context:\n{}\n\nAttached context:\n{}\n\nProject context:\nName: {}\nStatus: {}\nDescription: {}\n\nConversation:\nTitle: {}\nExisting message count: {}\n\nCurrent user message:\n{}",
             system_instruction,
+            markdown_context_text,
+            attached_context_text,
             project.name,
             project.status,
             if project.description.trim().is_empty() {
@@ -1075,7 +1192,6 @@ impl AppDatabase {
             },
             conversation.title,
             message_count,
-            attached_context_text,
             draft_message
         );
 
@@ -1086,6 +1202,7 @@ impl AppDatabase {
             conversation_label: conversation.title,
             message_count,
             draft_message: draft_message.to_string(),
+            project_markdown_context_items: markdown_context.files,
             attached_context_items,
             assembled_prompt,
             warnings,
@@ -1101,6 +1218,8 @@ impl AppDatabase {
         let project = Self::get_project_by_id(&connection, conversation.project_id)?;
         let contexts =
             Self::list_planning_conversation_context_for_connection(&connection, conversation_id)?;
+        let markdown_context =
+            Self::load_project_markdown_context_for_project(&connection, project.id)?;
         let mut attached_context_items = Vec::new();
 
         for context in contexts {
@@ -1116,7 +1235,10 @@ impl AppDatabase {
             &mut attached_context_items,
         )?;
 
-        Ok(build_planning_context_payload(&attached_context_items))
+        Ok(build_planning_context_payload(
+            &markdown_context,
+            &attached_context_items,
+        ))
     }
 
     pub fn list_bridge_file_drafts(&self, project_id: i64) -> Result<Vec<BridgeFileDraftRecord>> {
@@ -1153,6 +1275,8 @@ impl AppDatabase {
         let messages = Self::list_planning_messages_for_connection(&connection, conversation_id)?;
         let contexts =
             Self::list_planning_conversation_context_for_connection(&connection, conversation_id)?;
+        let markdown_context =
+            Self::load_project_markdown_context_for_project(&connection, project.id)?;
 
         let mut attached_context_items = Vec::new();
         for context in contexts {
@@ -1175,6 +1299,7 @@ impl AppDatabase {
             &project,
             &conversation,
             &messages,
+            &markdown_context,
             &attached_context_items,
         );
 
@@ -1440,6 +1565,21 @@ impl AppDatabase {
                     updated_at: row.get(9)?,
                 })
             },
+        )
+    }
+
+    fn get_project_markdown_context_by_project_id(
+        connection: &Connection,
+        project_id: i64,
+    ) -> Result<ProjectMarkdownContextRecord> {
+        connection.query_row(
+            "
+            SELECT id, project_id, root_path, readme_path, created_at, updated_at
+            FROM project_markdown_context
+            WHERE project_id = ?1
+            ",
+            params![project_id],
+            project_markdown_context_from_row,
         )
     }
 
@@ -1787,6 +1927,21 @@ impl AppDatabase {
         Ok(())
     }
 
+    fn load_project_markdown_context_for_project(
+        connection: &Connection,
+        project_id: i64,
+    ) -> Result<ProjectMarkdownContextPayload> {
+        let config =
+            Self::get_project_markdown_context_by_project_id(connection, project_id).optional()?;
+        Ok(match config {
+            Some(config) => load_project_markdown_context_from_config(&config),
+            None => ProjectMarkdownContextPayload {
+                files: Vec::new(),
+                warnings: vec!["No project Markdown context root is configured.".to_string()],
+            },
+        })
+    }
+
     fn get_project_github_repository_by_id(
         connection: &Connection,
         id: i64,
@@ -1859,6 +2014,19 @@ fn planning_conversation_context_from_row(
     })
 }
 
+fn project_markdown_context_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<ProjectMarkdownContextRecord> {
+    Ok(ProjectMarkdownContextRecord {
+        id: row.get(0)?,
+        project_id: row.get(1)?,
+        root_path: row.get(2)?,
+        readme_path: row.get(3)?,
+        created_at: row.get(4)?,
+        updated_at: row.get(5)?,
+    })
+}
+
 fn bridge_file_draft_from_row(row: &rusqlite::Row<'_>) -> Result<BridgeFileDraftRecord> {
     Ok(BridgeFileDraftRecord {
         id: row.get(0)?,
@@ -1876,6 +2044,7 @@ fn build_bridge_file_draft_markdown(
     project: &ProjectRecord,
     conversation: &PlanningConversationRecord,
     messages: &[PlanningMessageRecord],
+    markdown_context: &ProjectMarkdownContextPayload,
     context_items: &[PromptPreviewContextItem],
 ) -> String {
     let description = if project.description.trim().is_empty() {
@@ -1903,6 +2072,7 @@ fn build_bridge_file_draft_markdown(
             .collect::<Vec<_>>()
             .join("\n")
     };
+    let project_markdown_context = build_project_markdown_context_text(&markdown_context.files);
     let relevant_context = if context_items.is_empty() {
         "No attached context was linked to this conversation.".to_string()
     } else {
@@ -1943,10 +2113,13 @@ fn build_bridge_file_draft_markdown(
 ## Goal\n\n\
 {}\n\n\
 ## Relevant Context\n\n\
+### Project Markdown Context\n\n\
+{}\n\n\
+### Conversation Manual Attachments\n\n\
 {}\n\n\
 ## Implementation Instructions\n\n\
 TODO: User review required.\n\n\
-Use the project, conversation transcript, and attached context above as source material. Do not invent repository files, external services, or implementation details that are not present in the provided context.\n\n\
+Use the project, project Markdown context, conversation transcript, and manual attachments above as source material. Do not invent repository files, external services, or implementation details that are not present in the provided context.\n\n\
 ## Validation Checklist\n\n\
 - Review this bridge draft for accuracy before using it in Codex.\n\
 - Confirm the selected project and conversation are correct.\n\
@@ -1977,14 +2150,16 @@ Use the project, conversation transcript, and attached context above as source m
         messages.len(),
         transcript,
         goal,
+        project_markdown_context,
         relevant_context
     )
 }
 
 fn build_planning_context_payload(
+    markdown_context: &ProjectMarkdownContextPayload,
     context_items: &[PromptPreviewContextItem],
 ) -> PlanningContextPayload {
-    let mut warnings = Vec::new();
+    let mut warnings = markdown_context.warnings.clone();
     let included_context = context_items
         .iter()
         .filter_map(|item| {
@@ -2005,16 +2180,337 @@ fn build_planning_context_payload(
         })
         .collect::<Vec<_>>();
 
-    let content = if included_context.is_empty() {
+    let markdown_text = build_project_markdown_context_text(&markdown_context.files);
+    let attachment_text = if included_context.is_empty() {
+        "No conversation manual attachments included.".to_string()
+    } else {
+        included_context.join("\n\n---\n\n")
+    };
+
+    let content = if markdown_context.files.is_empty() && included_context.is_empty() {
         String::new()
     } else {
         format!(
-            "Attached local context for this conversation:\n\n{}",
-            included_context.join("\n\n---\n\n")
+            "Project Markdown Context:\n\n{}\n\nConversation manual attachments:\n\n{}",
+            markdown_text, attachment_text
         )
     };
 
     PlanningContextPayload { content, warnings }
+}
+
+fn build_project_markdown_context_text(files: &[ProjectMarkdownContextFile]) -> String {
+    if files.is_empty() {
+        return "No project Markdown context loaded.".to_string();
+    }
+
+    files
+        .iter()
+        .map(|file| {
+            let status = if file.included {
+                "Included: Yes"
+            } else {
+                "Included: No"
+            };
+            let body = if file.included && !file.content.trim().is_empty() {
+                file.content.as_str()
+            } else if !file.warning.trim().is_empty() {
+                file.warning.as_str()
+            } else {
+                "No content."
+            };
+            format!(
+                "File: {}\n{}\nContent:\n{}",
+                file.relative_path, status, body
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n---\n\n")
+}
+
+fn load_project_markdown_context_from_config(
+    config: &ProjectMarkdownContextRecord,
+) -> ProjectMarkdownContextPayload {
+    let mut warnings = Vec::new();
+    let root_path = PathBuf::from(config.root_path.trim());
+
+    let root = match fs::canonicalize(&root_path) {
+        Ok(path) if path.is_dir() => path,
+        Ok(_) => {
+            return ProjectMarkdownContextPayload {
+                files: vec![ProjectMarkdownContextFile {
+                    relative_path: ".".to_string(),
+                    included: false,
+                    content: String::new(),
+                    warning: "Configured Markdown context root is not a directory.".to_string(),
+                }],
+                warnings: vec!["Configured Markdown context root is not a directory.".to_string()],
+            };
+        }
+        Err(error) => {
+            return ProjectMarkdownContextPayload {
+                files: vec![ProjectMarkdownContextFile {
+                    relative_path: ".".to_string(),
+                    included: false,
+                    content: String::new(),
+                    warning: format!("Configured Markdown context root could not be read: {error}"),
+                }],
+                warnings: vec![format!(
+                    "Configured Markdown context root could not be read: {error}"
+                )],
+            };
+        }
+    };
+
+    let readme_path = normalize_relative_markdown_path(&config.readme_path)
+        .unwrap_or_else(|| "README.md".to_string());
+    let mut relative_paths = Vec::new();
+    push_unique_path(&mut relative_paths, readme_path.clone());
+    for path in known_markdown_context_paths(&root) {
+        push_unique_path(&mut relative_paths, path);
+    }
+
+    let readme_full_path = root.join(&readme_path);
+    match fs::read_to_string(&readme_full_path) {
+        Ok(content) => {
+            let (references, reference_warnings) = extract_markdown_references(&content);
+            warnings.extend(reference_warnings);
+            for path in references {
+                push_unique_path(&mut relative_paths, path);
+            }
+        }
+        Err(error) => warnings.push(format!("{readme_path}: could not be read: {error}")),
+    }
+
+    let mut files = Vec::new();
+    let mut total_bytes = 0usize;
+
+    for relative_path in relative_paths {
+        let Some(file) = load_markdown_context_file(&root, &relative_path, &mut total_bytes) else {
+            continue;
+        };
+        if !file.warning.trim().is_empty() {
+            warnings.push(format!("{}: {}", file.relative_path, file.warning));
+        }
+        files.push(file);
+    }
+
+    ProjectMarkdownContextPayload { files, warnings }
+}
+
+fn known_markdown_context_paths(root: &Path) -> Vec<String> {
+    let mut paths = Vec::new();
+    for relative_path in ["README.md", "CHANGELOG.md"] {
+        if root.join(relative_path).is_file() {
+            paths.push(relative_path.to_string());
+        }
+    }
+
+    for directory in ["docs", "bridge-files"] {
+        let full_directory = root.join(directory);
+        let Ok(entries) = fs::read_dir(full_directory) else {
+            continue;
+        };
+        let mut names = entries
+            .filter_map(|entry| entry.ok())
+            .filter_map(|entry| {
+                let path = entry.path();
+                if path.is_file() && is_markdown_path(&path) {
+                    path.file_name()
+                        .and_then(|name| name.to_str())
+                        .map(|name| format!("{directory}/{name}"))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        names.sort();
+        paths.extend(names);
+    }
+
+    paths
+}
+
+fn load_markdown_context_file(
+    root: &Path,
+    relative_path: &str,
+    total_bytes: &mut usize,
+) -> Option<ProjectMarkdownContextFile> {
+    let normalized = match normalize_relative_markdown_path(relative_path) {
+        Some(path) => path,
+        None => {
+            return Some(ProjectMarkdownContextFile {
+                relative_path: relative_path.to_string(),
+                included: false,
+                content: String::new(),
+                warning: "Skipped unsafe or non-Markdown path.".to_string(),
+            });
+        }
+    };
+
+    let full_path = root.join(&normalized);
+    let canonical = match fs::canonicalize(&full_path) {
+        Ok(path) => path,
+        Err(error) => {
+            return Some(ProjectMarkdownContextFile {
+                relative_path: normalized,
+                included: false,
+                content: String::new(),
+                warning: format!("Markdown file could not be read: {error}"),
+            });
+        }
+    };
+
+    if !canonical.starts_with(root) {
+        return Some(ProjectMarkdownContextFile {
+            relative_path: normalized,
+            included: false,
+            content: String::new(),
+            warning: "Skipped because the resolved path is outside the configured root."
+                .to_string(),
+        });
+    }
+
+    if !canonical.is_file() || !is_markdown_path(&canonical) {
+        return Some(ProjectMarkdownContextFile {
+            relative_path: normalized,
+            included: false,
+            content: String::new(),
+            warning: "Skipped because the resolved path is not a Markdown file.".to_string(),
+        });
+    }
+
+    let content = match fs::read_to_string(&canonical) {
+        Ok(content) => content,
+        Err(error) => {
+            return Some(ProjectMarkdownContextFile {
+                relative_path: normalized,
+                included: false,
+                content: String::new(),
+                warning: format!("Markdown file could not be read: {error}"),
+            });
+        }
+    };
+
+    let mut warning = String::new();
+    let mut included_content = content;
+    if included_content.len() > MARKDOWN_CONTEXT_PER_FILE_LIMIT {
+        included_content.truncate(MARKDOWN_CONTEXT_PER_FILE_LIMIT);
+        warning = format!(
+            "File was truncated to {} bytes for context assembly.",
+            MARKDOWN_CONTEXT_PER_FILE_LIMIT
+        );
+    }
+
+    if *total_bytes >= MARKDOWN_CONTEXT_TOTAL_LIMIT {
+        return Some(ProjectMarkdownContextFile {
+            relative_path: normalized,
+            included: false,
+            content: String::new(),
+            warning: "Skipped because the project Markdown context size limit was reached."
+                .to_string(),
+        });
+    }
+
+    let remaining = MARKDOWN_CONTEXT_TOTAL_LIMIT - *total_bytes;
+    if included_content.len() > remaining {
+        included_content.truncate(remaining);
+        warning = format!(
+            "File was truncated because the project Markdown context total size limit is {} bytes.",
+            MARKDOWN_CONTEXT_TOTAL_LIMIT
+        );
+    }
+    *total_bytes += included_content.len();
+
+    Some(ProjectMarkdownContextFile {
+        relative_path: normalized,
+        included: true,
+        content: included_content,
+        warning,
+    })
+}
+
+fn extract_markdown_references(content: &str) -> (Vec<String>, Vec<String>) {
+    let mut references = Vec::new();
+    let mut warnings = Vec::new();
+    for line in content.lines() {
+        let mut rest = line;
+        while let Some(start) = rest.find("](") {
+            let after_start = &rest[start + 2..];
+            let Some(end) = after_start.find(')') else {
+                break;
+            };
+            let target = after_start[..end].trim();
+            if let Some(path) = normalize_relative_markdown_path(target) {
+                push_unique_path(&mut references, path);
+            } else if looks_like_markdown_reference(target) {
+                warnings.push(format!(
+                    "{target}: skipped unsafe or unsupported Markdown reference."
+                ));
+            }
+            rest = &after_start[end + 1..];
+        }
+
+        for raw_part in line.split_whitespace() {
+            let cleaned = raw_part.trim_matches(|character: char| {
+                matches!(
+                    character,
+                    '"' | '\'' | '`' | '<' | '>' | '(' | ')' | '[' | ']' | ',' | '.'
+                )
+            });
+            if let Some(path) = normalize_relative_markdown_path(cleaned) {
+                push_unique_path(&mut references, path);
+            }
+        }
+    }
+    (references, warnings)
+}
+
+fn normalize_relative_markdown_path(value: &str) -> Option<String> {
+    let without_anchor = value.split('#').next().unwrap_or_default();
+    let without_query = without_anchor.split('?').next().unwrap_or_default();
+    let cleaned = without_query.trim().replace('\\', "/");
+    if cleaned.is_empty()
+        || cleaned.starts_with('/')
+        || cleaned.contains(':')
+        || cleaned.contains("://")
+        || cleaned.contains('*')
+        || cleaned.contains('?')
+        || cleaned.split('/').any(|part| part == "..")
+    {
+        return None;
+    }
+
+    let lower = cleaned.to_ascii_lowercase();
+    if !(lower.ends_with(".md") || lower.ends_with(".markdown")) {
+        return None;
+    }
+
+    Some(cleaned)
+}
+
+fn is_markdown_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| {
+            extension.eq_ignore_ascii_case("md") || extension.eq_ignore_ascii_case("markdown")
+        })
+        .unwrap_or(false)
+}
+
+fn looks_like_markdown_reference(value: &str) -> bool {
+    let lower = value.to_ascii_lowercase();
+    lower.contains(".md") || lower.contains(".markdown")
+}
+
+fn push_unique_path(paths: &mut Vec<String>, path: String) {
+    let key = path.to_ascii_lowercase();
+    if !paths
+        .iter()
+        .any(|existing| existing.to_ascii_lowercase() == key)
+    {
+        paths.push(path);
+    }
 }
 
 fn first_user_message(messages: &[PlanningMessageRecord]) -> Option<String> {

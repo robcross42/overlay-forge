@@ -21,6 +21,8 @@ All notable changes to Overlay Forge will be documented in this file.
 - Milestone 9 - Manual Context Attachments is complete, passed, and successful.
 - Milestone 10 - Prompt Preview is complete, passed, and successful.
 - Milestone 11 - Bridge File Drafting is complete, passed, and successful.
+- Milestone 12 - Project Markdown Context is tentatively validated and needs a UI follow-up pass after Milestone 13.
+- Milestone 13 - Project Workspace UI Consolidation is planned and not started.
 
 ### Added
 
@@ -102,6 +104,14 @@ All notable changes to Overlay Forge will be documented in this file.
 - Added read-only Bridge Drafts panel with saved draft list and generated Markdown content display.
 - Added generated Markdown draft structure with project, conversation source, goal, relevant context, implementation instructions, validation checklist, deferred items, and notes.
 - Added attached context inclusion for project chat sends, including linked GitHub repository metadata when available.
+- Added project-level local Markdown context configuration for selected projects.
+- Added SQLite `project_markdown_context` table initialization for per-project local Markdown context roots.
+- Added backend commands for getting, saving, clearing, and loading project Markdown context.
+- Added safe local Markdown loading from configured project roots, including `README.md`, `CHANGELOG.md`, `docs/*.md`, `bridge-files/*.md`, and explicit Markdown references found in `README.md`.
+- Added readable warnings for missing, unreadable, unsafe, skipped, and truncated Markdown files.
+- Added Project Markdown context display in selected-project Chat.
+- Added project Markdown context inclusion for Prompt Preview, project chat sends, and bridge draft generation.
+- Added `docs/MILESTONE_13.md` as the baseline plan for Project Workspace UI Consolidation.
 
 ### Changed
 
@@ -150,6 +160,11 @@ All notable changes to Overlay Forge will be documented in this file.
 - Confirmed bridge draft deletion removes only the selected draft and does not delete source conversations, messages, or context records.
 - Confirmed linked GitHub repository metadata is resolved from the selected project for bridge drafts, prompt previews, and project chat sends.
 - Confirmed export, full editor workflows, and direct Codex handoff remain deferred beyond Milestone 11.
+- Confirmed project Markdown context is project-scoped, local-first, and not stored as per-conversation manual attachments.
+- Confirmed conversation manual attachments remain an additional context layer after project Markdown context.
+- Confirmed GitHub file APIs, broad repository indexing, bridge export, and direct Codex handoff remain deferred beyond Milestone 12.
+- Clarified that Milestone 12 is tentatively validated functionally, but needs a second validation pass after Milestone 13 removes redundant workspace UI.
+- Clarified that Milestone 13 should preserve conversation-scoped manual attachment data semantics while moving attachment controls out of the primary chat surface.
 
 ### Validation
 
@@ -216,3 +231,8 @@ All notable changes to Overlay Forge will be documented in this file.
 - Verified Rust backend compile after Milestone 11 implementation with `cargo build`.
 - Verified development launch after Milestone 11 implementation with `npm run tauri:dev`; the app process started and was stopped after the validation timeout.
 - Manual validation for Milestone 11 is complete, passed, and successful.
+- Verified `npm install` completes successfully after Milestone 12 implementation.
+- Verified frontend build after Milestone 12 implementation with `npm run build`.
+- Verified Rust backend compile after Milestone 12 implementation with `cargo build`.
+- Verified development launch after Milestone 12 implementation with `npm run tauri:dev`; the app process started and was stopped after the validation timeout.
+- Manual validation for Milestone 12 is tentatively successful for context ingestion and pending a second UI-focused validation pass after Milestone 13.

@@ -1101,12 +1101,12 @@ select.text-input option:hover {
 
 .planning-sidebar {
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
   align-content: start;
   gap: 12px;
   min-width: 0;
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
 }
 
 .workspace-project-context {
@@ -1134,11 +1134,110 @@ select.text-input option:hover {
 
 .planning-chat-surface {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto auto auto auto;
+  grid-template-rows: minmax(0, 1fr) auto auto auto auto auto;
   gap: 12px;
   min-width: 0;
   min-height: 0;
   overflow: auto;
+}
+
+.markdown-context-config,
+.project-markdown-panel {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.markdown-context-heading,
+.markdown-context-actions,
+.project-markdown-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.markdown-context-heading p,
+.markdown-context-heading h4,
+.project-markdown-heading p,
+.project-markdown-heading h4 {
+  margin: 0;
+}
+
+.markdown-context-heading p,
+.project-markdown-heading p,
+.markdown-context-summary,
+.project-markdown-list p,
+.project-markdown-warnings p {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.markdown-context-heading h4,
+.project-markdown-heading h4 {
+  font-size: 0.9rem;
+}
+
+.markdown-context-actions .primary-button,
+.markdown-context-actions .ghost-button {
+  flex: 1;
+  min-width: 0;
+}
+
+.markdown-context-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.project-markdown-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.project-markdown-item {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(79, 208, 165, 0.28);
+  border-radius: 8px;
+  background: rgba(79, 208, 165, 0.08);
+}
+
+.project-markdown-item-warning {
+  border-color: rgba(255, 203, 107, 0.35);
+  background: rgba(255, 203, 107, 0.08);
+}
+
+.project-markdown-item span,
+.project-markdown-item strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-markdown-item span {
+  color: var(--text);
+  font-size: 0.8rem;
+}
+
+.project-markdown-item strong {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.project-markdown-item p,
+.project-markdown-warnings p {
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .message-list {
