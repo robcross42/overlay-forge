@@ -2,9 +2,9 @@
 
 ## Current Status
 
-**Current project baseline: Milestone 9.**
+**Current project baseline: Milestone 10.**
 
-Milestone 9 is the latest completed, tested, and user-validated milestone.
+Milestone 10 is the latest completed, tested, and user-validated milestone.
 
 **Milestone 0 - Overlay Shell Validation is complete, passed, and successful.**
 
@@ -86,7 +86,7 @@ Use explicit milestone IDs. Do not infer milestone numbers from this list's item
 
 ## Scope Guard
 
-Milestone 9 is the current passed stable baseline for later work. Do not implement later milestone features by reverting to an earlier code path; future work should begin from the completed overlay shell, hotkey behavior, always-on-top behavior, component host, local SQLite scratchpad, Tasks, Notes, Calendar, Projects navigation tree/workspace, Planning Chat persistence, manual context attachments, GitHub Integration, and YouTube components.
+Milestone 10 is the current passed stable baseline for later work. Do not implement later milestone features by reverting to an earlier code path; future work should begin from the completed overlay shell, hotkey behavior, always-on-top behavior, component host, local SQLite scratchpad, Tasks, Notes, Calendar, Projects navigation tree/workspace, Planning Chat persistence, manual context attachments, Prompt Preview, GitHub Integration, and YouTube components.
 
 Milestone 4 remains intentionally small. It does not include automatic Codex handoff, GitHub write operations, pull request creation, branch creation, issue management, full repository browsing, GitHub Actions integration, OAuth, multi-account support, advanced sync, vector store/repo indexing, YouTube integration, external calendar integration, cloud sync, or multi-user auth.
 

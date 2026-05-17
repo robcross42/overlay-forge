@@ -6,7 +6,7 @@ Overlay Forge is a local-first desktop overlay shell for planning, notes, tasks,
 
 **Milestone 1 is complete, passed, and successful.** It adds Tasks, Notes, and Calendar components beside the existing Scratchpad without replacing the Milestone 0 foundation.
 
-**Current project baseline: Milestone 9.** Future bridge prompts, planning, and implementation should treat Milestone 9 as the latest completed and user-validated app state.
+**Current project baseline: Milestone 10.** Future bridge prompts, planning, and implementation should treat Milestone 10 as the latest completed and user-validated app state.
 
 **Milestone 2 is complete, passed, and successful.** It adds a local Projects component with SQLite persistence.
 
