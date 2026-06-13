@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   hideOverlayWindow,
-  minimizeOverlayWindow,
   shutdownOverlayApp,
   startOverlayDrag,
   startOverlayResize,
@@ -54,14 +53,6 @@ export function WindowTitlebar() {
         onDoubleClick={(event) => event.stopPropagation()}
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <button
-          aria-label="Minimize"
-          className="window-control"
-          onClick={() => void minimizeOverlayWindow()}
-          type="button"
-        >
-          <span aria-hidden="true">-</span>
-        </button>
         <button
           aria-label={isMaximized ? "Restore" : "Maximize"}
           className="window-control"

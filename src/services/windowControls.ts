@@ -15,7 +15,7 @@ type ResizeDirection =
 const overlayWindow = getCurrentWindow();
 
 export function startOverlayDrag() {
-  return overlayWindow.startDragging();
+  return invoke<void>("start_manual_overlay_drag");
 }
 
 export function startOverlayResize(direction: ResizeDirection) {
@@ -24,6 +24,10 @@ export function startOverlayResize(direction: ResizeDirection) {
 
 export function setOverlayMinimumSize(width: number, height: number) {
   return overlayWindow.setMinSize(new LogicalSize(width, height));
+}
+
+export function setOverlayWindowOpacity(opacity: number) {
+  return invoke<void>("set_overlay_window_opacity", { opacity });
 }
 
 export function clearOverlayMinimumSize() {
@@ -44,6 +48,14 @@ export async function toggleOverlayMaximize(shouldToggle: boolean) {
 
 export function hideOverlayWindow() {
   return overlayWindow.hide();
+}
+
+export function showOverlayWindow() {
+  return overlayWindow.show().then(() => overlayWindow.setFocus());
+}
+
+export function isOverlayWindowVisible() {
+  return overlayWindow.isVisible();
 }
 
 export function shutdownOverlayApp() {

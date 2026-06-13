@@ -5,6 +5,7 @@ import {
   catalogGamePartsFromScreenshots,
   createGame,
   createGameChatConversation,
+  createGameChatScreenshotCapture,
   createGameScreenshotCaptureRequest,
   deleteGameChatConversation,
   deleteGameScreenshot,
@@ -27,6 +28,8 @@ import type {
 
 type GamingProps = {
   chatOverlayMode?: boolean;
+  chatOverlayRequestNonce?: number;
+  chatScreenshotCaptureRequestNonce?: number;
   gameSections: Game[];
   navAction: GameNavAction | null;
   onEnterChatOverlayMode?: () => void;
@@ -59,6 +62,8 @@ const CHAT_SCREENSHOTS_PER_PAGE = 8;
 
 export function Gaming({
   chatOverlayMode = false,
+  chatOverlayRequestNonce = 0,
+  chatScreenshotCaptureRequestNonce = 0,
   gameSections,
   navAction,
   onEnterChatOverlayMode,
@@ -84,6 +89,7 @@ export function Gaming({
   const [newChatTitle, setNewChatTitle] = useState("");
   const [chatDraft, setChatDraft] = useState("");
   const [isSendingChat, setIsSendingChat] = useState(false);
+  const [isCapturingPromptScreenshot, setIsCapturingPromptScreenshot] = useState(false);
   const [selectedPromptScreenshotIds, setSelectedPromptScreenshotIds] = useState<number[]>([]);
   const [chatScreenshotPage, setChatScreenshotPage] = useState(0);
   const [isChatScreenshotPickerOpen, setIsChatScreenshotPickerOpen] = useState(false);
@@ -180,6 +186,41 @@ export function Gaming({
       onExitChatOverlayMode?.();
     }
   }, [chatOverlayMode, selectedGame?.id, gameView, selectedChatConversationId, onExitChatOverlayMode]);
+
+  useEffect(() => {
+    if (
+      chatOverlayRequestNonce > 0 &&
+      selectedGame &&
+      gameView === "chat" &&
+      selectedChatConversationId
+    ) {
+      onEnterChatOverlayMode?.();
+    }
+  }, [
+    chatOverlayRequestNonce,
+    selectedGame?.id,
+    gameView,
+    selectedChatConversationId,
+    onEnterChatOverlayMode
+  ]);
+
+  useEffect(() => {
+    if (
+      chatScreenshotCaptureRequestNonce > 0 &&
+      chatOverlayMode &&
+      selectedGame &&
+      gameView === "chat" &&
+      selectedChatConversationId
+    ) {
+      void capturePromptScreenshot(selectedGame);
+    }
+  }, [
+    chatScreenshotCaptureRequestNonce,
+    chatOverlayMode,
+    selectedGame?.id,
+    gameView,
+    selectedChatConversationId
+  ]);
 
   useEffect(() => {
     setChatScreenshotPage((current) => Math.min(current, chatScreenshotPageCount - 1));
@@ -292,6 +333,31 @@ export function Gaming({
     }
   }
 
+  async function capturePromptScreenshot(game: Game) {
+    if (!selectedChatConversationId || isCapturingPromptScreenshot) {
+      return;
+    }
+
+    setIsCapturingPromptScreenshot(true);
+    setStatus("Capturing screenshot");
+    try {
+      const request = await createGameChatScreenshotCapture(
+        game.id,
+        screenshotTimestampLabel(new Date())
+      );
+      setScreenshots((current) => [request, ...current.filter((item) => item.id !== request.id)]);
+      setSelectedPromptScreenshotIds((current) =>
+        current.includes(request.id) ? current : [...current, request.id]
+      );
+      setChatScreenshotPage(0);
+      setStatus("Screenshot added to current prompt");
+    } catch (error) {
+      setStatus(formatError(error));
+    } finally {
+      setIsCapturingPromptScreenshot(false);
+    }
+  }
+
   async function catalogParts(game: Game) {
     setIsCatalogingParts(true);
     try {
@@ -344,9 +410,7 @@ export function Gaming({
       return;
     }
 
-    const content = chatDraft.trimEnd().endsWith("\\")
-      ? chatDraft.trimEnd().slice(0, -1).trim()
-      : chatDraft.trim();
+    const content = chatDraft.trim();
     if (!content) {
       setStatus("Message is required");
       return;
@@ -669,6 +733,7 @@ export function Gaming({
               messages={chatMessages}
               newConversationTitle={newChatTitle}
               onEnterChatOverlayMode={onEnterChatOverlayMode}
+              onCaptureScreenshot={() => void capturePromptScreenshot(selectedGame)}
               onCreateConversation={() => void createGameChat()}
               onDeleteConversation={(conversation) => void removeGameChat(conversation)}
               onDraftChange={setChatDraft}
@@ -680,6 +745,11 @@ export function Gaming({
                 setIsChatScreenshotPickerOpen(false);
               }}
               onSendMessage={() => void sendGameChat()}
+              promptContextSummary={
+                selectedPromptScreenshotIds.length > 0
+                  ? `${selectedPromptScreenshotIds.length} screenshot(s) attached`
+                  : ""
+              }
               selectedConversationId={selectedChatConversationId}
               showFocusedToolbar={false}
               status={status}

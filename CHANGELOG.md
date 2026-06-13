@@ -6,6 +6,55 @@ Unreleased changes are grouped by day using `YYYY-MM-DD` headings so a single da
 
 ## Unreleased
 
+### 2026-06-13
+
+#### Added
+
+- Added `Ctrl+Shift+C` as a global shortcut to open or refocus the simplified Gaming chat overlay for the currently selected existing game chat.
+- Added a Settings keybind editor with configurable key1/key2/key3 shortcut cells for global app functions.
+- Added SQLite-backed keybind persistence and live global shortcut re-registration.
+- Added a simple Gaming chat overlay capture button that reuses the working game screenshot capture flow and automatically attaches the saved screenshot to the current prompt.
+- Added `Capture Screenshot For Gaming Chat` as a configurable keybind function in Settings.
+- Added mouse button support for configurable keybinds, including `Mouse4`, `Mouse5`, and modifier combinations such as `Ctrl+Mouse4`.
+- Added Windows native opacity control for the simple Gaming chat overlay.
+
+#### Changed
+
+- Made the left navigation pane scroll independently with a compact slider-only scrollbar so smaller overlay window sizes can still access all navigation items.
+- Changed the Settings panel to use the same compact slider-only scrollbar styling as the left navigation pane.
+- Changed keybind editing so `key1`, `key2`, and `key3` represent the ordered parts of one shortcut, such as `Ctrl`, `Shift`, `Space`.
+- Changed Settings keybind capture so mouse clicks can be assigned from the same keybind prompt.
+- Changed Gaming chat Enter-submit behavior from a trailing backslash to two trailing spaces before pressing Enter.
+- Changed the simple Gaming chat overlay to use a smoky translucent treatment inspired by GearBlocks' in-game control panels.
+- Replaced the transparent-window experiment with simple-chat native window opacity so WebView2's black backing still renders translucently over the game.
+- Reapplied simple-chat native opacity before showing the hidden chat overlay so `Ctrl+Shift+C` reopen does not return as opaque black.
+- Removed the titlebar minimize button so Overlay Forge is not minimized to the taskbar from the app controls.
+- Removed the simple chat overlay move and resize buttons; the left rail now drags the overlay, and resizing remains handled by window edges/corners.
+- Changed overlay window dragging to use manual positioning on Windows so the main overlay and simple chat overlay can be placed tight against screen borders without triggering Windows auto-snap.
+- Changed the simple chat overlay close button to hide the overlay window instead of flashing back to the full Overlay Forge shell.
+- Changed `Ctrl+Shift+C` so it opens the current game's Chats page when no game chat is currently selected.
+- Made Gaming chat overlay shortcut requests durable so `Ctrl+Shift+C` still routes correctly when Overlay Forge is hidden or waking from focus.
+
+#### Fixed
+
+- Removed the simple Gaming chat overlay selection step; chat capture now takes a full game screenshot for fast repeated mouse-bound captures.
+- Fixed Gaming chat screenshot shortcuts so they no longer focus Overlay Forge before capture, preserving the foreground game target.
+- Separated simple chat overlay shortcut behavior from the main Overlay Forge toggle: `Ctrl+Shift+C` toggles the simple chat overlay, while `Ctrl+Shift+Space` restores the main shell.
+- Fixed shortcut state handling so `Ctrl+Shift+C` sees the current simple chat overlay state and `Ctrl+Shift+Space` is not double-triggered by key repeat.
+- Fixed `Ctrl+Shift+C` reopening a hidden simple chat overlay and immediately hiding it again by preserving the window visibility state from before the shortcut was handled.
+- Fixed `Ctrl+Shift+Space` main-shell toggling so React decides whether to hide the main shell or switch out of simple chat mode using the window visibility state from before the shortcut was handled.
+- Added a compact screenshot attachment indicator inside the simple Gaming chat overlay prompt area.
+
+#### Documentation
+
+- Documented the Gaming chat overlay shortcut in README and bridge context.
+- Documented Settings as the place to configure Overlay Forge keybinds.
+
+#### Validation
+
+- Marked the 2026-06-13 Overlay Forge, Gaming chat overlay, screenshot capture, keybind, and window behavior changes as implemented, successful, and validated.
+- Validated with `npm run build`, `cargo build`, and runtime confirmation that simple chat translucency renders correctly and screenshots transmit correctly.
+
 ### 2026-06-06
 
 #### Documentation

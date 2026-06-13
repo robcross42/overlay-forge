@@ -59,6 +59,10 @@ button {
 
 .overlay-frame-chat-mode {
   grid-template-rows: minmax(0, 1fr);
+  background: rgba(8, 10, 13, 0.82);
+  border-color: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
 }
 
 .overlay-frame-chat-mode .overlay-shell {
@@ -221,6 +225,7 @@ button {
   flex-direction: column;
   gap: 24px;
   min-width: 0;
+  min-height: 0;
   padding: 24px;
   border-right: 1px solid var(--line);
   background: rgba(8, 12, 16, 0.34);
@@ -269,7 +274,35 @@ button {
 
 .component-nav {
   display: grid;
+  align-content: start;
+  flex: 1 1 auto;
   gap: 8px;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-color: rgba(157, 175, 191, 0.5) transparent;
+  scrollbar-width: thin;
+}
+
+.component-nav::-webkit-scrollbar {
+  width: 8px;
+}
+
+.component-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.component-nav::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(157, 175, 191, 0.46);
+  background-clip: padding-box;
+}
+
+.component-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(238, 244, 248, 0.58);
+  background-clip: padding-box;
 }
 
 .nav-item {
@@ -1377,6 +1410,8 @@ select.text-input option:hover {
 .chat-workspace-overlay-mode {
   height: 100%;
   min-height: 0;
+  padding: 4px;
+  background: transparent;
 }
 
 .chat-workspace-sidebar,
@@ -1401,6 +1436,8 @@ select.text-input option:hover {
 
 .chat-workspace-overlay-mode .chat-workspace-main-no-toolbar {
   grid-template-rows: minmax(0, 1fr) auto;
+  padding: 6px;
+  background: transparent;
 }
 
 .chat-workspace-overlay-mode .chat-input-row {
@@ -1412,6 +1449,8 @@ select.text-input option:hover {
   height: 56px;
   min-height: 56px;
   max-height: 56px;
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(6, 8, 11, 0.72);
   padding: 8px 84px 8px 10px;
   line-height: 1.35;
 }
@@ -1420,6 +1459,8 @@ select.text-input option:hover {
   position: absolute;
   right: 8px;
   bottom: 8px;
+  background: rgba(255, 255, 255, 0.18);
+  color: #f8fbff;
   min-height: 32px;
   padding: 0 12px;
 }
@@ -1507,6 +1548,14 @@ select.text-input option:hover {
 .chat-screenshot-context strong {
   color: var(--muted);
   font-size: 0.78rem;
+}
+
+.chat-overlay-context-summary {
+  align-self: stretch;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  color: #9fb1c7;
+  font-size: 0.76rem;
+  padding: 0.45rem 0.65rem 0;
 }
 
 .chat-screenshot-summary .ghost-button {
@@ -1656,6 +1705,32 @@ select.text-input option:hover {
   align-content: start;
   gap: 12px;
   min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-color: rgba(157, 175, 191, 0.5) transparent;
+  scrollbar-width: thin;
+}
+
+.settings-panel::-webkit-scrollbar {
+  width: 8px;
+}
+
+.settings-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.settings-panel::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(157, 175, 191, 0.46);
+  background-clip: padding-box;
+}
+
+.settings-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(238, 244, 248, 0.58);
+  background-clip: padding-box;
 }
 
 .settings-card {
@@ -1703,6 +1778,123 @@ select.text-input option:hover {
   align-items: center;
   gap: 10px;
   min-width: 0;
+}
+
+.settings-keybinds-card {
+  max-width: 920px;
+}
+
+.settings-card-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.keybind-table {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--line);
+}
+
+.keybind-row {
+  display: grid;
+  grid-template-columns: minmax(190px, 1.4fr) repeat(3, minmax(120px, 1fr));
+  min-width: 0;
+  background: rgba(11, 16, 22, 0.94);
+}
+
+.keybind-row > span,
+.keybind-row > strong,
+.keybind-cell {
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+}
+
+.keybind-row-head {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.keybind-row-head span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.keybind-row > strong {
+  display: flex;
+  align-items: center;
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.keybind-cell {
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.86rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.keybind-cell:hover,
+.keybind-cell:focus-visible {
+  background: rgba(88, 166, 255, 0.13);
+  outline: none;
+}
+
+.keybind-cell:empty,
+.keybind-cell:not(.duplicate) {
+  color: var(--text);
+}
+
+.keybind-cell.duplicate {
+  color: #ffd8d8;
+  background: rgba(255, 105, 97, 0.18);
+}
+
+.keybind-capture-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(4, 8, 13, 0.74);
+}
+
+.keybind-capture-dialog {
+  display: grid;
+  gap: 8px;
+  width: min(420px, 100%);
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #111820;
+  box-shadow: 0 20px 54px rgba(0, 0, 0, 0.34);
+}
+
+.keybind-capture-dialog p,
+.keybind-capture-dialog strong {
+  margin: 0;
+}
+
+.keybind-capture-dialog p {
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.keybind-capture-dialog strong {
+  color: var(--muted);
+  font-size: 0.84rem;
 }
 
 .game-part-filter-bar {
@@ -2459,7 +2651,21 @@ select.text-input option:hover {
   align-content: start;
   gap: 6px;
   min-width: 0;
+  min-height: 0;
   padding-top: 2px;
+}
+
+.chat-workspace-overlay-mode .chat-overlay-controls {
+  min-height: 100%;
+  padding: 4px 0;
+  background: transparent;
+  cursor: move;
+}
+
+.chat-overlay-exit-slot {
+  display: grid;
+  gap: 6px;
+  place-items: start center;
 }
 
 .chat-overlay-control {
@@ -2468,10 +2674,10 @@ select.text-input option:hover {
   width: 32px;
   height: 32px;
   padding: 0;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(248, 251, 255, 0.86);
   cursor: pointer;
   font-size: 0.86rem;
   font-weight: 850;
@@ -2486,9 +2692,19 @@ select.text-input option:hover {
 .chat-overlay-control:hover,
 .chat-overlay-control:focus-visible {
   outline: none;
-  border-color: rgba(79, 208, 165, 0.45);
-  background: rgba(79, 208, 165, 0.13);
-  color: var(--accent-strong);
+  border-color: rgba(255, 255, 255, 0.48);
+  background: rgba(255, 255, 255, 0.26);
+  color: #ffffff;
+}
+
+.chat-workspace-overlay-mode .chat-message {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(6, 8, 11, 0.72);
+}
+
+.chat-workspace-overlay-mode .chat-message-user {
+  border-color: rgba(255, 255, 255, 0.26);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .planning-panel-focused .planning-chat-surface {

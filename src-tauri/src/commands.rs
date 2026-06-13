@@ -7,6 +7,7 @@ use crate::db::{
     ProjectRecord, TaskRecord, YouTubeReferenceRecord,
 };
 use crate::github;
+use crate::hotkeys;
 use crate::openai;
 use crate::AppState;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -20,7 +21,7 @@ use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Manager, PhysicalPosition, State};
 
 #[derive(Serialize)]
 pub struct MilestoneStatus {
@@ -38,6 +39,13 @@ pub struct ApiKeyStatus {
 }
 
 #[derive(Serialize)]
+pub struct KeybindRecord {
+    pub action: String,
+    pub label: String,
+    pub keys: Vec<String>,
+}
+
+#[derive(Serialize)]
 pub struct GamePartCategoryRecord {
     pub name: String,
     #[serde(rename = "fallbackIcon")]
@@ -45,6 +53,17 @@ pub struct GamePartCategoryRecord {
     #[serde(rename = "iconPath")]
     pub icon_path: String,
     pub count: i64,
+}
+
+fn to_keybind_records(keybinds: Vec<hotkeys::KeybindConfig>) -> Vec<KeybindRecord> {
+    keybinds
+        .into_iter()
+        .map(|keybind| KeybindRecord {
+            action: keybind.action,
+            label: keybind.label,
+            keys: keybind.keys,
+        })
+        .collect()
 }
 
 #[tauri::command]
@@ -108,6 +127,35 @@ pub fn clear_openai_api_key(state: State<'_, AppState>) -> Result<ApiKeyStatus, 
 }
 
 #[tauri::command]
+pub fn consume_pending_shortcut_action(
+    state: State<'_, AppState>,
+) -> Result<Option<String>, String> {
+    let mut pending = state
+        .pending_shortcut_action
+        .lock()
+        .map_err(|_| "Shortcut action state is unavailable.".to_string())?;
+    Ok(pending.take())
+}
+
+#[tauri::command]
+pub fn list_keybinds(app: AppHandle) -> Result<Vec<KeybindRecord>, String> {
+    hotkeys::load_keybinds(&app).map(to_keybind_records)
+}
+
+#[tauri::command]
+pub fn save_keybinds(
+    app: AppHandle,
+    keybinds: Vec<hotkeys::KeybindConfig>,
+) -> Result<Vec<KeybindRecord>, String> {
+    hotkeys::save_keybinds(&app, keybinds).map(to_keybind_records)
+}
+
+#[tauri::command]
+pub fn reset_keybinds(app: AppHandle) -> Result<Vec<KeybindRecord>, String> {
+    hotkeys::reset_keybinds(&app).map(to_keybind_records)
+}
+
+#[tauri::command]
 pub fn save_scratchpad(content: String, state: State<'_, AppState>) -> Result<(), String> {
     state
         .database
@@ -119,7 +167,7 @@ pub fn save_scratchpad(content: String, state: State<'_, AppState>) -> Result<()
 pub fn get_milestone_status(state: State<'_, AppState>) -> Result<MilestoneStatus, String> {
     Ok(MilestoneStatus {
         milestone: "Milestone 13".to_string(),
-        hotkey: "Ctrl+Shift+Space".to_string(),
+        hotkey: "Ctrl+Shift+Space / Ctrl+Shift+C".to_string(),
         database_ready: state.database.is_ready(),
     })
 }
@@ -127,6 +175,16 @@ pub fn get_milestone_status(state: State<'_, AppState>) -> Result<MilestoneStatu
 #[tauri::command]
 pub fn shutdown_app(app: AppHandle) {
     app.exit(0);
+}
+
+#[tauri::command]
+pub fn start_manual_overlay_drag(app: AppHandle) -> Result<(), String> {
+    manual_overlay_drag(app)
+}
+
+#[tauri::command]
+pub fn set_overlay_window_opacity(app: AppHandle, opacity: f64) -> Result<(), String> {
+    set_overlay_opacity(app, opacity)
 }
 
 #[tauri::command]
@@ -918,6 +976,56 @@ pub fn create_game_screenshot_capture_request(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<GameScreenshotCaptureRequestRecord, String> {
+    create_game_screenshot_capture(
+        game_id,
+        timestamp_label,
+        app,
+        state,
+        "visible-game-display",
+        "windows-gdi-bitblt-foreground-window",
+        "hide Overlay Forge before capture, then restore it",
+        "captured_windows_gdi",
+        "Captured through Windows GDI BitBlt from the foreground window after hiding Overlay Forge. Alpha was forced to 255 before PNG encoding.",
+        true,
+        capture_foreground_window_to_png,
+    )
+}
+
+#[tauri::command]
+pub fn create_game_chat_screenshot_capture(
+    game_id: i64,
+    timestamp_label: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<GameScreenshotCaptureRequestRecord, String> {
+    create_game_screenshot_capture(
+        game_id,
+        timestamp_label,
+        app,
+        state,
+        "visible-game-display",
+        "windows-gdi-bitblt-foreground-window",
+        "hide Overlay Forge before capture and leave focus with the game",
+        "captured_windows_gdi_chat",
+        "Captured through Windows GDI BitBlt from the foreground window after hiding Overlay Forge. Alpha was forced to 255 before PNG encoding and the screenshot was attached to the current Gaming chat prompt.",
+        false,
+        capture_foreground_window_to_png,
+    )
+}
+
+fn create_game_screenshot_capture(
+    game_id: i64,
+    timestamp_label: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+    capture_scope: &str,
+    method_source: &str,
+    overlay_handling: &str,
+    capture_status: &str,
+    notes: &str,
+    restore_overlay: bool,
+    capture: fn(&std::path::Path) -> Result<(), String>,
+) -> Result<GameScreenshotCaptureRequestRecord, String> {
     let game = state
         .database
         .get_game(game_id)
@@ -943,16 +1051,16 @@ pub fn create_game_screenshot_capture_request(
         "gameId": game.id,
         "gameName": game.name,
         "gameSlug": game.slug,
-        "captureScope": "visible-game-display",
+        "captureScope": capture_scope,
         "includeOverlay": false,
         "targetFilePath": target_file_path_text,
         "method": {
-            "source": "windows-gdi-bitblt-foreground-window",
+            "source": method_source,
             "format": "png",
             "colorSpace": "sRGB",
             "forceAlpha": 255,
             "filenamePattern": "GameName_YYYYMMDD_HHMMSS_unique.png",
-            "overlayHandling": "hide Overlay Forge before capture, then restore it",
+            "overlayHandling": overlay_handling,
             "knownRisk": "GDI capture may still fail or produce black frames for some hardware-accelerated or protected game surfaces."
         }
     });
@@ -966,11 +1074,13 @@ pub fn create_game_screenshot_capture_request(
     }
     thread::sleep(Duration::from_millis(350));
 
-    let capture_result = capture_foreground_window_to_png(&target_file_path);
+    let capture_result = capture(&target_file_path);
 
-    if let Some(window) = window.as_ref() {
-        let _ = window.show();
-        let _ = window.set_focus();
+    if restore_overlay || capture_result.is_err() {
+        if let Some(window) = window.as_ref() {
+            let _ = window.show();
+            let _ = window.set_focus();
+        }
     }
 
     capture_result?;
@@ -983,9 +1093,9 @@ pub fn create_game_screenshot_capture_request(
             &target_file_path_text,
             &request_id,
             &request_file_path_text,
-            "captured_windows_gdi",
+            capture_status,
             &timestamp_label,
-            "Captured through Windows GDI BitBlt from the foreground window after hiding Overlay Forge. Alpha was forced to 255 before PNG encoding.",
+            notes,
         )
         .map_err(|error| error.to_string())
 }
@@ -1296,6 +1406,83 @@ fn validate_youtube_video_id(value: &str) -> Result<String, String> {
     }
 
     Ok(video_id.to_string())
+}
+
+#[cfg(target_os = "windows")]
+fn manual_overlay_drag(app: AppHandle) -> Result<(), String> {
+    use std::mem;
+    use windows_sys::Win32::Foundation::POINT;
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
+    use windows_sys::Win32::UI::WindowsAndMessaging::GetCursorPos;
+
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "Overlay window was not found.".to_string())?;
+    let start_window_position = window.outer_position().map_err(|error| error.to_string())?;
+    let start_cursor = unsafe {
+        let mut point: POINT = mem::zeroed();
+        if GetCursorPos(&mut point) == 0 {
+            return Err("Could not read the mouse position.".to_string());
+        }
+        point
+    };
+
+    loop {
+        let left_button_down =
+            unsafe { (GetAsyncKeyState(VK_LBUTTON as i32) & 0x8000u16 as i16) != 0 };
+        if !left_button_down {
+            break;
+        }
+
+        let cursor = unsafe {
+            let mut point: POINT = mem::zeroed();
+            if GetCursorPos(&mut point) == 0 {
+                break;
+            }
+            point
+        };
+        let next_x = start_window_position.x + (cursor.x - start_cursor.x);
+        let next_y = start_window_position.y + (cursor.y - start_cursor.y);
+        let _ = window.set_position(PhysicalPosition::new(next_x, next_y));
+        thread::sleep(Duration::from_millis(8));
+    }
+
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn manual_overlay_drag(_app: AppHandle) -> Result<(), String> {
+    Err("Manual no-snap overlay drag is only available on Windows.".to_string())
+}
+
+#[cfg(target_os = "windows")]
+fn set_overlay_opacity(app: AppHandle, opacity: f64) -> Result<(), String> {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        GetWindowLongPtrW, SetLayeredWindowAttributes, SetWindowLongPtrW, GWL_EXSTYLE,
+        LWA_ALPHA, WS_EX_LAYERED,
+    };
+
+    let window = app
+        .get_webview_window("main")
+        .ok_or_else(|| "Overlay window was not found.".to_string())?;
+    let hwnd = window.hwnd().map_err(|error| error.to_string())?.0
+        as windows_sys::Win32::Foundation::HWND;
+    let alpha = (opacity.clamp(0.2, 1.0) * 255.0).round() as u8;
+
+    unsafe {
+        let style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED as isize);
+        if SetLayeredWindowAttributes(hwnd, 0, alpha, LWA_ALPHA) == 0 {
+            return Err("Could not set overlay window opacity.".to_string());
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn set_overlay_opacity(_app: AppHandle, _opacity: f64) -> Result<(), String> {
+    Ok(())
 }
 
 fn open_external_url(url: &str) -> Result<(), String> {

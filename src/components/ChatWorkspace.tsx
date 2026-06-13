@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
-import { startOverlayDrag, startOverlayResize } from "../services/windowControls";
+import { startOverlayDrag } from "../services/windowControls";
 
 export type ChatConversation = {
   id: number;
@@ -28,12 +28,14 @@ type ChatWorkspaceProps<TConversation extends ChatConversation, TMessage extends
   emptyConversationLabel: string;
   inputPlaceholder: string;
   contextSlot?: ReactNode;
+  promptContextSummary?: string;
   chatOverlayMode?: boolean;
   emptyMainSlot?: ReactNode;
   hideSidebarWhenSelected?: boolean;
   showFocusedToolbar?: boolean;
   onEnterChatOverlayMode?: () => void;
   onExitChatOverlayMode?: () => void;
+  onCaptureScreenshot?: () => void;
   onCreateConversation: () => void;
   onDeleteConversation: (conversation: TConversation) => void;
   onDraftChange: (value: string) => void;
@@ -54,12 +56,14 @@ export function ChatWorkspace<TConversation extends ChatConversation, TMessage e
   emptyConversationLabel,
   inputPlaceholder,
   contextSlot,
+  promptContextSummary,
   chatOverlayMode = false,
   emptyMainSlot,
   hideSidebarWhenSelected = false,
   showFocusedToolbar = true,
   onEnterChatOverlayMode,
   onExitChatOverlayMode,
+  onCaptureScreenshot,
   onCreateConversation,
   onDeleteConversation,
   onDraftChange,
@@ -93,7 +97,7 @@ export function ChatWorkspace<TConversation extends ChatConversation, TMessage e
       event.shiftKey ||
       !selectedConversation ||
       isSending ||
-      !draft.trimEnd().endsWith("\\")
+      !draft.endsWith("  ")
     ) {
       return;
     }
@@ -165,43 +169,47 @@ export function ChatWorkspace<TConversation extends ChatConversation, TMessage e
       )}
 
       {showSideActions && (
-        <div className="chat-overlay-controls" aria-label="Chat controls">
+        <div
+          className="chat-overlay-controls"
+          aria-label="Chat controls"
+          onMouseDown={(event) => {
+            if (chatOverlayMode && event.button === 0 && event.target === event.currentTarget) {
+              event.preventDefault();
+              void startOverlayDrag();
+            }
+          }}
+        >
           {chatOverlayMode ? (
-            <>
+            <div className="chat-overlay-exit-slot">
               <button
                 aria-label="Exit chat overlay mode"
                 className="chat-overlay-control"
-                onClick={onExitChatOverlayMode}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onExitChatOverlayMode?.();
+                }}
+                onMouseDown={(event) => event.stopPropagation()}
                 title="Exit"
                 type="button"
               >
                 x
               </button>
-              <button
-                aria-label="Move chat overlay"
-                className="chat-overlay-control"
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                  void startOverlayDrag();
-                }}
-                title="Move"
-                type="button"
-              >
-                +
-              </button>
-              <button
-                aria-label="Resize chat overlay"
-                className="chat-overlay-control"
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                  void startOverlayResize("SouthEast");
-                }}
-                title="Resize"
-                type="button"
-              >
-                /
-              </button>
-            </>
+              {onCaptureScreenshot && (
+                <button
+                  aria-label="Capture screenshot for current chat prompt"
+                  className="chat-overlay-control"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onCaptureScreenshot();
+                  }}
+                  onMouseDown={(event) => event.stopPropagation()}
+                  title="Capture screenshot"
+                  type="button"
+                >
+                  Cap
+                </button>
+              )}
+            </div>
           ) : (
             <button
               aria-label="Enter chat overlay mode"
@@ -261,6 +269,10 @@ export function ChatWorkspace<TConversation extends ChatConversation, TMessage e
                 ))
               )}
             </div>
+
+            {chatOverlayMode && promptContextSummary && (
+              <div className="chat-overlay-context-summary">{promptContextSummary}</div>
+            )}
 
             <form className="chat-input-row">
               <textarea

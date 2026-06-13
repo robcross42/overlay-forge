@@ -1,3 +1,5 @@
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useEffect, useMemo, useState } from "react";
 import { ComponentHost } from "../components/ComponentHost";
 import { WindowResizeHandles, WindowTitlebar } from "../components/WindowControls";
@@ -17,7 +19,12 @@ import { deletePlanningConversation, listPlanningConversations } from "../servic
 import type { PlanningConversation } from "../services/planningChat";
 import { deleteProject, listProjects } from "../services/projects";
 import type { Project } from "../services/projects";
-import { setOverlayMinimumSize } from "../services/windowControls";
+import {
+  hideOverlayWindow,
+  setOverlayMinimumSize,
+  setOverlayWindowOpacity,
+  showOverlayWindow
+} from "../services/windowControls";
 
 type ComponentId =
   | "scratchpad"
@@ -69,6 +76,8 @@ export default function App() {
   const [projectNavAction, setProjectNavAction] = useState<ProjectNavAction | null>(null);
   const [gameNavAction, setGameNavAction] = useState<GameNavAction | null>(null);
   const [isChatOverlayMode, setIsChatOverlayMode] = useState(false);
+  const [gameChatOverlayRequestNonce, setGameChatOverlayRequestNonce] = useState(0);
+  const [gameChatScreenshotCaptureRequestNonce, setGameChatScreenshotCaptureRequestNonce] = useState(0);
   const [conversationsByProject, setConversationsByProject] = useState<
     Record<number, PlanningConversation[]>
   >({});
@@ -126,7 +135,105 @@ export default function App() {
       isChatOverlayMode ? 320 : 760,
       isChatOverlayMode ? 210 : 480
     );
+    void setOverlayWindowOpacity(isChatOverlayMode ? 0.78 : 1);
   }, [isChatOverlayMode]);
+
+  useEffect(() => {
+    let isMounted = true;
+    let unlisten: (() => void) | null = null;
+    let unlistenOverlayToggle: (() => void) | null = null;
+    let unlistenScreenshotCapture: (() => void) | null = null;
+    let pollId: number | null = null;
+
+    function consumePendingShortcut() {
+      invoke<string | null>("consume_pending_shortcut_action")
+        .then((action) => {
+          if (!isMounted || !action) {
+            return;
+          }
+
+          if (action === "toggle_overlay") {
+            void handleMainOverlayShortcut();
+          } else if (action === "toggle_overlay_was_visible") {
+            void handleMainOverlayShortcut(true);
+          } else if (action === "toggle_overlay_was_hidden") {
+            void handleMainOverlayShortcut(false);
+          } else if (action === "game_chat_overlay") {
+            void handleGameChatOverlayShortcut();
+          } else if (action === "game_chat_overlay_was_visible") {
+            void handleGameChatOverlayShortcut(true);
+          } else if (action === "game_chat_overlay_was_hidden") {
+            void handleGameChatOverlayShortcut(false);
+          } else if (action === "game_chat_region_capture") {
+            setGameChatScreenshotCaptureRequestNonce(Date.now());
+          }
+        })
+        .catch(() => {});
+    }
+
+    listen("game-chat-overlay-requested", () => {
+      if (!isMounted) {
+        return;
+      }
+
+      consumePendingShortcut();
+    })
+      .then((cleanup) => {
+        if (isMounted) {
+          unlisten = cleanup;
+        } else {
+          cleanup();
+        }
+      })
+      .catch(() => {});
+
+    listen("overlay-toggle-requested", () => {
+      if (!isMounted) {
+        return;
+      }
+
+      consumePendingShortcut();
+    })
+      .then((cleanup) => {
+        if (isMounted) {
+          unlistenOverlayToggle = cleanup;
+        } else {
+          cleanup();
+        }
+      })
+      .catch(() => {});
+
+    listen("game-chat-screenshot-capture-requested", () => {
+      if (!isMounted) {
+        return;
+      }
+
+      consumePendingShortcut();
+    })
+      .then((cleanup) => {
+        if (isMounted) {
+          unlistenScreenshotCapture = cleanup;
+        } else {
+          cleanup();
+        }
+      })
+      .catch(() => {});
+
+    window.addEventListener("focus", consumePendingShortcut);
+    pollId = window.setInterval(consumePendingShortcut, 500);
+    consumePendingShortcut();
+
+    return () => {
+      isMounted = false;
+      unlisten?.();
+      unlistenOverlayToggle?.();
+      unlistenScreenshotCapture?.();
+      window.removeEventListener("focus", consumePendingShortcut);
+      if (pollId !== null) {
+        window.clearInterval(pollId);
+      }
+    };
+  }, [activeComponent, gameNavAction, gameSections, isChatOverlayMode, selectedGameId]);
 
   const activeMeta = useMemo(
     () => ({
@@ -173,6 +280,30 @@ export default function App() {
   function openGaming() {
     setIsChatOverlayMode(false);
     setActiveComponent("gaming");
+  }
+
+  async function hideChatOverlayWindow() {
+    await hideOverlayWindow();
+  }
+
+  async function closeChatOverlayWindow() {
+    try {
+      await hideOverlayWindow();
+    } finally {
+      setIsChatOverlayMode(false);
+    }
+  }
+
+  async function handleMainOverlayShortcut(preShortcutWasVisible?: boolean) {
+    if (preShortcutWasVisible === true && !isChatOverlayMode) {
+      await hideOverlayWindow().catch(() => {});
+      return;
+    }
+
+    setIsChatOverlayMode(false);
+    if (preShortcutWasVisible === false) {
+      await showOverlayWindow().catch(() => {});
+    }
   }
 
   function selectGameSection(game: Game) {
@@ -222,6 +353,52 @@ export default function App() {
     setGameMenuId(null);
     setSelectedGameId(game.id);
     setGameNavAction({ type, gameId: game.id, nonce: Date.now() });
+  }
+
+  async function handleGameChatOverlayShortcut(preShortcutWasVisible?: boolean) {
+    if (isChatOverlayMode) {
+      if (preShortcutWasVisible === true) {
+        await hideChatOverlayWindow().catch(() => {});
+      } else {
+        await setOverlayWindowOpacity(0.78).catch(() => {});
+        await showOverlayWindow().catch(() => {});
+      }
+      return;
+    }
+
+    const selectedGame =
+      gameSections.find((game) => game.id === selectedGameId) ?? gameSections[0] ?? null;
+    if (!selectedGame) {
+      openGaming();
+      await showOverlayWindow().catch(() => {});
+      return;
+    }
+
+    const selectedConversationId =
+      activeComponent === "gaming" &&
+      gameNavAction?.type === "chat" &&
+      gameNavAction.gameId === selectedGame.id
+        ? gameNavAction.conversationId
+        : null;
+
+    openGaming();
+    setGamingExpanded(true);
+    setGameMenuId(null);
+    setSelectedGameId(selectedGame.id);
+
+    if (selectedConversationId) {
+      await setOverlayWindowOpacity(0.78).catch(() => {});
+      await showOverlayWindow().catch(() => {});
+      setGameChatOverlayRequestNonce(Date.now());
+      return;
+    }
+
+    await showOverlayWindow().catch(() => {});
+    setGameNavAction({
+      type: "newChat",
+      gameId: selectedGame.id,
+      nonce: Date.now()
+    });
   }
 
   function selectGameConversation(game: Game, conversation: GameChatConversation) {
@@ -685,13 +862,18 @@ export default function App() {
             {activeComponent === "gaming" && (
               <Gaming
                 chatOverlayMode={isChatOverlayMode}
+                chatOverlayRequestNonce={gameChatOverlayRequestNonce}
+                chatScreenshotCaptureRequestNonce={gameChatScreenshotCaptureRequestNonce}
                 gameSections={gameSections}
                 navAction={gameNavAction}
-                onEnterChatOverlayMode={() => setIsChatOverlayMode(true)}
+                onEnterChatOverlayMode={() => {
+                  void setOverlayWindowOpacity(0.78);
+                  setIsChatOverlayMode(true);
+                }}
                 onGameCreated={onGameCreated}
                 onGameChatConversationsChanged={onGameChatConversationsChanged}
                 onGameDeleted={onGameDeleted}
-                onExitChatOverlayMode={() => setIsChatOverlayMode(false)}
+                onExitChatOverlayMode={() => void closeChatOverlayWindow()}
                 onSelectGame={setSelectedGameId}
                 selectedGameId={selectedGameId}
               />
@@ -700,8 +882,11 @@ export default function App() {
               <Projects
                 chatOverlayMode={isChatOverlayMode}
                 navAction={projectNavAction}
-                onEnterChatOverlayMode={() => setIsChatOverlayMode(true)}
-                onExitChatOverlayMode={() => setIsChatOverlayMode(false)}
+                onEnterChatOverlayMode={() => {
+                  void setOverlayWindowOpacity(0.78);
+                  setIsChatOverlayMode(true);
+                }}
+                onExitChatOverlayMode={() => void closeChatOverlayWindow()}
                 onProjectCreated={(project) => {
                   setProjects((current) => [project, ...current]);
                   setSelectedProjectId(project.id);

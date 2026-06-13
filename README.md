@@ -74,6 +74,8 @@ Status: **Complete / Passed / Successful**
 
 The Gaming screenshot feature is validated for the current GearBlocks workflow. Overlay Forge can capture the visible foreground game display while hiding the overlay, save unique PNG files and capture manifests under gitignored `game-screenshots/`, persist screenshot metadata in SQLite, render in-app thumbnails, and delete screenshots with their capture metadata from the right-click screenshot menu. See `docs/GAMING_SCREENSHOT_VALIDATION.md`.
 
+The simple Gaming chat overlay also includes a capture button for quick full game screenshots. Chat captures reuse the regular screenshot capture flow, save as normal game screenshots, and automatically attach to the current chat prompt.
+
 Completed Milestone 0 capabilities:
 
 - Tauri v2 desktop shell
@@ -173,13 +175,23 @@ Build the frontend:
 npm run build
 ```
 
-## Hotkey
+## Hotkeys
 
 The Milestone 0 overlay toggle is registered in Rust as:
 
 ```text
 Ctrl+Shift+Space
 ```
+
+The Gaming chat overlay focus shortcut is registered in Rust as:
+
+```text
+Ctrl+Shift+C
+```
+
+It opens or refocuses the simplified Gaming chat overlay for the currently selected existing game chat.
+
+Global shortcuts can be configured from Settings -> Keybinds. Each function uses `key1`, `key2`, and `key3` as the ordered parts of one shortcut, such as `Ctrl`, `Shift`, `Space`. Mouse buttons are supported for shortcut parts, including `Mouse4`, `Mouse5`, and modifier combinations such as `Ctrl+Mouse4`.
 
 ## Local Data
 

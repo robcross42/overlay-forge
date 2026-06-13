@@ -108,6 +108,13 @@ export function createGameScreenshotCaptureRequest(gameId: number, timestampLabe
   });
 }
 
+export function createGameChatScreenshotCapture(gameId: number, timestampLabel: string) {
+  return invoke<GameScreenshotCaptureRequest>("create_game_chat_screenshot_capture", {
+    gameId,
+    timestampLabel
+  });
+}
+
 export function listGameChatConversations(gameId: number) {
   return invoke<GameChatConversation[]>("list_game_chat_conversations", { gameId });
 }

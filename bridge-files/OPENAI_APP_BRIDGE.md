@@ -79,13 +79,17 @@ Milestone numbering note: Milestone 2 is the Local Projects component. Milestone
 - Implemented Project Workspace UI Consolidation for focused chat layout
 - Gaming workspace with GearBlocks as the initial game section
 - Validated Gaming screenshot capture, thumbnail preview, context menu, and delete cleanup
+- Simple Gaming chat overlay screenshot capture that reuses the regular game screenshot flow and attaches the screenshot to the current prompt
 - Centralized Project deferred items in `docs/PROJECT_DEFERRED_ITEMS.md`
 
-## Hotkey
+## Hotkeys
 
 ```text
-Ctrl+Shift+Space
+Ctrl+Shift+Space - toggle Overlay Forge visibility
+Ctrl+Shift+C - open or refocus the selected Gaming chat overlay
 ```
+
+These shortcuts are configurable in Settings -> Keybinds. Each function uses `key1`, `key2`, and `key3` as the ordered parts of one shortcut. Mouse buttons can be used as shortcut parts, including `Mouse4`, `Mouse5`, and modifier combinations such as `Ctrl+Mouse4`.
 
 ## Deferred
 
