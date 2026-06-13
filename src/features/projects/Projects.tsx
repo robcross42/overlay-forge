@@ -38,9 +38,12 @@ type ProjectNavAction = {
 };
 
 type ProjectsProps = {
+  chatOverlayMode?: boolean;
   projects: Project[];
   selectedProjectId: number | null;
   navAction: ProjectNavAction | null;
+  onEnterChatOverlayMode?: () => void;
+  onExitChatOverlayMode?: () => void;
   onSelectProject: (projectId: number | null) => void;
   onProjectCreated: (project: Project) => void;
   onProjectUpdated: (project: Project) => void;
@@ -52,9 +55,12 @@ type ProjectsProps = {
 };
 
 export function Projects({
+  chatOverlayMode = false,
   projects,
   selectedProjectId,
   navAction,
+  onEnterChatOverlayMode,
+  onExitChatOverlayMode,
   onSelectProject,
   onProjectCreated,
   onProjectUpdated,
@@ -683,8 +689,11 @@ export function Projects({
 
           {selectedProject && workspaceSection === "chat" && (
             <PlanningChat
+              chatOverlayMode={chatOverlayMode}
               focused
               initialConversationId={navAction?.conversationId}
+              onEnterChatOverlayMode={onEnterChatOverlayMode}
+              onExitChatOverlayMode={onExitChatOverlayMode}
               onConversationsChanged={(conversations) =>
                 onProjectConversationsChanged(selectedProject.id, conversations)
               }

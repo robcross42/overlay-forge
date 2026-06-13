@@ -68,6 +68,12 @@ Status: **Complete / Passed / Successful**
 
 Milestone 13 consolidates the Projects workspace UI so project/conversation selection lives in the left navigation hierarchy and the main panel gives most of its space to the selected chat conversation. The project row menu uses `New Chat` for new conversations, while existing conversations are opened from their left-nav child rows. Project Edit is now the home for project details, GitHub integration, local Markdown context configuration, and local repo/context settings. Conversation attached context and local Markdown bridge drafts live in a collapsible right-hand pane.
 
+**Gaming Screenshot Capture**
+
+Status: **Complete / Passed / Successful**
+
+The Gaming screenshot feature is validated for the current GearBlocks workflow. Overlay Forge can capture the visible foreground game display while hiding the overlay, save unique PNG files and capture manifests under gitignored `game-screenshots/`, persist screenshot metadata in SQLite, render in-app thumbnails, and delete screenshots with their capture metadata from the right-click screenshot menu. See `docs/GAMING_SCREENSHOT_VALIDATION.md`.
+
 Completed Milestone 0 capabilities:
 
 - Tauri v2 desktop shell
@@ -124,6 +130,8 @@ Required Markdown context files:
 - `docs/ARCHITECTURE.md`
 - `docs/BRIDGE_FILES.md`
 - `docs/DATA_MODEL.md`
+- `docs/GAMING_SCREENSHOT_VALIDATION.md`
+- `docs/PROJECT_RULES.md`
 - `docs/MILESTONE_0.md`
 - `docs/MILESTONE_1.md`
 - `docs/MILESTONE_2.md`
@@ -139,6 +147,7 @@ Required Markdown context files:
 - `docs/MILESTONE_12.md`
 - `docs/MILESTONE_13.md`
 - `docs/PROJECT_PLAN.md`
+- `docs/PROJECT_DEFERRED_ITEMS.md`
 
 For future bridge prompts, instruct ChatGPT/Codex to read all `*.md` files in the project repo structure before making planning or implementation decisions.
 

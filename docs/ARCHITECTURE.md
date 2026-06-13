@@ -46,6 +46,8 @@ Milestone 12 - Project Markdown Context is complete, passed, and successful. It 
 
 Milestone 13 - Project Workspace UI Consolidation is complete, passed, and successful. It removes redundant project workspace framing, moves project configuration into a clean Project Edit surface, shows conversations in the left navigation hierarchy, keeps the primary chat surface focused, and moves conversation attached context plus local Markdown bridge drafts into a collapsible right-hand chat pane.
 
+Gaming Screenshot Capture is complete, passed, and successful. It adds a Gaming feature surface with a GearBlocks workspace, selected-game screenshot capture controls, thumbnail previews, and screenshot context-menu cleanup while preserving the shell-owned component host.
+
 ## UI Consistency
 
 Organizer components should follow the same interaction pattern unless a milestone explicitly documents a reason to diverge:
@@ -88,6 +90,7 @@ The Tauri backend owns:
 - Planning prompt preview command
 - Bridge file draft commands
 - Project Markdown context configuration and loading commands
+- Gaming and screenshot capture commands
 - Global hotkey registration
 - Window show/hide behavior
 
@@ -118,6 +121,8 @@ Milestone 10 adds no new tables. Prompt Preview uses existing project, planning 
 Milestone 11 adds idempotent table initialization for `bridge_file_drafts`. Drafts are project-scoped, may link to a source planning conversation, and store generated Markdown content locally. Migrations are non-destructive and must not remove existing user data.
 
 Milestone 12 adds idempotent table initialization for `project_markdown_context`. Each row stores one configured local Markdown root per project. Markdown file content is read freshly from disk for chat load, Prompt Preview, project chat sends, and bridge draft generation; file snapshots are not cached in SQLite.
+
+Gaming adds idempotent table initialization for `games`, `game_catalog_objects`, `game_catalog_references`, and `game_catalog_screenshots`. Screenshot image bytes are stored as PNG files under `game-screenshots/`, while SQLite stores metadata and local paths only. The screenshot preview path uses Tauri asset loading scoped to `game-screenshots/`.
 
 ## OpenAI Boundary
 
@@ -202,6 +207,16 @@ Milestone 5 YouTube references are local-first and user-curated. React invokes l
 No YouTube API key is required. No YouTube account login, OAuth flow, watch history, subscription import, playlist sync, comment sync, transcript extraction, recommendations, downloads, scraping, background metadata crawler, or account sync is used.
 
 Saved YouTube URLs open externally in the system browser. This is preferred over an unrestricted embedded browser so the overlay workflow remains controlled.
+
+## Gaming Screenshot Boundary
+
+Gaming Screenshot Capture is local-first and user-initiated. React invokes local Tauri commands to list games, create/delete game sections, capture screenshots, list screenshot metadata, and delete screenshot records/files.
+
+The validated capture path hides Overlay Forge before capture, captures the visible foreground game display through Windows GDI for the current implementation, forces PNG alpha values to 255, saves unique PNG files under `game-screenshots/<game-slug>/`, writes capture manifests under `game-screenshots/capture-requests/`, and then restores the overlay.
+
+The webview may render screenshot thumbnails only through the Tauri asset protocol scoped to `game-screenshots/`. Deletion is constrained to that folder and removes the PNG, capture manifest, screenshot metadata row, and local-path reference rows that point at either deleted file.
+
+The preferred future GearBlocks path remains game-internal rendered-frame export from the game engine. Clipboard capture, `Win+Shift+S`, Snipping Tool dependency, HDR output, wide-gamut output, and alpha-dependent image files remain avoided for the long-term capture target.
 
 ## References Boundary
 

@@ -2,7 +2,7 @@
 
 Bridge files are markdown handoff documents that describe project state, constraints, and implementation requests for Codex.
 
-Milestone 3 introduces an OpenAI Planning Chat foundation, Milestone 4 introduces a GitHub repository-link foundation, Milestone 5 introduces a controlled local YouTube reference foundation, Milestone 6 moves project-scoped chat into the selected Projects workspace, Milestone 7 refines the selected-project workspace layout, Milestone 8 completes Projects navigation tree actions, Milestone 9 completes manual context attachments, Milestone 10 completes Prompt Preview, Milestone 11 completes local Bridge File Drafting, Milestone 12 completes project-level local Markdown context, and Milestone 13 completes Project Workspace UI Consolidation. Export and Codex handoff are still deferred.
+Milestone 3 introduces an OpenAI Planning Chat foundation, Milestone 4 introduces a GitHub repository-link foundation, Milestone 5 introduces a controlled local YouTube reference foundation, Milestone 6 moves project-scoped chat into the selected Projects workspace, Milestone 7 refines the selected-project workspace layout, Milestone 8 completes Projects navigation tree actions, Milestone 9 completes manual context attachments, Milestone 10 completes Prompt Preview, Milestone 11 completes local Bridge File Drafting, Milestone 12 completes project-level local Markdown context, and Milestone 13 completes Project Workspace UI Consolidation. Gaming Screenshot Capture is also complete, passed, and successful as a post-Milestone 13 feature addendum. Export and Codex handoff are still deferred.
 
 ## Current Manual Bridge
 
@@ -40,6 +40,8 @@ Milestone 12 - Project Markdown Context is complete, passed, and successful.
 
 Milestone 13 - Project Workspace UI Consolidation is complete, passed, and successful.
 
+Gaming Screenshot Capture is complete, passed, and successful. It adds a Gaming workspace with GearBlocks, overlay-hidden screenshot capture, unique PNG and capture manifest output under `game-screenshots/`, SQLite screenshot metadata, Tauri asset-backed thumbnail previews, and right-click screenshot deletion cleanup.
+
 Milestone 3 is complete, passed, and successful. It adds local planning conversations/messages and backend OpenAI Responses API calls, but it does not generate bridge files yet.
 
 Milestone 4 is complete, passed, and successful. It adds local project GitHub repository linkage and backend GitHub metadata fetches through `GITHUB_TOKEN`, but it does not perform Codex handoff or GitHub write operations.
@@ -61,6 +63,8 @@ Milestone 11 is complete, passed, and successful. It adds local SQLite bridge dr
 Milestone 12 is complete, passed, and successful for context ingestion. It adds project-level local Markdown context by loading a fresh `README.md` from a configured project root whenever project chat starts or loads, then resolving referenced Markdown files inside that project root for chat and bridge drafts.
 
 Milestone 13 is complete, passed, and successful. It consolidates the Projects workspace UI so project and conversation selection live in the left navigation hierarchy, while Project Edit owns project details, GitHub integration, local Markdown context configuration, and local repo/context settings. Conversation attached context and local Markdown bridge drafts now live in a collapsible right-hand chat pane. The project row menu uses `New Chat` for new conversations; existing conversations open from their left-nav child rows.
+
+Gaming Screenshot Capture is complete, passed, and successful. Future work should preserve the validated `game-screenshots/` folder layout, metadata table, Tauri asset preview scope, overlay-hidden capture behavior, and screenshot delete cleanup unless a later game-internal capture milestone explicitly supersedes the Windows GDI implementation.
 
 Milestone numbering note: Milestone 2 is the Local Projects component and is complete, passed, and successful. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Milestone 6 is Project Workspace Chat. Milestone 7 is Project Workspace Layout Refinement. Milestone 8 is Projects Navigation Tree Actions and is complete, passed, and successful. Milestone 9 is Manual Context Attachments and is complete, passed, and successful. Milestone 10 is Prompt Preview and is complete, passed, and successful. Milestone 11 is Bridge File Drafting and is complete, passed, and successful. Milestone 12 is Project Markdown Context and is complete, passed, and successful. Milestone 13 is Project Workspace UI Consolidation and is complete, passed, and successful. Do not infer milestone IDs from numbered-list positions.
 
@@ -85,6 +89,10 @@ When the user reports that a milestone validation is complete, Codex should trea
 5. Push the current branch.
 
 Codex should not commit unrelated user changes. If unrelated changes are present, leave them unstaged or ask for direction if they block the milestone commit.
+
+## Project Deferred Items
+
+See `docs/PROJECT_DEFERRED_ITEMS.md` for the centralized list of deferred items related to Project Chat, Bridge Files, and GitHub integration.
 
 ## Status Values Planned For Later Milestones
 

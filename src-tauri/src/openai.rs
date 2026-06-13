@@ -1,23 +1,41 @@
-use crate::db::{PlanningMessageRecord, ProjectRecord};
+use crate::db::{GameChatMessageRecord, GameRecord, PlanningMessageRecord, ProjectRecord};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 
 const OPENAI_RESPONSES_URL: &str = "https://api.openai.com/v1/responses";
 const DEFAULT_MODEL: &str = "gpt-5";
 pub const PLANNING_SYSTEM_INSTRUCTION: &str = "You are helping plan the selected Overlay Forge local project. Keep responses concise, practical, and implementation-oriented. Prefer Codex-ready structure when the user asks for implementation planning. Do not claim repository access unless repository content was explicitly provided to the model request.";
+pub const GAME_SYSTEM_INSTRUCTION: &str = "You are helping plan, analyze, and document the selected game workspace in Overlay Forge. Keep responses concise, practical, and grounded in the provided game context. When discussing visible parts, builds, screenshots, or physics behavior, distinguish observed facts from assumptions.";
 
 #[derive(Serialize)]
 struct ResponsesRequest {
     model: &'static str,
     instructions: &'static str,
     input: Vec<ResponsesInputMessage>,
+    reasoning: ResponsesReasoning,
+    text: ResponsesText,
     store: bool,
+}
+
+#[derive(Serialize)]
+struct ResponsesReasoning {
+    effort: &'static str,
+}
+
+#[derive(Serialize)]
+struct ResponsesText {
+    verbosity: &'static str,
 }
 
 #[derive(Serialize)]
 struct ResponsesInputMessage {
     role: String,
-    content: String,
+    content: Value,
+}
+
+pub struct GameChatImageInput {
+    pub label: String,
+    pub data_url: String,
 }
 
 #[derive(Deserialize)]
@@ -31,17 +49,14 @@ struct ResponsesError {
 }
 
 pub async fn create_planning_response(
+    api_key: &str,
     project: &ProjectRecord,
     messages: &[PlanningMessageRecord],
     attached_context: &str,
 ) -> Result<String, String> {
-    let api_key = std::env::var("OPENAI_API_KEY")
-        .map(|value| value.trim().to_string())
-        .unwrap_or_default();
-
-    if api_key.is_empty() {
+    if api_key.trim().is_empty() {
         return Err(
-            "OpenAI API key is not configured. Set OPENAI_API_KEY and restart Overlay Forge."
+            "OpenAI API key is not configured. Save one in Settings or set OPENAI_API_KEY."
                 .to_string(),
         );
     }
@@ -50,13 +65,66 @@ pub async fn create_planning_response(
         model: DEFAULT_MODEL,
         instructions: PLANNING_SYSTEM_INSTRUCTION,
         input: build_input(project, messages, attached_context),
+        reasoning: low_latency_reasoning(),
+        text: concise_text(),
         store: false,
     };
 
     let client = reqwest::Client::new();
     let response = client
         .post(OPENAI_RESPONSES_URL)
-        .bearer_auth(api_key)
+        .bearer_auth(api_key.trim())
+        .json(&request)
+        .send()
+        .await
+        .map_err(|error| format!("OpenAI request failed: {error}"))?;
+
+    let status = response.status();
+    let body = response
+        .text()
+        .await
+        .map_err(|error| format!("OpenAI response could not be read: {error}"))?;
+
+    if !status.is_success() {
+        if let Ok(error_body) = serde_json::from_str::<ResponsesErrorBody>(&body) {
+            if let Some(error) = error_body.error {
+                return Err(format!("OpenAI request failed: {}", error.message));
+            }
+        }
+
+        return Err(format!("OpenAI request failed with status {status}"));
+    }
+
+    extract_output_text(&body)
+}
+
+pub async fn create_game_response(
+    api_key: &str,
+    game: &GameRecord,
+    messages: &[GameChatMessageRecord],
+    attached_context: &str,
+    images: &[GameChatImageInput],
+) -> Result<String, String> {
+    if api_key.trim().is_empty() {
+        return Err(
+            "OpenAI API key is not configured. Save one in Settings or set OPENAI_API_KEY."
+                .to_string(),
+        );
+    }
+
+    let request = ResponsesRequest {
+        model: DEFAULT_MODEL,
+        instructions: GAME_SYSTEM_INSTRUCTION,
+        input: build_game_input(game, messages, attached_context, images),
+        reasoning: low_latency_reasoning(),
+        text: concise_text(),
+        store: false,
+    };
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(OPENAI_RESPONSES_URL)
+        .bearer_auth(api_key.trim())
         .json(&request)
         .send()
         .await
@@ -88,25 +156,94 @@ fn build_input(
 ) -> Vec<ResponsesInputMessage> {
     let mut input = vec![ResponsesInputMessage {
         role: "user".to_string(),
-        content: format!(
+        content: text_content(format!(
             "Selected local project context:\nName: {}\nStatus: {}\nDescription: {}",
             project.name, project.status, project.description
-        ),
+        )),
     }];
 
     if !attached_context.trim().is_empty() {
         input.push(ResponsesInputMessage {
             role: "user".to_string(),
-            content: attached_context.to_string(),
+            content: text_content(attached_context.to_string()),
         });
     }
 
     input.extend(messages.iter().map(|message| ResponsesInputMessage {
         role: message.role.clone(),
-        content: message.content.clone(),
+        content: text_content(message.content.clone()),
     }));
 
     input
+}
+
+fn build_game_input(
+    game: &GameRecord,
+    messages: &[GameChatMessageRecord],
+    attached_context: &str,
+    images: &[GameChatImageInput],
+) -> Vec<ResponsesInputMessage> {
+    let mut input = vec![ResponsesInputMessage {
+        role: "user".to_string(),
+        content: text_content(format!(
+            "Selected game workspace context:\nName: {}\nSlug: {}\nSummary: {}",
+            game.name, game.slug, game.summary
+        )),
+    }];
+
+    if !attached_context.trim().is_empty() {
+        input.push(ResponsesInputMessage {
+            role: "user".to_string(),
+            content: text_content(attached_context.to_string()),
+        });
+    }
+
+    for (index, message) in messages.iter().enumerate() {
+        let is_latest_user_message = index + 1 == messages.len() && message.role == "user";
+        input.push(ResponsesInputMessage {
+            role: message.role.clone(),
+            content: if is_latest_user_message && !images.is_empty() {
+                image_prompt_content(&message.content, images)
+            } else {
+                text_content(message.content.clone())
+            },
+        });
+    }
+
+    input
+}
+
+fn text_content(text: String) -> Value {
+    json!(text)
+}
+
+fn low_latency_reasoning() -> ResponsesReasoning {
+    ResponsesReasoning { effort: "low" }
+}
+
+fn concise_text() -> ResponsesText {
+    ResponsesText { verbosity: "low" }
+}
+
+fn image_prompt_content(text: &str, images: &[GameChatImageInput]) -> Value {
+    let mut content = vec![json!({
+        "type": "input_text",
+        "text": text,
+    })];
+
+    for image in images {
+        content.push(json!({
+            "type": "input_text",
+            "text": format!("Attached screenshot: {}", image.label),
+        }));
+        content.push(json!({
+            "type": "input_image",
+            "image_url": image.data_url,
+            "detail": "low",
+        }));
+    }
+
+    json!(content)
 }
 
 fn extract_output_text(body: &str) -> Result<String, String> {

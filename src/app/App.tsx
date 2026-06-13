@@ -2,38 +2,54 @@ import { useEffect, useMemo, useState } from "react";
 import { ComponentHost } from "../components/ComponentHost";
 import { WindowResizeHandles, WindowTitlebar } from "../components/WindowControls";
 import { Calendar } from "../features/calendar/Calendar";
+import { Gaming } from "../features/gaming/Gaming";
 import { Notes } from "../features/notes/Notes";
 import { Projects } from "../features/projects/Projects";
 import { Scratchpad } from "../features/scratchpad/Scratchpad";
+import { Settings } from "../features/settings/Settings";
 import { Tasks } from "../features/tasks/Tasks";
 import { YouTube } from "../features/youtube/YouTube";
 import { getMilestoneStatus } from "../services/appStatus";
 import type { MilestoneStatus } from "../services/appStatus";
+import { deleteGame, listGameChatConversations, listGames } from "../services/gaming";
+import type { Game, GameChatConversation } from "../services/gaming";
 import { deletePlanningConversation, listPlanningConversations } from "../services/planningChat";
 import type { PlanningConversation } from "../services/planningChat";
 import { deleteProject, listProjects } from "../services/projects";
 import type { Project } from "../services/projects";
+import { setOverlayMinimumSize } from "../services/windowControls";
 
 type ComponentId =
   | "scratchpad"
   | "tasks"
   | "notes"
   | "calendar"
+  | "gaming"
   | "projects"
-  | "youtube";
+  | "youtube"
+  | "settings";
 
 const navItems = [
   { id: "scratchpad", label: "Scratchpad" },
   { id: "tasks", label: "Tasks" },
   { id: "notes", label: "Notes" },
   { id: "calendar", label: "Calendar" },
+  { id: "gaming", label: "Gaming" },
   { id: "projects", label: "Projects" },
-  { id: "youtube", label: "YouTube" }
+  { id: "youtube", label: "YouTube" },
+  { id: "settings", label: "Settings" }
 ] satisfies Array<{ id: ComponentId; label: string }>;
 
 type ProjectNavAction = {
   type: "create" | "overview" | "newChat" | "chat" | "references" | "edit";
   projectId?: number;
+  conversationId?: number;
+  nonce: number;
+};
+
+type GameNavAction = {
+  type: "home" | "newChat" | "chat" | "screenshots" | "parts";
+  gameId?: number;
   conversationId?: number;
   nonce: number;
 };
@@ -44,11 +60,20 @@ export default function App() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [projectsExpanded, setProjectsExpanded] = useState(true);
+  const [gamingExpanded, setGamingExpanded] = useState(true);
+  const [gameSections, setGameSections] = useState<Game[]>([]);
+  const [selectedGameId, setSelectedGameId] = useState<number | null>(null);
+  const [gameMenuId, setGameMenuId] = useState<number | null>(null);
   const [projectMenuId, setProjectMenuId] = useState<number | null>(null);
   const [conversationMenuId, setConversationMenuId] = useState<number | null>(null);
   const [projectNavAction, setProjectNavAction] = useState<ProjectNavAction | null>(null);
+  const [gameNavAction, setGameNavAction] = useState<GameNavAction | null>(null);
+  const [isChatOverlayMode, setIsChatOverlayMode] = useState(false);
   const [conversationsByProject, setConversationsByProject] = useState<
     Record<number, PlanningConversation[]>
+  >({});
+  const [conversationsByGame, setConversationsByGame] = useState<
+    Record<number, GameChatConversation[]>
   >({});
 
   useEffect(() => {
@@ -78,6 +103,31 @@ export default function App() {
       });
   }, []);
 
+  useEffect(() => {
+    listGames()
+      .then((nextGames) => {
+        setGameSections(nextGames);
+        setSelectedGameId((current) =>
+          current && nextGames.some((game) => game.id === current)
+            ? current
+            : nextGames[0]?.id ?? null
+        );
+        void refreshGameConversations(nextGames);
+      })
+      .catch(() => {
+        setGameSections([]);
+        setSelectedGameId(null);
+        setConversationsByGame({});
+      });
+  }, []);
+
+  useEffect(() => {
+    void setOverlayMinimumSize(
+      isChatOverlayMode ? 320 : 760,
+      isChatOverlayMode ? 210 : 480
+    );
+  }, [isChatOverlayMode]);
+
   const activeMeta = useMemo(
     () => ({
       title: navItems.find((item) => item.id === activeComponent)?.label ?? "Scratchpad",
@@ -101,8 +151,110 @@ export default function App() {
     setConversationsByProject(Object.fromEntries(entries));
   }
 
+  async function refreshGameConversations(nextGames = gameSections) {
+    const entries = await Promise.all(
+      nextGames.map(async (game) => {
+        try {
+          const conversations = await listGameChatConversations(game.id);
+          return [game.id, conversations] as const;
+        } catch {
+          return [game.id, []] as const;
+        }
+      })
+    );
+    setConversationsByGame(Object.fromEntries(entries));
+  }
+
   function openProjects() {
+    setIsChatOverlayMode(false);
     setActiveComponent("projects");
+  }
+
+  function openGaming() {
+    setIsChatOverlayMode(false);
+    setActiveComponent("gaming");
+  }
+
+  function selectGameSection(game: Game) {
+    openGaming();
+    setGamingExpanded(true);
+    setGameMenuId(null);
+    setSelectedGameId(game.id);
+    setGameNavAction({ type: "home", gameId: game.id, nonce: Date.now() });
+  }
+
+  function openGamingCreate() {
+    openGaming();
+    setGamingExpanded(true);
+    setGameMenuId(null);
+    setSelectedGameId(null);
+    setGameNavAction(null);
+  }
+
+  function onGameCreated(game: Game) {
+    setGameSections((current) => [game, ...current]);
+    setSelectedGameId(game.id);
+    setGamingExpanded(true);
+    setConversationsByGame((current) => ({ ...current, [game.id]: [] }));
+    setGameNavAction({ type: "home", gameId: game.id, nonce: Date.now() });
+  }
+
+  function onGameDeleted(gameId: number) {
+    setGameSections((current) => {
+      const nextGameSections = current.filter((game) => game.id !== gameId);
+      setSelectedGameId((selected) =>
+        selected === gameId ? nextGameSections[0]?.id ?? null : selected
+      );
+      return nextGameSections;
+    });
+    setGameMenuId(null);
+    setConversationsByGame((current) => {
+      const next = { ...current };
+      delete next[gameId];
+      return next;
+    });
+    setGameNavAction((current) => (current?.gameId === gameId ? null : current));
+  }
+
+  function openGameAction(game: Game, type: Exclude<GameNavAction["type"], "chat">) {
+    openGaming();
+    setGamingExpanded(true);
+    setGameMenuId(null);
+    setSelectedGameId(game.id);
+    setGameNavAction({ type, gameId: game.id, nonce: Date.now() });
+  }
+
+  function selectGameConversation(game: Game, conversation: GameChatConversation) {
+    openGaming();
+    setGamingExpanded(true);
+    setGameMenuId(null);
+    setSelectedGameId(game.id);
+    setGameNavAction({
+      type: "chat",
+      gameId: game.id,
+      conversationId: conversation.id,
+      nonce: Date.now()
+    });
+  }
+
+  function onGameChatConversationsChanged(gameId: number, conversations: GameChatConversation[]) {
+    setConversationsByGame((current) => ({ ...current, [gameId]: conversations }));
+  }
+
+  async function removeGame(game: Game) {
+    const confirmed = window.confirm(
+      `Delete "${game.name}"? This removes the local game section and its catalog records.`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteGame(game.id);
+      onGameDeleted(game.id);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : String(error));
+    }
   }
 
   function startProjectCreate() {
@@ -199,11 +351,12 @@ export default function App() {
   }
 
   return (
-    <main className="overlay-frame">
-      <WindowResizeHandles />
-      <WindowTitlebar />
+    <main className={isChatOverlayMode ? "overlay-frame overlay-frame-chat-mode" : "overlay-frame"}>
+      {!isChatOverlayMode && <WindowResizeHandles />}
+      {!isChatOverlayMode && <WindowTitlebar />}
 
       <div className="overlay-shell">
+        {!isChatOverlayMode && (
         <aside className="sidebar">
           <div className="brand-block">
             <span className="brand-mark">OF</span>
@@ -215,7 +368,12 @@ export default function App() {
 
           <nav className="component-nav" aria-label="Components">
             {navItems.map((item) => (
-              <div className={item.id === "projects" ? "nav-tree-group" : undefined} key={item.id}>
+              <div
+                className={
+                  item.id === "projects" || item.id === "gaming" ? "nav-tree-group" : undefined
+                }
+                key={item.id}
+              >
                 {item.id === "projects" ? (
                   <>
                     <div
@@ -355,10 +513,132 @@ export default function App() {
                       </div>
                     )}
                   </>
+                ) : item.id === "gaming" ? (
+                  <>
+                    <div
+                      className={
+                        item.id === activeComponent
+                          ? "nav-item nav-item-active nav-tree-parent"
+                          : "nav-item nav-tree-parent"
+                      }
+                    >
+                      <button
+                        aria-label={gamingExpanded ? "Collapse Gaming" : "Expand Gaming"}
+                        className="nav-icon-button"
+                        onClick={() => setGamingExpanded((current) => !current)}
+                        type="button"
+                      >
+                        {gamingExpanded ? "v" : ">"}
+                      </button>
+                      <button className="nav-label-button" onClick={openGaming} type="button">
+                        {item.label}
+                      </button>
+                      <button
+                        aria-label="Open game section creator"
+                        className="nav-icon-button"
+                        onClick={openGamingCreate}
+                        type="button"
+                      >
+                        +
+                      </button>
+                    </div>
+
+                    {gamingExpanded && (
+                      <div className="nav-tree-children" aria-label="Game sections">
+                        {gameSections.map((game) => (
+                          <div className="nav-project-branch" key={game.id}>
+                            <div
+                              className={
+                                game.id === selectedGameId && activeComponent === "gaming"
+                                  ? "nav-child-row nav-child-row-active"
+                                  : "nav-child-row"
+                              }
+                            >
+                              <button
+                                className="nav-child-label"
+                                onClick={() => selectGameSection(game)}
+                                title={game.name}
+                                type="button"
+                              >
+                                {game.name}
+                              </button>
+                              <button
+                                aria-label={`Game actions for ${game.name}`}
+                                className="nav-icon-button"
+                                onClick={() =>
+                                  setGameMenuId((current) => (current === game.id ? null : game.id))
+                                }
+                                type="button"
+                              >
+                                ...
+                              </button>
+                              {gameMenuId === game.id && (
+                                <div className="nav-project-menu">
+                                  <button
+                                    onClick={() => openGameAction(game, "home")}
+                                    type="button"
+                                  >
+                                    Home
+                                  </button>
+                                  <button
+                                    onClick={() => openGameAction(game, "newChat")}
+                                    type="button"
+                                  >
+                                    New Chat
+                                  </button>
+                                  <button
+                                    onClick={() => openGameAction(game, "screenshots")}
+                                    type="button"
+                                  >
+                                    Screenshots
+                                  </button>
+                                  <button
+                                    onClick={() => openGameAction(game, "parts")}
+                                    type="button"
+                                  >
+                                    Parts
+                                  </button>
+                                  <button onClick={() => void removeGame(game)} type="button">
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+
+                            {(conversationsByGame[game.id] ?? []).map((conversation) => (
+                              <div
+                                className={
+                                  game.id === selectedGameId &&
+                                  gameNavAction?.type === "chat" &&
+                                  gameNavAction.conversationId === conversation.id
+                                    ? "nav-conversation-row nav-conversation-row-active"
+                                    : "nav-conversation-row"
+                                }
+                                key={conversation.id}
+                                title={conversation.title}
+                              >
+                                <button
+                                  className="nav-conversation-label"
+                                  onClick={() => selectGameConversation(game, conversation)}
+                                  type="button"
+                                >
+                                  <span className="nav-chat-icon">chat</span>
+                                  <span>{conversation.title}</span>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 ) : (
-                  <button
-                    className={item.id === activeComponent ? "nav-item nav-item-active" : "nav-item"}
-                    onClick={() => setActiveComponent(item.id)}
+            <button
+              className={item.id === activeComponent ? "nav-item nav-item-active" : "nav-item"}
+                    onClick={() => {
+                      setIsChatOverlayMode(false);
+                      setActiveComponent(item.id);
+                    }}
                     type="button"
                   >
                     {item.label}
@@ -373,12 +653,21 @@ export default function App() {
             <span>{status?.databaseReady ? "SQLite ready" : "SQLite pending"}</span>
           </div>
         </aside>
+        )}
 
         <section
-          className={activeComponent === "projects" ? "workspace workspace-projects" : "workspace"}
+          className={
+            activeComponent === "projects"
+              ? isChatOverlayMode
+                ? "workspace workspace-projects workspace-chat-overlay-mode"
+                : "workspace workspace-projects"
+              : activeComponent === "gaming" && isChatOverlayMode
+                ? "workspace workspace-chat-overlay-mode"
+              : "workspace"
+          }
           aria-label="Active component"
         >
-          {activeComponent !== "projects" && (
+          {activeComponent !== "projects" && activeComponent !== "gaming" && (
             <header className="workspace-header">
               <div>
                 <p>{activeMeta.eyebrow}</p>
@@ -393,9 +682,26 @@ export default function App() {
             {activeComponent === "tasks" && <Tasks />}
             {activeComponent === "notes" && <Notes />}
             {activeComponent === "calendar" && <Calendar />}
+            {activeComponent === "gaming" && (
+              <Gaming
+                chatOverlayMode={isChatOverlayMode}
+                gameSections={gameSections}
+                navAction={gameNavAction}
+                onEnterChatOverlayMode={() => setIsChatOverlayMode(true)}
+                onGameCreated={onGameCreated}
+                onGameChatConversationsChanged={onGameChatConversationsChanged}
+                onGameDeleted={onGameDeleted}
+                onExitChatOverlayMode={() => setIsChatOverlayMode(false)}
+                onSelectGame={setSelectedGameId}
+                selectedGameId={selectedGameId}
+              />
+            )}
             {activeComponent === "projects" && (
               <Projects
+                chatOverlayMode={isChatOverlayMode}
                 navAction={projectNavAction}
+                onEnterChatOverlayMode={() => setIsChatOverlayMode(true)}
+                onExitChatOverlayMode={() => setIsChatOverlayMode(false)}
                 onProjectCreated={(project) => {
                   setProjects((current) => [project, ...current]);
                   setSelectedProjectId(project.id);
@@ -423,8 +729,9 @@ export default function App() {
                 selectedProjectId={selectedProjectId}
               />
             )}
-            {activeComponent === "youtube" && <YouTube />}
-          </ComponentHost>
+          {activeComponent === "youtube" && <YouTube />}
+          {activeComponent === "settings" && <Settings />}
+        </ComponentHost>
         </section>
       </div>
     </main>

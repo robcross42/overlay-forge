@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { LogicalSize } from "@tauri-apps/api/dpi";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
 type ResizeDirection =
@@ -19,6 +20,14 @@ export function startOverlayDrag() {
 
 export function startOverlayResize(direction: ResizeDirection) {
   return overlayWindow.startResizeDragging(direction);
+}
+
+export function setOverlayMinimumSize(width: number, height: number) {
+  return overlayWindow.setMinSize(new LogicalSize(width, height));
+}
+
+export function clearOverlayMinimumSize() {
+  return overlayWindow.setMinSize(null);
 }
 
 export function minimizeOverlayWindow() {

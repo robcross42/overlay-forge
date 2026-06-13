@@ -82,6 +82,12 @@ Status: **Complete / Passed / Successful**
 
 Milestone 13 consolidates the Projects workspace UI around the left navigation hierarchy, a focused main chat surface, and a collapsible right-hand chat pane. Project conversations appear as child rows under projects, `New Chat` opens an empty new-conversation area from the project row menu, and project editing contains project details, GitHub integration, local Markdown context configuration, and local repo/context settings.
 
+**Gaming Screenshot Capture**
+
+Status: **Complete / Passed / Successful**
+
+The Gaming screenshot feature is validated as a post-Milestone 13 feature addendum. GearBlocks is the initial game workspace, and the selected-game pane can capture the visible foreground game display while hiding Overlay Forge, save unique PNGs and capture manifests under `game-screenshots/`, persist screenshot metadata in SQLite, render thumbnail previews, and delete screenshots with related local capture metadata from the right-click screenshot menu.
+
 ## Product Direction
 
 Overlay Forge is a personal desktop command hub that floats above the user's workflow and eventually helps turn ideas, notes, tasks, and project plans into Codex-ready markdown bridge files.
@@ -105,9 +111,17 @@ Use explicit milestone IDs. Do not infer milestone numbers from this list's item
 - Milestone 12 - Project markdown context - complete, passed, successful
 - Milestone 13 - Project workspace UI consolidation - complete, passed, successful
 
+## Project (Chat/Bridge/GitHub) Deferred Items
+
+Deferred items for the Project workspace (Planning Chat, Bridge Files, GitHub) are centralized here:
+
+- `docs/PROJECT_DEFERRED_ITEMS.md`
+
 ## Scope Guard
 
 Milestone 13 is the current passed stable baseline for later work. Do not implement later milestone features by reverting to an earlier code path; future work should begin from the completed overlay shell, hotkey behavior, always-on-top behavior, component host, local SQLite scratchpad, Tasks, Notes, Calendar, Projects navigation tree/workspace, focused Planning Chat persistence, manual context attachments, project Markdown context, Bridge File Drafting, GitHub Integration, YouTube components, and Project Workspace UI Consolidation.
+
+Gaming Screenshot Capture is a completed, passed, and successful feature addendum on top of Milestone 13. Future Gaming work should preserve the validated screenshot folder layout, SQLite screenshot metadata path, thumbnail rendering through the Tauri asset protocol, overlay-hidden capture behavior, and right-click delete cleanup semantics.
 
 Milestone 4 remains intentionally small. It does not include automatic Codex handoff, GitHub write operations, pull request creation, branch creation, issue management, full repository browsing, GitHub Actions integration, OAuth, multi-account support, advanced sync, vector store/repo indexing, YouTube integration, external calendar integration, cloud sync, or multi-user auth.
 

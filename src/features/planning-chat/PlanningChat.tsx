@@ -39,11 +39,15 @@ import { listTasks } from "../../services/tasks";
 import type { Task } from "../../services/tasks";
 import { listYouTubeReferences } from "../../services/youtube";
 import type { YouTubeReference } from "../../services/youtube";
+import { startOverlayDrag, startOverlayResize } from "../../services/windowControls";
 
 type PlanningChatProps = {
+  chatOverlayMode?: boolean;
   project?: Project;
   focused?: boolean;
   initialConversationId?: number | null;
+  onEnterChatOverlayMode?: () => void;
+  onExitChatOverlayMode?: () => void;
   onConversationsChanged?: (conversations: PlanningConversation[]) => void;
   startInNewConversation?: boolean;
 };
@@ -65,9 +69,12 @@ const contextTypes = [
 ] satisfies Array<{ value: PlanningContextType; label: string }>;
 
 export function PlanningChat({
+  chatOverlayMode = false,
   project,
   focused = false,
   initialConversationId,
+  onEnterChatOverlayMode,
+  onExitChatOverlayMode,
   onConversationsChanged,
   startInNewConversation = false
 }: PlanningChatProps) {
@@ -120,6 +127,7 @@ export function PlanningChat({
   );
 
   const showConversationSidebar = !focused;
+  const showChatOverlayMode = focused && chatOverlayMode;
 
   useEffect(() => {
     if (project) {
@@ -231,6 +239,12 @@ export function PlanningChat({
       })
       .catch((error) => setStatus(formatError(error)));
   }, [selectedConversationId, selectedProjectId]);
+
+  useEffect(() => {
+    if (showChatOverlayMode && !selectedConversation) {
+      onExitChatOverlayMode?.();
+    }
+  }, [showChatOverlayMode, selectedConversation?.id, onExitChatOverlayMode]);
 
   useEffect(() => {
     Promise.all([listNotes(), listTasks(), listCalendarEvents(), listYouTubeReferences(), loadScratchpad()])
@@ -566,7 +580,15 @@ export function PlanningChat({
   }
 
   return (
-    <section className={focused ? "planning-panel planning-panel-focused" : "feature-panel planning-panel"}>
+    <section
+      className={
+        showChatOverlayMode
+          ? "planning-panel planning-panel-focused planning-panel-chat-overlay-mode"
+          : focused
+            ? "planning-panel planning-panel-focused"
+            : "feature-panel planning-panel"
+      }
+    >
       {!focused && (
         <div className="panel-heading">
           <div>
@@ -730,25 +752,74 @@ export function PlanningChat({
 
         <div
           className={
-            focused
+            showChatOverlayMode
+              ? "planning-chat-shell planning-chat-shell-overlay-mode"
+              : focused
               ? isRightPaneOpen
                 ? "planning-chat-shell planning-chat-shell-with-right"
                 : "planning-chat-shell planning-chat-shell-with-right planning-chat-shell-right-collapsed"
               : "planning-chat-shell"
           }
         >
+        {showChatOverlayMode && (
+          <div className="chat-overlay-controls" aria-label="Chat overlay controls">
+            <button
+              aria-label="Exit chat overlay mode"
+              className="chat-overlay-control"
+              onClick={onExitChatOverlayMode}
+              title="Exit"
+              type="button"
+            >
+              x
+            </button>
+            <button
+              aria-label="Move chat overlay"
+              className="chat-overlay-control"
+              onMouseDown={(event) => {
+                event.preventDefault();
+                void startOverlayDrag();
+              }}
+              title="Move"
+              type="button"
+            >
+              +
+            </button>
+            <button
+              aria-label="Resize chat overlay"
+              className="chat-overlay-control"
+              onMouseDown={(event) => {
+                event.preventDefault();
+                void startOverlayResize("SouthEast");
+              }}
+              title="Resize"
+              type="button"
+            >
+              /
+            </button>
+          </div>
+        )}
         <div className="planning-chat-surface">
-          {focused && (
+          {focused && !showChatOverlayMode && (
             <div className="focused-chat-toolbar">
               <div>
                 <p>{selectedProject?.name ?? "Project"}</p>
                 <h3>{selectedConversation?.title ?? "Select or create a conversation"}</h3>
               </div>
-              <span className={isSending ? "save-pill save-pill-loading" : "save-pill"}>{status}</span>
+              <div className="focused-chat-actions">
+                <button
+                  className="ghost-button"
+                  disabled={!selectedConversation || isSending}
+                  onClick={onEnterChatOverlayMode}
+                  type="button"
+                >
+                  Overlay
+                </button>
+                <span className={isSending ? "save-pill save-pill-loading" : "save-pill"}>{status}</span>
+              </div>
             </div>
           )}
 
-          {focused && !selectedConversation && (
+          {focused && !showChatOverlayMode && !selectedConversation && (
             <div className="focused-conversation-controls">
               <input
                 aria-label="Conversation title"
@@ -1028,7 +1099,7 @@ export function PlanningChat({
           )}
         </div>
 
-        {focused && (
+          {focused && !showChatOverlayMode && (
           <aside
             className={
               isRightPaneOpen

@@ -170,6 +170,89 @@ pub struct YouTubeReferenceRecord {
     pub updated_at: String,
 }
 
+#[derive(Clone, Serialize)]
+pub struct GameRecord {
+    pub id: i64,
+    pub name: String,
+    pub slug: String,
+    pub summary: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct GameCatalogObjectRecord {
+    pub id: i64,
+    #[serde(rename = "gameId")]
+    pub game_id: i64,
+    pub name: String,
+    #[serde(rename = "objectType")]
+    pub object_type: String,
+    pub category: String,
+    #[serde(rename = "categoryIcon")]
+    pub category_icon: String,
+    #[serde(rename = "categoryIconPath")]
+    pub category_icon_path: String,
+    pub description: String,
+    pub notes: String,
+    pub tags: String,
+    #[serde(rename = "thumbnailPath")]
+    pub thumbnail_path: String,
+    #[serde(rename = "sourceScreenshotPath")]
+    pub source_screenshot_path: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+#[derive(Serialize)]
+pub struct GameScreenshotCaptureRequestRecord {
+    pub id: i64,
+    #[serde(rename = "gameId")]
+    pub game_id: i64,
+    pub title: String,
+    #[serde(rename = "filePath")]
+    pub file_path: String,
+    #[serde(rename = "requestId")]
+    pub request_id: String,
+    #[serde(rename = "requestPath")]
+    pub request_path: String,
+    #[serde(rename = "captureStatus")]
+    pub capture_status: String,
+    #[serde(rename = "capturedAt")]
+    pub captured_at: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+#[derive(Serialize)]
+pub struct GameChatConversationRecord {
+    pub id: i64,
+    #[serde(rename = "gameId")]
+    pub game_id: i64,
+    pub title: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+pub struct GameChatMessageRecord {
+    pub id: i64,
+    #[serde(rename = "conversationId")]
+    pub conversation_id: i64,
+    pub role: String,
+    pub content: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+}
+
 #[derive(Serialize)]
 pub struct PromptPreviewContextItem {
     pub id: i64,
@@ -246,6 +329,13 @@ impl AppDatabase {
             );
 
             INSERT OR IGNORE INTO scratchpad (id, content) VALUES (1, '');
+
+            CREATE TABLE IF NOT EXISTS app_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
 
             CREATE TABLE IF NOT EXISTS tasks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -355,10 +445,165 @@ impl AppDatabase {
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+
+            CREATE TABLE IF NOT EXISTS games (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                slug TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                summary TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS game_catalog_objects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                object_type TEXT NOT NULL DEFAULT '',
+                category TEXT NOT NULL DEFAULT '',
+                description TEXT NOT NULL DEFAULT '',
+                notes TEXT NOT NULL DEFAULT '',
+                tags TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS game_catalog_references (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                object_id INTEGER,
+                title TEXT NOT NULL,
+                reference_type TEXT NOT NULL DEFAULT '',
+                url TEXT NOT NULL DEFAULT '',
+                local_path TEXT NOT NULL DEFAULT '',
+                notes TEXT NOT NULL DEFAULT '',
+                tags TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS game_catalog_screenshots (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                object_id INTEGER,
+                title TEXT NOT NULL DEFAULT '',
+                file_path TEXT NOT NULL,
+                request_id TEXT NOT NULL DEFAULT '',
+                request_path TEXT NOT NULL DEFAULT '',
+                capture_status TEXT NOT NULL DEFAULT 'captured',
+                captured_at TEXT NOT NULL DEFAULT '',
+                notes TEXT NOT NULL DEFAULT '',
+                tags TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS game_chat_conversations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                title TEXT NOT NULL DEFAULT 'Game chat',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS game_chat_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                conversation_id INTEGER NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_game_catalog_objects_game_id
+                ON game_catalog_objects (game_id);
+            CREATE INDEX IF NOT EXISTS idx_game_catalog_objects_game_name
+                ON game_catalog_objects (game_id, name COLLATE NOCASE);
+            CREATE INDEX IF NOT EXISTS idx_game_catalog_references_game_id
+                ON game_catalog_references (game_id);
+            CREATE INDEX IF NOT EXISTS idx_game_catalog_references_object_id
+                ON game_catalog_references (object_id);
+            CREATE INDEX IF NOT EXISTS idx_game_catalog_screenshots_game_id
+                ON game_catalog_screenshots (game_id);
+            CREATE INDEX IF NOT EXISTS idx_game_catalog_screenshots_object_id
+                ON game_catalog_screenshots (object_id);
+            CREATE INDEX IF NOT EXISTS idx_game_chat_conversations_game_id
+                ON game_chat_conversations (game_id);
+            CREATE INDEX IF NOT EXISTS idx_game_chat_messages_conversation_id
+                ON game_chat_messages (conversation_id);
+
+            INSERT OR IGNORE INTO games (name, slug, summary)
+            VALUES (
+                'GearBlocks',
+                'gearblocks',
+                'Game-specific workspace section for GearBlocks planning, object cataloging, references, and screenshots.'
+            );
             ",
         )?;
         Self::ensure_column(&connection, "tasks", "body", "TEXT NOT NULL DEFAULT ''")?;
         Self::ensure_column(&connection, "tasks", "deadline", "TEXT NOT NULL DEFAULT ''")?;
+        Self::ensure_column(
+            &connection,
+            "game_catalog_screenshots",
+            "request_id",
+            "TEXT NOT NULL DEFAULT ''",
+        )?;
+        Self::ensure_column(
+            &connection,
+            "game_catalog_screenshots",
+            "request_path",
+            "TEXT NOT NULL DEFAULT ''",
+        )?;
+        Self::ensure_column(
+            &connection,
+            "game_catalog_screenshots",
+            "capture_status",
+            "TEXT NOT NULL DEFAULT 'captured'",
+        )?;
+        Self::ensure_column(
+            &connection,
+            "game_catalog_objects",
+            "category_icon",
+            "TEXT NOT NULL DEFAULT ''",
+        )?;
+        Self::ensure_column(
+            &connection,
+            "game_catalog_objects",
+            "category_icon_path",
+            "TEXT NOT NULL DEFAULT ''",
+        )?;
+        Self::ensure_column(
+            &connection,
+            "game_catalog_objects",
+            "thumbnail_path",
+            "TEXT NOT NULL DEFAULT ''",
+        )?;
+        Self::ensure_column(
+            &connection,
+            "game_catalog_objects",
+            "source_screenshot_path",
+            "TEXT NOT NULL DEFAULT ''",
+        )?;
+        connection.execute(
+            "
+            CREATE INDEX IF NOT EXISTS idx_game_catalog_screenshots_request_id
+                ON game_catalog_screenshots (request_id)
+            ",
+            [],
+        )?;
+        connection.execute(
+            "
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_game_catalog_objects_game_name_unique
+                ON game_catalog_objects (game_id, name COLLATE NOCASE)
+            ",
+            [],
+        )?;
+        connection.execute(
+            "
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_game_catalog_objects_game_name_exact_unique
+                ON game_catalog_objects (game_id, name)
+            ",
+            [],
+        )?;
 
         Ok(Self {
             connection: Mutex::new(connection),
@@ -368,6 +613,41 @@ impl AppDatabase {
 
     pub fn is_ready(&self) -> bool {
         self.ready
+    }
+
+    pub fn get_app_setting(&self, key: &str) -> Result<Option<String>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection
+            .query_row(
+                "SELECT value FROM app_settings WHERE key = ?1",
+                params![key.trim()],
+                |row| row.get(0),
+            )
+            .optional()
+    }
+
+    pub fn save_app_setting(&self, key: &str, value: &str) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute(
+            "
+            INSERT INTO app_settings (key, value)
+            VALUES (?1, ?2)
+            ON CONFLICT(key) DO UPDATE SET
+                value = excluded.value,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![key.trim(), value],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_app_setting(&self, key: &str) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute(
+            "DELETE FROM app_settings WHERE key = ?1",
+            params![key.trim()],
+        )?;
+        Ok(())
     }
 
     pub fn get_scratchpad(&self) -> Result<String> {
@@ -1420,6 +1700,422 @@ impl AppDatabase {
         Ok(())
     }
 
+    pub fn list_games(&self) -> Result<Vec<GameRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        let mut statement = connection.prepare(
+            "
+            SELECT id, name, slug, summary, created_at, updated_at
+            FROM games
+            ORDER BY name COLLATE NOCASE ASC, id ASC
+            ",
+        )?;
+
+        let games = statement
+            .query_map([], game_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(games)
+    }
+
+    pub fn get_game(&self, id: i64) -> Result<GameRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, id)
+    }
+
+    pub fn create_game(&self, name: &str, summary: &str) -> Result<GameRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        let trimmed_name = name.trim();
+        let slug = game_slug(trimmed_name);
+        connection.execute(
+            "
+            INSERT INTO games (name, slug, summary)
+            VALUES (?1, ?2, ?3)
+            ",
+            params![trimmed_name, slug, summary.trim()],
+        )?;
+
+        let id = connection.last_insert_rowid();
+        Self::get_game_by_id(&connection, id)
+    }
+
+    pub fn delete_game(&self, id: i64) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute(
+            "
+            DELETE FROM game_chat_messages
+            WHERE conversation_id IN (
+                SELECT id FROM game_chat_conversations WHERE game_id = ?1
+            )
+            ",
+            params![id],
+        )?;
+        connection.execute(
+            "DELETE FROM game_chat_conversations WHERE game_id = ?1",
+            params![id],
+        )?;
+        connection.execute(
+            "DELETE FROM game_catalog_screenshots WHERE game_id = ?1",
+            params![id],
+        )?;
+        connection.execute(
+            "DELETE FROM game_catalog_references WHERE game_id = ?1",
+            params![id],
+        )?;
+        connection.execute(
+            "DELETE FROM game_catalog_objects WHERE game_id = ?1",
+            params![id],
+        )?;
+        connection.execute("DELETE FROM games WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    pub fn list_game_catalog_objects(&self, game_id: i64) -> Result<Vec<GameCatalogObjectRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                id,
+                game_id,
+                name,
+                object_type,
+                category,
+                category_icon,
+                category_icon_path,
+                description,
+                notes,
+                tags,
+                thumbnail_path,
+                source_screenshot_path,
+                created_at,
+                updated_at
+            FROM game_catalog_objects
+            WHERE game_id = ?1
+            ORDER BY category COLLATE NOCASE ASC, name COLLATE NOCASE ASC
+            ",
+        )?;
+
+        let objects = statement
+            .query_map(params![game_id], game_catalog_object_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(objects)
+    }
+
+    pub fn delete_game_screenshot_catalog_objects(&self, game_id: i64) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute(
+            "
+            DELETE FROM game_catalog_objects
+            WHERE game_id = ?1
+                AND tags LIKE '%screenshot-catalog%'
+            ",
+            params![game_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn upsert_game_catalog_object(
+        &self,
+        game_id: i64,
+        name: &str,
+        object_type: &str,
+        category: &str,
+        category_icon: &str,
+        category_icon_path: &str,
+        description: &str,
+        notes: &str,
+        tags: &str,
+        thumbnail_path: &str,
+        source_screenshot_path: &str,
+    ) -> Result<GameCatalogObjectRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute(
+            "
+            INSERT INTO game_catalog_objects (
+                game_id,
+                name,
+                object_type,
+                category,
+                category_icon,
+                category_icon_path,
+                description,
+                notes,
+                tags,
+                thumbnail_path,
+                source_screenshot_path
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+            ON CONFLICT(game_id, name) DO UPDATE SET
+                object_type = excluded.object_type,
+                category = excluded.category,
+                category_icon = excluded.category_icon,
+                category_icon_path = excluded.category_icon_path,
+                description = excluded.description,
+                notes = excluded.notes,
+                tags = excluded.tags,
+                thumbnail_path = excluded.thumbnail_path,
+                source_screenshot_path = excluded.source_screenshot_path,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                game_id,
+                name.trim(),
+                object_type.trim(),
+                category.trim(),
+                category_icon.trim(),
+                category_icon_path.trim(),
+                description.trim(),
+                notes.trim(),
+                tags.trim(),
+                thumbnail_path.trim(),
+                source_screenshot_path.trim()
+            ],
+        )?;
+
+        Self::get_game_catalog_object_by_name(&connection, game_id, name)
+    }
+
+    pub fn create_game_screenshot_capture_request(
+        &self,
+        game_id: i64,
+        title: &str,
+        file_path: &str,
+        request_id: &str,
+        request_path: &str,
+        capture_status: &str,
+        captured_at: &str,
+        notes: &str,
+    ) -> Result<GameScreenshotCaptureRequestRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute(
+            "
+            INSERT INTO game_catalog_screenshots (
+                game_id,
+                title,
+                file_path,
+                request_id,
+                request_path,
+                capture_status,
+                captured_at,
+                notes
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            ",
+            params![
+                game_id,
+                title.trim(),
+                file_path.trim(),
+                request_id.trim(),
+                request_path.trim(),
+                capture_status.trim(),
+                captured_at.trim(),
+                notes
+            ],
+        )?;
+
+        let id = connection.last_insert_rowid();
+        Self::get_game_screenshot_capture_request_by_id(&connection, id)
+    }
+
+    pub fn list_game_chat_conversations(
+        &self,
+        game_id: i64,
+    ) -> Result<Vec<GameChatConversationRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        let mut statement = connection.prepare(
+            "
+            SELECT id, game_id, title, created_at, updated_at
+            FROM game_chat_conversations
+            WHERE game_id = ?1
+            ORDER BY updated_at DESC, id DESC
+            ",
+        )?;
+
+        let conversations = statement
+            .query_map(params![game_id], game_chat_conversation_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(conversations)
+    }
+
+    pub fn create_game_chat_conversation(
+        &self,
+        game_id: i64,
+        title: &str,
+    ) -> Result<GameChatConversationRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        let clean_title = if title.trim().is_empty() {
+            "Game chat"
+        } else {
+            title.trim()
+        };
+
+        connection.execute(
+            "
+            INSERT INTO game_chat_conversations (game_id, title)
+            VALUES (?1, ?2)
+            ",
+            params![game_id, clean_title],
+        )?;
+
+        let id = connection.last_insert_rowid();
+        Self::get_game_chat_conversation_by_id(&connection, id)
+    }
+
+    pub fn get_game_chat_conversation(&self, id: i64) -> Result<GameChatConversationRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_chat_conversation_by_id(&connection, id)
+    }
+
+    pub fn list_game_chat_messages(
+        &self,
+        conversation_id: i64,
+    ) -> Result<Vec<GameChatMessageRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_chat_conversation_by_id(&connection, conversation_id)?;
+        Self::list_game_chat_messages_for_connection(&connection, conversation_id)
+    }
+
+    pub fn recent_game_chat_messages(
+        &self,
+        conversation_id: i64,
+        limit: i64,
+    ) -> Result<Vec<GameChatMessageRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        let mut statement = connection.prepare(
+            "
+            SELECT id, conversation_id, role, content, created_at
+            FROM (
+                SELECT id, conversation_id, role, content, created_at
+                FROM game_chat_messages
+                WHERE conversation_id = ?1
+                ORDER BY id DESC
+                LIMIT ?2
+            )
+            ORDER BY id ASC
+            ",
+        )?;
+
+        let messages = statement
+            .query_map(params![conversation_id, limit], game_chat_message_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(messages)
+    }
+
+    pub fn create_game_chat_message(
+        &self,
+        conversation_id: i64,
+        role: &str,
+        content: &str,
+    ) -> Result<GameChatMessageRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_chat_conversation_by_id(&connection, conversation_id)?;
+        connection.execute(
+            "
+            INSERT INTO game_chat_messages (conversation_id, role, content)
+            VALUES (?1, ?2, ?3)
+            ",
+            params![conversation_id, role.trim(), content.trim()],
+        )?;
+        connection.execute(
+            "
+            UPDATE game_chat_conversations
+            SET updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?1
+            ",
+            params![conversation_id],
+        )?;
+
+        let id = connection.last_insert_rowid();
+        Self::get_game_chat_message_by_id(&connection, id)
+    }
+
+    pub fn delete_game_chat_conversation(&self, conversation_id: i64) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute(
+            "DELETE FROM game_chat_messages WHERE conversation_id = ?1",
+            params![conversation_id],
+        )?;
+        connection.execute(
+            "DELETE FROM game_chat_conversations WHERE id = ?1",
+            params![conversation_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn list_game_screenshots(
+        &self,
+        game_id: i64,
+    ) -> Result<Vec<GameScreenshotCaptureRequestRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                id,
+                game_id,
+                title,
+                file_path,
+                request_id,
+                request_path,
+                capture_status,
+                captured_at,
+                created_at,
+                updated_at
+            FROM game_catalog_screenshots
+            WHERE game_id = ?1
+                AND capture_status != 'requested'
+            ORDER BY created_at DESC, id DESC
+            ",
+        )?;
+
+        let screenshots = statement
+            .query_map(params![game_id], game_screenshot_capture_request_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(screenshots)
+    }
+
+    pub fn get_game_screenshot(
+        &self,
+        id: i64,
+    ) -> Result<Option<GameScreenshotCaptureRequestRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_screenshot_capture_request_by_id(&connection, id).optional()
+    }
+
+    pub fn delete_game_screenshot_references(
+        &self,
+        game_id: i64,
+        file_path: &str,
+        request_path: &str,
+    ) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute(
+            "
+            DELETE FROM game_catalog_references
+            WHERE game_id = ?1
+                AND (
+                    local_path = ?2
+                    OR local_path = ?3
+                )
+            ",
+            params![game_id, file_path.trim(), request_path.trim()],
+        )?;
+        Ok(())
+    }
+
+    pub fn delete_game_screenshot(&self, id: i64) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute(
+            "DELETE FROM game_catalog_screenshots WHERE id = ?1",
+            params![id],
+        )?;
+        Ok(())
+    }
+
     fn get_task_by_id(connection: &Connection, id: i64) -> Result<TaskRecord> {
         connection.query_row(
             "
@@ -1721,6 +2417,124 @@ impl AppDatabase {
             params![id],
             youtube_reference_from_row,
         )
+    }
+
+    fn get_game_by_id(connection: &Connection, id: i64) -> Result<GameRecord> {
+        connection.query_row(
+            "
+            SELECT id, name, slug, summary, created_at, updated_at
+            FROM games
+            WHERE id = ?1
+            ",
+            params![id],
+            game_from_row,
+        )
+    }
+
+    fn get_game_catalog_object_by_name(
+        connection: &Connection,
+        game_id: i64,
+        name: &str,
+    ) -> Result<GameCatalogObjectRecord> {
+        connection.query_row(
+            "
+            SELECT
+                id,
+                game_id,
+                name,
+                object_type,
+                category,
+                category_icon,
+                category_icon_path,
+                description,
+                notes,
+                tags,
+                thumbnail_path,
+                source_screenshot_path,
+                created_at,
+                updated_at
+            FROM game_catalog_objects
+            WHERE game_id = ?1
+                AND name = ?2 COLLATE NOCASE
+            ",
+            params![game_id, name.trim()],
+            game_catalog_object_from_row,
+        )
+    }
+
+    fn get_game_screenshot_capture_request_by_id(
+        connection: &Connection,
+        id: i64,
+    ) -> Result<GameScreenshotCaptureRequestRecord> {
+        connection.query_row(
+            "
+            SELECT
+                id,
+                game_id,
+                title,
+                file_path,
+                request_id,
+                request_path,
+                capture_status,
+                captured_at,
+                created_at,
+                updated_at
+            FROM game_catalog_screenshots
+            WHERE id = ?1
+            ",
+            params![id],
+            game_screenshot_capture_request_from_row,
+        )
+    }
+
+    fn get_game_chat_conversation_by_id(
+        connection: &Connection,
+        id: i64,
+    ) -> Result<GameChatConversationRecord> {
+        connection.query_row(
+            "
+            SELECT id, game_id, title, created_at, updated_at
+            FROM game_chat_conversations
+            WHERE id = ?1
+            ",
+            params![id],
+            game_chat_conversation_from_row,
+        )
+    }
+
+    fn get_game_chat_message_by_id(
+        connection: &Connection,
+        id: i64,
+    ) -> Result<GameChatMessageRecord> {
+        connection.query_row(
+            "
+            SELECT id, conversation_id, role, content, created_at
+            FROM game_chat_messages
+            WHERE id = ?1
+            ",
+            params![id],
+            game_chat_message_from_row,
+        )
+    }
+
+    fn list_game_chat_messages_for_connection(
+        connection: &Connection,
+        conversation_id: i64,
+    ) -> Result<Vec<GameChatMessageRecord>> {
+        let mut statement = connection.prepare(
+            "
+            SELECT id, conversation_id, role, content, created_at
+            FROM game_chat_messages
+            WHERE conversation_id = ?1
+            ORDER BY id ASC
+            ",
+        )?;
+
+        let messages = statement
+            .query_map(params![conversation_id], game_chat_message_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(messages)
     }
 
     fn get_bridge_file_draft_by_id(
@@ -2577,4 +3391,96 @@ fn youtube_reference_from_row(row: &rusqlite::Row<'_>) -> Result<YouTubeReferenc
         created_at: row.get(7)?,
         updated_at: row.get(8)?,
     })
+}
+
+fn game_from_row(row: &rusqlite::Row<'_>) -> Result<GameRecord> {
+    Ok(GameRecord {
+        id: row.get(0)?,
+        name: row.get(1)?,
+        slug: row.get(2)?,
+        summary: row.get(3)?,
+        created_at: row.get(4)?,
+        updated_at: row.get(5)?,
+    })
+}
+
+fn game_catalog_object_from_row(row: &rusqlite::Row<'_>) -> Result<GameCatalogObjectRecord> {
+    Ok(GameCatalogObjectRecord {
+        id: row.get(0)?,
+        game_id: row.get(1)?,
+        name: row.get(2)?,
+        object_type: row.get(3)?,
+        category: row.get(4)?,
+        category_icon: row.get(5)?,
+        category_icon_path: row.get(6)?,
+        description: row.get(7)?,
+        notes: row.get(8)?,
+        tags: row.get(9)?,
+        thumbnail_path: row.get(10)?,
+        source_screenshot_path: row.get(11)?,
+        created_at: row.get(12)?,
+        updated_at: row.get(13)?,
+    })
+}
+
+fn game_screenshot_capture_request_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<GameScreenshotCaptureRequestRecord> {
+    Ok(GameScreenshotCaptureRequestRecord {
+        id: row.get(0)?,
+        game_id: row.get(1)?,
+        title: row.get(2)?,
+        file_path: row.get(3)?,
+        request_id: row.get(4)?,
+        request_path: row.get(5)?,
+        capture_status: row.get(6)?,
+        captured_at: row.get(7)?,
+        created_at: row.get(8)?,
+        updated_at: row.get(9)?,
+    })
+}
+
+fn game_chat_conversation_from_row(row: &rusqlite::Row<'_>) -> Result<GameChatConversationRecord> {
+    Ok(GameChatConversationRecord {
+        id: row.get(0)?,
+        game_id: row.get(1)?,
+        title: row.get(2)?,
+        created_at: row.get(3)?,
+        updated_at: row.get(4)?,
+    })
+}
+
+fn game_chat_message_from_row(row: &rusqlite::Row<'_>) -> Result<GameChatMessageRecord> {
+    Ok(GameChatMessageRecord {
+        id: row.get(0)?,
+        conversation_id: row.get(1)?,
+        role: row.get(2)?,
+        content: row.get(3)?,
+        created_at: row.get(4)?,
+    })
+}
+
+fn game_slug(name: &str) -> String {
+    let mut slug = String::new();
+    let mut previous_was_separator = false;
+
+    for character in name.trim().chars() {
+        if character.is_ascii_alphanumeric() {
+            slug.push(character.to_ascii_lowercase());
+            previous_was_separator = false;
+        } else if !previous_was_separator && !slug.is_empty() {
+            slug.push('-');
+            previous_was_separator = true;
+        }
+    }
+
+    while slug.ends_with('-') {
+        slug.pop();
+    }
+
+    if slug.is_empty() {
+        "game".to_string()
+    } else {
+        slug
+    }
 }

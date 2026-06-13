@@ -2,7 +2,52 @@
 
 All notable changes to Overlay Forge will be documented in this file.
 
+Unreleased changes are grouped by day using `YYYY-MM-DD` headings so a single day's work can be reviewed quickly.
+
 ## Unreleased
+
+### 2026-06-06
+
+#### Documentation
+
+- Added project rules requiring future changelog entries to be grouped by change date.
+- Added `docs/PROJECT_RULES.md` to document the daily changelog tracking convention.
+- Added `docs/GAMING_SCREENSHOT_VALIDATION.md` to document Gaming Screenshot Capture as complete, passed, and successful.
+- Added `docs/GEARBLOCKS_PARTS_CATALOG.md` as a shareable ChatGPT reference for GearBlocks categories and cataloged parts.
+- Updated README, project plan, architecture, data model, and bridge docs with the validated screenshot capture status.
+
+#### Added
+
+- Added a top-level Gaming section with add/remove controls for game workspace sections.
+- Added the initial GearBlocks game section.
+- Added expandable Gaming child rows in the left navigation for game sections.
+- Added persisted SQLite tables for games, game catalog objects, game catalog references, and game screenshot file-path metadata.
+- Added Tauri commands and frontend services for listing, creating, and deleting persisted games.
+- Added selected-game toolbar buttons for screenshot capture, object creation, and reference creation.
+- Documented the internal game-engine PNG screenshot workflow for GearBlocks-compatible captures.
+- Wired the Capture Screenshot button to create a capture manifest JSON and unique PNG path under gitignored `game-screenshots/`.
+- Changed Capture Screenshot to test Windows GDI foreground-window capture while hiding Overlay Forge before saving the PNG.
+- Added a scrollable selected-game content area with a collapsible Screenshots thumbnail section showing capture date/time.
+- Replaced the screenshot success alert with a temporary floating `Successful` bubble.
+- Added a right-click screenshot context menu with visual test actions and a delete action.
+- Added screenshot deletion that removes the saved PNG, capture manifest JSON, and screenshot database row.
+- Changed the selected-game toolbar's second action to `Parts`.
+- Added a GearBlocks parts catalog import that upserts recognizable parts from the screenshot set into `game_catalog_objects`.
+- Added a selected-game Parts chart showing category icon, thumbnail source, part name, and practical physics-use description.
+- Doubled the Parts chart text size and widened chart rows/columns to support the larger typography.
+- Replaced Parts chart category text indicators with a filter button row that uses cropped GearBlocks category icons from the source screenshots.
+- Rebuilt GearBlocks Parts filters around all 21 left-panel part categories in source screenshot order, including selectable categories with no cataloged rows yet.
+- Changed selected game sections to open a blank main pane without Gaming or game-title labels.
+- Removed the selected-game blank pane border so no top separator line appears.
+
+#### Fixed
+
+- Enabled Tauri asset loading for the `game-screenshots/` folder so saved screenshots can render as in-app thumbnails.
+- Filtered missing screenshot files out of the preview list so manually deleted captures do not leave broken thumbnail cards.
+
+#### Validation
+
+- Documented Gaming Screenshot Capture as complete, passed, and successful after validating capture, saved files, thumbnail previews, and screenshot delete cleanup.
 
 ### Milestone Status
 
@@ -120,6 +165,7 @@ All notable changes to Overlay Forge will be documented in this file.
 - Added project row `...` menu routing for Overview, Chat, References, Edit, and Delete.
 - Added a focused chat surface that removes redundant Projects, Active Workspace, tab, and Planning Chat headings.
 - Added Project Edit as the consolidated surface for project details, GitHub repository linkage, and project Markdown context configuration.
+- Added `docs/PROJECT_DEFERRED_ITEMS.md` to centralize Project workspace deferred items.
 
 ### Changed
 
@@ -178,6 +224,8 @@ All notable changes to Overlay Forge will be documented in this file.
 - Preserved left-navigation conversation child-row selection as the only path for opening existing chats directly.
 - Confirmed Milestone 13 did not require schema changes.
 - Confirmed conversation manual attachments remain conversation-scoped after UI consolidation.
+- Synced `docs/DATA_MODEL.md` to mark the Milestone 12 data model as complete and revalidated after Milestone 13.
+- Linked `README.md`, `docs/BRIDGE_FILES.md`, and `docs/PROJECT_PLAN.md` to the centralized Project deferred items doc.
 
 ### Validation
 
