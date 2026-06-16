@@ -1,6 +1,7 @@
 use crate::db::{
     BridgeFileDraftRecord, CalendarEventRecord, GameCatalogObjectRecord,
-    GameChatConversationRecord, GameChatMessageRecord, GameRecord,
+    GameChatConversationRecord, GameChatMessageRecord, GameConstructionRecord,
+    GameDataLocationRecord, GameRecord, GameRuntimeConstructionExportRecord, GameRuntimePartRecord,
     GameScreenshotCaptureRequestRecord, NoteRecord, PlanningConversationContextRecord,
     PlanningConversationRecord, PlanningMessageRecord, PlanningPromptPreviewRecord,
     ProjectGitHubRepositoryRecord, ProjectMarkdownContextPayload, ProjectMarkdownContextRecord,
@@ -9,19 +10,24 @@ use crate::db::{
 use crate::github;
 use crate::hotkeys;
 use crate::openai;
-use crate::AppState;
+use crate::{AppState, GameChatOverlaySelection};
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
+use bson::{Bson, Document};
+use flate2::read::DeflateDecoder;
 use serde::Serialize;
 use serde_json::json;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::fs::{self, File};
-use std::io::{BufReader, BufWriter};
-use std::path::PathBuf;
+use std::io::{BufReader, BufWriter, Read};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Manager, PhysicalPosition, State};
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, State, WebviewWindow};
+
+static MANUAL_OVERLAY_DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 #[derive(Serialize)]
 pub struct MilestoneStatus {
@@ -53,6 +59,105 @@ pub struct GamePartCategoryRecord {
     #[serde(rename = "iconPath")]
     pub icon_path: String,
     pub count: i64,
+}
+
+#[derive(Serialize)]
+pub struct GearBlocksConstructionFileRecord {
+    pub name: String,
+    #[serde(rename = "folderPath")]
+    pub folder_path: String,
+    #[serde(rename = "constructionPath")]
+    pub construction_path: String,
+    #[serde(rename = "byteSize")]
+    pub byte_size: u64,
+}
+
+#[derive(Serialize)]
+pub struct GearBlocksConstructionDecodeRecord {
+    pub name: String,
+    #[serde(rename = "folderPath")]
+    pub folder_path: String,
+    #[serde(rename = "constructionPath")]
+    pub construction_path: String,
+    #[serde(rename = "byteSize")]
+    pub byte_size: u64,
+    #[serde(rename = "decodedByteSize")]
+    pub decoded_byte_size: usize,
+    pub summary: GearBlocksConstructionSummaryRecord,
+    pub document: serde_json::Value,
+}
+
+#[derive(Serialize)]
+pub struct GearBlocksLuaExporterInstallRecord {
+    #[serde(rename = "scriptModPath")]
+    pub script_mod_path: String,
+    #[serde(rename = "mainLuaPath")]
+    pub main_lua_path: String,
+    #[serde(rename = "exportDirectory")]
+    pub export_directory: String,
+}
+
+#[derive(Serialize)]
+pub struct GearBlocksRuntimeExportRecord {
+    pub id: String,
+    pub name: String,
+    #[serde(rename = "intendedPath")]
+    pub intended_path: String,
+    #[serde(rename = "sourceLogPath")]
+    pub source_log_path: String,
+    #[serde(rename = "byteSize")]
+    pub byte_size: usize,
+    pub document: serde_json::Value,
+}
+
+#[derive(Serialize)]
+pub struct GearBlocksRuntimeContextSyncRecord {
+    pub changed: bool,
+    #[serde(rename = "runtimeExportCount")]
+    pub runtime_export_count: usize,
+    #[serde(rename = "runtimePartCount")]
+    pub runtime_part_count: usize,
+    #[serde(rename = "constructionCount")]
+    pub construction_count: usize,
+    #[serde(rename = "runtimeExports")]
+    pub runtime_exports: Vec<GameRuntimeConstructionExportRecord>,
+    #[serde(rename = "runtimeParts")]
+    pub runtime_parts: Vec<GameRuntimePartRecord>,
+    pub constructions: Vec<GameConstructionRecord>,
+}
+
+#[derive(Serialize)]
+pub struct GearBlocksConstructionSummaryRecord {
+    #[serde(rename = "isFrozen")]
+    pub is_frozen: Option<bool>,
+    #[serde(rename = "isInvulnerable")]
+    pub is_invulnerable: Option<bool>,
+    #[serde(rename = "compositeCount")]
+    pub composite_count: usize,
+    #[serde(rename = "partCount")]
+    pub part_count: usize,
+    #[serde(rename = "uniqueAssetGuidCount")]
+    pub unique_asset_guid_count: usize,
+    #[serde(rename = "attachmentCount")]
+    pub attachment_count: usize,
+    #[serde(rename = "linkCount")]
+    pub link_count: usize,
+    #[serde(rename = "intersectionCount")]
+    pub intersection_count: usize,
+    pub parts: Vec<GearBlocksConstructionPartSummaryRecord>,
+}
+
+#[derive(Serialize)]
+pub struct GearBlocksConstructionPartSummaryRecord {
+    pub index: usize,
+    #[serde(rename = "compositeIndex")]
+    pub composite_index: usize,
+    #[serde(rename = "compositePartIndex")]
+    pub composite_part_index: usize,
+    #[serde(rename = "assetGuid")]
+    pub asset_guid: String,
+    pub dimensions: Vec<f64>,
+    pub behaviours: Vec<String>,
 }
 
 fn to_keybind_records(keybinds: Vec<hotkeys::KeybindConfig>) -> Vec<KeybindRecord> {
@@ -178,13 +283,112 @@ pub fn shutdown_app(app: AppHandle) {
 }
 
 #[tauri::command]
-pub fn start_manual_overlay_drag(app: AppHandle) -> Result<(), String> {
-    manual_overlay_drag(app)
+pub fn start_manual_overlay_drag(window: WebviewWindow) -> Result<(), String> {
+    manual_overlay_drag(window)
 }
 
 #[tauri::command]
-pub fn set_overlay_window_opacity(app: AppHandle, opacity: f64) -> Result<(), String> {
-    set_overlay_opacity(app, opacity)
+pub fn set_overlay_window_opacity(window: WebviewWindow, opacity: f64) -> Result<(), String> {
+    set_overlay_opacity(&window, opacity)
+}
+
+#[tauri::command]
+pub fn focus_last_game_window(state: State<'_, AppState>) -> Result<bool, String> {
+    focus_last_game_window_impl(state)
+}
+
+#[tauri::command]
+pub fn open_game_chat_overlay_window(
+    game_id: i64,
+    conversation_id: i64,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<GameChatOverlaySelection, String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    let conversation = state
+        .database
+        .get_game_chat_conversation(conversation_id)
+        .map_err(|error| error.to_string())?;
+    if conversation.game_id != game.id {
+        return Err("Selected chat does not belong to the selected game.".to_string());
+    }
+
+    let selection = GameChatOverlaySelection {
+        game_id: game.id,
+        conversation_id: conversation.id,
+    };
+    state
+        .active_game_chat_overlay
+        .lock()
+        .map_err(|_| "Game chat overlay state is unavailable.".to_string())?
+        .replace(selection.clone());
+
+    let app_for_window = app.clone();
+    let selection_for_window = selection.clone();
+    app.run_on_main_thread(move || {
+        if let Err(error) = show_game_chat_overlay_window(&app_for_window, &selection_for_window) {
+            eprintln!("Could not open game chat overlay window: {error}");
+        }
+    })
+    .map_err(|error| error.to_string())?;
+
+    Ok(selection)
+}
+
+fn show_game_chat_overlay_window(
+    app: &AppHandle,
+    selection: &GameChatOverlaySelection,
+) -> Result<(), String> {
+    let window = app
+        .get_webview_window("game-chat")
+        .ok_or_else(|| "Game chat overlay window was not created at startup.".to_string())?;
+
+    window
+        .set_always_on_top(true)
+        .map_err(|error| error.to_string())?;
+    ensure_window_accepts_mouse_input(&window)?;
+    window.show().map_err(|error| error.to_string())?;
+    let _ = set_overlay_opacity(&window, 0.78);
+    window.set_focus().map_err(|error| error.to_string())?;
+    let _ = app.emit("game-chat-overlay-selection-changed", selection.clone());
+    let _ = app.emit("game-chat-overlay-focus-prompt", ());
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn focus_game_chat_overlay_window(app: AppHandle) -> Result<bool, String> {
+    if app.get_webview_window("game-chat").is_none() {
+        return Ok(false);
+    }
+
+    let app_for_window = app.clone();
+    app.run_on_main_thread(move || {
+        if let Some(window) = app_for_window.get_webview_window("game-chat") {
+            let _ = ensure_window_accepts_mouse_input(&window);
+            let _ = window.show();
+            let _ = window.set_always_on_top(true);
+            let _ = set_overlay_opacity(&window, 0.78);
+            let _ = window.set_focus();
+            let _ = app_for_window.emit("game-chat-overlay-focus-prompt", ());
+        }
+    })
+    .map_err(|error| error.to_string())?;
+    Ok(true)
+}
+
+#[tauri::command]
+pub fn get_active_game_chat_overlay(
+    state: State<'_, AppState>,
+) -> Result<Option<GameChatOverlaySelection>, String> {
+    state
+        .active_game_chat_overlay
+        .lock()
+        .map_err(|_| "Game chat overlay state is unavailable.".to_string())
+        .map(|selection| selection.clone())
 }
 
 #[tauri::command]
@@ -804,6 +1008,602 @@ pub fn delete_game(id: i64, state: State<'_, AppState>) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn list_game_data_locations(
+    game_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<GameDataLocationRecord>, String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    if !game_exposes_data_locations(&game) {
+        return Ok(Vec::new());
+    }
+
+    state
+        .database
+        .list_game_data_locations(game_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn save_game_data_location(
+    game_id: i64,
+    location_type: String,
+    directory_path: String,
+    state: State<'_, AppState>,
+) -> Result<GameDataLocationRecord, String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    require_game_data_locations_enabled(&game)?;
+    let normalized_type = normalize_game_location_type(&location_type)?;
+    let canonical_path = validate_directory_path(&directory_path)?;
+
+    state
+        .database
+        .save_game_data_location(
+            game.id,
+            normalized_type,
+            game_location_type_label(normalized_type),
+            &canonical_path,
+        )
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn delete_game_data_location(
+    game_id: i64,
+    location_type: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    require_game_data_locations_enabled(&game)?;
+    let normalized_type = normalize_game_location_type(&location_type)?;
+
+    state
+        .database
+        .delete_game_data_location(game.id, normalized_type)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn list_gearblocks_construction_files(
+    game_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<GearBlocksConstructionFileRecord>, String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    require_gearblocks_game(&game)?;
+    let root = gearblocks_saved_constructions_root(&state, game.id)?;
+    list_gearblocks_construction_files_in_root(&root)
+}
+
+#[tauri::command]
+pub fn list_game_constructions(
+    game_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<GameConstructionRecord>, String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    require_gearblocks_game(&game)?;
+    state
+        .database
+        .list_game_constructions(game.id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn sync_gearblocks_saved_constructions(
+    game_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<GameConstructionRecord>, String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    require_gearblocks_game(&game)?;
+    sync_gearblocks_saved_constructions_for_game(&state, game.id)
+}
+
+#[tauri::command]
+pub fn sync_gearblocks_runtime_context(
+    game_id: i64,
+    state: State<'_, AppState>,
+) -> Result<GearBlocksRuntimeContextSyncRecord, String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    require_gearblocks_game(&game)?;
+
+    let fingerprint = gearblocks_runtime_context_fingerprint(&state, game.id)?;
+    let fingerprint_key = format!("gearblocks.runtime_context_fingerprint.{}", game.id);
+    let previous_fingerprint = state
+        .database
+        .get_app_setting(&fingerprint_key)
+        .map_err(|error| error.to_string())?;
+    let changed = previous_fingerprint.as_deref() != Some(fingerprint.as_str());
+    if changed {
+        import_latest_gearblocks_runtime_exports(&state, game.id)?;
+        sync_gearblocks_saved_constructions_for_game(&state, game.id)?;
+        state
+            .database
+            .save_app_setting(&fingerprint_key, &fingerprint)
+            .map_err(|error| error.to_string())?;
+    }
+
+    let constructions = state
+        .database
+        .list_game_constructions(game.id)
+        .map_err(|error| error.to_string())?;
+    let runtime_exports = state
+        .database
+        .list_game_runtime_construction_exports(game.id)
+        .map_err(|error| error.to_string())?;
+    let runtime_parts = state
+        .database
+        .list_game_runtime_parts(game.id)
+        .map_err(|error| error.to_string())?;
+    let runtime_parts = gearblocks_runtime_parts_all_in_catalog_order(runtime_parts);
+
+    Ok(GearBlocksRuntimeContextSyncRecord {
+        changed,
+        runtime_export_count: runtime_exports.len(),
+        runtime_part_count: runtime_parts.len(),
+        construction_count: constructions.len(),
+        runtime_exports,
+        runtime_parts,
+        constructions,
+    })
+}
+
+fn sync_gearblocks_saved_constructions_for_game(
+    state: &AppState,
+    game_id: i64,
+) -> Result<Vec<GameConstructionRecord>, String> {
+    let root = gearblocks_saved_constructions_root(state, game_id)?;
+    let files = list_gearblocks_construction_files_in_root(&root)?;
+    let indexed_at = unix_timestamp_label();
+    let mut records = Vec::new();
+
+    for file in files {
+        let decoded = decode_gearblocks_construction_path(Path::new(&file.construction_path))?;
+        let summary_json =
+            serde_json::to_string_pretty(&decoded.summary).map_err(|error| error.to_string())?;
+        let document_json =
+            serde_json::to_string_pretty(&decoded.document).map_err(|error| error.to_string())?;
+        let record = state
+            .database
+            .upsert_game_construction(
+                game_id,
+                &decoded.name,
+                &decoded.folder_path,
+                &decoded.construction_path,
+                decoded.byte_size as i64,
+                decoded.decoded_byte_size as i64,
+                decoded.summary.composite_count as i64,
+                decoded.summary.part_count as i64,
+                decoded.summary.unique_asset_guid_count as i64,
+                decoded.summary.attachment_count as i64,
+                decoded.summary.link_count as i64,
+                decoded.summary.intersection_count as i64,
+                decoded.summary.is_frozen,
+                decoded.summary.is_invulnerable,
+                &summary_json,
+                &document_json,
+                &indexed_at,
+            )
+            .map_err(|error| error.to_string())?;
+        records.push(record);
+    }
+
+    records.sort_by(|left, right| {
+        left.name
+            .to_ascii_lowercase()
+            .cmp(&right.name.to_ascii_lowercase())
+    });
+    Ok(records)
+}
+
+fn gearblocks_runtime_context_fingerprint(
+    state: &AppState,
+    game_id: i64,
+) -> Result<String, String> {
+    let root = gearblocks_default_user_data_root()?;
+    let mut entries = Vec::new();
+
+    for log_path in [root.join("Player-prev.log"), root.join("Player.log")] {
+        entries.push(file_fingerprint_entry("log", &log_path));
+    }
+
+    let constructions_root = gearblocks_saved_constructions_root(state, game_id)?;
+    for file in list_gearblocks_construction_files_in_root(&constructions_root)? {
+        entries.push(file_fingerprint_entry(
+            "construction",
+            Path::new(&file.construction_path),
+        ));
+    }
+
+    entries.sort();
+    Ok(entries.join("|"))
+}
+
+fn file_fingerprint_entry(kind: &str, path: &Path) -> String {
+    let normalized_path = path.to_string_lossy();
+    match fs::metadata(path) {
+        Ok(metadata) => {
+            let modified = metadata
+                .modified()
+                .ok()
+                .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
+                .map(|value| format!("{}.{}", value.as_secs(), value.subsec_nanos()))
+                .unwrap_or_else(|| "unknown".to_string());
+            format!(
+                "{}:{}:{}:{}",
+                kind,
+                normalized_path,
+                metadata.len(),
+                modified
+            )
+        }
+        Err(_) => format!("{}:{}:missing", kind, normalized_path),
+    }
+}
+
+#[tauri::command]
+pub fn decode_gearblocks_construction_file(
+    construction_path: String,
+) -> Result<GearBlocksConstructionDecodeRecord, String> {
+    let path = validate_gearblocks_construction_file_path(&construction_path)?;
+    decode_gearblocks_construction_path(&path)
+}
+
+#[tauri::command]
+pub fn decode_gearblocks_construction_folder(
+    folder_path: String,
+) -> Result<GearBlocksConstructionDecodeRecord, String> {
+    require_text(&folder_path, "Construction folder")?;
+    let folder = PathBuf::from(folder_path.trim());
+    if !folder.is_dir() {
+        return Err("Selected construction path is not a folder.".to_string());
+    }
+    let path = find_construction_file_in_folder(&folder)
+        .ok_or_else(|| "Selected folder does not contain construction.bytes.".to_string())?;
+    decode_gearblocks_construction_path(&path)
+}
+
+#[tauri::command]
+pub fn install_gearblocks_lua_exporter(
+    game_id: i64,
+    state: State<'_, AppState>,
+) -> Result<GearBlocksLuaExporterInstallRecord, String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    require_gearblocks_game(&game)?;
+
+    let gearblocks_root = gearblocks_default_user_data_root()?;
+    let script_mod_path = gearblocks_root
+        .join("ScriptMods")
+        .join("OverlayForgeConstructionExporter");
+    let export_directory = gearblocks_runtime_export_dir(&state, game.id, &gearblocks_root)?;
+    fs::create_dir_all(&script_mod_path).map_err(|error| error.to_string())?;
+    fs::create_dir_all(&export_directory).map_err(|error| error.to_string())?;
+
+    let main_lua = include_str!(
+        "../../gearblocks-script-mods/OverlayForgeConstructionExporter/main.lua.template"
+    )
+    .replace("{{EXPORT_DIR}}", &lua_long_bracket_path(&export_directory));
+    let main_lua_path = script_mod_path.join("main.lua");
+    fs::write(&main_lua_path, main_lua).map_err(|error| error.to_string())?;
+    fs::write(
+        script_mod_path.join("meta.json"),
+        include_str!("../../gearblocks-script-mods/OverlayForgeConstructionExporter/meta.json"),
+    )
+    .map_err(|error| error.to_string())?;
+
+    Ok(GearBlocksLuaExporterInstallRecord {
+        script_mod_path: script_mod_path.to_string_lossy().to_string(),
+        main_lua_path: main_lua_path.to_string_lossy().to_string(),
+        export_directory: export_directory.to_string_lossy().to_string(),
+    })
+}
+
+#[tauri::command]
+pub fn list_gearblocks_runtime_exports(
+    game_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<GearBlocksRuntimeExportRecord>, String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    require_gearblocks_game(&game)?;
+
+    let root = gearblocks_default_user_data_root()?;
+    let mut exports = Vec::new();
+    for log_path in [root.join("Player-prev.log"), root.join("Player.log")] {
+        if log_path.is_file() {
+            exports.extend(parse_gearblocks_runtime_exports_from_log(&log_path)?);
+        }
+    }
+
+    Ok(exports)
+}
+
+#[tauri::command]
+pub fn import_gearblocks_runtime_part_index(
+    game_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<GameRuntimePartRecord>, String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    require_gearblocks_game(&game)?;
+
+    import_latest_gearblocks_runtime_exports(&state, game.id)?;
+
+    let parts = state
+        .database
+        .list_game_runtime_parts(game.id)
+        .map_err(|error| error.to_string())?;
+
+    Ok(gearblocks_runtime_parts_all_in_catalog_order(parts))
+}
+
+#[tauri::command]
+pub fn list_game_runtime_parts(
+    game_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<GameRuntimePartRecord>, String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    let parts = state
+        .database
+        .list_game_runtime_parts(game_id)
+        .map_err(|error| error.to_string())?;
+
+    if game.slug == "gearblocks" {
+        Ok(gearblocks_runtime_parts_all_in_catalog_order(parts))
+    } else {
+        Ok(parts)
+    }
+}
+
+#[tauri::command]
+pub fn update_game_runtime_part_notes(
+    game_id: i64,
+    part_id: i64,
+    notes: String,
+    state: State<'_, AppState>,
+) -> Result<GameRuntimePartRecord, String> {
+    state
+        .database
+        .update_game_runtime_part_notes(game_id, part_id, &notes)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn clear_game_runtime_part_images_for_category(
+    game_id: i64,
+    category: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<GameRuntimePartRecord>, String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    require_gearblocks_game(&game)?;
+
+    let category = category.trim();
+    if category.is_empty() || category.eq_ignore_ascii_case("all") {
+        return Err(
+            "Select a specific GearBlocks part category before clearing images.".to_string(),
+        );
+    }
+
+    let parts = state
+        .database
+        .clear_game_runtime_part_images_for_category(game.id, category)
+        .map_err(|error| error.to_string())?;
+
+    Ok(gearblocks_runtime_parts_in_catalog_order(category, parts))
+}
+
+#[tauri::command]
+pub fn set_game_runtime_part_display_image(
+    game_id: i64,
+    part_id: i64,
+    image_path: String,
+    state: State<'_, AppState>,
+) -> Result<GameRuntimePartRecord, String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    require_gearblocks_game(&game)?;
+
+    let source_path = PathBuf::from(image_path.trim());
+    if !source_path.is_file() {
+        return Err("Selected image file was not found.".to_string());
+    }
+
+    let extension = source_path
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|value| value.trim().to_ascii_lowercase())
+        .unwrap_or_default();
+    if !is_supported_catalog_image_extension(&extension) {
+        return Err("Select a PNG, JPG, JPEG, WEBP, or BMP image.".to_string());
+    }
+
+    let part = state
+        .database
+        .get_game_runtime_part(part_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| "Runtime part was not found.".to_string())?;
+    if part.game_id != game.id {
+        return Err("Runtime part does not belong to the selected game.".to_string());
+    }
+
+    let screenshots_root = overlay_workspace_root()?.join("game-screenshots");
+    let part_image_dir = screenshots_root.join(&game.slug).join("part-images");
+    fs::create_dir_all(&part_image_dir).map_err(|error| error.to_string())?;
+
+    let part_label = if !part.asset_name.trim().is_empty() {
+        part.asset_name.as_str()
+    } else if !part.display_name.trim().is_empty() {
+        part.display_name.as_str()
+    } else {
+        part.part_key.as_str()
+    };
+    let file_stem = safe_filename_part(part_label);
+    let image_file_name = if file_stem.is_empty() {
+        format!("part_{}.{}", part.id, extension)
+    } else {
+        format!("{}_{}.{}", file_stem, part.id, extension)
+    };
+    let target_path = part_image_dir.join(image_file_name);
+    fs::copy(&source_path, &target_path).map_err(|error| error.to_string())?;
+
+    state
+        .database
+        .update_game_runtime_part_display_image(
+            game.id,
+            part.id,
+            &path_text(&target_path),
+            &path_text(&source_path),
+        )
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn import_gearblocks_catalog_screenshot_images(
+    game_id: i64,
+    category: String,
+    image_path: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<GameRuntimePartRecord>, String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    require_gearblocks_game(&game)?;
+
+    let category = category.trim();
+    if category.is_empty() || category.eq_ignore_ascii_case("all") {
+        return Err(
+            "Select a specific GearBlocks part category before importing a catalog screenshot."
+                .to_string(),
+        );
+    }
+
+    let source_path = PathBuf::from(image_path.trim());
+    if !source_path.is_file() {
+        return Err("Selected catalog screenshot was not found.".to_string());
+    }
+    if source_path.extension().and_then(|value| value.to_str()) != Some("png") {
+        return Err("Catalog screenshot import currently expects a PNG screenshot.".to_string());
+    }
+
+    import_latest_gearblocks_runtime_exports(&state, game.id)?;
+
+    let parts = state
+        .database
+        .list_game_runtime_parts(game.id)
+        .map_err(|error| error.to_string())?
+        .into_iter()
+        .filter(|part| part.category == category)
+        .collect::<Vec<_>>();
+    let parts = gearblocks_runtime_parts_in_catalog_order(category, parts);
+    if parts.is_empty() {
+        return Err(format!(
+            "No runtime API parts are indexed for the {category} category."
+        ));
+    }
+
+    let screenshots_root = overlay_workspace_root()?.join("game-screenshots");
+    let part_image_dir = screenshots_root.join(&game.slug).join("part-images");
+    fs::create_dir_all(&part_image_dir).map_err(|error| error.to_string())?;
+
+    let first_missing_part_index = parts
+        .iter()
+        .position(|part| part.display_image_path.trim().is_empty())
+        .unwrap_or(parts.len());
+    if first_missing_part_index >= parts.len() {
+        return Err(format!(
+            "All {category} parts already have image associations. Clear the category images before re-importing."
+        ));
+    }
+
+    let (screenshot_width, screenshot_height) = png_image_dimensions(&source_path)?;
+    let import_plan = build_gearblocks_catalog_import_plan(
+        &source_path,
+        &parts,
+        first_missing_part_index,
+        screenshot_width,
+        screenshot_height,
+    )?;
+
+    let mut updated_parts = Vec::new();
+    for (part_index, crop, cropped_rgba) in import_plan {
+        let part = &parts[part_index];
+        let part_label = if !part.asset_name.trim().is_empty() {
+            part.asset_name.as_str()
+        } else if !part.display_name.trim().is_empty() {
+            part.display_name.as_str()
+        } else {
+            part.part_key.as_str()
+        };
+        let file_stem = safe_filename_part(part_label);
+        let file_name = if file_stem.is_empty() {
+            format!("catalog_{}_part_{}.png", safe_tag_part(category), part.id)
+        } else {
+            format!(
+                "catalog_{}_{}_{}.png",
+                safe_tag_part(category),
+                file_stem,
+                part.id
+            )
+        };
+        let output_path = part_image_dir.join(file_name);
+        write_rgba_png(&output_path, crop.width, crop.height, &cropped_rgba)?;
+        let updated = state
+            .database
+            .update_game_runtime_part_display_image(
+                game.id,
+                part.id,
+                &path_text(&output_path),
+                &path_text(&source_path),
+            )
+            .map_err(|error| error.to_string())?;
+        updated_parts.push(updated);
+    }
+
+    if updated_parts.is_empty() {
+        return Err(
+            "No complete catalog icons with visible part-name text were found in the selected screenshot."
+                .to_string(),
+        );
+    }
+
+    Ok(updated_parts)
+}
+
+#[tauri::command]
 pub fn list_game_catalog_objects(
     game_id: i64,
     state: State<'_, AppState>,
@@ -829,7 +1629,7 @@ pub fn list_game_part_categories(
 
     let parts = state
         .database
-        .list_game_catalog_objects(game.id)
+        .list_game_runtime_parts(game.id)
         .map_err(|error| error.to_string())?;
     let mut counts = HashMap::new();
     for part in parts {
@@ -974,12 +1774,14 @@ pub fn create_game_screenshot_capture_request(
     game_id: i64,
     timestamp_label: String,
     app: AppHandle,
+    window: WebviewWindow,
     state: State<'_, AppState>,
 ) -> Result<GameScreenshotCaptureRequestRecord, String> {
     create_game_screenshot_capture(
         game_id,
         timestamp_label,
         app,
+        window,
         state,
         "visible-game-display",
         "windows-gdi-bitblt-foreground-window",
@@ -987,6 +1789,7 @@ pub fn create_game_screenshot_capture_request(
         "captured_windows_gdi",
         "Captured through Windows GDI BitBlt from the foreground window after hiding Overlay Forge. Alpha was forced to 255 before PNG encoding.",
         true,
+        false,
         capture_foreground_window_to_png,
     )
 }
@@ -996,12 +1799,14 @@ pub fn create_game_chat_screenshot_capture(
     game_id: i64,
     timestamp_label: String,
     app: AppHandle,
+    window: WebviewWindow,
     state: State<'_, AppState>,
 ) -> Result<GameScreenshotCaptureRequestRecord, String> {
     create_game_screenshot_capture(
         game_id,
         timestamp_label,
         app,
+        window,
         state,
         "visible-game-display",
         "windows-gdi-bitblt-foreground-window",
@@ -1009,6 +1814,7 @@ pub fn create_game_chat_screenshot_capture(
         "captured_windows_gdi_chat",
         "Captured through Windows GDI BitBlt from the foreground window after hiding Overlay Forge. Alpha was forced to 255 before PNG encoding and the screenshot was attached to the current Gaming chat prompt.",
         false,
+        true,
         capture_foreground_window_to_png,
     )
 }
@@ -1017,6 +1823,7 @@ fn create_game_screenshot_capture(
     game_id: i64,
     timestamp_label: String,
     app: AppHandle,
+    window: WebviewWindow,
     state: State<'_, AppState>,
     capture_scope: &str,
     method_source: &str,
@@ -1024,6 +1831,7 @@ fn create_game_screenshot_capture(
     capture_status: &str,
     notes: &str,
     restore_overlay: bool,
+    restore_chat_overlay: bool,
     capture: fn(&std::path::Path) -> Result<(), String>,
 ) -> Result<GameScreenshotCaptureRequestRecord, String> {
     let game = state
@@ -1068,22 +1876,23 @@ fn create_game_screenshot_capture(
         serde_json::to_string_pretty(&request_payload).map_err(|error| error.to_string())?;
     fs::write(&request_file_path, request_payload_text).map_err(|error| error.to_string())?;
 
-    let window = app.get_webview_window("main");
-    if let Some(window) = window.as_ref() {
-        window.hide().map_err(|error| error.to_string())?;
-    }
+    let invoking_window_label = window.label().to_string();
+    let hidden_overlay_windows = hide_overlay_windows_for_capture(&app)?;
     thread::sleep(Duration::from_millis(350));
 
     let capture_result = capture(&target_file_path);
 
     if restore_overlay || capture_result.is_err() {
-        if let Some(window) = window.as_ref() {
-            let _ = window.show();
-            let _ = window.set_focus();
-        }
+        let _ = window.show();
+        let _ = window.set_focus();
     }
+    restore_previously_visible_overlay_windows(&hidden_overlay_windows, &invoking_window_label);
 
     capture_result?;
+
+    if restore_chat_overlay {
+        restore_game_chat_overlay_after_capture(&app, &state)?;
+    }
 
     state
         .database
@@ -1098,6 +1907,71 @@ fn create_game_screenshot_capture(
             notes,
         )
         .map_err(|error| error.to_string())
+}
+
+const OVERLAY_CAPTURE_WINDOW_LABELS: [&str; 2] = ["main", "game-chat"];
+
+struct HiddenOverlayCaptureWindow {
+    label: &'static str,
+    window: WebviewWindow,
+    was_visible: bool,
+}
+
+fn hide_overlay_windows_for_capture(
+    app: &AppHandle,
+) -> Result<Vec<HiddenOverlayCaptureWindow>, String> {
+    let mut hidden_windows = Vec::new();
+
+    for label in OVERLAY_CAPTURE_WINDOW_LABELS {
+        let Some(window) = app.get_webview_window(label) else {
+            continue;
+        };
+        let was_visible = window.is_visible().map_err(|error| error.to_string())?;
+        if was_visible {
+            window.hide().map_err(|error| error.to_string())?;
+        }
+        hidden_windows.push(HiddenOverlayCaptureWindow {
+            label,
+            window,
+            was_visible,
+        });
+    }
+
+    Ok(hidden_windows)
+}
+
+fn restore_previously_visible_overlay_windows(
+    hidden_windows: &[HiddenOverlayCaptureWindow],
+    invoking_window_label: &str,
+) {
+    for hidden_window in hidden_windows {
+        if !hidden_window.was_visible || hidden_window.label == invoking_window_label {
+            continue;
+        }
+        let _ = hidden_window.window.set_always_on_top(true);
+        let _ = ensure_window_accepts_mouse_input(&hidden_window.window);
+        let _ = set_overlay_opacity(&hidden_window.window, 0.78);
+        let _ = show_window_without_activation(&hidden_window.window);
+    }
+}
+
+fn restore_game_chat_overlay_after_capture(
+    app: &AppHandle,
+    state: &State<'_, AppState>,
+) -> Result<(), String> {
+    let Some(window) = app.get_webview_window("game-chat") else {
+        return Ok(());
+    };
+
+    window
+        .set_always_on_top(true)
+        .map_err(|error| error.to_string())?;
+    ensure_window_accepts_mouse_input(&window)?;
+    let _ = set_overlay_opacity(&window, 0.78);
+    show_window_without_activation(&window)?;
+    let _ = focus_last_game_window_from_state(state.inner());
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -1165,7 +2039,7 @@ pub async fn send_game_chat_message(
         game.id,
         screenshot_ids.unwrap_or_default().as_slice(),
     )?;
-    let custom_context = game_custom_prompt_context(&game)?;
+    let custom_context = game_custom_prompt_context(&state, &game)?;
     let api_key = configured_openai_api_key(&state)?;
     let assistant_content = openai::create_game_response(
         &api_key,
@@ -1187,11 +2061,23 @@ pub async fn send_game_chat_message(
         .map_err(|error| error.to_string())
 }
 
-fn game_custom_prompt_context(game: &GameRecord) -> Result<String, String> {
+fn game_custom_prompt_context(
+    state: &State<'_, AppState>,
+    game: &GameRecord,
+) -> Result<String, String> {
     match game.slug.as_str() {
-        "gearblocks" => gearblocks_parts_catalog_prompt_context(),
+        "gearblocks" => gearblocks_prompt_context(state, game.id),
         _ => Ok(String::new()),
     }
+}
+
+fn gearblocks_prompt_context(state: &State<'_, AppState>, game_id: i64) -> Result<String, String> {
+    let mut sections = vec![gearblocks_parts_catalog_prompt_context()?];
+    if let Some(runtime_context) = gearblocks_latest_runtime_understanding_context(state, game_id)?
+    {
+        sections.push(runtime_context);
+    }
+    Ok(sections.join("\n\n---\n\n"))
 }
 
 fn configured_openai_api_key(state: &State<'_, AppState>) -> Result<String, String> {
@@ -1409,15 +2295,27 @@ fn validate_youtube_video_id(value: &str) -> Result<String, String> {
 }
 
 #[cfg(target_os = "windows")]
-fn manual_overlay_drag(app: AppHandle) -> Result<(), String> {
+fn manual_overlay_drag(window: WebviewWindow) -> Result<(), String> {
+    if MANUAL_OVERLAY_DRAG_ACTIVE.swap(true, Ordering::SeqCst) {
+        return Ok(());
+    }
+
+    thread::spawn(move || {
+        let _ = manual_overlay_drag_loop(window);
+        MANUAL_OVERLAY_DRAG_ACTIVE.store(false, Ordering::SeqCst);
+    });
+
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn manual_overlay_drag_loop(window: WebviewWindow) -> Result<(), String> {
     use std::mem;
     use windows_sys::Win32::Foundation::POINT;
     use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
     use windows_sys::Win32::UI::WindowsAndMessaging::GetCursorPos;
 
-    let window = app
-        .get_webview_window("main")
-        .ok_or_else(|| "Overlay window was not found.".to_string())?;
+    let started_at = std::time::Instant::now();
     let start_window_position = window.outer_position().map_err(|error| error.to_string())?;
     let start_cursor = unsafe {
         let mut point: POINT = mem::zeroed();
@@ -1444,6 +2342,9 @@ fn manual_overlay_drag(app: AppHandle) -> Result<(), String> {
         let next_x = start_window_position.x + (cursor.x - start_cursor.x);
         let next_y = start_window_position.y + (cursor.y - start_cursor.y);
         let _ = window.set_position(PhysicalPosition::new(next_x, next_y));
+        if started_at.elapsed() > Duration::from_secs(8) {
+            break;
+        }
         thread::sleep(Duration::from_millis(8));
     }
 
@@ -1451,22 +2352,110 @@ fn manual_overlay_drag(app: AppHandle) -> Result<(), String> {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn manual_overlay_drag(_app: AppHandle) -> Result<(), String> {
+fn manual_overlay_drag(_window: WebviewWindow) -> Result<(), String> {
     Err("Manual no-snap overlay drag is only available on Windows.".to_string())
 }
 
 #[cfg(target_os = "windows")]
-fn set_overlay_opacity(app: AppHandle, opacity: f64) -> Result<(), String> {
+fn focus_last_game_window_impl(state: State<'_, AppState>) -> Result<bool, String> {
+    focus_last_game_window_from_state(state.inner())
+}
+
+#[cfg(target_os = "windows")]
+fn focus_last_game_window_from_state(state: &AppState) -> Result<bool, String> {
+    use windows_sys::Win32::Foundation::HWND;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{IsWindow, SetForegroundWindow};
+
+    let hwnd = state
+        .last_game_window
+        .lock()
+        .map_err(|_| "Last game window state is unavailable.".to_string())?
+        .unwrap_or_default();
+    if hwnd == 0 {
+        return Ok(false);
+    }
+
+    let hwnd = hwnd as HWND;
+    unsafe {
+        if IsWindow(hwnd) == 0 {
+            return Ok(false);
+        }
+        Ok(SetForegroundWindow(hwnd) != 0)
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn focus_last_game_window_impl(_state: State<'_, AppState>) -> Result<bool, String> {
+    Ok(false)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn focus_last_game_window_from_state(_state: &AppState) -> Result<bool, String> {
+    Ok(false)
+}
+
+#[cfg(target_os = "windows")]
+fn show_window_without_activation(window: &WebviewWindow) -> Result<(), String> {
+    use windows_sys::Win32::Foundation::HWND;
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        GetWindowLongPtrW, SetLayeredWindowAttributes, SetWindowLongPtrW, GWL_EXSTYLE,
-        LWA_ALPHA, WS_EX_LAYERED,
+        SetWindowPos, ShowWindow, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+        SWP_SHOWWINDOW, SW_SHOWNOACTIVATE,
     };
 
-    let window = app
-        .get_webview_window("main")
-        .ok_or_else(|| "Overlay window was not found.".to_string())?;
-    let hwnd = window.hwnd().map_err(|error| error.to_string())?.0
-        as windows_sys::Win32::Foundation::HWND;
+    let hwnd = window.hwnd().map_err(|error| error.to_string())?;
+    unsafe {
+        ShowWindow(hwnd.0 as HWND, SW_SHOWNOACTIVATE);
+        SetWindowPos(
+            hwnd.0 as HWND,
+            HWND_TOPMOST,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW,
+        );
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn ensure_window_accepts_mouse_input(window: &WebviewWindow) -> Result<(), String> {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_NOACTIVATE, WS_EX_TRANSPARENT,
+    };
+
+    let hwnd =
+        window.hwnd().map_err(|error| error.to_string())?.0 as windows_sys::Win32::Foundation::HWND;
+    unsafe {
+        let style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        let next_style = style & !(WS_EX_TRANSPARENT as isize) & !(WS_EX_NOACTIVATE as isize);
+        if next_style != style {
+            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, next_style);
+        }
+    }
+
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn ensure_window_accepts_mouse_input(_window: &WebviewWindow) -> Result<(), String> {
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn show_window_without_activation(window: &WebviewWindow) -> Result<(), String> {
+    window.show().map_err(|error| error.to_string())
+}
+
+#[cfg(target_os = "windows")]
+fn set_overlay_opacity(window: &WebviewWindow, opacity: f64) -> Result<(), String> {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        GetWindowLongPtrW, SetLayeredWindowAttributes, SetWindowLongPtrW, GWL_EXSTYLE, LWA_ALPHA,
+        WS_EX_LAYERED,
+    };
+
+    let hwnd =
+        window.hwnd().map_err(|error| error.to_string())?.0 as windows_sys::Win32::Foundation::HWND;
     let alpha = (opacity.clamp(0.2, 1.0) * 255.0).round() as u8;
 
     unsafe {
@@ -1481,7 +2470,7 @@ fn set_overlay_opacity(app: AppHandle, opacity: f64) -> Result<(), String> {
 }
 
 #[cfg(not(target_os = "windows"))]
-fn set_overlay_opacity(_app: AppHandle, _opacity: f64) -> Result<(), String> {
+fn set_overlay_opacity(_window: &WebviewWindow, _opacity: f64) -> Result<(), String> {
     Ok(())
 }
 
@@ -1510,6 +2499,1218 @@ fn require_text(value: &str, field_name: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn game_exposes_data_locations(game: &GameRecord) -> bool {
+    game.slug == "gearblocks"
+}
+
+fn require_game_data_locations_enabled(game: &GameRecord) -> Result<(), String> {
+    if game_exposes_data_locations(game) {
+        Ok(())
+    } else {
+        Err(format!(
+            "{} does not expose save or alternate data location settings.",
+            game.name
+        ))
+    }
+}
+
+fn require_gearblocks_game(game: &GameRecord) -> Result<(), String> {
+    if game.slug == "gearblocks" {
+        Ok(())
+    } else {
+        Err(format!(
+            "{} does not expose GearBlocks construction decoding.",
+            game.name
+        ))
+    }
+}
+
+fn normalize_game_location_type(location_type: &str) -> Result<&'static str, String> {
+    match location_type.trim().to_ascii_lowercase().as_str() {
+        "save" => Ok("save"),
+        "alternate" => Ok("alternate"),
+        _ => Err("Game data location type must be save or alternate.".to_string()),
+    }
+}
+
+fn game_location_type_label(location_type: &str) -> &'static str {
+    match location_type {
+        "save" => "Save Location",
+        "alternate" => "Alternate Data Location",
+        _ => "Data Location",
+    }
+}
+
+fn validate_directory_path(directory_path: &str) -> Result<String, String> {
+    require_text(directory_path, "Directory path")?;
+    let path = PathBuf::from(directory_path.trim());
+    let canonical = fs::canonicalize(&path)
+        .map_err(|error| format!("Could not read selected directory: {error}"))?;
+    if !canonical.is_dir() {
+        return Err("Selected path is not a directory.".to_string());
+    }
+
+    Ok(canonical.to_string_lossy().to_string())
+}
+
+fn gearblocks_saved_constructions_root(state: &AppState, game_id: i64) -> Result<PathBuf, String> {
+    let locations = state
+        .database
+        .list_game_data_locations(game_id)
+        .map_err(|error| error.to_string())?;
+    if let Some(location) = locations
+        .iter()
+        .find(|location| location.location_type == "save")
+    {
+        let configured = PathBuf::from(location.directory_path.trim());
+        if configured.is_dir() {
+            return Ok(configured);
+        }
+    }
+
+    Ok(gearblocks_default_user_data_root()?.join("SavedConstructions"))
+}
+
+fn gearblocks_default_user_data_root() -> Result<PathBuf, String> {
+    let profile = std::env::var("USERPROFILE").map_err(|_| {
+        "USERPROFILE is not available for GearBlocks user data discovery.".to_string()
+    })?;
+    Ok(PathBuf::from(profile)
+        .join("AppData")
+        .join("LocalLow")
+        .join("SmashHammer Games")
+        .join("GearBlocks"))
+}
+
+fn gearblocks_runtime_export_dir(
+    state: &State<'_, AppState>,
+    game_id: i64,
+    gearblocks_root: &std::path::Path,
+) -> Result<PathBuf, String> {
+    let locations = state
+        .database
+        .list_game_data_locations(game_id)
+        .map_err(|error| error.to_string())?;
+    if let Some(location) = locations
+        .iter()
+        .find(|location| location.location_type == "alternate")
+    {
+        let configured = PathBuf::from(location.directory_path.trim());
+        if configured.is_dir() {
+            return Ok(configured);
+        }
+    }
+
+    Ok(gearblocks_root.join("OverlayForgeExports"))
+}
+
+fn lua_long_bracket_path(path: &std::path::Path) -> String {
+    path.to_string_lossy().replace("]]", "] ]")
+}
+
+struct PendingGearBlocksRuntimeExport {
+    intended_path: String,
+    chunks: Vec<String>,
+}
+
+fn parse_gearblocks_runtime_exports_from_log(
+    log_path: &Path,
+) -> Result<Vec<GearBlocksRuntimeExportRecord>, String> {
+    const BEGIN_MARKER: &str = "[OverlayForgeExportBegin]";
+    const DATA_MARKER: &str = "[OverlayForgeExportData]";
+    const END_MARKER: &str = "[OverlayForgeExportEnd]";
+
+    let text = fs::read_to_string(log_path)
+        .map_err(|error| format!("Could not read GearBlocks runtime export log: {error}"))?;
+    let mut pending: HashMap<String, PendingGearBlocksRuntimeExport> = HashMap::new();
+    let mut exports = Vec::new();
+    let source_log_path = log_path.to_string_lossy().to_string();
+
+    for line in text.lines() {
+        if let Some(index) = line.find(BEGIN_MARKER) {
+            let payload = &line[index + BEGIN_MARKER.len()..];
+            if let Ok(document) = serde_json::from_str::<serde_json::Value>(payload) {
+                if let Some(id) = document.get("id").and_then(|value| value.as_str()) {
+                    let intended_path = document
+                        .get("path")
+                        .and_then(|value| value.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    pending.insert(
+                        id.to_string(),
+                        PendingGearBlocksRuntimeExport {
+                            intended_path,
+                            chunks: Vec::new(),
+                        },
+                    );
+                }
+            }
+            continue;
+        }
+
+        if let Some(index) = line.find(DATA_MARKER) {
+            let payload = &line[index + DATA_MARKER.len()..];
+            if let Some((id, chunk)) = payload.split_once('|') {
+                if let Some(export) = pending.get_mut(id) {
+                    export.chunks.push(chunk.to_string());
+                }
+            }
+            continue;
+        }
+
+        if let Some(index) = line.find(END_MARKER) {
+            let id = line[index + END_MARKER.len()..].trim();
+            if let Some(export) = pending.remove(id) {
+                let content = export.chunks.join("");
+                if let Ok(document) = serde_json::from_str::<serde_json::Value>(&content) {
+                    let name = Path::new(&export.intended_path)
+                        .file_name()
+                        .and_then(|value| value.to_str())
+                        .filter(|value| !value.is_empty())
+                        .unwrap_or(id)
+                        .to_string();
+                    exports.push(GearBlocksRuntimeExportRecord {
+                        id: id.to_string(),
+                        name,
+                        intended_path: export.intended_path,
+                        source_log_path: source_log_path.clone(),
+                        byte_size: content.len(),
+                        document,
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(exports)
+}
+
+struct GearBlocksRuntimePart<'a> {
+    id: i64,
+    index: i64,
+    name: String,
+    category: String,
+    system: &'static str,
+    purpose: &'static str,
+    behaviours: Vec<String>,
+    local_position: Option<&'a serde_json::Value>,
+    current_unit_size: Option<&'a serde_json::Value>,
+    link_node_count: usize,
+    mass: f64,
+    is_structural: bool,
+    is_functional: bool,
+}
+
+fn gearblocks_latest_runtime_understanding_context(
+    state: &AppState,
+    game_id: i64,
+) -> Result<Option<String>, String> {
+    import_latest_gearblocks_runtime_exports(state, game_id)?;
+    let Some(latest) = state
+        .database
+        .latest_game_runtime_construction_export(game_id)
+        .map_err(|error| error.to_string())?
+    else {
+        return Ok(None);
+    };
+    let document = serde_json::from_str::<serde_json::Value>(&latest.document_json)
+        .map_err(|error| format!("Latest GearBlocks runtime export JSON is invalid: {error}"))?;
+    let export = GearBlocksRuntimeExportRecord {
+        id: latest.export_id,
+        name: latest.name,
+        intended_path: latest.intended_path,
+        source_log_path: latest.source_log_path,
+        byte_size: latest.byte_size.max(0) as usize,
+        document,
+    };
+
+    Ok(Some(gearblocks_runtime_understanding_context(&export)))
+}
+
+fn gearblocks_runtime_understanding_context(export: &GearBlocksRuntimeExportRecord) -> String {
+    let parts_json = export
+        .document
+        .get("parts")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let mut parts = Vec::new();
+
+    for part in &parts_json {
+        let name = preferred_part_name(part);
+        let category = json_string(part.get("category"));
+        let behaviours = part
+            .get("behaviours")
+            .and_then(|value| value.as_array())
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(|item| item.get("name").and_then(|value| value.as_str()))
+                    .map(|value| value.to_string())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        let behaviour_text = behaviours.join(" ").to_ascii_lowercase();
+        let combined_text = format!(
+            "{} {} {} {}",
+            name,
+            category,
+            behaviour_text,
+            json_string(part.get("assetName"))
+        )
+        .to_ascii_lowercase();
+        let system = classify_gearblocks_part_system(&combined_text, &category, &behaviours);
+        let purpose = gearblocks_part_purpose(system, &combined_text, &behaviour_text);
+        let link_node_count = part
+            .get("linkNodes")
+            .and_then(|value| value.as_array())
+            .map(|items| items.len())
+            .unwrap_or(0);
+        let is_structural = system == "structural frame" || system == "mounts and connectors";
+        let is_functional = !is_structural || !behaviours.is_empty() || link_node_count > 0;
+
+        parts.push(GearBlocksRuntimePart {
+            id: json_i64(part.get("id")),
+            index: json_i64(part.get("index")),
+            name,
+            category,
+            system,
+            purpose,
+            behaviours,
+            local_position: part.get("localPosition"),
+            current_unit_size: part.get("currentUnitSize"),
+            link_node_count,
+            mass: json_f64(part.get("mass")),
+            is_structural,
+            is_functional,
+        });
+    }
+
+    let mut sections = Vec::new();
+    sections.push("# GearBlocks Runtime Construction Understanding".to_string());
+    sections.push(format!(
+        "Source: latest runtime export reconstructed from `{}`. Intended output path: `{}`.",
+        export.source_log_path, export.intended_path
+    ));
+    sections.push(format!(
+        "Construction ID: {}. Parts: {}. Runtime-reported parts: {}. Mass: {:.2}. Frozen: {}. Invulnerable: {}. Player character: {}.",
+        json_i64(export.document.get("id")),
+        parts.len(),
+        json_i64(export.document.get("numParts")),
+        json_f64(export.document.get("mass")),
+        json_bool_label(export.document.get("isFrozen")),
+        json_bool_label(export.document.get("isInvulnerable")),
+        json_bool_label(export.document.get("isPlayerCharacter"))
+    ));
+
+    sections.push(gearblocks_system_counts_section(&parts));
+    sections.push(gearblocks_inventory_section(
+        "Functional inventory by system",
+        &parts,
+        false,
+    ));
+    sections.push(gearblocks_inventory_section(
+        "Structural inventory",
+        &parts,
+        true,
+    ));
+    sections.push(gearblocks_structural_bounds_section(&parts));
+    sections.push(gearblocks_functional_parts_section(&parts));
+    if let Some(attribute_section) =
+        gearblocks_construction_api_attributes_section(&export.document)
+    {
+        sections.push(attribute_section);
+    }
+    if let Some(attribute_section) = gearblocks_part_api_attributes_section(&parts_json) {
+        sections.push(attribute_section);
+    }
+
+    sections.join("\n\n")
+}
+
+fn persist_runtime_export(
+    state: &AppState,
+    game_id: i64,
+    export: &GearBlocksRuntimeExportRecord,
+    indexed_at: &str,
+) -> Result<GameRuntimeConstructionExportRecord, String> {
+    let document_json =
+        serde_json::to_string_pretty(&export.document).map_err(|error| error.to_string())?;
+    state
+        .database
+        .upsert_game_runtime_construction_export(
+            game_id,
+            &export.id,
+            &export.name,
+            &json_string(export.document.get("exportKind")),
+            &export.intended_path,
+            &export.source_log_path,
+            export.byte_size as i64,
+            &export
+                .document
+                .get("id")
+                .map(json_value_to_string)
+                .unwrap_or_default(),
+            export
+                .document
+                .get("exportedAt")
+                .and_then(|value| value.as_str())
+                .unwrap_or_default(),
+            json_i64(export.document.get("numParts")),
+            json_f64(export.document.get("mass")),
+            json_optional_bool(export.document.get("isFrozen")),
+            json_optional_bool(export.document.get("isInvulnerable")),
+            json_optional_bool(export.document.get("isPlayerCharacter")),
+            &document_json,
+            indexed_at,
+        )
+        .map_err(|error| error.to_string())
+}
+
+fn import_runtime_export_parts(
+    state: &AppState,
+    game_id: i64,
+    export: &GearBlocksRuntimeExportRecord,
+) -> Result<(), String> {
+    let parts = export
+        .document
+        .get("parts")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let source_construction_id = export
+        .document
+        .get("id")
+        .map(json_value_to_string)
+        .unwrap_or_default();
+    let last_seen_at = export
+        .document
+        .get("exportedAt")
+        .and_then(|value| value.as_str())
+        .unwrap_or_default()
+        .to_string();
+
+    for part in parts {
+        let part_key = runtime_part_key(&part);
+        if part_key.is_empty() {
+            continue;
+        }
+        let properties_json =
+            serde_json::to_string_pretty(&part).map_err(|error| error.to_string())?;
+        state
+            .database
+            .upsert_game_runtime_part(
+                game_id,
+                &part_key,
+                &json_string(part.get("assetGuid")),
+                &json_string(part.get("assetName")),
+                &json_string(part.get("displayName")),
+                &json_string(part.get("fullDisplayName")),
+                &json_string(part.get("category")),
+                json_f64(part.get("mass")),
+                &properties_json,
+                &export.id,
+                &source_construction_id,
+                &last_seen_at,
+            )
+            .map_err(|error| error.to_string())?;
+    }
+
+    Ok(())
+}
+
+fn import_latest_gearblocks_runtime_exports(
+    state: &AppState,
+    game_id: i64,
+) -> Result<usize, String> {
+    let root = gearblocks_default_user_data_root()?;
+    let mut exports = Vec::new();
+    for log_path in [root.join("Player-prev.log"), root.join("Player.log")] {
+        if log_path.is_file() {
+            exports.extend(parse_gearblocks_runtime_exports_from_log(&log_path)?);
+        }
+    }
+
+    let indexed_at = unix_timestamp_label();
+    for export in &exports {
+        persist_runtime_export(state, game_id, export, &indexed_at)?;
+        import_runtime_export_parts(state, game_id, export)?;
+    }
+
+    Ok(exports.len())
+}
+
+fn runtime_part_key(part: &serde_json::Value) -> String {
+    let asset_guid = json_string(part.get("assetGuid"));
+    if !asset_guid.trim().is_empty() && asset_guid.trim() != "nil" {
+        return format!("asset-guid:{}", asset_guid.trim());
+    }
+
+    let asset_name = json_string(part.get("assetName"));
+    if !asset_name.trim().is_empty() {
+        return format!("asset-name:{}", asset_name.trim().to_ascii_lowercase());
+    }
+
+    let display_name = preferred_part_name(part);
+    let category = json_string(part.get("category"));
+    if display_name.trim().is_empty() {
+        String::new()
+    } else {
+        format!(
+            "display:{}:{}",
+            category.trim().to_ascii_lowercase(),
+            display_name.trim().to_ascii_lowercase()
+        )
+    }
+}
+
+fn json_value_to_string(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::String(text) => text.clone(),
+        serde_json::Value::Null => String::new(),
+        value => value.to_string(),
+    }
+}
+
+fn classify_gearblocks_part_system(
+    text: &str,
+    category: &str,
+    behaviours: &[String],
+) -> &'static str {
+    let category = category.to_ascii_lowercase();
+    let has_behaviour = |needle: &str| {
+        behaviours
+            .iter()
+            .any(|behaviour| behaviour.to_ascii_lowercase().contains(needle))
+    };
+
+    if category.contains("wheel")
+        || text.contains("wheel")
+        || text.contains("tire")
+        || text.contains("tyre")
+    {
+        "wheels and tires"
+    } else if category.contains("suspension")
+        || text.contains("spring")
+        || text.contains("damper")
+        || text.contains("control arm")
+        || text.contains("wishbone")
+        || has_behaviour("ball")
+    {
+        "suspension"
+    } else if category.contains("steering") || text.contains("steering") || text.contains("rack") {
+        "steering"
+    } else if category.contains("combustion")
+        || category.contains("engine")
+        || text.contains("engine")
+        || text.contains("cylinder")
+        || text.contains("crank")
+        || has_behaviour("engine")
+    {
+        "powertrain engine"
+    } else if category.contains("gear")
+        || text.contains("gear")
+        || text.contains("differential")
+        || text.contains("shaft")
+        || text.contains("axle")
+        || text.contains("cv joint")
+        || has_behaviour("gear")
+        || has_behaviour("differential")
+        || has_behaviour("velocity")
+    {
+        "drivetrain"
+    } else if category.contains("brake")
+        || category.contains("clutch")
+        || text.contains("brake")
+        || text.contains("clutch")
+        || has_behaviour("clutch")
+    {
+        "brakes and clutches"
+    } else if category.contains("control")
+        || category.contains("logic")
+        || text.contains("seat")
+        || text.contains("lever")
+        || text.contains("button")
+        || text.contains("sensor")
+        || has_behaviour("control")
+        || has_behaviour("data")
+    {
+        "controls and data"
+    } else if text.contains("beam")
+        || text.contains("plate")
+        || text.contains("bracket")
+        || text.contains("frame")
+        || text.contains("panel")
+        || text.contains("bar")
+        || text.contains("strut")
+    {
+        "structural frame"
+    } else if category.contains("connector") || text.contains("connector") || text.contains("mount")
+    {
+        "mounts and connectors"
+    } else if category.contains("body")
+        || text.contains("body")
+        || text.contains("fender")
+        || text.contains("panel")
+    {
+        "bodywork"
+    } else {
+        "unknown or miscellaneous"
+    }
+}
+
+fn gearblocks_part_purpose(system: &str, text: &str, behaviour_text: &str) -> &'static str {
+    if behaviour_text.contains("spring") || text.contains("coil-over") || text.contains("damper") {
+        "spring/damper element controlling suspension travel"
+    } else if text.contains("control arm") || behaviour_text.contains("ball") {
+        "articulated suspension locating member"
+    } else if text.contains("differential") {
+        "differential gear element distributing drive torque"
+    } else if text.contains("clutch") {
+        "engageable drivetrain coupling or clutch gear"
+    } else if text.contains("brake") {
+        "braking element"
+    } else if text.contains("gear") {
+        "gear train element transmitting or changing rotation"
+    } else if text.contains("cv joint") {
+        "constant-velocity joint or axle segment"
+    } else if text.contains("axle") || text.contains("shaft") {
+        "rotating shaft or axle segment"
+    } else if text.contains("crank") || behaviour_text.contains("engine") {
+        "engine crank or combustion powertrain element"
+    } else if text.contains("wheel") || text.contains("tire") || text.contains("tyre") {
+        "ground contact rolling element"
+    } else if text.contains("steering") || text.contains("rack") {
+        "steering input or linkage element"
+    } else if system == "structural frame" {
+        "rigid welded structural member"
+    } else if system == "mounts and connectors" {
+        "mounting connector or rigid attachment element"
+    } else if system == "controls and data" {
+        "control, signal, or data-bearing element"
+    } else {
+        "part role inferred from category and behaviours"
+    }
+}
+
+fn gearblocks_system_counts_section(parts: &[GearBlocksRuntimePart<'_>]) -> String {
+    let mut counts: HashMap<&str, usize> = HashMap::new();
+    let mut mass_by_system: HashMap<&str, f64> = HashMap::new();
+    for part in parts {
+        *counts.entry(part.system).or_default() += 1;
+        *mass_by_system.entry(part.system).or_default() += part.mass;
+    }
+
+    let mut systems = counts.keys().copied().collect::<Vec<_>>();
+    systems.sort_unstable();
+    let lines = systems
+        .into_iter()
+        .map(|system| {
+            format!(
+                "- {}: {} part(s), {:.2} mass",
+                system,
+                counts.get(system).copied().unwrap_or_default(),
+                mass_by_system.get(system).copied().unwrap_or_default()
+            )
+        })
+        .collect::<Vec<_>>();
+
+    format!("## System Counts\n{}", lines.join("\n"))
+}
+
+fn gearblocks_inventory_section(
+    title: &str,
+    parts: &[GearBlocksRuntimePart<'_>],
+    structural_only: bool,
+) -> String {
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    for part in parts {
+        if structural_only != part.is_structural {
+            continue;
+        }
+        let key = format!("{} | {}", part.system, part.name);
+        *counts.entry(key).or_default() += 1;
+    }
+
+    if counts.is_empty() {
+        return format!("## {title}\nNo matching parts identified.");
+    }
+
+    let mut rows = counts.into_iter().collect::<Vec<_>>();
+    rows.sort_by(|left, right| left.0.cmp(&right.0));
+    let lines = rows
+        .into_iter()
+        .take(80)
+        .map(|(name, count)| format!("- {} x{}", name, count))
+        .collect::<Vec<_>>();
+
+    format!("## {title}\n{}", lines.join("\n"))
+}
+
+fn gearblocks_structural_bounds_section(parts: &[GearBlocksRuntimePart<'_>]) -> String {
+    let mut min_values = [f64::MAX; 3];
+    let mut max_values = [f64::MIN; 3];
+    let mut found = false;
+
+    for part in parts.iter().filter(|part| part.is_structural) {
+        let Some(position) = part.local_position else {
+            continue;
+        };
+        let Some((x, y, z)) = json_vector3(position) else {
+            continue;
+        };
+        for (index, value) in [x, y, z].into_iter().enumerate() {
+            min_values[index] = min_values[index].min(value);
+            max_values[index] = max_values[index].max(value);
+        }
+        found = true;
+    }
+
+    if !found {
+        return "## Structural Envelope\nNo structural bounds could be inferred.".to_string();
+    }
+
+    format!(
+        "## Structural Envelope\nStructural member local-position bounds: x {:.2}..{:.2}, y {:.2}..{:.2}, z {:.2}..{:.2}. This is a coarse chassis envelope, not a visual mesh.",
+        min_values[0], max_values[0], min_values[1], max_values[1], min_values[2], max_values[2]
+    )
+}
+
+fn gearblocks_functional_parts_section(parts: &[GearBlocksRuntimePart<'_>]) -> String {
+    let mut functional_parts = parts
+        .iter()
+        .filter(|part| part.is_functional)
+        .collect::<Vec<_>>();
+    functional_parts.sort_by(|left, right| {
+        left.system
+            .cmp(right.system)
+            .then(left.index.cmp(&right.index))
+    });
+
+    let mut lines = Vec::new();
+    for part in functional_parts.iter().take(140) {
+        let behaviours = if part.behaviours.is_empty() {
+            "none".to_string()
+        } else {
+            part.behaviours.join(", ")
+        };
+        let size = part
+            .current_unit_size
+            .and_then(json_vector3)
+            .map(|(x, y, z)| format!(" size=({x:.2},{y:.2},{z:.2})"))
+            .unwrap_or_default();
+        let position = part
+            .local_position
+            .and_then(json_vector3)
+            .map(|(x, y, z)| format!(" local=({x:.2},{y:.2},{z:.2})"))
+            .unwrap_or_default();
+        lines.push(format!(
+            "- #{} idx {} [{} / {}] {}: {}; behaviours={}; links={}{}{}",
+            part.id,
+            part.index,
+            part.system,
+            part.category,
+            part.name,
+            part.purpose,
+            behaviours,
+            part.link_node_count,
+            position,
+            size
+        ));
+    }
+
+    if functional_parts.len() > lines.len() {
+        lines.push(format!(
+            "- {} additional functional part(s) omitted from prompt context for size.",
+            functional_parts.len() - lines.len()
+        ));
+    }
+
+    if lines.is_empty() {
+        "## Functional Parts\nNo functional parts identified.".to_string()
+    } else {
+        format!("## Functional Parts\n{}", lines.join("\n"))
+    }
+}
+
+fn gearblocks_construction_api_attributes_section(document: &serde_json::Value) -> Option<String> {
+    let attributes = gearblocks_flatten_api_attributes(document);
+    if attributes.is_empty() {
+        return None;
+    }
+
+    let lines = attributes
+        .into_iter()
+        .map(|attribute| format!("- {attribute}"))
+        .collect::<Vec<_>>();
+    Some(format!(
+        "## Construction API Getter Values\n{}",
+        lines.join("\n")
+    ))
+}
+
+fn gearblocks_part_api_attributes_section(parts_json: &[serde_json::Value]) -> Option<String> {
+    let mut lines = Vec::new();
+    for part in parts_json {
+        let attributes = gearblocks_flatten_api_attributes(part);
+        if attributes.is_empty() {
+            continue;
+        }
+        let part_name = preferred_part_name(part);
+        let part_id = json_i64(part.get("id"));
+        let part_index = json_i64(part.get("index"));
+        lines.push(format!(
+            "- #{} idx {} {}: {}",
+            part_id,
+            part_index,
+            part_name,
+            attributes.join("; ")
+        ));
+    }
+
+    if lines.is_empty() {
+        return None;
+    }
+
+    Some(format!("## Part API Getter Values\n{}", lines.join("\n")))
+}
+
+fn gearblocks_flatten_api_attributes(value: &serde_json::Value) -> Vec<String> {
+    let mut attributes = BTreeSet::new();
+    collect_gearblocks_api_attributes(value, "", &mut attributes);
+    attributes.into_iter().collect()
+}
+
+fn collect_gearblocks_api_attributes(
+    value: &serde_json::Value,
+    prefix: &str,
+    attributes: &mut BTreeSet<String>,
+) {
+    match value {
+        serde_json::Value::Object(object) => {
+            if let Some(items) = object
+                .get("apiAttributes")
+                .and_then(|value| value.as_array())
+            {
+                for item in items {
+                    let interface = item
+                        .get("interface")
+                        .and_then(|value| value.as_str())
+                        .unwrap_or("UnknownInterface");
+                    let name = item
+                        .get("name")
+                        .and_then(|value| value.as_str())
+                        .unwrap_or("UnknownAttribute");
+                    let value = item
+                        .get("value")
+                        .map(compact_json_value)
+                        .unwrap_or_else(|| "null".to_string());
+                    let attribute_name = format!("{interface}.{name}");
+                    let label = if prefix.is_empty() {
+                        attribute_name
+                    } else {
+                        format!("{prefix}.{attribute_name}")
+                    };
+                    attributes.insert(format!("{label}={value}"));
+                }
+            }
+
+            for (key, child) in object {
+                if key == "apiAttributes" {
+                    continue;
+                }
+                let next_prefix = match key.as_str() {
+                    "properties" | "paint" | "attachments" | "resizable" | "tweakables" => {
+                        if prefix.is_empty() {
+                            key.to_string()
+                        } else {
+                            format!("{prefix}.{key}")
+                        }
+                    }
+                    "behaviours" | "linkNodes" => {
+                        if prefix.is_empty() {
+                            key.to_string()
+                        } else {
+                            format!("{prefix}.{key}")
+                        }
+                    }
+                    _ => prefix.to_string(),
+                };
+                collect_gearblocks_api_attributes(child, &next_prefix, attributes);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for (index, item) in items.iter().enumerate() {
+                let next_prefix = if prefix.is_empty() {
+                    String::new()
+                } else {
+                    format!("{prefix}[{}]", index + 1)
+                };
+                collect_gearblocks_api_attributes(item, &next_prefix, attributes);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn compact_json_value(value: &serde_json::Value) -> String {
+    let text = match value {
+        serde_json::Value::String(text) => text.clone(),
+        serde_json::Value::Null => "null".to_string(),
+        value => serde_json::to_string(value).unwrap_or_else(|_| value.to_string()),
+    };
+    let single_line = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if single_line.chars().count() > 220 {
+        format!("{}...", single_line.chars().take(220).collect::<String>())
+    } else {
+        single_line
+    }
+}
+
+fn preferred_part_name(part: &serde_json::Value) -> String {
+    for key in ["fullDisplayName", "displayName", "assetName"] {
+        let value = json_string(part.get(key));
+        if !value.is_empty() {
+            return value;
+        }
+    }
+    "Unnamed part".to_string()
+}
+
+fn json_string(value: Option<&serde_json::Value>) -> String {
+    value
+        .and_then(|value| value.as_str())
+        .unwrap_or_default()
+        .trim()
+        .to_string()
+}
+
+fn json_i64(value: Option<&serde_json::Value>) -> i64 {
+    value.and_then(|value| value.as_i64()).unwrap_or_default()
+}
+
+fn json_f64(value: Option<&serde_json::Value>) -> f64 {
+    value.and_then(|value| value.as_f64()).unwrap_or_default()
+}
+
+fn json_optional_bool(value: Option<&serde_json::Value>) -> Option<bool> {
+    value.and_then(|value| value.as_bool())
+}
+
+fn json_bool_label(value: Option<&serde_json::Value>) -> &'static str {
+    match value.and_then(|value| value.as_bool()) {
+        Some(true) => "true",
+        Some(false) => "false",
+        None => "unknown",
+    }
+}
+
+fn json_vector3(value: &serde_json::Value) -> Option<(f64, f64, f64)> {
+    Some((
+        value.get("x")?.as_f64()?,
+        value.get("y")?.as_f64()?,
+        value.get("z")?.as_f64()?,
+    ))
+}
+
+fn list_gearblocks_construction_files_in_root(
+    root: &std::path::Path,
+) -> Result<Vec<GearBlocksConstructionFileRecord>, String> {
+    if !root.is_dir() {
+        return Ok(Vec::new());
+    }
+
+    let mut files = Vec::new();
+    for entry in fs::read_dir(root).map_err(|error| error.to_string())? {
+        let entry = entry.map_err(|error| error.to_string())?;
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        if let Some(construction_path) = find_construction_file_in_folder(&path) {
+            files.push(gearblocks_construction_file_record(&construction_path)?);
+        }
+    }
+    files.sort_by(|left, right| {
+        left.name
+            .to_ascii_lowercase()
+            .cmp(&right.name.to_ascii_lowercase())
+    });
+    Ok(files)
+}
+
+fn find_construction_file_in_folder(folder: &std::path::Path) -> Option<PathBuf> {
+    for file_name in ["construction.bytes", "construction.byte"] {
+        let path = folder.join(file_name);
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+    None
+}
+
+fn validate_gearblocks_construction_file_path(path_text: &str) -> Result<PathBuf, String> {
+    require_text(path_text, "Construction file path")?;
+    let path = PathBuf::from(path_text.trim());
+    if !path.is_file() {
+        return Err("Selected construction path is not a file.".to_string());
+    }
+    let Some(file_name) = path.file_name().and_then(|value| value.to_str()) else {
+        return Err("Selected construction path has no file name.".to_string());
+    };
+    if !matches!(file_name, "construction.bytes" | "construction.byte") {
+        return Err("Selected file must be construction.bytes or construction.byte.".to_string());
+    }
+    Ok(path)
+}
+
+fn gearblocks_construction_file_record(
+    construction_path: &std::path::Path,
+) -> Result<GearBlocksConstructionFileRecord, String> {
+    let metadata = fs::metadata(construction_path).map_err(|error| error.to_string())?;
+    let folder_path = construction_path
+        .parent()
+        .ok_or_else(|| "Construction file has no parent folder.".to_string())?;
+    let name = folder_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("Construction")
+        .to_string();
+    Ok(GearBlocksConstructionFileRecord {
+        name,
+        folder_path: folder_path.to_string_lossy().to_string(),
+        construction_path: construction_path.to_string_lossy().to_string(),
+        byte_size: metadata.len(),
+    })
+}
+
+fn decode_gearblocks_construction_path(
+    construction_path: &std::path::Path,
+) -> Result<GearBlocksConstructionDecodeRecord, String> {
+    let compressed = fs::read(construction_path).map_err(|error| error.to_string())?;
+    let mut decoder = DeflateDecoder::new(compressed.as_slice());
+    let mut decoded = Vec::new();
+    decoder
+        .read_to_end(&mut decoded)
+        .map_err(|error| format!("Could not deflate GearBlocks construction bytes: {error}"))?;
+    let document = Document::from_reader(decoded.as_slice())
+        .map_err(|error| format!("Could not parse GearBlocks construction BSON: {error}"))?;
+    let document_json = bson_document_to_json(&document);
+    let summary = summarize_gearblocks_construction(&document_json);
+    let file_record = gearblocks_construction_file_record(construction_path)?;
+
+    Ok(GearBlocksConstructionDecodeRecord {
+        name: file_record.name,
+        folder_path: file_record.folder_path,
+        construction_path: file_record.construction_path,
+        byte_size: compressed.len() as u64,
+        decoded_byte_size: decoded.len(),
+        summary,
+        document: document_json,
+    })
+}
+
+fn bson_document_to_json(document: &Document) -> serde_json::Value {
+    let mut map = serde_json::Map::new();
+    for (key, value) in document.iter() {
+        map.insert(key.to_string(), bson_value_to_json(key, value));
+    }
+    serde_json::Value::Object(map)
+}
+
+fn bson_value_to_json(key: &str, value: &Bson) -> serde_json::Value {
+    match value {
+        Bson::Double(value) => json!(value),
+        Bson::String(value) => json!(value),
+        Bson::Array(values) => serde_json::Value::Array(
+            values
+                .iter()
+                .enumerate()
+                .map(|(index, value)| bson_value_to_json(&index.to_string(), value))
+                .collect(),
+        ),
+        Bson::Document(document) => bson_document_to_json(document),
+        Bson::Boolean(value) => json!(value),
+        Bson::Null => serde_json::Value::Null,
+        Bson::Int32(value) => json!(value),
+        Bson::Int64(value) => json!(value),
+        Bson::Binary(binary) => bson_binary_to_json(key, &binary.bytes),
+        Bson::DateTime(value) => json!(value.to_string()),
+        Bson::ObjectId(value) => json!(value.to_string()),
+        Bson::RegularExpression(value) => json!(value.to_string()),
+        Bson::Timestamp(value) => json!({
+            "time": value.time,
+            "increment": value.increment
+        }),
+        Bson::Decimal128(value) => json!(value.to_string()),
+        Bson::Undefined => serde_json::Value::Null,
+        Bson::MaxKey => json!("MaxKey"),
+        Bson::MinKey => json!("MinKey"),
+        Bson::DbPointer(value) => json!(format!("{value:?}")),
+        Bson::JavaScriptCode(value) => json!(value),
+        Bson::JavaScriptCodeWithScope(value) => json!({
+            "code": value.code,
+            "scope": bson_document_to_json(&value.scope)
+        }),
+        Bson::Symbol(value) => json!(value),
+    }
+}
+
+fn bson_binary_to_json(key: &str, bytes: &[u8]) -> serde_json::Value {
+    if key.eq_ignore_ascii_case("assetGUID") && bytes.len() == 8 {
+        return json!({
+            "type": "assetGuid",
+            "u64": u64::from_le_bytes(bytes.try_into().unwrap()).to_string(),
+            "hex": bytes_to_hex(bytes)
+        });
+    }
+    if matches!(bytes.len(), 12 | 16) {
+        return json!({
+            "type": if bytes.len() == 12 { "vector3" } else { "quaternion" },
+            "values": bytes_to_f32_values(bytes)
+        });
+    }
+    if key.eq_ignore_ascii_case("col") && bytes.len() == 4 {
+        return json!({
+            "type": "rgba",
+            "values": bytes
+        });
+    }
+
+    json!({
+        "type": "binary",
+        "byteLength": bytes.len(),
+        "hex": bytes_to_hex(bytes)
+    })
+}
+
+fn bytes_to_f32_values(bytes: &[u8]) -> Vec<f64> {
+    bytes
+        .chunks_exact(4)
+        .map(|chunk| {
+            let mut value = [0_u8; 4];
+            value.copy_from_slice(chunk);
+            f32::from_le_bytes(value) as f64
+        })
+        .collect()
+}
+
+fn bytes_to_hex(bytes: &[u8]) -> String {
+    bytes
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<Vec<_>>()
+        .join("")
+}
+
+fn summarize_gearblocks_construction(
+    document: &serde_json::Value,
+) -> GearBlocksConstructionSummaryRecord {
+    let composites = document.get("composites");
+    let part_data = document.get("partData");
+    let mut parts = Vec::new();
+    let mut unique_asset_guids = std::collections::HashSet::new();
+
+    for (composite_index, composite) in json_collection_values(composites).into_iter().enumerate() {
+        let composite_parts = composite.get("parts");
+        for (composite_part_index, part) in json_collection_values(composite_parts)
+            .into_iter()
+            .enumerate()
+        {
+            let index = parts.len();
+            let asset_guid = json_asset_guid(part.get("assetGUID")).unwrap_or_default();
+            if !asset_guid.is_empty() {
+                unique_asset_guids.insert(asset_guid.clone());
+            }
+            let part_data_item = json_collection_value_at(part_data, index);
+            let dimensions = part_data_item
+                .and_then(|value| value.get("dims"))
+                .and_then(json_vector_values)
+                .unwrap_or_default();
+            let behaviours = part_data_item
+                .and_then(|value| value.get("behaviours"))
+                .map(json_object_keys)
+                .unwrap_or_default();
+
+            parts.push(GearBlocksConstructionPartSummaryRecord {
+                index,
+                composite_index,
+                composite_part_index,
+                asset_guid,
+                dimensions,
+                behaviours,
+            });
+        }
+    }
+
+    GearBlocksConstructionSummaryRecord {
+        is_frozen: document.get("isFrozen").and_then(|value| value.as_bool()),
+        is_invulnerable: document
+            .get("isInvulnerable")
+            .and_then(|value| value.as_bool()),
+        composite_count: json_collection_len(composites),
+        part_count: parts.len(),
+        unique_asset_guid_count: unique_asset_guids.len(),
+        attachment_count: json_collection_len(document.get("attachments")),
+        link_count: json_collection_len(document.get("links")),
+        intersection_count: json_collection_len(document.get("intersections")),
+        parts,
+    }
+}
+
+fn json_collection_len(value: Option<&serde_json::Value>) -> usize {
+    match value {
+        Some(serde_json::Value::Array(values)) => values.len(),
+        Some(serde_json::Value::Object(values)) => values.len(),
+        _ => 0,
+    }
+}
+
+fn json_collection_values(value: Option<&serde_json::Value>) -> Vec<&serde_json::Value> {
+    match value {
+        Some(serde_json::Value::Array(values)) => values.iter().collect(),
+        Some(serde_json::Value::Object(values)) => {
+            let mut pairs = values.iter().collect::<Vec<_>>();
+            pairs.sort_by_key(|(key, _)| key.parse::<usize>().unwrap_or(usize::MAX));
+            pairs.into_iter().map(|(_, value)| value).collect()
+        }
+        _ => Vec::new(),
+    }
+}
+
+fn json_collection_value_at(
+    value: Option<&serde_json::Value>,
+    index: usize,
+) -> Option<&serde_json::Value> {
+    match value {
+        Some(serde_json::Value::Array(values)) => values.get(index),
+        Some(serde_json::Value::Object(values)) => values.get(&index.to_string()),
+        _ => None,
+    }
+}
+
+fn json_asset_guid(value: Option<&serde_json::Value>) -> Option<String> {
+    value
+        .and_then(|value| value.get("u64"))
+        .and_then(|value| value.as_str())
+        .map(str::to_string)
+}
+
+fn json_vector_values(value: &serde_json::Value) -> Option<Vec<f64>> {
+    value.get("values").and_then(|values| {
+        values
+            .as_array()
+            .map(|items| items.iter().filter_map(|item| item.as_f64()).collect())
+    })
+}
+
+fn json_object_keys(value: &serde_json::Value) -> Vec<String> {
+    match value {
+        serde_json::Value::Object(map) => map.keys().cloned().collect(),
+        _ => Vec::new(),
+    }
+}
+
 fn overlay_workspace_root() -> Result<PathBuf, String> {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     manifest_dir
@@ -1531,6 +3732,13 @@ fn screenshot_request_id(timestamp_label: &str) -> String {
     } else {
         format!("{label}_{suffix}")
     }
+}
+
+fn unix_timestamp_label() -> String {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs().to_string())
+        .unwrap_or_else(|_| "0".to_string())
 }
 
 fn safe_filename_part(value: &str) -> String {
@@ -1557,6 +3765,262 @@ fn safe_filename_part(value: &str) -> String {
     output
 }
 
+fn is_supported_catalog_image_extension(extension: &str) -> bool {
+    matches!(extension, "png" | "jpg" | "jpeg" | "webp" | "bmp")
+}
+
+const GEARBLOCKS_CATALOG_COLUMNS: usize = 8;
+const GEARBLOCKS_CATALOG_START_X: u32 = 226;
+const GEARBLOCKS_CATALOG_START_Y: u32 = 88;
+const GEARBLOCKS_CATALOG_SCROLLED_START_Y: u32 = 187;
+const GEARBLOCKS_CATALOG_TILE_WIDTH: u32 = 180;
+const GEARBLOCKS_CATALOG_TILE_HEIGHT: u32 = 180;
+const GEARBLOCKS_CATALOG_GAP_X: u32 = 9;
+const GEARBLOCKS_CATALOG_GAP_Y: u32 = 9;
+
+fn gearblocks_catalog_tile_crops(count: usize, start_y: u32) -> Vec<IconCrop> {
+    (0..count)
+        .map(|index| {
+            let index = index as u32;
+            let column = index % GEARBLOCKS_CATALOG_COLUMNS as u32;
+            let row = index / GEARBLOCKS_CATALOG_COLUMNS as u32;
+            IconCrop {
+                x: GEARBLOCKS_CATALOG_START_X
+                    + column * (GEARBLOCKS_CATALOG_TILE_WIDTH + GEARBLOCKS_CATALOG_GAP_X),
+                y: start_y + row * (GEARBLOCKS_CATALOG_TILE_HEIGHT + GEARBLOCKS_CATALOG_GAP_Y),
+                width: GEARBLOCKS_CATALOG_TILE_WIDTH,
+                height: GEARBLOCKS_CATALOG_TILE_HEIGHT,
+            }
+        })
+        .collect()
+}
+
+fn build_gearblocks_catalog_import_plan(
+    source_path: &std::path::Path,
+    parts: &[GameRuntimePartRecord],
+    first_missing_part_index: usize,
+    screenshot_width: u32,
+    screenshot_height: u32,
+) -> Result<Vec<(usize, IconCrop, Vec<u8>)>, String> {
+    let first_missing_row = first_missing_part_index / GEARBLOCKS_CATALOG_COLUMNS;
+    let candidate_offsets = if first_missing_part_index == 0 {
+        vec![0]
+    } else {
+        let first_candidate_row = first_missing_row.saturating_sub(4);
+        (first_candidate_row..=first_missing_row)
+            .map(|row| row * GEARBLOCKS_CATALOG_COLUMNS)
+            .collect::<Vec<_>>()
+    };
+    let candidate_start_ys = if first_missing_part_index == 0 {
+        vec![GEARBLOCKS_CATALOG_START_Y]
+    } else {
+        vec![
+            GEARBLOCKS_CATALOG_START_Y,
+            GEARBLOCKS_CATALOG_SCROLLED_START_Y,
+        ]
+    };
+
+    let mut best_plan = Vec::new();
+    let mut best_matching_overlap_count = 0_usize;
+    for part_index_offset in candidate_offsets {
+        for start_y in &candidate_start_ys {
+            let mut plan = Vec::new();
+            let mut matching_overlap_count = 0_usize;
+            for (screen_index, crop) in gearblocks_catalog_tile_crops(parts.len(), *start_y)
+                .into_iter()
+                .enumerate()
+            {
+                if !icon_crop_is_within_bounds(crop, screenshot_width, screenshot_height) {
+                    continue;
+                }
+
+                let part_index = part_index_offset + screen_index;
+                let Some(part) = parts.get(part_index) else {
+                    continue;
+                };
+                let cropped_rgba = read_png_crop_rgba(source_path, crop)?;
+                if !gearblocks_catalog_crop_looks_complete(&cropped_rgba, crop.width, crop.height) {
+                    continue;
+                }
+
+                if !part.display_image_path.trim().is_empty() {
+                    if gearblocks_catalog_crop_matches_existing_image(
+                        &cropped_rgba,
+                        crop.width,
+                        crop.height,
+                        &part.display_image_path,
+                    ) {
+                        matching_overlap_count += 1;
+                    }
+                    continue;
+                }
+
+                plan.push((part_index, crop, cropped_rgba));
+            }
+
+            if matching_overlap_count > best_matching_overlap_count
+                || (matching_overlap_count == best_matching_overlap_count
+                    && plan.len() > best_plan.len())
+            {
+                best_matching_overlap_count = matching_overlap_count;
+                best_plan = plan;
+            }
+        }
+    }
+
+    if best_plan.is_empty() {
+        return Err(
+            "No complete catalog icons with visible part-name text were found in the selected screenshot."
+                .to_string(),
+        );
+    }
+
+    Ok(best_plan)
+}
+
+fn icon_crop_is_within_bounds(crop: IconCrop, image_width: u32, image_height: u32) -> bool {
+    crop.x
+        .checked_add(crop.width)
+        .is_some_and(|right| right <= image_width)
+        && crop
+            .y
+            .checked_add(crop.height)
+            .is_some_and(|bottom| bottom <= image_height)
+}
+
+fn png_image_dimensions(source_path: &std::path::Path) -> Result<(u32, u32), String> {
+    let file = File::open(source_path).map_err(|error| error.to_string())?;
+    let decoder = png::Decoder::new(BufReader::new(file));
+    let reader = decoder.read_info().map_err(|error| error.to_string())?;
+    let info = reader.info();
+    Ok((info.width, info.height))
+}
+
+fn gearblocks_catalog_crop_matches_existing_image(
+    cropped_rgba: &[u8],
+    width: u32,
+    height: u32,
+    existing_image_path: &str,
+) -> bool {
+    let path = Path::new(existing_image_path.trim());
+    if !path.is_file() {
+        return false;
+    }
+
+    let Ok((existing_width, existing_height)) = png_image_dimensions(path) else {
+        return false;
+    };
+    if existing_width != width || existing_height != height {
+        return false;
+    }
+
+    let Ok(existing_rgba) = read_png_crop_rgba(
+        path,
+        IconCrop {
+            x: 0,
+            y: 0,
+            width,
+            height,
+        },
+    ) else {
+        return false;
+    };
+
+    gearblocks_catalog_images_are_similar(cropped_rgba, &existing_rgba)
+}
+
+fn gearblocks_catalog_images_are_similar(left: &[u8], right: &[u8]) -> bool {
+    if left.len() != right.len() || left.len() < 4 {
+        return false;
+    }
+
+    let mut sampled_pixels = 0_u64;
+    let mut total_difference = 0_u64;
+    for index in (0..left.len()).step_by(64) {
+        if index + 2 >= left.len() {
+            break;
+        }
+        sampled_pixels += 1;
+        total_difference += left[index].abs_diff(right[index]) as u64;
+        total_difference += left[index + 1].abs_diff(right[index + 1]) as u64;
+        total_difference += left[index + 2].abs_diff(right[index + 2]) as u64;
+    }
+
+    sampled_pixels > 0 && (total_difference / (sampled_pixels * 3)) <= 18
+}
+
+fn gearblocks_runtime_parts_in_catalog_order(
+    category: &str,
+    parts: Vec<GameRuntimePartRecord>,
+) -> Vec<GameRuntimePartRecord> {
+    let expected_parts = gearblocks_catalog_part_seeds()
+        .into_iter()
+        .filter(|seed| seed.category == category)
+        .collect::<Vec<_>>();
+    if expected_parts.is_empty() {
+        return parts;
+    }
+
+    let mut remaining = parts;
+    let mut ordered = Vec::new();
+    for expected in expected_parts {
+        let expected_key = normalized_part_name_key(expected.name);
+        let expected_asset_key = expected.asset_name.map(normalized_part_name_key);
+        let Some(index) = remaining.iter().position(|part| {
+            let name_matches = normalized_part_name_key(&part.display_name) == expected_key
+                || normalized_part_name_key(&part.full_display_name) == expected_key;
+            let asset_matches = expected_asset_key
+                .as_ref()
+                .is_none_or(|key| normalized_part_name_key(&part.asset_name) == *key);
+            name_matches && asset_matches
+        }) else {
+            continue;
+        };
+        ordered.push(remaining.remove(index));
+    }
+
+    ordered.extend(remaining);
+    ordered
+}
+
+fn gearblocks_runtime_parts_all_in_catalog_order(
+    parts: Vec<GameRuntimePartRecord>,
+) -> Vec<GameRuntimePartRecord> {
+    let categories = gearblocks_part_categories()
+        .into_iter()
+        .map(|category| category.name)
+        .collect::<Vec<_>>();
+    let mut ordered = Vec::new();
+    let mut remaining = parts;
+
+    for category in categories {
+        let mut category_parts = Vec::new();
+        let mut index = 0;
+        while index < remaining.len() {
+            if remaining[index].category == category {
+                category_parts.push(remaining.remove(index));
+            } else {
+                index += 1;
+            }
+        }
+        ordered.extend(gearblocks_runtime_parts_in_catalog_order(
+            category,
+            category_parts,
+        ));
+    }
+
+    ordered.extend(remaining);
+    ordered
+}
+
+fn normalized_part_name_key(value: &str) -> String {
+    value
+        .chars()
+        .filter(|character| character.is_ascii_alphanumeric())
+        .flat_map(|character| character.to_lowercase())
+        .collect()
+}
+
 fn path_text(path: &std::path::Path) -> String {
     path.to_string_lossy().to_string()
 }
@@ -1564,6 +4028,7 @@ fn path_text(path: &std::path::Path) -> String {
 struct GearBlocksPartSeed {
     name: &'static str,
     category: &'static str,
+    asset_name: Option<&'static str>,
 }
 
 #[derive(Clone, Copy)]
@@ -1782,7 +4247,7 @@ fn gearblocks_catalog_part_seeds() -> Vec<GearBlocksPartSeed> {
             "Engine Cylinder 2x2 2L (Transparent)",
             "Engine Head x1",
             "Engine Head x2",
-            "Engine Inlet",
+            "Engine Throttle x1",
             "4-Blade Fan x3",
             "7-Blade Fan x4",
             "Air-cooled Fan x3",
@@ -1827,6 +4292,7 @@ fn gearblocks_catalog_part_seeds() -> Vec<GearBlocksPartSeed> {
             "Angle Limiter (Axle to Axle)",
             "Angle Limiter (Block to Axle)",
             "Ball",
+            "Ball & Axle",
             "CV Joint (Inner)",
             "CV Joint (Inner) & Axle",
             "CV Joint (Outer)",
@@ -1878,7 +4344,7 @@ fn gearblocks_catalog_part_seeds() -> Vec<GearBlocksPartSeed> {
             "2 Line Display 9x2",
             "4 Line Display 5x2",
             "4 Line Display 9x4",
-            "Joystick Display",
+            "Joypad (Dual Axis)",
             "Keypad (1 Key)",
             "Keypad (4 Keys)",
             "Keypad (9 Keys)",
@@ -2130,14 +4596,52 @@ fn gearblocks_catalog_part_seeds() -> Vec<GearBlocksPartSeed> {
             "Control Arm 3x5",
             "Control Arm 3x6",
             "Control Arm 3x7",
-            "Coil-over (Barrel) Large",
-            "Coil-over (Piston) Large",
-            "Coil-over (Barrel) Medium",
-            "Coil-over (Piston) Medium",
-            "Coil-over (Barrel) Small",
-            "Coil-over (Piston) Small",
-            "Coil-over (Barrel) Small Strong",
-            "Coil-over (Piston) Small Strong",
+        ],
+    );
+    push_part_seed_variants(
+        &mut seeds,
+        "Suspension",
+        &[
+            ("Coil-over (Barrel) Large", "SpringDamper Ball Large Barrel"),
+            ("Coil-over (Piston) Large", "SpringDamper Ball Large Piston"),
+            (
+                "Coil-over (Barrel) Medium",
+                "SpringDamper Ball Medium Barrel",
+            ),
+            (
+                "Coil-over (Piston) Medium",
+                "SpringDamper Ball Medium Piston",
+            ),
+            ("Coil-over (Barrel) Small", "SpringDamper Ball Small Barrel"),
+            ("Coil-over (Piston) Small", "SpringDamper Ball Small Piston"),
+            (
+                "Coil-over (Barrel) Small Strong",
+                "SpringDamper Ball Small Strong Barrel",
+            ),
+            (
+                "Coil-over (Piston) Small Strong",
+                "SpringDamper Ball Small Strong Piston",
+            ),
+            ("Coil-over (Barrel) Large", "SpringDamper Large Barrel"),
+            ("Coil-over (Piston) Large", "SpringDamper Large Piston"),
+            ("Coil-over (Barrel) Medium", "SpringDamper Medium Barrel"),
+            ("Coil-over (Piston) Medium", "SpringDamper Medium Piston"),
+            ("Coil-over (Barrel) Small", "SpringDamper Small Barrel"),
+            ("Coil-over (Piston) Small", "SpringDamper Small Piston"),
+            (
+                "Coil-over (Barrel) Small Strong",
+                "SpringDamper Small Strong Barrel",
+            ),
+            (
+                "Coil-over (Piston) Small Strong",
+                "SpringDamper Small Strong Piston",
+            ),
+        ],
+    );
+    push_part_seeds(
+        &mut seeds,
+        "Suspension",
+        &[
             "Steering Arm 1-Ball 1-Axle x4",
             "Steering Arm 2-Axle x4",
             "Steering Arm 2-Ball x4",
@@ -2165,6 +4669,7 @@ fn gearblocks_catalog_part_seeds() -> Vec<GearBlocksPartSeed> {
             "Car Wheel 3x7",
             "Car Wheel 3x8",
             "Car Wheel 4x8",
+            "Go-kart Wheel 2.5x4",
             "Go-kart Wheel 2x5",
             "Motorcycle Wheel 1x8",
             "Off-road Wheel 5.5x11",
@@ -2187,7 +4692,25 @@ fn push_part_seeds(
     names: &[&'static str],
 ) {
     for name in names {
-        seeds.push(GearBlocksPartSeed { name, category });
+        seeds.push(GearBlocksPartSeed {
+            name,
+            category,
+            asset_name: None,
+        });
+    }
+}
+
+fn push_part_seed_variants(
+    seeds: &mut Vec<GearBlocksPartSeed>,
+    category: &'static str,
+    variants: &[(&'static str, &'static str)],
+) {
+    for (name, asset_name) in variants {
+        seeds.push(GearBlocksPartSeed {
+            name,
+            category,
+            asset_name: Some(asset_name),
+        });
     }
 }
 
@@ -2235,6 +4758,11 @@ fn crop_png_region(
     output_path: &std::path::Path,
     crop: IconCrop,
 ) -> Result<(), String> {
+    let rgba = read_png_crop_rgba(source_path, crop)?;
+    write_rgba_png(output_path, crop.width, crop.height, &rgba)
+}
+
+fn read_png_crop_rgba(source_path: &std::path::Path, crop: IconCrop) -> Result<Vec<u8>, String> {
     let file = File::open(source_path).map_err(|error| error.to_string())?;
     let decoder = png::Decoder::new(BufReader::new(file));
     let mut reader = decoder.read_info().map_err(|error| error.to_string())?;
@@ -2267,7 +4795,76 @@ fn crop_png_region(
         }
     }
 
-    write_rgba_png(output_path, crop.width, crop.height, &rgba)
+    Ok(rgba)
+}
+
+fn gearblocks_catalog_crop_looks_complete(rgba: &[u8], width: u32, height: u32) -> bool {
+    if width < 80 || height < 100 {
+        return false;
+    }
+    if gearblocks_catalog_crop_has_internal_separator(rgba, width, height) {
+        return false;
+    }
+
+    let footer_top = height.saturating_sub(70);
+    let footer_bottom = height.saturating_sub(8);
+    let left = 8;
+    let right = width.saturating_sub(8);
+    let mut blue_footer_pixels = 0_u32;
+    let mut bright_footer_pixels = 0_u32;
+    let mut sampled_pixels = 0_u32;
+
+    for y in footer_top..footer_bottom {
+        for x in left..right {
+            let index = ((y * width + x) as usize) * 4;
+            if index + 2 >= rgba.len() {
+                continue;
+            }
+            sampled_pixels += 1;
+            let red = rgba[index];
+            let green = rgba[index + 1];
+            let blue = rgba[index + 2];
+
+            if blue > 145 && green > 95 && red < 120 {
+                blue_footer_pixels += 1;
+            }
+            if red > 205 && green > 205 && blue > 205 {
+                bright_footer_pixels += 1;
+            }
+        }
+    }
+
+    sampled_pixels > 0 && blue_footer_pixels < sampled_pixels / 2 && bright_footer_pixels >= 350
+}
+
+fn gearblocks_catalog_crop_has_internal_separator(rgba: &[u8], width: u32, height: u32) -> bool {
+    let start_y = height / 3;
+    let end_y = (height * 2) / 3;
+    let required_pixels = (width * 3) / 4;
+
+    for y in start_y..end_y {
+        let mut separator_pixels = 0_u32;
+        for x in 0..width {
+            let index = ((y * width + x) as usize) * 4;
+            if index + 2 >= rgba.len() {
+                continue;
+            }
+            let red = rgba[index];
+            let green = rgba[index + 1];
+            let blue = rgba[index + 2];
+
+            if (40..=95).contains(&red) && (55..=130).contains(&green) && (85..=190).contains(&blue)
+            {
+                separator_pixels += 1;
+            }
+        }
+
+        if separator_pixels >= required_pixels {
+            return true;
+        }
+    }
+
+    false
 }
 
 fn practical_part_description(name: &str, category: &str) -> String {

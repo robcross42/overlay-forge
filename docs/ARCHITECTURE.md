@@ -48,6 +48,8 @@ Milestone 13 - Project Workspace UI Consolidation is complete, passed, and succe
 
 Gaming Screenshot Capture is complete, passed, and successful. It adds a Gaming feature surface with a GearBlocks workspace, selected-game screenshot capture controls, thumbnail previews, and screenshot context-menu cleanup while preserving the shell-owned component host.
 
+Overlay Forge 0.2.0 GearBlocks runtime API interface support is complete, passed, and successful. It adds documented construction namespace interface descriptors, Lua exporter getter snapshots, runtime-log import normalization, SQLite persistence of expanded getter data, and catalog display of attribute availability.
+
 ## UI Consistency
 
 Organizer components should follow the same interaction pattern unless a milestone explicitly documents a reason to diverge:
@@ -122,7 +124,9 @@ Milestone 11 adds idempotent table initialization for `bridge_file_drafts`. Draf
 
 Milestone 12 adds idempotent table initialization for `project_markdown_context`. Each row stores one configured local Markdown root per project. Markdown file content is read freshly from disk for chat load, Prompt Preview, project chat sends, and bridge draft generation; file snapshots are not cached in SQLite.
 
-Gaming adds idempotent table initialization for `games`, `game_catalog_objects`, `game_catalog_references`, and `game_catalog_screenshots`. Screenshot image bytes are stored as PNG files under `game-screenshots/`, while SQLite stores metadata and local paths only. The screenshot preview path uses Tauri asset loading scoped to `game-screenshots/`.
+Gaming adds idempotent table initialization for `games`, `game_data_locations`, `game_catalog_objects`, `game_catalog_references`, and `game_catalog_screenshots`. `game_data_locations` stores game-scoped local save or alternate data directories for games that expose the feature, with GearBlocks currently exposing the controls from its selected-game Home screen. Screenshot image bytes are stored as PNG files under `game-screenshots/`, while SQLite stores metadata and local paths only. The screenshot preview path uses Tauri asset loading scoped to `game-screenshots/`.
+
+GearBlocks construction decoding is local-first and file-based. GearBlocks' default user data location is `%USERPROFILE%\AppData\LocalLow\SmashHammer Games\GearBlocks\`. Overlay Forge discovers `construction.bytes` files from the configured GearBlocks Save Location or that default root's `SavedConstructions` folder, inflates the raw DEFLATE payload, parses the BSON document, and renders a JSON-friendly summary on the GearBlocks Home screen. Runtime-only metadata such as display names, categories, mass, active stage, and documented construction namespace getter snapshots is handled through an installable GearBlocks Lua script mod under the default root's `ScriptMods` folder that exports loaded construction metadata through marked `Player.log` JSON chunks when direct Lua file writes are unavailable. GearBlocks chat automatically converts the latest runtime export into a semantic vehicle-build summary that aggregates welded structural pieces and lists functional systems with inferred purposes.
 
 ## OpenAI Boundary
 

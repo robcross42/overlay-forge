@@ -76,6 +76,16 @@ The Gaming screenshot feature is validated for the current GearBlocks workflow. 
 
 The simple Gaming chat overlay also includes a capture button for quick full game screenshots. Chat captures reuse the regular screenshot capture flow, save as normal game screenshots, and automatically attach to the current chat prompt.
 
+GearBlocks also exposes selected-game Home controls for setting its Save Location and Alternate Data Location through a native directory picker. These paths are stored locally in SQLite as game-scoped data-location records.
+
+The GearBlocks Home screen includes a Construction Decoder for local `construction.bytes` saves. Overlay Forge inflates the raw DEFLATE payload, parses the BSON document, and presents a compact construction summary plus decoded JSON. The same panel can install an Overlay Forge GearBlocks script mod that exports richer runtime metadata from loaded constructions to JSON. See `docs/GEARBLOCKS_CONSTRUCTION_DECODER.md`.
+
+**Overlay Forge 0.2.0 - GearBlocks Runtime API Interfaces**
+
+Status: **Complete / Passed / Successful**
+
+Overlay Forge 0.2.0 marks the documented `SmashHammer.GearBlocks.Construction` namespace reference interfaces as implemented for runtime export support. The GearBlocks Lua exporter emits `apiAttributes` getter snapshots, the runtime importer persists the expanded export payload in SQLite, Parts catalog details show available API attributes without catalog values, and exported construction context retains captured getter values for chat and DB definitions. See `docs/GEARBLOCKS_RUNTIME_INTERFACES.md`.
+
 Completed Milestone 0 capabilities:
 
 - Tauri v2 desktop shell
@@ -133,6 +143,10 @@ Required Markdown context files:
 - `docs/BRIDGE_FILES.md`
 - `docs/DATA_MODEL.md`
 - `docs/GAMING_SCREENSHOT_VALIDATION.md`
+- `docs/GEARBLOCKS_CONSTRUCTION_DECODER.md`
+- `docs/GEARBLOCKS_PARTS_CATALOG.md`
+- `docs/GEARBLOCKS_RUNTIME_INTERFACES.md`
+- `docs/NEXT_VALIDATION_REMINDER.md`
 - `docs/PROJECT_RULES.md`
 - `docs/MILESTONE_0.md`
 - `docs/MILESTONE_1.md`

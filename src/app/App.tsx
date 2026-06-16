@@ -13,13 +13,21 @@ import { Tasks } from "../features/tasks/Tasks";
 import { YouTube } from "../features/youtube/YouTube";
 import { getMilestoneStatus } from "../services/appStatus";
 import type { MilestoneStatus } from "../services/appStatus";
-import { deleteGame, listGameChatConversations, listGames } from "../services/gaming";
+import {
+  deleteGame,
+  focusGameChatOverlayWindow,
+  getActiveGameChatOverlay,
+  listGameChatConversations,
+  listGames,
+  openGameChatOverlayWindow
+} from "../services/gaming";
 import type { Game, GameChatConversation } from "../services/gaming";
 import { deletePlanningConversation, listPlanningConversations } from "../services/planningChat";
 import type { PlanningConversation } from "../services/planningChat";
 import { deleteProject, listProjects } from "../services/projects";
 import type { Project } from "../services/projects";
 import {
+  focusLastGameWindow,
   hideOverlayWindow,
   setOverlayMinimumSize,
   setOverlayWindowOpacity,
@@ -76,8 +84,7 @@ export default function App() {
   const [projectNavAction, setProjectNavAction] = useState<ProjectNavAction | null>(null);
   const [gameNavAction, setGameNavAction] = useState<GameNavAction | null>(null);
   const [isChatOverlayMode, setIsChatOverlayMode] = useState(false);
-  const [gameChatOverlayRequestNonce, setGameChatOverlayRequestNonce] = useState(0);
-  const [gameChatScreenshotCaptureRequestNonce, setGameChatScreenshotCaptureRequestNonce] = useState(0);
+  const [isSidebarMinimized, setIsSidebarMinimized] = useState(false);
   const [conversationsByProject, setConversationsByProject] = useState<
     Record<number, PlanningConversation[]>
   >({});
@@ -142,7 +149,6 @@ export default function App() {
     let isMounted = true;
     let unlisten: (() => void) | null = null;
     let unlistenOverlayToggle: (() => void) | null = null;
-    let unlistenScreenshotCapture: (() => void) | null = null;
     let pollId: number | null = null;
 
     function consumePendingShortcut() {
@@ -160,12 +166,12 @@ export default function App() {
             void handleMainOverlayShortcut(false);
           } else if (action === "game_chat_overlay") {
             void handleGameChatOverlayShortcut();
-          } else if (action === "game_chat_overlay_was_visible") {
-            void handleGameChatOverlayShortcut(true);
           } else if (action === "game_chat_overlay_was_hidden") {
             void handleGameChatOverlayShortcut(false);
-          } else if (action === "game_chat_region_capture") {
-            setGameChatScreenshotCaptureRequestNonce(Date.now());
+          } else if (action === "game_chat_overlay_focus_chat") {
+            void focusGameChatPrompt();
+          } else if (action === "game_chat_overlay_focus_game") {
+            void focusGameContext();
           }
         })
         .catch(() => {});
@@ -203,22 +209,6 @@ export default function App() {
       })
       .catch(() => {});
 
-    listen("game-chat-screenshot-capture-requested", () => {
-      if (!isMounted) {
-        return;
-      }
-
-      consumePendingShortcut();
-    })
-      .then((cleanup) => {
-        if (isMounted) {
-          unlistenScreenshotCapture = cleanup;
-        } else {
-          cleanup();
-        }
-      })
-      .catch(() => {});
-
     window.addEventListener("focus", consumePendingShortcut);
     pollId = window.setInterval(consumePendingShortcut, 500);
     consumePendingShortcut();
@@ -227,7 +217,6 @@ export default function App() {
       isMounted = false;
       unlisten?.();
       unlistenOverlayToggle?.();
-      unlistenScreenshotCapture?.();
       window.removeEventListener("focus", consumePendingShortcut);
       if (pollId !== null) {
         window.clearInterval(pollId);
@@ -301,7 +290,7 @@ export default function App() {
     }
 
     setIsChatOverlayMode(false);
-    if (preShortcutWasVisible === false) {
+    if (preShortcutWasVisible !== true) {
       await showOverlayWindow().catch(() => {});
     }
   }
@@ -355,14 +344,23 @@ export default function App() {
     setGameNavAction({ type, gameId: game.id, nonce: Date.now() });
   }
 
+  async function focusGameChatPrompt() {
+    const didFocus = await focusGameChatOverlayWindow().catch(() => false);
+    if (!didFocus) {
+      await handleGameChatOverlayShortcut(false);
+    }
+  }
+
+  async function focusGameContext() {
+    await focusLastGameWindow().catch(() => false);
+  }
+
   async function handleGameChatOverlayShortcut(preShortcutWasVisible?: boolean) {
-    if (isChatOverlayMode) {
-      if (preShortcutWasVisible === true) {
-        await hideChatOverlayWindow().catch(() => {});
-      } else {
-        await setOverlayWindowOpacity(0.78).catch(() => {});
-        await showOverlayWindow().catch(() => {});
-      }
+    const activeOverlay = await getActiveGameChatOverlay().catch(() => null);
+    if (activeOverlay) {
+      await openGameChatOverlayWindow(activeOverlay.gameId, activeOverlay.conversationId).catch(
+        () => {}
+      );
       return;
     }
 
@@ -387,9 +385,7 @@ export default function App() {
     setSelectedGameId(selectedGame.id);
 
     if (selectedConversationId) {
-      await setOverlayWindowOpacity(0.78).catch(() => {});
-      await showOverlayWindow().catch(() => {});
-      setGameChatOverlayRequestNonce(Date.now());
+      await openGameChatOverlayWindow(selectedGame.id, selectedConversationId).catch(() => {});
       return;
     }
 
@@ -532,15 +528,65 @@ export default function App() {
       {!isChatOverlayMode && <WindowResizeHandles />}
       {!isChatOverlayMode && <WindowTitlebar />}
 
-      <div className="overlay-shell">
+      <div className={isSidebarMinimized ? "overlay-shell overlay-shell-sidebar-minimized" : "overlay-shell"}>
         {!isChatOverlayMode && (
-        <aside className="sidebar">
+        <aside className={isSidebarMinimized ? "sidebar sidebar-minimized" : "sidebar"}>
+          {isSidebarMinimized ? (
+            <>
+              <button
+                aria-label="Restore navigation"
+                className="sidebar-toggle sidebar-toggle-collapsed"
+                onClick={() => setIsSidebarMinimized(false)}
+                title="Restore navigation"
+                type="button"
+              >
+                &gt;
+              </button>
+              <nav className="component-nav component-nav-compact" aria-label="Components">
+                {navItems.map((item) => (
+                  <button
+                    aria-label={item.label}
+                    className={
+                      item.id === activeComponent
+                        ? "nav-item nav-item-active nav-item-compact"
+                        : "nav-item nav-item-compact"
+                    }
+                    key={item.id}
+                    onClick={() => {
+                      setIsChatOverlayMode(false);
+                      if (item.id === "projects") {
+                        openProjects();
+                      } else if (item.id === "gaming") {
+                        openGaming();
+                      } else {
+                        setActiveComponent(item.id);
+                      }
+                    }}
+                    title={item.label}
+                    type="button"
+                  >
+                    {compactNavLabel(item.label)}
+                  </button>
+                ))}
+              </nav>
+            </>
+          ) : (
+          <>
           <div className="brand-block">
             <span className="brand-mark">OF</span>
             <div>
               <h1>Overlay Forge</h1>
               <p>Desktop command hub</p>
             </div>
+            <button
+              aria-label="Minimize navigation"
+              className="sidebar-toggle"
+              onClick={() => setIsSidebarMinimized(true)}
+              title="Minimize navigation"
+              type="button"
+            >
+              &lt;
+            </button>
           </div>
 
           <nav className="component-nav" aria-label="Components">
@@ -829,6 +875,8 @@ export default function App() {
             <span className={status?.databaseReady ? "status-dot ready" : "status-dot"} />
             <span>{status?.databaseReady ? "SQLite ready" : "SQLite pending"}</span>
           </div>
+          </>
+          )}
         </aside>
         )}
 
@@ -862,14 +910,11 @@ export default function App() {
             {activeComponent === "gaming" && (
               <Gaming
                 chatOverlayMode={isChatOverlayMode}
-                chatOverlayRequestNonce={gameChatOverlayRequestNonce}
-                chatScreenshotCaptureRequestNonce={gameChatScreenshotCaptureRequestNonce}
                 gameSections={gameSections}
                 navAction={gameNavAction}
-                onEnterChatOverlayMode={() => {
-                  void setOverlayWindowOpacity(0.78);
-                  setIsChatOverlayMode(true);
-                }}
+                onEnterChatOverlayMode={(game, conversationId) =>
+                  void openGameChatOverlayWindow(game.id, conversationId)
+                }
                 onGameCreated={onGameCreated}
                 onGameChatConversationsChanged={onGameChatConversationsChanged}
                 onGameDeleted={onGameDeleted}
@@ -921,4 +966,12 @@ export default function App() {
       </div>
     </main>
   );
+}
+
+function compactNavLabel(label: string) {
+  const words = label.split(/\s+/).filter(Boolean);
+  if (words.length > 1) {
+    return words.map((word) => word[0]).join("").slice(0, 2).toUpperCase();
+  }
+  return label.slice(0, 2).toUpperCase();
 }

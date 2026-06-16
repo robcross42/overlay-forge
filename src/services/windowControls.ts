@@ -30,6 +30,10 @@ export function setOverlayWindowOpacity(opacity: number) {
   return invoke<void>("set_overlay_window_opacity", { opacity });
 }
 
+export function focusLastGameWindow() {
+  return invoke<boolean>("focus_last_game_window");
+}
+
 export function clearOverlayMinimumSize() {
   return overlayWindow.setMinSize(null);
 }

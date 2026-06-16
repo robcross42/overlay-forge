@@ -29,6 +29,7 @@ type ChatWorkspaceProps<TConversation extends ChatConversation, TMessage extends
   inputPlaceholder: string;
   contextSlot?: ReactNode;
   promptContextSummary?: string;
+  focusInputRequestNonce?: number;
   chatOverlayMode?: boolean;
   emptyMainSlot?: ReactNode;
   hideSidebarWhenSelected?: boolean;
@@ -57,6 +58,7 @@ export function ChatWorkspace<TConversation extends ChatConversation, TMessage e
   inputPlaceholder,
   contextSlot,
   promptContextSummary,
+  focusInputRequestNonce = 0,
   chatOverlayMode = false,
   emptyMainSlot,
   hideSidebarWhenSelected = false,
@@ -72,6 +74,7 @@ export function ChatWorkspace<TConversation extends ChatConversation, TMessage e
   onSendMessage
 }: ChatWorkspaceProps<TConversation, TMessage>) {
   const messageListRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const selectedConversation =
     conversations.find((conversation) => conversation.id === selectedConversationId) ?? null;
   const showEmptyMainSlot = !selectedConversation && emptyMainSlot;
@@ -90,6 +93,14 @@ export function ChatWorkspace<TConversation extends ChatConversation, TMessage e
       behavior: isSending ? "auto" : "smooth"
     });
   }, [isSending, messages.length, selectedConversation?.id]);
+
+  useEffect(() => {
+    if (!selectedConversation || focusInputRequestNonce <= 0) {
+      return;
+    }
+
+    inputRef.current?.focus();
+  }, [focusInputRequestNonce, selectedConversation?.id]);
 
   function handleDraftKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (
@@ -276,6 +287,7 @@ export function ChatWorkspace<TConversation extends ChatConversation, TMessage e
 
             <form className="chat-input-row">
               <textarea
+                ref={inputRef}
                 aria-label="Chat message"
                 className="body-input compact"
                 disabled={!selectedConversation || isSending}

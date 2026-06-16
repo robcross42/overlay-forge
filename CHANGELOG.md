@@ -6,6 +6,49 @@ Unreleased changes are grouped by day using `YYYY-MM-DD` headings so a single da
 
 ## Unreleased
 
+## 0.2.0 - 2026-06-15
+
+Minor version release for the GearBlocks construction runtime API interface inclusion.
+
+### 2026-06-15
+
+#### Changed
+
+- Bumped Overlay Forge from `0.1.0` to `0.2.0` for the new GearBlocks construction runtime API interface feature.
+- Marked the GearBlocks parts catalog as complete and validated for game version `0.8.96622`.
+- Added GearBlocks catalog version/status metadata to the Parts view.
+- Hid the GearBlocks category image import and clear controls from the normal Parts view while keeping the maintenance code path available for future game-version catalog refreshes.
+- Hid the GearBlocks Player.log parts import button from the normal Parts view while keeping the import functionality available elsewhere for maintenance.
+- Added a blank GearBlocks Constructions top-level view as the future catalog surface for in-game constructions.
+- Added a persistent GearBlocks construction index backed by `game_constructions`, populated from `SavedConstructions` by decoding each `construction.bytes` file.
+- Changed the GearBlocks Constructions view to list indexed saved constructions with part, composite, and file-size summaries.
+- Fully implemented support structures and exporter wiring for the documented `SmashHammer.GearBlocks.Construction` namespace reference interfaces.
+- Added persisted GearBlocks runtime construction exports backed by SQLite so the full latest `Player.log` export is available to chat context without relying only on ad hoc log parsing.
+- Added automatic GearBlocks context sync that checks file fingerprints and refreshes runtime exports, runtime parts, and saved construction indexes when `Player.log` or saved construction files change while the GearBlocks workspace is selected.
+- Expanded the GearBlocks Lua exporter to emit `apiAttributes` getter snapshots for documented construction interfaces, including catalog-level attribute availability and per-export captured values.
+- Changed the GearBlocks part detail view to list available runtime API attributes by name while keeping actual values in the DB definitions/export payload.
+
+#### Documentation
+
+- Updated README, bridge, project plan, architecture, and data model notes for the Overlay Forge `0.2.0` GearBlocks runtime API interface release and future troubleshooting path.
+
+#### Validation
+
+- Validated the GearBlocks runtime API getter snapshot path in-game on Rob's vehicle: catalog part details show API attributes without values, and DB definitions / runtime export context include the expanded captured getter data.
+
+### 2026-06-14
+
+#### Fixed
+
+- Fixed simple Gaming chat overlay screenshot context feedback so the overlay always shows whether the current prompt has screenshots attached after captures or cleared context.
+- Changed Gaming chat screenshot shortcut requests to use a monotonic nonce instead of `Date.now()` so rapid repeated capture requests cannot be missed.
+- Fixed overlay shortcut flicker by making React the single owner of show/hide decisions after hotkeys report the pre-shortcut window visibility.
+- Changed `Ctrl+Shift+C` into a contextual Gaming chat focus key: it opens the game chat list when no chat is selected, focuses the selected simple chat prompt from game context, and returns focus to the remembered game window from chat context without hiding the chat overlay.
+
+#### Validation
+
+- Validated with `npm run build`, `cargo check`, and `git diff --check`.
+
 ### 2026-06-13
 
 #### Added
@@ -17,6 +60,13 @@ Unreleased changes are grouped by day using `YYYY-MM-DD` headings so a single da
 - Added `Capture Screenshot For Gaming Chat` as a configurable keybind function in Settings.
 - Added mouse button support for configurable keybinds, including `Mouse4`, `Mouse5`, and modifier combinations such as `Ctrl+Mouse4`.
 - Added Windows native opacity control for the simple Gaming chat overlay.
+- Added GearBlocks Home controls for setting game-scoped Save Location and Alternate Data Location folders through a native directory picker.
+- Added persisted `game_data_locations` records for game-scoped local data folders.
+- Added a GearBlocks Construction Decoder on the selected-game Home screen for local `construction.bytes` files.
+- Added raw DEFLATE + BSON decoding for GearBlocks construction saves, including composite, part, asset GUID, attachment, link, and decoded JSON summaries.
+- Added a GearBlocks Lua construction exporter installer that writes an Overlay Forge script mod for runtime construction metadata export.
+- Added the `OverlayForgeConstructionExporter` script mod template with targeted-construction and all-loaded-constructions JSON export actions.
+- Added automatic GearBlocks chat context generation from the latest runtime construction export, including structural aggregation and functional-system purpose inference.
 
 #### Changed
 
@@ -44,16 +94,28 @@ Unreleased changes are grouped by day using `YYYY-MM-DD` headings so a single da
 - Fixed `Ctrl+Shift+C` reopening a hidden simple chat overlay and immediately hiding it again by preserving the window visibility state from before the shortcut was handled.
 - Fixed `Ctrl+Shift+Space` main-shell toggling so React decides whether to hide the main shell or switch out of simple chat mode using the window visibility state from before the shortcut was handled.
 - Added a compact screenshot attachment indicator inside the simple Gaming chat overlay prompt area.
+- Fixed GearBlocks Lua exporter installation so script mods always install under GearBlocks' standard `AppData\LocalLow` `ScriptMods` folder instead of deriving the script path from configured data locations.
+- Fixed the GearBlocks Lua exporter path for GearBlocks' blocked `io.open` sandbox by falling back to marked `Player.log` JSON chunks and adding an Overlay Forge runtime-log importer.
 
 #### Documentation
 
 - Documented the Gaming chat overlay shortcut in README and bridge context.
 - Documented Settings as the place to configure Overlay Forge keybinds.
+- Documented game data-location persistence in the data model and architecture notes.
+- Documented the GearBlocks construction decoder, local save format discovery, and runtime API boundary.
+- Documented the GearBlocks Lua exporter install path, export directory behavior, and in-game validation boundary.
+- Documented `%USERPROFILE%\AppData\LocalLow\SmashHammer Games\GearBlocks\` as GearBlocks' default user data location and the source for default subpaths.
+- Documented the GearBlocks runtime construction understanding model used for chat context.
 
 #### Validation
 
 - Marked the 2026-06-13 Overlay Forge, Gaming chat overlay, screenshot capture, keybind, and window behavior changes as implemented, successful, and validated.
 - Validated with `npm run build`, `cargo build`, and runtime confirmation that simple chat translucency renders correctly and screenshots transmit correctly.
+- Validated the GearBlocks data-location implementation with `npm run build` and `cargo build`.
+- Validated the GearBlocks construction decoder implementation with `npm run build` and `cargo build`.
+- Validated the GearBlocks Lua exporter installer and command wiring with `npm run build` and `cargo check`; `cargo build` was blocked by Windows denying replacement of the locked `target\debug\overlay-forge.exe`.
+- Validated the GearBlocks runtime-log importer with `npm run build`, `cargo check`, and `git diff --check`.
+- Validated the GearBlocks construction understanding context with `npm run build`, `cargo check`, and `git diff --check`.
 
 ### 2026-06-06
 

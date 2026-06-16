@@ -24,6 +24,8 @@ The Gaming data model adds local game sections plus game-scoped catalog tables f
 
 Gaming Screenshot Capture is complete, passed, and successful for the current GearBlocks workflow. Screenshot metadata, capture manifests, thumbnail preview loading, and screenshot delete cleanup are validated.
 
+Overlay Forge 0.2.0 GearBlocks runtime API interface support is complete, passed, and successful. The expanded getter snapshot payload is stored in existing runtime export JSON fields so interface coverage can grow without a schema migration for each getter.
+
 ## Tables
 
 ### scratchpad
@@ -328,6 +330,102 @@ updated_at
 
 Game-scoped reference records for future external URLs, local files, notes, and object-linked reference material. `object_id` is optional so references can belong to a whole game or to a specific catalog object.
 
+### game_data_locations
+
+```text
+id
+game_id
+location_type
+label
+directory_path
+created_at
+updated_at
+```
+
+Game-scoped local directory records for save folders or alternate game data folders. `location_type` is unique per game and currently supports `save` and `alternate`. The frontend exposes these controls only for games that opt into the feature; GearBlocks exposes Save Location and Alternate Data Location controls on the selected-game Home screen.
+
+GearBlocks' default user data location is `%USERPROFILE%\AppData\LocalLow\SmashHammer Games\GearBlocks\`. Overlay Forge derives default GearBlocks subpaths from that root, including `SavedConstructions`, `ScriptMods`, and `OverlayForgeExports`, unless a feature explicitly uses a configured game data location.
+
+### game_constructions
+
+```text
+id
+game_id
+name
+folder_path
+construction_path
+byte_size
+decoded_byte_size
+composite_count
+part_count
+unique_asset_guid_count
+attachment_count
+link_count
+intersection_count
+is_frozen
+is_invulnerable
+summary_json
+document_json
+last_indexed_at
+created_at
+updated_at
+```
+
+GearBlocks saved construction index populated from each construction folder under `SavedConstructions`. Overlay Forge decodes each `construction.bytes` / `construction.byte` file with the local raw DEFLATE + BSON decoder and stores both a compact summary and the decoded JSON document for later construction catalog features.
+
+### game_runtime_construction_exports
+
+```text
+id
+game_id
+export_id
+name
+export_kind
+intended_path
+source_log_path
+byte_size
+construction_id
+exported_at
+part_count
+mass
+is_frozen
+is_invulnerable
+is_player_character
+document_json
+last_indexed_at
+created_at
+updated_at
+```
+
+GearBlocks runtime construction export index populated from Overlay Forge Lua exporter records reconstructed from `Player.log` / `Player-prev.log`. `document_json` stores the complete runtime export payload, including `apiAttributes` entries with captured getter values, so chat context can use the latest indexed construction data from SQLite. The GearBlocks workspace periodically checks `Player.log`, `Player-prev.log`, and saved construction file fingerprints while the game section is selected, then reindexes these records when those files change.
+
+### game_runtime_parts
+
+```text
+id
+game_id
+part_key
+asset_guid
+asset_name
+display_name
+full_display_name
+category
+mass
+properties_json
+source_export_id
+source_construction_id
+last_seen_at
+display_image_path
+source_image_path
+notes
+created_at
+updated_at
+```
+
+GearBlocks runtime API part index populated from Overlay Forge Lua exporter records reconstructed from `Player.log` / `Player-prev.log`. `part_key` prefers `AssetGUID`, falls back to `AssetName`, then to category plus display name. `properties_json` stores the full exported runtime part object, including documented construction namespace `apiAttributes`, so newly exposed GearBlocks API fields remain available without schema changes.
+
+`display_image_path` stores Overlay Forge's copied catalog display image under `game-screenshots/<game-slug>/part-images/`. `source_image_path` stores the original image selected by the user. Screenshot bytes are kept outside SQLite.
+
 ### game_catalog_screenshots
 
 ```text
@@ -406,6 +504,10 @@ Gaming uses non-destructive idempotent table initialization:
 CREATE TABLE IF NOT EXISTS games
 CREATE TABLE IF NOT EXISTS game_catalog_objects
 CREATE TABLE IF NOT EXISTS game_catalog_references
+CREATE TABLE IF NOT EXISTS game_data_locations
+CREATE TABLE IF NOT EXISTS game_constructions
+CREATE TABLE IF NOT EXISTS game_runtime_construction_exports
+CREATE TABLE IF NOT EXISTS game_runtime_parts
 CREATE TABLE IF NOT EXISTS game_catalog_screenshots
 ```
 

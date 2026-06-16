@@ -1,0 +1,1019 @@
+-- Overlay Forge Construction Exporter
+-- Installed by Overlay Forge. Load from GearBlocks SCRIPT MODS, then use the
+-- exporter window to export either the targeted construction or all live
+-- scene parts to JSON files.
+
+local EXPORT_DIR = [[{{EXPORT_DIR}}]]
+local LOG_CHUNK_SIZE = 3000
+
+local win = Windows.CreateWindow()
+win.SetAlignment( align_HorizCentre, 0, 420 )
+win.SetAlignment( align_VertCentre, 0, 210 )
+win.Title = "Overlay Forge Exporter"
+
+local statusLabel = win.CreateLabel()
+statusLabel.SetAlignment( align_HorizEdges, 12, 12 )
+statusLabel.SetAlignment( align_TopEdge, 12, 44 )
+statusLabel.Alignment = textAnc_MiddleLeft
+
+local exportTargetButton = win.CreateTextButton()
+exportTargetButton.SetAlignment( align_LeftEdge, 12, 190 )
+exportTargetButton.SetAlignment( align_TopEdge, 64, 36 )
+
+local exportAllButton = win.CreateTextButton()
+exportAllButton.SetAlignment( align_RightEdge, 12, 190 )
+exportAllButton.SetAlignment( align_TopEdge, 64, 36 )
+
+local function setText(element, text)
+    if element == nil then
+        return
+    end
+    pcall(function() element.Text = text end)
+    pcall(function() element.text = text end)
+end
+
+local function addEventHandler(eventSource, handler)
+    if eventSource ~= nil and eventSource.add ~= nil then
+        eventSource.add(handler)
+        return true
+    end
+    return false
+end
+
+local function addClickHandler(button, handler)
+    if button == nil then
+        return false
+    end
+    return addEventHandler(button.OnClick, handler) or addEventHandler(button.onClick, handler)
+end
+
+local function showWindow(window, isVisible)
+    if window == nil then
+        return
+    end
+    if window.Show ~= nil then
+        pcall(function() window.Show(isVisible) end)
+    elseif window.show ~= nil then
+        pcall(function() window.show(isVisible) end)
+    end
+end
+
+setText(statusLabel, "Overlay Forge exporter ready.")
+setText(exportTargetButton, "Export Target")
+setText(exportAllButton, "Export All")
+
+local function setStatus(text)
+    setText(statusLabel, text)
+    print("[OverlayForge] " .. text)
+end
+
+local function escapeJsonString(value)
+    local text = tostring(value or "")
+    text = text:gsub("\\", "\\\\")
+    text = text:gsub("\"", "\\\"")
+    text = text:gsub("\b", "\\b")
+    text = text:gsub("\f", "\\f")
+    text = text:gsub("\n", "\\n")
+    text = text:gsub("\r", "\\r")
+    text = text:gsub("\t", "\\t")
+    return "\"" .. text .. "\""
+end
+
+local function isArray(value)
+    if type(value) ~= "table" then
+        return false
+    end
+    local count = 0
+    for key, _ in pairs(value) do
+        if type(key) ~= "number" then
+            return false
+        end
+        if key > count then
+            count = key
+        end
+    end
+    return true
+end
+
+local function encodeJson(value)
+    local valueType = type(value)
+    if valueType == "nil" then
+        return "null"
+    elseif valueType == "boolean" then
+        return value and "true" or "false"
+    elseif valueType == "number" then
+        return tostring(value)
+    elseif valueType == "string" then
+        return escapeJsonString(value)
+    elseif valueType == "table" then
+        local parts = {}
+        if isArray(value) then
+            for index = 1, #value do
+                table.insert(parts, encodeJson(value[index]))
+            end
+            return "[" .. table.concat(parts, ",") .. "]"
+        end
+        for key, item in pairs(value) do
+            table.insert(parts, escapeJsonString(key) .. ":" .. encodeJson(item))
+        end
+        return "{" .. table.concat(parts, ",") .. "}"
+    end
+    return escapeJsonString(value)
+end
+
+local function vectorToTable(value)
+    if value == nil then
+        return nil
+    end
+    return {
+        x = value.x or value.X or 0,
+        y = value.y or value.Y or 0,
+        z = value.z or value.Z or 0
+    }
+end
+
+local function quaternionToTable(value)
+    if value == nil then
+        return nil
+    end
+    return {
+        x = value.x or value.X or 0,
+        y = value.y or value.Y or 0,
+        z = value.z or value.Z or 0,
+        w = value.w or value.W or 0
+    }
+end
+
+local function safeRead(getter, fallback)
+    local ok, value = pcall(getter)
+    if ok then
+        return value
+    end
+    return fallback
+end
+
+local function safeTry(getter)
+    local ok, value = pcall(getter)
+    return ok, value
+end
+
+local function addAttribute(attributes, interfaceName, attributeName, getter, normalizer)
+    local ok, value = safeTry(getter)
+    if not ok or value == nil then
+        return false
+    end
+    local exportedValue = value
+    if normalizer ~= nil then
+        exportedValue = normalizer(value)
+    elseif type(value) ~= "boolean" and type(value) ~= "number" and type(value) ~= "string" then
+        exportedValue = tostring(value)
+    end
+    table.insert(attributes, {
+        interface = interfaceName,
+        name = attributeName,
+        valueType = type(value),
+        value = exportedValue
+    })
+    return true
+end
+
+local function hasAnyAttribute(target, specs)
+    if target == nil then
+        return false
+    end
+    for _, spec in ipairs(specs) do
+        local ok, value = safeTry(spec)
+        if ok and value ~= nil then
+            return true
+        end
+    end
+    return false
+end
+
+local function interfaceNamesFromAttributes(attributes)
+    local seen = {}
+    local names = {}
+    for _, attribute in ipairs(attributes or {}) do
+        if attribute.interface ~= nil and not seen[attribute.interface] then
+            seen[attribute.interface] = true
+            table.insert(names, attribute.interface)
+        end
+    end
+    return names
+end
+
+local function runtimeRef(value)
+    if value == nil then
+        return nil
+    end
+    return {
+        id = safeRead(function() return value.ID end, nil),
+        index = safeRead(function() return value.Idx end, nil),
+        name = safeRead(function() return value.Name end, safeRead(function() return value.DisplayName end, "")),
+        assetGuid = tostring(safeRead(function() return value.AssetGUID end, "")),
+        assetName = safeRead(function() return value.AssetName end, ""),
+        type = tostring(value)
+    }
+end
+
+local function describeTweakable(value)
+    if value == nil then
+        return nil
+    end
+    local valueType = type(value)
+    if valueType == "boolean" or valueType == "number" or valueType == "string" then
+        return value
+    end
+    return tostring(value)
+end
+
+local function collectEnumerable(value, describer, limit)
+    local items = {}
+    if value == nil then
+        return items
+    end
+    local ok = pcall(function()
+        for item in value do
+            table.insert(items, describer(item))
+            if limit ~= nil and #items >= limit then
+                break
+            end
+        end
+    end)
+    if not ok then
+        return {}
+    end
+    return items
+end
+
+local function collectRuntimeRefs(value, limit)
+    return collectEnumerable(value, runtimeRef, limit)
+end
+
+local function safeUtcDate(format)
+    if os ~= nil and os.date ~= nil then
+        local ok, value = pcall(function() return os.date(format) end)
+        if ok and value ~= nil then
+            return value
+        end
+    end
+    return "runtime"
+end
+
+local function getLocalPlayer()
+    if LocalPlayer ~= nil then
+        local localPlayer = safeRead(function() return LocalPlayer.Value end, nil)
+        if localPlayer ~= nil then
+            return localPlayer
+        end
+    end
+
+    if Players == nil then
+        return nil
+    end
+
+    local players = safeRead(function() return Players.Instances end, nil)
+    if players ~= nil then
+        for player in players do
+            if safeRead(function() return player.IsLocallyControlled end, false) then
+                return player
+            end
+        end
+    end
+
+    return safeRead(function() return Players.GetInstance(0) end, nil)
+end
+
+local function getTargetedConstruction()
+    local player = getLocalPlayer()
+    local targeter = safeRead(function() return player.Targeter end, nil)
+    if player == nil or targeter == nil or not safeRead(function() return targeter.IsTargetingPart end, false) then
+        return nil
+    end
+    local part = safeRead(function() return targeter.TargetedPart end, nil)
+    if part == nil then
+        return nil
+    end
+    return safeRead(function() return part.ParentConstruction end, nil)
+end
+
+local function describeBehaviour(behaviour)
+    local attributes = {}
+    addAttribute(attributes, "IPartBehaviour", "DebugInfo", function() return behaviour.DebugInfo end)
+    addAttribute(attributes, "IPartBehaviour", "Idx", function() return behaviour.Idx end)
+    addAttribute(attributes, "IPartBehaviour", "IsActivatable", function() return behaviour.IsActivatable end)
+    addAttribute(attributes, "IPartBehaviour", "IsActivated", function() return behaviour.IsActivated end)
+    addAttribute(attributes, "IPartBehaviour", "IsControllable", function() return behaviour.IsControllable end)
+    addAttribute(attributes, "IPartBehaviour", "IsTweakable", function() return behaviour.IsTweakable end)
+    addAttribute(attributes, "IPartBehaviour", "Name", function() return behaviour.Name end)
+    addAttribute(attributes, "IPartBehaviour", "Part", function() return behaviour.Part end, runtimeRef)
+
+    if hasAnyAttribute(behaviour, {
+        function() return behaviour.ControlInfo end,
+        function() return behaviour.IsControlBound end,
+        function() return behaviour.IsControlOverridden end,
+        function() return behaviour.OnlyControlWhenPlayerLocked end
+    }) then
+        addAttribute(attributes, "IControllablePartBehaviour", "ControlInfo", function() return behaviour.ControlInfo end)
+        addAttribute(attributes, "IControllablePartBehaviour", "IsControlBound", function() return behaviour.IsControlBound end)
+        addAttribute(attributes, "IControllablePartBehaviour", "IsControlOverridden", function() return behaviour.IsControlOverridden end)
+        addAttribute(attributes, "IControllablePartBehaviour", "OnlyControlWhenPlayerLocked", function() return behaviour.OnlyControlWhenPlayerLocked end)
+    end
+
+    if hasAnyAttribute(behaviour, {
+        function() return behaviour.CapacityRemaining end,
+        function() return behaviour.CapacityUsed end,
+        function() return behaviour.Charge end,
+        function() return behaviour.Discharge end
+    }) then
+        addAttribute(attributes, "IEnergyStore", "CapacityRemaining", function() return behaviour.CapacityRemaining end)
+        addAttribute(attributes, "IEnergyStore", "CapacityUsed", function() return behaviour.CapacityUsed end)
+        addAttribute(attributes, "IEnergyStore", "Charge", function() return behaviour.Charge end, function() return "available" end)
+        addAttribute(attributes, "IEnergyStore", "Discharge", function() return behaviour.Discharge end, function() return "available" end)
+    end
+
+    if hasAnyAttribute(behaviour, {
+        function() return behaviour.DrivenCrank end,
+        function() return behaviour.LinkedCylinders end,
+        function() return behaviour.NumLinkedCylinders end
+    }) then
+        addAttribute(attributes, "IEngineCrank", "DrivenCrank", function() return behaviour.DrivenCrank end, runtimeRef)
+        addAttribute(attributes, "IEngineCrank", "LinkedCylinders", function() return behaviour.LinkedCylinders end, collectRuntimeRefs)
+        addAttribute(attributes, "IEngineCrank", "NumLinkedCylinders", function() return behaviour.NumLinkedCylinders end)
+    end
+
+    if hasAnyAttribute(behaviour, {
+        function() return behaviour.CrankShaft end,
+        function() return behaviour.CurrentRotationSpeed end
+    }) then
+        addAttribute(attributes, "IEngineDrivenCrank", "CrankShaft", function() return behaviour.CrankShaft end, runtimeRef)
+        addAttribute(attributes, "IEngineDrivenCrank", "CurrentRotationSpeed", function() return behaviour.CurrentRotationSpeed end)
+    end
+
+    if hasAnyAttribute(behaviour, {
+        function() return behaviour.Crank end,
+        function() return behaviour.Head end,
+        function() return behaviour.GetCrankAngle end
+    }) then
+        addAttribute(attributes, "IEngineCylinder", "Crank", function() return behaviour.Crank end, runtimeRef)
+        addAttribute(attributes, "IEngineCylinder", "GetCrankAngle()", function() return behaviour.GetCrankAngle() end)
+        addAttribute(attributes, "IEngineCylinder", "Head", function() return behaviour.Head end, runtimeRef)
+    end
+
+    if hasAnyAttribute(behaviour, {
+        function() return behaviour.Cylinder end,
+        function() return behaviour.TimingAngle end
+    }) then
+        addAttribute(attributes, "IEngineHead", "Crank", function() return behaviour.Crank end, runtimeRef)
+        addAttribute(attributes, "IEngineHead", "Cylinder", function() return behaviour.Cylinder end, runtimeRef)
+        addAttribute(attributes, "IEngineHead", "GetCrankAngle()", function() return behaviour.GetCrankAngle() end)
+        addAttribute(attributes, "IEngineHead", "TimingAngle", function() return behaviour.TimingAngle end)
+    end
+
+    if hasAnyAttribute(behaviour, {
+        function() return behaviour.HasInside end,
+        function() return behaviour.OnConstructionEntered end,
+        function() return behaviour.OnPlayerEntered end
+    }) then
+        addAttribute(attributes, "ICheckpoint", "ConstructionHandler", function() return behaviour.ConstructionHandler end, function() return "available" end)
+        addAttribute(attributes, "ICheckpoint", "HasInside(IPart part)", function() return behaviour.HasInside end, function() return "requires argument" end)
+        addAttribute(attributes, "ICheckpoint", "OnConstructionEntered", function() return behaviour.OnConstructionEntered end, function() return "available" end)
+        addAttribute(attributes, "ICheckpoint", "OnConstructionExited", function() return behaviour.OnConstructionExited end, function() return "available" end)
+        addAttribute(attributes, "ICheckpoint", "OnPlayerEntered", function() return behaviour.OnPlayerEntered end, function() return "available" end)
+        addAttribute(attributes, "ICheckpoint", "OnPlayerExited", function() return behaviour.OnPlayerExited end, function() return "available" end)
+        addAttribute(attributes, "ICheckpoint", "PlayerHandler", function() return behaviour.PlayerHandler end, function() return "available" end)
+    end
+
+    return {
+        index = safeRead(function() return behaviour.Idx end, nil),
+        name = safeRead(function() return behaviour.Name end, tostring(behaviour)),
+        type = tostring(behaviour),
+        isTweakable = safeRead(function() return behaviour.IsTweakable end, false),
+        isActivatable = safeRead(function() return behaviour.IsActivatable end, false),
+        isActivated = safeRead(function() return behaviour.IsActivated end, false),
+        isControllable = safeRead(function() return behaviour.IsControllable end, false),
+        debugInfo = safeRead(function() return behaviour.DebugInfo end, ""),
+        interfaceNames = interfaceNamesFromAttributes(attributes),
+        apiAttributes = attributes
+    }
+end
+
+local function describeLink(link)
+    if link == nil then
+        return nil
+    end
+    local attributes = {}
+    addAttribute(attributes, "ILink", "LinkFromNode", function() return link.LinkFromNode end, runtimeRef)
+    addAttribute(attributes, "ILink", "LinkToNode", function() return link.LinkToNode end, runtimeRef)
+    return {
+        linkFromNode = runtimeRef(safeRead(function() return link.LinkFromNode end, nil)),
+        linkToNode = runtimeRef(safeRead(function() return link.LinkToNode end, nil)),
+        interfaceNames = interfaceNamesFromAttributes(attributes),
+        apiAttributes = attributes
+    }
+end
+
+local function describeLinkNode(linkNode)
+    local attributes = {}
+    addAttribute(attributes, "ILinkNode", "AssociatedLinks", function() return linkNode.AssociatedLinks end, function(value) return collectEnumerable(value, describeLink, 128) end)
+    addAttribute(attributes, "ILinkNode", "HasLinks", function() return linkNode.HasLinks end)
+    addAttribute(attributes, "ILinkNode", "Idx", function() return linkNode.Idx end)
+    addAttribute(attributes, "ILinkNode", "IsTypeHidden", function() return linkNode.IsTypeHidden end)
+    addAttribute(attributes, "ILinkNode", "LinkFromAvailable", function() return linkNode.LinkFromAvailable end)
+    addAttribute(attributes, "ILinkNode", "LinkToAvailable", function() return linkNode.LinkToAvailable end)
+    addAttribute(attributes, "ILinkNode", "LocalPosition", function() return linkNode.LocalPosition end, vectorToTable)
+    addAttribute(attributes, "ILinkNode", "OwnedLinks", function() return linkNode.OwnedLinks end, function(value) return collectEnumerable(value, describeLink, 128) end)
+    addAttribute(attributes, "ILinkNode", "Part", function() return linkNode.Part end, runtimeRef)
+    addAttribute(attributes, "ILinkNode", "Position", function() return linkNode.Position end, vectorToTable)
+    addAttribute(attributes, "ILinkNode", "TypeName", function() return linkNode.TypeName end)
+    return {
+        id = safeRead(function() return linkNode.ID end, nil),
+        name = safeRead(function() return linkNode.Name end, tostring(linkNode)),
+        position = vectorToTable(safeRead(function() return linkNode.Position end, nil)),
+        interfaceNames = interfaceNamesFromAttributes(attributes),
+        apiAttributes = attributes
+    }
+end
+
+local function describeAttachment(attachment)
+    if attachment == nil then
+        return nil
+    end
+    local attributes = {}
+    addAttribute(attributes, "IAttachment", "CanCycleTypes", function() return attachment.CanCycleTypes end)
+    addAttribute(attributes, "IAttachment", "ConnectedOrientation", function() return attachment.ConnectedOrientation end, quaternionToTable)
+    addAttribute(attributes, "IAttachment", "ConnectedPart", function() return attachment.ConnectedPart end, runtimeRef)
+    addAttribute(attributes, "IAttachment", "ConnectedPartAttachmentOrientation", function() return attachment.ConnectedPartAttachmentOrientation end, quaternionToTable)
+    addAttribute(attributes, "IAttachment", "ConnectedPartAttachmentPosition", function() return attachment.ConnectedPartAttachmentPosition end, vectorToTable)
+    addAttribute(attributes, "IAttachment", "ConnectedPosition", function() return attachment.ConnectedPosition end, vectorToTable)
+    addAttribute(attributes, "IAttachment", "IsInterior", function() return attachment.IsInterior end)
+    addAttribute(attributes, "IAttachment", "IsJointAttachingCompositeToItself", function() return attachment.IsJointAttachingCompositeToItself end)
+    addAttribute(attributes, "IAttachment", "IsJointAttachment", function() return attachment.IsJointAttachment end)
+    addAttribute(attributes, "IAttachment", "IsLocked", function() return attachment.IsLocked end)
+    addAttribute(attributes, "IAttachment", "IsTypeAllowed(AttachmentTypeFlags type)", function() return attachment.IsTypeAllowed end, function() return "requires AttachmentTypeFlags" end)
+    addAttribute(attributes, "IAttachment", "OwnerOrientation", function() return attachment.OwnerOrientation end, quaternionToTable)
+    addAttribute(attributes, "IAttachment", "OwnerPart", function() return attachment.OwnerPart end, runtimeRef)
+    addAttribute(attributes, "IAttachment", "OwnerPartAttachmentOrientation", function() return attachment.OwnerPartAttachmentOrientation end, quaternionToTable)
+    addAttribute(attributes, "IAttachment", "OwnerPartAttachmentPosition", function() return attachment.OwnerPartAttachmentPosition end, vectorToTable)
+    addAttribute(attributes, "IAttachment", "OwnerPosition", function() return attachment.OwnerPosition end, vectorToTable)
+    addAttribute(attributes, "IAttachment", "Type", function() return attachment.Type end, function(value) return tostring(value) end)
+    addAttribute(attributes, "IAttachment", "TypeName", function() return attachment.TypeName end)
+    return {
+        ownerPart = runtimeRef(safeRead(function() return attachment.OwnerPart end, nil)),
+        connectedPart = runtimeRef(safeRead(function() return attachment.ConnectedPart end, nil)),
+        typeName = safeRead(function() return attachment.TypeName end, ""),
+        type = tostring(safeRead(function() return attachment.Type end, "")),
+        isLocked = safeRead(function() return attachment.IsLocked end, false),
+        interfaceNames = interfaceNamesFromAttributes(attributes),
+        apiAttributes = attributes
+    }
+end
+
+local function boundsToTable(value)
+    if value == nil then
+        return nil
+    end
+    return {
+        center = vectorToTable(safeRead(function() return value.Center end, nil)),
+        size = vectorToTable(safeRead(function() return value.Size end, nil)),
+        min = vectorToTable(safeRead(function() return value.Min end, nil)),
+        max = vectorToTable(safeRead(function() return value.Max end, nil))
+    }
+end
+
+local function describePartProperties(properties)
+    if properties == nil then
+        return nil
+    end
+    local attributes = {}
+    addAttribute(attributes, "IPartProperties", "Density", function() return properties.Density end)
+    addAttribute(attributes, "IPartProperties", "IsPaintable", function() return properties.IsPaintable end)
+    addAttribute(attributes, "IPartProperties", "IsSwappable", function() return properties.IsSwappable end)
+    addAttribute(attributes, "IPartProperties", "Mass", function() return properties.Mass end)
+    addAttribute(attributes, "IPartProperties", "MaterialName", function() return properties.MaterialName end)
+    addAttribute(attributes, "IPartProperties", "Strength", function() return properties.Strength end)
+    return {
+        materialName = safeRead(function() return properties.MaterialName end, ""),
+        density = safeRead(function() return properties.Density end, 0),
+        mass = safeRead(function() return properties.Mass end, 0),
+        strength = safeRead(function() return properties.Strength end, 0),
+        isPaintable = safeRead(function() return properties.IsPaintable end, false),
+        isSwappable = safeRead(function() return properties.IsSwappable end, false),
+        interfaceNames = interfaceNamesFromAttributes(attributes),
+        apiAttributes = attributes
+    }
+end
+
+local function describePartPaint(paint)
+    if paint == nil then
+        return nil
+    end
+    local attributes = {}
+    addAttribute(attributes, "IPartPaint", "TargetColour", function() return paint.TargetColour end, function(value) return tostring(value) end)
+    return {
+        type = tostring(paint),
+        targetColour = tostring(safeRead(function() return paint.TargetColour end, "")),
+        color = tostring(safeRead(function() return paint.Color end, "")),
+        colour = tostring(safeRead(function() return paint.Colour end, "")),
+        interfaceNames = interfaceNamesFromAttributes(attributes),
+        apiAttributes = attributes
+    }
+end
+
+local function countEnumerable(value)
+    local count = 0
+    if value ~= nil then
+        local ok = pcall(function()
+            for _ in value do
+                count = count + 1
+            end
+        end)
+        if not ok then
+            return 0
+        end
+    end
+    return count
+end
+
+local function describePartAttachments(attachments)
+    if attachments == nil then
+        return nil
+    end
+    local attributes = {}
+    addAttribute(attributes, "IPartAttachments", "Associated", function() return attachments.Associated end, function(value) return collectEnumerable(value, describeAttachment, 128) end)
+    addAttribute(attributes, "IPartAttachments", "GetAttachedParts()", function() return attachments.GetAttachedParts() end, collectRuntimeRefs)
+    addAttribute(attributes, "IPartAttachments", "Owned", function() return attachments.Owned end, function(value) return collectEnumerable(value, describeAttachment, 128) end)
+    return {
+        ownedCount = countEnumerable(safeRead(function() return attachments.Owned end, nil)),
+        associatedCount = countEnumerable(safeRead(function() return attachments.Associated end, nil)),
+        owned = collectEnumerable(safeRead(function() return attachments.Owned end, nil), describeAttachment, 128),
+        associated = collectEnumerable(safeRead(function() return attachments.Associated end, nil), describeAttachment, 128),
+        attachedParts = collectRuntimeRefs(safeRead(function() return attachments.GetAttachedParts() end, nil), 128),
+        interfaceNames = interfaceNamesFromAttributes(attributes),
+        apiAttributes = attributes
+    }
+end
+
+local function describeResizable(resizable)
+    if resizable == nil then
+        return nil
+    end
+    local attributes = {}
+    addAttribute(attributes, "IResizable", "CurrentUnitSize", function() return resizable.CurrentUnitSize end, vectorToTable)
+    addAttribute(attributes, "IResizable", "ResizeUnitStep", function() return resizable.ResizeUnitStep end, vectorToTable)
+    addAttribute(attributes, "IResizable", "SetSize(Vector3Proxy unitSize, bool clamp=true)", function() return resizable.SetSize end, function() return "available" end)
+    if #attributes == 0 then
+        return nil
+    end
+    return {
+        currentUnitSize = vectorToTable(safeRead(function() return resizable.CurrentUnitSize end, nil)),
+        resizeUnitStep = vectorToTable(safeRead(function() return resizable.ResizeUnitStep end, nil)),
+        setSizeAvailable = safeRead(function() return resizable.SetSize end, nil) ~= nil,
+        interfaceNames = interfaceNamesFromAttributes(attributes),
+        apiAttributes = attributes
+    }
+end
+
+local function describeTweakables(tweakables)
+    if tweakables == nil then
+        return nil
+    end
+    local attributes = {}
+    addAttribute(attributes, "ITweakables", "NumTweakables", function() return tweakables.NumTweakables end)
+    addAttribute(attributes, "ITweakables", "Tweakables", function() return tweakables.Tweakables end, function(value) return collectEnumerable(value, describeTweakable, 128) end)
+    addAttribute(attributes, "ITweakables", "GetTweakable(string label)", function() return tweakables.GetTweakable end, function() return "requires label" end)
+    addAttribute(attributes, "ITweakables", "SyncTweakables()", function() return tweakables.SyncTweakables end, function() return "available" end)
+    if #attributes == 0 then
+        return nil
+    end
+    return {
+        numTweakables = safeRead(function() return tweakables.NumTweakables end, nil),
+        tweakables = collectEnumerable(safeRead(function() return tweakables.Tweakables end, nil), describeTweakable, 128),
+        syncTweakablesAvailable = safeRead(function() return tweakables.SyncTweakables end, nil) ~= nil,
+        interfaceNames = interfaceNamesFromAttributes(attributes),
+        apiAttributes = attributes
+    }
+end
+
+local function describePart(part)
+    local parentConstruction = safeRead(function() return part.ParentConstruction end, nil)
+    local attributes = {}
+    addAttribute(attributes, "IPart", "AssetGUID", function() return part.AssetGUID end, function(value) return tostring(value) end)
+    addAttribute(attributes, "IPart", "AssetName", function() return part.AssetName end)
+    addAttribute(attributes, "IPart", "Attachments", function() return part.Attachments end, function(value) return "available: " .. tostring(value) end)
+    addAttribute(attributes, "IPart", "Behaviours", function() return part.Behaviours end, function(value) return collectRuntimeRefs(value, 128) end)
+    addAttribute(attributes, "IPart", "Bounds", function() return part.Bounds end, boundsToTable)
+    addAttribute(attributes, "IPart", "Category", function() return part.Category end)
+    addAttribute(attributes, "IPart", "DisplayName", function() return part.DisplayName end)
+    addAttribute(attributes, "IPart", "FullDisplayName", function() return part.FullDisplayName end)
+    addAttribute(attributes, "IPart", "ID", function() return part.ID end)
+    addAttribute(attributes, "IPart", "Idx", function() return part.Idx end)
+    addAttribute(attributes, "IPart", "IsCollidable", function() return part.IsCollidable end)
+    addAttribute(attributes, "IPart", "IsDeprecated", function() return part.IsDeprecated end)
+    addAttribute(attributes, "IPart", "IsDestroyable", function() return part.IsDestroyable end)
+    addAttribute(attributes, "IPart", "IsEnabled", function() return part.IsEnabled end)
+    addAttribute(attributes, "IPart", "IsMaterialSwappable", function() return part.IsMaterialSwappable end)
+    addAttribute(attributes, "IPart", "IsPaintable", function() return part.IsPaintable end)
+    addAttribute(attributes, "IPart", "IsResizable", function() return part.IsResizable end)
+    addAttribute(attributes, "IPart", "IsSelectable", function() return part.IsSelectable end)
+    addAttribute(attributes, "IPart", "IsVisible", function() return part.IsVisible end)
+    addAttribute(attributes, "IPart", "LinkNodes", function() return part.LinkNodes end, function(value) return collectRuntimeRefs(value, 128) end)
+    addAttribute(attributes, "IPart", "Mass", function() return part.Mass end)
+    addAttribute(attributes, "IPart", "Paint", function() return part.Paint end, function(value) return "available: " .. tostring(value) end)
+    addAttribute(attributes, "IPart", "ParentConstruction", function() return part.ParentConstruction end, runtimeRef)
+    addAttribute(attributes, "IPart", "Properties", function() return part.Properties end, function(value) return "available: " .. tostring(value) end)
+    addAttribute(attributes, "IPart", "StageIdx", function() return part.StageIdx end)
+    addAttribute(attributes, "IPart", "Strength", function() return part.Strength end)
+    addAttribute(attributes, "IPart", "UnitVolume", function() return part.UnitVolume end)
+
+    local behaviours = {}
+    local behaviourByName = {}
+    local behaviourInstances = safeRead(function() return part.Behaviours end, nil)
+    if behaviourInstances ~= nil then
+        for behaviour in behaviourInstances do
+            local describedBehaviour = describeBehaviour(behaviour)
+            table.insert(behaviours, describedBehaviour)
+            if describedBehaviour.name ~= nil and describedBehaviour.name ~= "" then
+                behaviourByName[describedBehaviour.name] = runtimeRef(safeRead(function() return part.GetBehaviour(describedBehaviour.name) end, nil))
+                table.insert(attributes, {
+                    interface = "IPart",
+                    name = "GetBehaviour(\"" .. tostring(describedBehaviour.name) .. "\")",
+                    valueType = "userdata",
+                    value = behaviourByName[describedBehaviour.name]
+                })
+            end
+        end
+    end
+
+    local linkNodes = {}
+    local linkNodeInstances = safeRead(function() return part.LinkNodes end, nil)
+    if linkNodeInstances ~= nil then
+        for linkNode in linkNodeInstances do
+            table.insert(linkNodes, describeLinkNode(linkNode))
+        end
+    end
+
+    local resizable = describeResizable(safeRead(function() return part end, nil))
+    local tweakables = describeTweakables(safeRead(function() return part.Tweakables end, nil))
+    if tweakables == nil then
+        tweakables = describeTweakables(safeRead(function() return part end, nil))
+    end
+
+    return {
+        id = safeRead(function() return part.ID end, nil),
+        index = safeRead(function() return part.Idx end, nil),
+        parentConstructionId = safeRead(function() return parentConstruction.ID end, nil),
+        parentConstructionIsPlayerCharacter = safeRead(function() return parentConstruction.IsPlayerCharacter end, false),
+        parentConstructionIsAtomic = safeRead(function() return parentConstruction.IsAtomic end, false),
+        assetGuid = tostring(safeRead(function() return part.AssetGUID end, "")),
+        assetName = safeRead(function() return part.AssetName end, ""),
+        category = safeRead(function() return part.Category end, ""),
+        displayName = safeRead(function() return part.DisplayName end, ""),
+        fullDisplayName = safeRead(function() return part.FullDisplayName end, ""),
+        isDeprecated = safeRead(function() return part.IsDeprecated end, false),
+        isResizable = safeRead(function() return part.IsResizable end, false),
+        mass = safeRead(function() return part.Mass end, 0),
+        strength = safeRead(function() return part.Strength end, 0),
+        unitVolume = safeRead(function() return part.UnitVolume end, 0),
+        isPaintable = safeRead(function() return part.IsPaintable end, false),
+        isMaterialSwappable = safeRead(function() return part.IsMaterialSwappable end, false),
+        properties = describePartProperties(safeRead(function() return part.Properties end, nil)),
+        paint = describePartPaint(safeRead(function() return part.Paint end, nil)),
+        attachments = describePartAttachments(safeRead(function() return part.Attachments end, nil)),
+        bounds = boundsToTable(safeRead(function() return part.Bounds end, nil)),
+        isVisible = safeRead(function() return part.IsVisible end, false),
+        isSelectable = safeRead(function() return part.IsSelectable end, false),
+        isDestroyable = safeRead(function() return part.IsDestroyable end, false),
+        isCollidable = safeRead(function() return part.IsCollidable end, false),
+        isEnabled = safeRead(function() return part.IsEnabled end, false),
+        stageIndex = safeRead(function() return part.StageIdx end, nil),
+        position = vectorToTable(safeRead(function() return part.Position end, nil)),
+        orientation = quaternionToTable(safeRead(function() return part.Orientation end, nil)),
+        localPosition = vectorToTable(safeRead(function() return part.LocalPosition end, nil)),
+        localOrientation = quaternionToTable(safeRead(function() return part.LocalOrientation end, nil)),
+        currentUnitSize = vectorToTable(safeRead(function() return part.CurrentUnitSize end, nil)),
+        resizable = resizable,
+        tweakables = tweakables,
+        behaviours = behaviours,
+        behaviourByName = behaviourByName,
+        linkNodes = linkNodes,
+        interfaceNames = interfaceNamesFromAttributes(attributes),
+        apiAttributes = attributes
+    }
+end
+
+local describeRuntimeOperationSupport
+
+local function describeSceneParts(parts)
+    return {
+        exportedAt = safeUtcDate("!%Y-%m-%dT%H:%M:%SZ"),
+        exporter = "OverlayForgeConstructionExporter",
+        exportKind = "sceneParts",
+        id = "scene_parts",
+        numParts = #parts,
+        runtimeOperationSupport = describeRuntimeOperationSupport(),
+        parts = parts
+    }
+end
+
+local function describeConstructionAttributes(construction, parts)
+    local attributes = {}
+    addAttribute(attributes, "IConstruction", "ActiveStageIdx", function() return construction.ActiveStageIdx end)
+    addAttribute(attributes, "IConstruction", "AddPartsToCatalogue(IDictionary<AssetGUID, ushort> partCatalogue)", function() return construction.AddPartsToCatalogue end, function() return "requires dictionary" end)
+    addAttribute(attributes, "IConstruction", "BuilderPlayerID", function() return construction.BuilderPlayerID end)
+    addAttribute(attributes, "IConstruction", "CalcWorldBounds(bool activeStageOnly=false)", function() return construction.CalcWorldBounds(false) end, boundsToTable)
+    addAttribute(attributes, "IConstruction", "CalcWorldCentreOfMass()", function() return construction.CalcWorldCentreOfMass() end, vectorToTable)
+    addAttribute(attributes, "IConstruction", "CharacterPlayerID", function() return construction.CharacterPlayerID end)
+    addAttribute(attributes, "IConstruction", "GetPart(ushort idx)", function()
+        local firstPart = safeRead(function() return construction.GetPart(0) end, nil)
+        if firstPart == nil and parts ~= nil and #parts > 0 then
+            return parts[1]
+        end
+        return firstPart
+    end, runtimeRef)
+    addAttribute(attributes, "IConstruction", "ID", function() return construction.ID end)
+    addAttribute(attributes, "IConstruction", "IsAtomic", function() return construction.IsAtomic end)
+    addAttribute(attributes, "IConstruction", "IsBuildableBy(byte playerID)", function()
+        return {
+            player0 = safeRead(function() return construction.IsBuildableBy(0) end, nil),
+            player1 = safeRead(function() return construction.IsBuildableBy(1) end, nil),
+            player2 = safeRead(function() return construction.IsBuildableBy(2) end, nil),
+            player3 = safeRead(function() return construction.IsBuildableBy(3) end, nil)
+        }
+    end)
+    addAttribute(attributes, "IConstruction", "IsFrozen", function() return construction.IsFrozen end)
+    addAttribute(attributes, "IConstruction", "IsInvulnerable", function() return construction.IsInvulnerable end)
+    addAttribute(attributes, "IConstruction", "IsPlayerCharacter", function() return construction.IsPlayerCharacter end)
+    addAttribute(attributes, "IConstruction", "IsSelectableBy(byte playerID)", function()
+        return {
+            player0 = safeRead(function() return construction.IsSelectableBy(0) end, nil),
+            player1 = safeRead(function() return construction.IsSelectableBy(1) end, nil),
+            player2 = safeRead(function() return construction.IsSelectableBy(2) end, nil),
+            player3 = safeRead(function() return construction.IsSelectableBy(3) end, nil)
+        }
+    end)
+    addAttribute(attributes, "IConstruction", "Mass", function() return construction.Mass end)
+    addAttribute(attributes, "IConstruction", "MaxStageIdx", function() return construction.MaxStageIdx end)
+    addAttribute(attributes, "IConstruction", "NumComposites", function() return construction.NumComposites end)
+    addAttribute(attributes, "IConstruction", "NumParts", function() return construction.NumParts end)
+    addAttribute(attributes, "IConstruction", "Parts", function() return construction.Parts end, collectRuntimeRefs)
+    addAttribute(attributes, "IConstruction", "PreviewImage", function() return construction.PreviewImage end, function(value) return tostring(value) end)
+    addAttribute(attributes, "IConstruction", "SetActiveStage(ushort stageIdx)", function() return construction.SetActiveStage end, function() return "available" end)
+    return attributes
+end
+
+local function addOperationAvailability(attributes, interfaceName, operationName, source, memberName)
+    addAttribute(attributes, interfaceName, operationName, function() return source[memberName] end, function() return "available" end)
+end
+
+describeRuntimeOperationSupport = function()
+    local attributes = {}
+
+    local attachmentOperations = safeRead(function() return AttachmentOperations end, nil)
+    if attachmentOperations ~= nil then
+        addOperationAvailability(attributes, "IAttachmentOperations", "CreateAttachment(...)", attachmentOperations, "CreateAttachment")
+        addOperationAvailability(attributes, "IAttachmentOperations", "DeleteAllAttachments(...)", attachmentOperations, "DeleteAllAttachments")
+        addOperationAvailability(attributes, "IAttachmentOperations", "DeleteAttachment(IAttachment attachment, bool invokeAsPlayer=false)", attachmentOperations, "DeleteAttachment")
+        addOperationAvailability(attributes, "IAttachmentOperations", "ReplaceAttachment(IAttachment attachment, AttachmentTypeFlags newType, bool invokeAsPlayer=false)", attachmentOperations, "ReplaceAttachment")
+    end
+
+    local constructionOperations = safeRead(function() return ConstructionOperations end, nil)
+    if constructionOperations ~= nil then
+        addOperationAvailability(attributes, "IConstructionOperations", "AssignBuilderPlayerID(ushort constructionID, byte builderPlayerID)", constructionOperations, "AssignBuilderPlayerID")
+        addOperationAvailability(attributes, "IConstructionOperations", "FreezeConstructionAndMove(...)", constructionOperations, "FreezeConstructionAndMove")
+        addOperationAvailability(attributes, "IConstructionOperations", "FreezeConstructionAtGround(...)", constructionOperations, "FreezeConstructionAtGround")
+        addOperationAvailability(attributes, "IConstructionOperations", "FreezeConstructionAtPlayer(...)", constructionOperations, "FreezeConstructionAtPlayer")
+        addOperationAvailability(attributes, "IConstructionOperations", "SetConstructionCollidable(ushort constructionID, bool isCollidable)", constructionOperations, "SetConstructionCollidable")
+        addOperationAvailability(attributes, "IConstructionOperations", "SetConstructionDestroyable(ushort constructionID, bool isDestroyable)", constructionOperations, "SetConstructionDestroyable")
+        addOperationAvailability(attributes, "IConstructionOperations", "SetConstructionFrozen(ushort constructionID, bool freeze, bool invokeAsPlayer=false)", constructionOperations, "SetConstructionFrozen")
+        addOperationAvailability(attributes, "IConstructionOperations", "SetConstructionSelectable(ushort constructionID, bool isSelectable)", constructionOperations, "SetConstructionSelectable")
+        addOperationAvailability(attributes, "IConstructionOperations", "SetConstructionTargetable(ushort constructionID, bool isTargetable)", constructionOperations, "SetConstructionTargetable")
+        addOperationAvailability(attributes, "IConstructionOperations", "SetConstructionVisible(ushort constructionID, bool isVisible)", constructionOperations, "SetConstructionVisible")
+        addOperationAvailability(attributes, "IConstructionOperations", "SetPartCollidable(ushort partID, bool isCollidable)", constructionOperations, "SetPartCollidable")
+        addOperationAvailability(attributes, "IConstructionOperations", "SetPartDestroyable(ushort partID, bool isDestroyable)", constructionOperations, "SetPartDestroyable")
+        addOperationAvailability(attributes, "IConstructionOperations", "SetPartSelectable(ushort partID, bool isSelectable)", constructionOperations, "SetPartSelectable")
+        addOperationAvailability(attributes, "IConstructionOperations", "SetPartsStage(ushort[] partIDs, SetStageMode setStageMode, ushort stageIdx=0)", constructionOperations, "SetPartsStage")
+        addOperationAvailability(attributes, "IConstructionOperations", "SetPartVisible(ushort partID, bool isVisible)", constructionOperations, "SetPartVisible")
+    end
+
+    local partBehaviourOperations = safeRead(function() return PartBehaviourOperations end, nil)
+    if partBehaviourOperations ~= nil then
+        addOperationAvailability(attributes, "IPartBehaviourOperations", "ToggleActivated(IPart part)", partBehaviourOperations, "ToggleActivated")
+    end
+
+    local populateConstructions = safeRead(function() return PopConstructions end, nil)
+    if populateConstructions ~= nil then
+        addOperationAvailability(attributes, "IPopulateConstructions", "DestroyConstruction(ushort constructionID, bool invokeAsPlayer=false)", populateConstructions, "DestroyConstruction")
+        addOperationAvailability(attributes, "IPopulateConstructions", "DestroyConstructions(ushort[] constructionIDs, bool invokeAsPlayer=false)", populateConstructions, "DestroyConstructions")
+        addOperationAvailability(attributes, "IPopulateConstructions", "DestroyPart(ushort partID, bool invokeAsPlayer=false)", populateConstructions, "DestroyPart")
+        addOperationAvailability(attributes, "IPopulateConstructions", "DuplicateConstruction(...)", populateConstructions, "DuplicateConstruction")
+        addOperationAvailability(attributes, "IPopulateConstructions", "DuplicatePart(...)", populateConstructions, "DuplicatePart")
+        addAttribute(attributes, "IPopulateConstructions", "GetPlayerConstructionID(byte playerID)", function()
+            return {
+                player0 = safeRead(function() return populateConstructions.GetPlayerConstructionID(0) end, nil),
+                player1 = safeRead(function() return populateConstructions.GetPlayerConstructionID(1) end, nil),
+                player2 = safeRead(function() return populateConstructions.GetPlayerConstructionID(2) end, nil),
+                player3 = safeRead(function() return populateConstructions.GetPlayerConstructionID(3) end, nil)
+            }
+        end)
+        addOperationAvailability(attributes, "IPopulateConstructions", "SpawnConstruction(...)", populateConstructions, "SpawnConstruction")
+        addOperationAvailability(attributes, "IPopulateConstructions", "SpawnPart(...)", populateConstructions, "SpawnPart")
+    end
+
+    return {
+        interfaceNames = interfaceNamesFromAttributes(attributes),
+        apiAttributes = attributes
+    }
+end
+
+local function describeConstruction(construction)
+    local parts = {}
+    local partInstances = safeRead(function() return construction.Parts end, nil)
+    if partInstances ~= nil then
+        for part in partInstances do
+            table.insert(parts, describePart(part))
+        end
+    end
+    local attributes = describeConstructionAttributes(construction, parts)
+
+    return {
+        exportedAt = safeUtcDate("!%Y-%m-%dT%H:%M:%SZ"),
+        exporter = "OverlayForgeConstructionExporter",
+        id = safeRead(function() return construction.ID end, nil),
+        numComposites = safeRead(function() return construction.NumComposites end, 0),
+        numParts = safeRead(function() return construction.NumParts end, #parts),
+        isAtomic = safeRead(function() return construction.IsAtomic end, false),
+        isPlayerCharacter = safeRead(function() return construction.IsPlayerCharacter end, false),
+        isFrozen = safeRead(function() return construction.IsFrozen end, false),
+        isInvulnerable = safeRead(function() return construction.IsInvulnerable end, false),
+        mass = safeRead(function() return construction.Mass end, 0),
+        maxStageIndex = safeRead(function() return construction.MaxStageIdx end, nil),
+        activeStageIndex = safeRead(function() return construction.ActiveStageIdx end, nil),
+        centreOfMass = vectorToTable(safeRead(function() return construction.CalcWorldCentreOfMass() end, nil)),
+        parts = parts,
+        runtimeOperationSupport = describeRuntimeOperationSupport(),
+        interfaceNames = interfaceNamesFromAttributes(attributes),
+        apiAttributes = attributes
+    }
+end
+
+local function ensureExportDir()
+    if os ~= nil and os.execute ~= nil then
+        os.execute("mkdir \"" .. EXPORT_DIR .. "\"")
+    end
+end
+
+local function writeFile(path, content)
+    if io == nil or io.open == nil then
+        return false, "Lua io.open is not available in this script context."
+    end
+    local file, errorMessage = io.open(path, "w")
+    if file == nil then
+        return false, errorMessage
+    end
+    file:write(content)
+    file:close()
+    return true, nil
+end
+
+local function safeFileName(value)
+    local text = tostring(value or "construction")
+    text = text:gsub("[^%w%-_%. ]", "_")
+    text = text:gsub("%s+", "_")
+    if text == "" then
+        return "construction"
+    end
+    return text
+end
+
+local function emitLogExport(path, content)
+    local exportId = safeFileName(path) .. "_" .. safeUtcDate("!%Y%m%d_%H%M%S")
+    print("[OverlayForgeExportBegin]" .. encodeJson({
+        id = exportId,
+        path = path,
+        length = string.len(content),
+        chunkSize = LOG_CHUNK_SIZE
+    }))
+
+    local offset = 1
+    while offset <= string.len(content) do
+        print("[OverlayForgeExportData]" .. exportId .. "|" .. string.sub(content, offset, offset + LOG_CHUNK_SIZE - 1))
+        offset = offset + LOG_CHUNK_SIZE
+    end
+
+    print("[OverlayForgeExportEnd]" .. exportId)
+    return true, "Player.log"
+end
+
+local function exportPayload(payload, label)
+    ensureExportDir()
+    local fileName = safeFileName(label or tostring(payload.id or "export")) .. "_" .. safeUtcDate("!%Y%m%d_%H%M%S") .. ".json"
+    local path = EXPORT_DIR .. "\\" .. fileName
+    local content = encodeJson(payload)
+    local ok, destination = writeFile(path, content)
+    if not ok and destination == "Lua io.open is not available in this script context." then
+        ok, destination = emitLogExport(path, content)
+    end
+    if not ok then
+        setStatus("Export failed: " .. tostring(destination))
+        return false
+    end
+    setStatus("Exported " .. tostring(payload.numParts or 0) .. " parts to " .. tostring(destination))
+    return true
+end
+
+local function exportConstruction(construction, label)
+    local payload = describeConstruction(construction)
+    return exportPayload(payload, label or ("construction_" .. tostring(payload.id)))
+end
+
+local function exportTargetedConstruction()
+    local construction = getTargetedConstruction()
+    if construction == nil then
+        setStatus("Point at a part before exporting target.")
+        return
+    end
+    exportConstruction(construction, "target_" .. tostring(safeRead(function() return construction.ID end, "construction")))
+end
+
+local function exportAllSceneParts()
+    if Parts == nil then
+        return false
+    end
+
+    local partInstances = safeRead(function() return Parts.Instances end, nil)
+    if partInstances == nil then
+        return false
+    end
+
+    local parts = {}
+    for part in partInstances do
+        table.insert(parts, describePart(part))
+    end
+
+    if #parts == 0 then
+        setStatus("No scene parts found.")
+        return true
+    end
+
+    return exportPayload(describeSceneParts(parts), "scene_parts")
+end
+
+local function exportAllConstructions()
+    local count = 0
+    local exported = 0
+    if Constructions == nil then
+        setStatus("Constructions API is not available.")
+        return
+    end
+
+    local constructionInstances = safeRead(function() return Constructions.Instances end, nil)
+    if constructionInstances == nil then
+        setStatus("No construction enumeration is available.")
+        return
+    end
+
+    for construction in constructionInstances do
+        count = count + 1
+        local constructionID = safeRead(function() return construction.ID end, count)
+        if exportConstruction(construction, "construction_" .. tostring(constructionID)) then
+            exported = exported + 1
+        end
+    end
+    if count == 0 then
+        setStatus("No loaded constructions found.")
+    else
+        setStatus("Exported " .. tostring(exported) .. " of " .. tostring(count) .. " construction(s).")
+    end
+end
+
+local function onExportTarget()
+    exportTargetedConstruction()
+end
+
+local function onExportAll()
+    if not exportAllSceneParts() then
+        exportAllConstructions()
+    end
+end
+
+local function onWindowClose()
+    UnloadScript.Raise( ScriptName )
+end
+
+if not addClickHandler(exportTargetButton, onExportTarget) then
+    setStatus("Export Target button could not bind click handler.")
+end
+if not addClickHandler(exportAllButton, onExportAll) then
+    setStatus("Export All button could not bind click handler.")
+end
+addEventHandler(win.OnClose, onWindowClose)
+addEventHandler(win.onClose, onWindowClose)
+showWindow(win, true)
+
+setStatus("Exporter loaded. Output: " .. EXPORT_DIR)
+
+function Cleanup()
+    pcall(function() Windows.DestroyWindow( win ) end)
+    pcall(function() Windows.destroyWindow( win ) end)
+end

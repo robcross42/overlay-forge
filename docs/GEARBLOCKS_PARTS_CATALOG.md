@@ -2,7 +2,39 @@
 
 This one-time reference documents the GearBlocks part categories and cataloged part names currently recognized from the screenshot set in Overlay Forge.
 
+Current catalog metadata:
+
+- GearBlocks game version: `0.8.96622`
+- Catalog status: complete
+- Validation status: validated
+
 Use this file as shared context for ChatGPT when asking for part identification, build planning, image analysis, or practical physics explanations. The category order follows the GearBlocks left-panel category layout from top left to bottom right.
+
+## Runtime Catalog Image Workflow
+
+Overlay Forge's current source of truth for GearBlocks parts is the runtime API index imported from the Lua exporter logs. The `0.8.96622` catalog is complete and validated, so the normal Parts view hides category image import and clear controls.
+
+When GearBlocks releases a new version and the catalog needs to be refreshed, re-enable the maintenance controls and use this workflow:
+
+1. In GearBlocks, place one of each part in the empty test map.
+2. Load `Overlay Forge Construction Exporter` and click `Export All`.
+3. Capture the in-game catalog screenshot for the same category.
+4. In Overlay Forge, go to Gaming -> GearBlocks -> Parts and select one category filter, such as `Aero`.
+5. Click `Import Catalog Screenshot` and choose the in-game catalog screenshot for that category. Overlay Forge refreshes the runtime part index from the current `Player.log`, crops the visible catalog tiles left-to-right/top-to-bottom, and assigns them to that category's runtime API parts in catalog order.
+6. The category view renders only the catalog icons in the same fixed eight-column layout used by the game. Click an icon to open that part's detail view.
+7. In the detail view, use `Set Image` or `Replace Image` for manual image correction, and use `Notes` for practical observations about the part.
+
+For categories that require scrolling in GearBlocks, import each screenshot separately. Overlay Forge only imports complete visible icon tiles and skips any tile that is cut off by the screenshot edge.
+
+If a category has bad image assignments during a future refresh, select that category and use `Clear Category Images`. This removes the runtime part image associations for that category but does not delete files from disk.
+
+The selected image is copied into:
+
+```text
+game-screenshots/gearblocks/part-images/
+```
+
+The runtime part record stores both the copied display image path and the original source image path. `AssetGUID` remains the preferred identity key, with `AssetName` and `Category + DisplayName` used as fallbacks.
 
 ## Category Order
 
@@ -157,7 +189,7 @@ Use this file as shared context for ChatGPT when asking for part identification,
 - Engine Cylinder 2x2 2L (Transparent)
 - Engine Head x1
 - Engine Head x2
-- Engine Inlet
+- Engine Throttle x1
 - 4-Blade Fan x3
 - 7-Blade Fan x4
 - Air-cooled Fan x3
@@ -199,6 +231,7 @@ Use this file as shared context for ChatGPT when asking for part identification,
 - Angle Limiter (Axle to Axle)
 - Angle Limiter (Block to Axle)
 - Ball
+- Ball & Axle
 - CV Joint (Inner)
 - CV Joint (Inner) & Axle
 - CV Joint (Outer)
@@ -244,7 +277,7 @@ Use this file as shared context for ChatGPT when asking for part identification,
 - 2 Line Display 9x2
 - 4 Line Display 5x2
 - 4 Line Display 9x4
-- Joystick Display
+- Joypad (Dual Axis)
 - Keypad (1 Key)
 - Keypad (4 Keys)
 - Keypad (9 Keys)
@@ -469,6 +502,14 @@ Use this file as shared context for ChatGPT when asking for part identification,
 - Coil-over (Piston) Small
 - Coil-over (Barrel) Small Strong
 - Coil-over (Piston) Small Strong
+- Coil-over (Barrel) Large
+- Coil-over (Piston) Large
+- Coil-over (Barrel) Medium
+- Coil-over (Piston) Medium
+- Coil-over (Barrel) Small
+- Coil-over (Piston) Small
+- Coil-over (Barrel) Small Strong
+- Coil-over (Piston) Small Strong
 - Steering Arm 1-Ball 1-Axle x4
 - Steering Arm 2-Axle x4
 - Steering Arm 2-Ball x4
@@ -493,6 +534,7 @@ Use this file as shared context for ChatGPT when asking for part identification,
 - Car Wheel 3x7
 - Car Wheel 3x8
 - Car Wheel 4x8
+- Go-kart Wheel 2.5x4
 - Go-kart Wheel 2x5
 - Motorcycle Wheel 1x8
 - Off-road Wheel 5.5x11

@@ -1,0 +1,9 @@
+{
+  "name": "Overlay Forge Construction Exporter",
+  "desc": "Exports loaded GearBlocks construction runtime metadata to JSON for Overlay Forge.",
+  "tags": [
+    "Overlay Forge",
+    "Construction",
+    "Export"
+  ]
+}

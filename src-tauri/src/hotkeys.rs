@@ -12,9 +12,12 @@ const KEYBINDS_SETTING_KEY: &str = "keybinds_v1";
 const TOGGLE_OVERLAY_ACTION: &str = "toggle_overlay";
 const TOGGLE_OVERLAY_WAS_VISIBLE_ACTION: &str = "toggle_overlay_was_visible";
 const TOGGLE_OVERLAY_WAS_HIDDEN_ACTION: &str = "toggle_overlay_was_hidden";
+const MAIN_WINDOW_LABEL: &str = "main";
+const GAME_CHAT_WINDOW_LABEL: &str = "game-chat";
 const GAME_CHAT_OVERLAY_ACTION: &str = "game_chat_overlay";
-const GAME_CHAT_OVERLAY_WAS_VISIBLE_ACTION: &str = "game_chat_overlay_was_visible";
 const GAME_CHAT_OVERLAY_WAS_HIDDEN_ACTION: &str = "game_chat_overlay_was_hidden";
+const GAME_CHAT_OVERLAY_FOCUS_CHAT_ACTION: &str = "game_chat_overlay_focus_chat";
+const GAME_CHAT_OVERLAY_FOCUS_GAME_ACTION: &str = "game_chat_overlay_focus_game";
 const GAME_CHAT_SCREENSHOT_CAPTURE_ACTION: &str = "game_chat_region_capture";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -52,7 +55,11 @@ pub fn register_toggle_hotkey(app: &mut App) -> Result<(), Box<dyn Error>> {
                                 trigger_game_chat_overlay_shortcut(app);
                             }
                             GAME_CHAT_SCREENSHOT_CAPTURE_ACTION => {
-                                set_pending_shortcut_action(app, GAME_CHAT_SCREENSHOT_CAPTURE_ACTION);
+                                remember_foreground_window_as_game(app);
+                                set_pending_shortcut_action(
+                                    app,
+                                    GAME_CHAT_SCREENSHOT_CAPTURE_ACTION,
+                                );
                                 let _ = app.emit("game-chat-screenshot-capture-requested", ());
                             }
                             _ => {}
@@ -185,7 +192,7 @@ fn resolve_shortcut_action(app: &tauri::AppHandle, shortcut: &Shortcut) -> Resul
 
 fn toggle_overlay_window(app: &tauri::AppHandle) {
     let was_visible = app
-        .get_webview_window("main")
+        .get_webview_window(MAIN_WINDOW_LABEL)
         .and_then(|window| window.is_visible().ok())
         .unwrap_or(false);
     let action = if was_visible {
@@ -196,7 +203,7 @@ fn toggle_overlay_window(app: &tauri::AppHandle) {
 
     set_pending_shortcut_action(app, action);
     if !was_visible {
-        show_overlay_window(app);
+        wake_overlay_window(app);
     }
     let _ = app.emit("overlay-toggle-requested", ());
 }
@@ -251,6 +258,7 @@ fn trigger_shortcut_action(app: &tauri::AppHandle, action: &str) {
         TOGGLE_OVERLAY_ACTION => toggle_overlay_window(app),
         GAME_CHAT_OVERLAY_ACTION => trigger_game_chat_overlay_shortcut(app),
         GAME_CHAT_SCREENSHOT_CAPTURE_ACTION => {
+            remember_foreground_window_as_game(app);
             set_pending_shortcut_action(app, GAME_CHAT_SCREENSHOT_CAPTURE_ACTION);
             let _ = app.emit("game-chat-screenshot-capture-requested", ());
         }
@@ -259,25 +267,91 @@ fn trigger_shortcut_action(app: &tauri::AppHandle, action: &str) {
 }
 
 fn trigger_game_chat_overlay_shortcut(app: &tauri::AppHandle) {
-    let was_visible = app
-        .get_webview_window("main")
+    let chat_was_visible = app
+        .get_webview_window(GAME_CHAT_WINDOW_LABEL)
         .and_then(|window| window.is_visible().ok())
         .unwrap_or(false);
-    let action = if was_visible {
-        GAME_CHAT_OVERLAY_WAS_VISIBLE_ACTION
+    let foreground_is_chat = is_window_foreground(app, GAME_CHAT_WINDOW_LABEL);
+    if !foreground_is_chat {
+        remember_foreground_window_as_game(app);
+    }
+
+    let action = if chat_was_visible && foreground_is_chat {
+        GAME_CHAT_OVERLAY_FOCUS_GAME_ACTION
+    } else if chat_was_visible {
+        GAME_CHAT_OVERLAY_FOCUS_CHAT_ACTION
     } else {
         GAME_CHAT_OVERLAY_WAS_HIDDEN_ACTION
     };
 
     set_pending_shortcut_action(app, action);
-    if !was_visible {
-        show_overlay_window(app);
+    if chat_was_visible && !foreground_is_chat {
+        wake_game_chat_window(app);
+    } else if !chat_was_visible {
+        wake_overlay_window(app);
     }
     let _ = app.emit("game-chat-overlay-requested", ());
 }
 
-fn show_overlay_window(app: &tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
+#[cfg(windows)]
+fn is_window_foreground(app: &tauri::AppHandle, label: &str) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
+
+    let Some(window) = app.get_webview_window(label) else {
+        return false;
+    };
+    let Ok(hwnd) = window.hwnd() else {
+        return false;
+    };
+    unsafe { GetForegroundWindow() == hwnd.0 as windows_sys::Win32::Foundation::HWND }
+}
+
+#[cfg(not(windows))]
+fn is_window_foreground(_app: &tauri::AppHandle, _label: &str) -> bool {
+    false
+}
+
+#[cfg(windows)]
+fn remember_foreground_window_as_game(app: &tauri::AppHandle) {
+    use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
+
+    let foreground = unsafe { GetForegroundWindow() };
+    if foreground.is_null() {
+        return;
+    }
+
+    for label in [MAIN_WINDOW_LABEL, GAME_CHAT_WINDOW_LABEL] {
+        if let Some(window) = app.get_webview_window(label) {
+            if let Ok(hwnd) = window.hwnd() {
+                if foreground == hwnd.0 as windows_sys::Win32::Foundation::HWND {
+                    return;
+                }
+            }
+        }
+    }
+
+    let state = app.state::<AppState>();
+    match state.last_game_window.lock() {
+        Ok(mut last_game_window) => {
+            *last_game_window = Some(foreground as isize);
+        }
+        Err(_) => {}
+    };
+}
+
+#[cfg(not(windows))]
+fn remember_foreground_window_as_game(_app: &tauri::AppHandle) {}
+
+fn wake_overlay_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
+        let _ = window.show();
+        let _ = window.set_always_on_top(true);
+        let _ = window.set_focus();
+    }
+}
+
+fn wake_game_chat_window(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window(GAME_CHAT_WINDOW_LABEL) {
         let _ = window.show();
         let _ = window.set_always_on_top(true);
         let _ = window.set_focus();
@@ -500,7 +574,9 @@ fn validate_mouse_shortcut_policy(value: &str) -> Result<(), String> {
 
     for modifier in &modifiers {
         if !is_supported_modifier(modifier) {
-            return Err(format!("{modifier} is not supported as a mouse shortcut modifier"));
+            return Err(format!(
+                "{modifier} is not supported as a mouse shortcut modifier"
+            ));
         }
         if !unique_modifiers.insert(modifier.to_lowercase()) {
             return Err(format!("Duplicate keybind part is not allowed: {modifier}"));
@@ -543,7 +619,10 @@ fn is_supported_modifier(value: &str) -> bool {
 }
 
 fn is_mouse_shortcut_text(value: &str) -> bool {
-    value.split('+').map(normalize_key_part).any(|part| is_mouse_key(&part))
+    value
+        .split('+')
+        .map(normalize_key_part)
+        .any(|part| is_mouse_key(&part))
 }
 
 fn is_mouse_key(value: &str) -> bool {

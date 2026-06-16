@@ -1,6 +1,6 @@
 {
   "name": "overlay-forge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,16 +8,20 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "pretauri:dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stop-overlay-forge.ps1",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "app:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-debug.ps1",
+    "app:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stop-overlay-forge.ps1"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.9.0",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
     "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "^5.9.0",
-    "vite": "^7.2.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "typescript": "^5.9.0",
+    "vite": "^7.2.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.9.0",
@@ -25,4 +29,3 @@
     "@types/react-dom": "^19.2.0"
   }
 }
-

@@ -183,6 +183,22 @@ pub struct GameRecord {
 }
 
 #[derive(Clone, Serialize)]
+pub struct GameDataLocationRecord {
+    pub id: i64,
+    #[serde(rename = "gameId")]
+    pub game_id: i64,
+    #[serde(rename = "locationType")]
+    pub location_type: String,
+    pub label: String,
+    #[serde(rename = "directoryPath")]
+    pub directory_path: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+#[derive(Clone, Serialize)]
 pub struct GameCatalogObjectRecord {
     pub id: i64,
     #[serde(rename = "gameId")]
@@ -202,6 +218,123 @@ pub struct GameCatalogObjectRecord {
     pub thumbnail_path: String,
     #[serde(rename = "sourceScreenshotPath")]
     pub source_screenshot_path: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct GameRuntimePartRecord {
+    pub id: i64,
+    #[serde(rename = "gameId")]
+    pub game_id: i64,
+    #[serde(rename = "partKey")]
+    pub part_key: String,
+    #[serde(rename = "assetGuid")]
+    pub asset_guid: String,
+    #[serde(rename = "assetName")]
+    pub asset_name: String,
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    #[serde(rename = "fullDisplayName")]
+    pub full_display_name: String,
+    pub category: String,
+    pub mass: f64,
+    #[serde(rename = "propertiesJson")]
+    pub properties_json: String,
+    #[serde(rename = "sourceExportId")]
+    pub source_export_id: String,
+    #[serde(rename = "sourceConstructionId")]
+    pub source_construction_id: String,
+    #[serde(rename = "lastSeenAt")]
+    pub last_seen_at: String,
+    #[serde(rename = "displayImagePath")]
+    pub display_image_path: String,
+    #[serde(rename = "sourceImagePath")]
+    pub source_image_path: String,
+    pub notes: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct GameRuntimeConstructionExportRecord {
+    pub id: i64,
+    #[serde(rename = "gameId")]
+    pub game_id: i64,
+    #[serde(rename = "exportId")]
+    pub export_id: String,
+    pub name: String,
+    #[serde(rename = "exportKind")]
+    pub export_kind: String,
+    #[serde(rename = "intendedPath")]
+    pub intended_path: String,
+    #[serde(rename = "sourceLogPath")]
+    pub source_log_path: String,
+    #[serde(rename = "byteSize")]
+    pub byte_size: i64,
+    #[serde(rename = "constructionId")]
+    pub construction_id: String,
+    #[serde(rename = "exportedAt")]
+    pub exported_at: String,
+    #[serde(rename = "partCount")]
+    pub part_count: i64,
+    pub mass: f64,
+    #[serde(rename = "isFrozen")]
+    pub is_frozen: Option<bool>,
+    #[serde(rename = "isInvulnerable")]
+    pub is_invulnerable: Option<bool>,
+    #[serde(rename = "isPlayerCharacter")]
+    pub is_player_character: Option<bool>,
+    #[serde(rename = "documentJson")]
+    pub document_json: String,
+    #[serde(rename = "lastIndexedAt")]
+    pub last_indexed_at: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct GameConstructionRecord {
+    pub id: i64,
+    #[serde(rename = "gameId")]
+    pub game_id: i64,
+    pub name: String,
+    #[serde(rename = "folderPath")]
+    pub folder_path: String,
+    #[serde(rename = "constructionPath")]
+    pub construction_path: String,
+    #[serde(rename = "byteSize")]
+    pub byte_size: i64,
+    #[serde(rename = "decodedByteSize")]
+    pub decoded_byte_size: i64,
+    #[serde(rename = "compositeCount")]
+    pub composite_count: i64,
+    #[serde(rename = "partCount")]
+    pub part_count: i64,
+    #[serde(rename = "uniqueAssetGuidCount")]
+    pub unique_asset_guid_count: i64,
+    #[serde(rename = "attachmentCount")]
+    pub attachment_count: i64,
+    #[serde(rename = "linkCount")]
+    pub link_count: i64,
+    #[serde(rename = "intersectionCount")]
+    pub intersection_count: i64,
+    #[serde(rename = "isFrozen")]
+    pub is_frozen: Option<bool>,
+    #[serde(rename = "isInvulnerable")]
+    pub is_invulnerable: Option<bool>,
+    #[serde(rename = "summaryJson")]
+    pub summary_json: String,
+    #[serde(rename = "documentJson")]
+    pub document_json: String,
+    #[serde(rename = "lastIndexedAt")]
+    pub last_indexed_at: String,
     #[serde(rename = "createdAt")]
     pub created_at: String,
     #[serde(rename = "updatedAt")]
@@ -482,6 +615,16 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS game_data_locations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                location_type TEXT NOT NULL,
+                label TEXT NOT NULL DEFAULT '',
+                directory_path TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE TABLE IF NOT EXISTS game_catalog_screenshots (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
@@ -494,6 +637,72 @@ impl AppDatabase {
                 captured_at TEXT NOT NULL DEFAULT '',
                 notes TEXT NOT NULL DEFAULT '',
                 tags TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS game_runtime_parts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                part_key TEXT NOT NULL,
+                asset_guid TEXT NOT NULL DEFAULT '',
+                asset_name TEXT NOT NULL DEFAULT '',
+                display_name TEXT NOT NULL DEFAULT '',
+                full_display_name TEXT NOT NULL DEFAULT '',
+                category TEXT NOT NULL DEFAULT '',
+                mass REAL NOT NULL DEFAULT 0,
+                properties_json TEXT NOT NULL DEFAULT '{}',
+                source_export_id TEXT NOT NULL DEFAULT '',
+                source_construction_id TEXT NOT NULL DEFAULT '',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                display_image_path TEXT NOT NULL DEFAULT '',
+                source_image_path TEXT NOT NULL DEFAULT '',
+                notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS game_constructions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                folder_path TEXT NOT NULL,
+                construction_path TEXT NOT NULL,
+                byte_size INTEGER NOT NULL DEFAULT 0,
+                decoded_byte_size INTEGER NOT NULL DEFAULT 0,
+                composite_count INTEGER NOT NULL DEFAULT 0,
+                part_count INTEGER NOT NULL DEFAULT 0,
+                unique_asset_guid_count INTEGER NOT NULL DEFAULT 0,
+                attachment_count INTEGER NOT NULL DEFAULT 0,
+                link_count INTEGER NOT NULL DEFAULT 0,
+                intersection_count INTEGER NOT NULL DEFAULT 0,
+                is_frozen INTEGER,
+                is_invulnerable INTEGER,
+                summary_json TEXT NOT NULL DEFAULT '{}',
+                document_json TEXT NOT NULL DEFAULT '{}',
+                last_indexed_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS game_runtime_construction_exports (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                export_id TEXT NOT NULL,
+                name TEXT NOT NULL DEFAULT '',
+                export_kind TEXT NOT NULL DEFAULT '',
+                intended_path TEXT NOT NULL DEFAULT '',
+                source_log_path TEXT NOT NULL DEFAULT '',
+                byte_size INTEGER NOT NULL DEFAULT 0,
+                construction_id TEXT NOT NULL DEFAULT '',
+                exported_at TEXT NOT NULL DEFAULT '',
+                part_count INTEGER NOT NULL DEFAULT 0,
+                mass REAL NOT NULL DEFAULT 0,
+                is_frozen INTEGER,
+                is_invulnerable INTEGER,
+                is_player_character INTEGER,
+                document_json TEXT NOT NULL DEFAULT '{}',
+                last_indexed_at TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
@@ -522,6 +731,8 @@ impl AppDatabase {
                 ON game_catalog_references (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_catalog_references_object_id
                 ON game_catalog_references (object_id);
+            CREATE INDEX IF NOT EXISTS idx_game_data_locations_game_id
+                ON game_data_locations (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_catalog_screenshots_game_id
                 ON game_catalog_screenshots (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_catalog_screenshots_object_id
@@ -530,6 +741,14 @@ impl AppDatabase {
                 ON game_chat_conversations (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_chat_messages_conversation_id
                 ON game_chat_messages (conversation_id);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_parts_game_id
+                ON game_runtime_parts (game_id);
+            CREATE INDEX IF NOT EXISTS idx_game_constructions_game_id
+                ON game_constructions (game_id);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_construction_exports_game_id
+                ON game_runtime_construction_exports (game_id);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_construction_exports_exported_at
+                ON game_runtime_construction_exports (game_id, exported_at);
 
             INSERT OR IGNORE INTO games (name, slug, summary)
             VALUES (
@@ -583,6 +802,24 @@ impl AppDatabase {
             "source_screenshot_path",
             "TEXT NOT NULL DEFAULT ''",
         )?;
+        Self::ensure_column(
+            &connection,
+            "game_runtime_parts",
+            "display_image_path",
+            "TEXT NOT NULL DEFAULT ''",
+        )?;
+        Self::ensure_column(
+            &connection,
+            "game_runtime_parts",
+            "source_image_path",
+            "TEXT NOT NULL DEFAULT ''",
+        )?;
+        Self::ensure_column(
+            &connection,
+            "game_runtime_parts",
+            "notes",
+            "TEXT NOT NULL DEFAULT ''",
+        )?;
         connection.execute(
             "
             CREATE INDEX IF NOT EXISTS idx_game_catalog_screenshots_request_id
@@ -601,6 +838,34 @@ impl AppDatabase {
             "
             CREATE UNIQUE INDEX IF NOT EXISTS idx_game_catalog_objects_game_name_exact_unique
                 ON game_catalog_objects (game_id, name)
+            ",
+            [],
+        )?;
+        connection.execute(
+            "
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_game_data_locations_game_type_unique
+                ON game_data_locations (game_id, location_type)
+            ",
+            [],
+        )?;
+        connection.execute(
+            "
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_game_runtime_parts_game_part_key_unique
+                ON game_runtime_parts (game_id, part_key)
+            ",
+            [],
+        )?;
+        connection.execute(
+            "
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_game_constructions_game_path_unique
+                ON game_constructions (game_id, construction_path)
+            ",
+            [],
+        )?;
+        connection.execute(
+            "
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_game_runtime_construction_exports_game_export_unique
+                ON game_runtime_construction_exports (game_id, export_id)
             ",
             [],
         )?;
@@ -1762,10 +2027,74 @@ impl AppDatabase {
             params![id],
         )?;
         connection.execute(
+            "DELETE FROM game_data_locations WHERE game_id = ?1",
+            params![id],
+        )?;
+        connection.execute(
             "DELETE FROM game_catalog_objects WHERE game_id = ?1",
             params![id],
         )?;
         connection.execute("DELETE FROM games WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    pub fn list_game_data_locations(&self, game_id: i64) -> Result<Vec<GameDataLocationRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        let mut statement = connection.prepare(
+            "
+            SELECT id, game_id, location_type, label, directory_path, created_at, updated_at
+            FROM game_data_locations
+            WHERE game_id = ?1
+            ORDER BY
+                CASE location_type
+                    WHEN 'save' THEN 0
+                    WHEN 'alternate' THEN 1
+                    ELSE 2
+                END,
+                id ASC
+            ",
+        )?;
+
+        let locations = statement
+            .query_map(params![game_id], game_data_location_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(locations)
+    }
+
+    pub fn save_game_data_location(
+        &self,
+        game_id: i64,
+        location_type: &str,
+        label: &str,
+        directory_path: &str,
+    ) -> Result<GameDataLocationRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        let trimmed_type = location_type.trim();
+        connection.execute(
+            "
+            INSERT INTO game_data_locations (game_id, location_type, label, directory_path)
+            VALUES (?1, ?2, ?3, ?4)
+            ON CONFLICT(game_id, location_type) DO UPDATE SET
+                label = excluded.label,
+                directory_path = excluded.directory_path,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![game_id, trimmed_type, label.trim(), directory_path.trim()],
+        )?;
+
+        Self::get_game_data_location_by_type(&connection, game_id, trimmed_type)
+    }
+
+    pub fn delete_game_data_location(&self, game_id: i64, location_type: &str) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        connection.execute(
+            "DELETE FROM game_data_locations WHERE game_id = ?1 AND location_type = ?2",
+            params![game_id, location_type.trim()],
+        )?;
         Ok(())
     }
 
@@ -1873,6 +2202,543 @@ impl AppDatabase {
         )?;
 
         Self::get_game_catalog_object_by_name(&connection, game_id, name)
+    }
+
+    pub fn list_game_runtime_parts(&self, game_id: i64) -> Result<Vec<GameRuntimePartRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                id,
+                game_id,
+                part_key,
+                asset_guid,
+                asset_name,
+                display_name,
+                full_display_name,
+                category,
+                mass,
+                properties_json,
+                source_export_id,
+                source_construction_id,
+                last_seen_at,
+                display_image_path,
+                source_image_path,
+                notes,
+                created_at,
+                updated_at
+            FROM game_runtime_parts
+            WHERE game_id = ?1
+            ORDER BY category COLLATE NOCASE ASC, display_name COLLATE NOCASE ASC, asset_name COLLATE NOCASE ASC
+            ",
+        )?;
+
+        let parts = statement
+            .query_map(params![game_id], game_runtime_part_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(parts)
+    }
+
+    pub fn get_game_runtime_part(&self, id: i64) -> Result<Option<GameRuntimePartRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection
+            .query_row(
+                "
+                SELECT
+                    id,
+                    game_id,
+                    part_key,
+                    asset_guid,
+                    asset_name,
+                    display_name,
+                    full_display_name,
+                    category,
+                    mass,
+                    properties_json,
+                    source_export_id,
+                    source_construction_id,
+                    last_seen_at,
+                    display_image_path,
+                    source_image_path,
+                    notes,
+                    created_at,
+                    updated_at
+                FROM game_runtime_parts
+                WHERE id = ?1
+                ",
+                params![id],
+                game_runtime_part_from_row,
+            )
+            .optional()
+    }
+
+    pub fn update_game_runtime_part_display_image(
+        &self,
+        game_id: i64,
+        part_id: i64,
+        display_image_path: &str,
+        source_image_path: &str,
+    ) -> Result<GameRuntimePartRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        connection.execute(
+            "
+            UPDATE game_runtime_parts
+            SET
+                display_image_path = ?1,
+                source_image_path = ?2,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?3
+                AND game_id = ?4
+            ",
+            params![
+                display_image_path.trim(),
+                source_image_path.trim(),
+                part_id,
+                game_id
+            ],
+        )?;
+
+        Self::get_game_runtime_part_by_id(&connection, game_id, part_id)
+    }
+
+    pub fn clear_game_runtime_part_images_for_category(
+        &self,
+        game_id: i64,
+        category: &str,
+    ) -> Result<Vec<GameRuntimePartRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        connection.execute(
+            "
+            UPDATE game_runtime_parts
+            SET
+                display_image_path = '',
+                source_image_path = '',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE game_id = ?1
+                AND category = ?2
+            ",
+            params![game_id, category.trim()],
+        )?;
+
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                id,
+                game_id,
+                part_key,
+                asset_guid,
+                asset_name,
+                display_name,
+                full_display_name,
+                category,
+                mass,
+                properties_json,
+                source_export_id,
+                source_construction_id,
+                last_seen_at,
+                display_image_path,
+                source_image_path,
+                notes,
+                created_at,
+                updated_at
+            FROM game_runtime_parts
+            WHERE game_id = ?1
+                AND category = ?2
+            ORDER BY display_name COLLATE NOCASE ASC, asset_name COLLATE NOCASE ASC
+            ",
+        )?;
+
+        let parts = statement
+            .query_map(
+                params![game_id, category.trim()],
+                game_runtime_part_from_row,
+            )?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(parts)
+    }
+
+    pub fn update_game_runtime_part_notes(
+        &self,
+        game_id: i64,
+        part_id: i64,
+        notes: &str,
+    ) -> Result<GameRuntimePartRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        connection.execute(
+            "
+            UPDATE game_runtime_parts
+            SET
+                notes = ?1,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?2
+                AND game_id = ?3
+            ",
+            params![notes, part_id, game_id],
+        )?;
+
+        Self::get_game_runtime_part_by_id(&connection, game_id, part_id)
+    }
+
+    pub fn upsert_game_runtime_part(
+        &self,
+        game_id: i64,
+        part_key: &str,
+        asset_guid: &str,
+        asset_name: &str,
+        display_name: &str,
+        full_display_name: &str,
+        category: &str,
+        mass: f64,
+        properties_json: &str,
+        source_export_id: &str,
+        source_construction_id: &str,
+        last_seen_at: &str,
+    ) -> Result<GameRuntimePartRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        connection.execute(
+            "
+            INSERT INTO game_runtime_parts (
+                game_id,
+                part_key,
+                asset_guid,
+                asset_name,
+                display_name,
+                full_display_name,
+                category,
+                mass,
+                properties_json,
+                source_export_id,
+                source_construction_id,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+            ON CONFLICT(game_id, part_key) DO UPDATE SET
+                asset_guid = excluded.asset_guid,
+                asset_name = excluded.asset_name,
+                display_name = excluded.display_name,
+                full_display_name = excluded.full_display_name,
+                category = excluded.category,
+                mass = excluded.mass,
+                properties_json = excluded.properties_json,
+                source_export_id = excluded.source_export_id,
+                source_construction_id = excluded.source_construction_id,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                game_id,
+                part_key.trim(),
+                asset_guid.trim(),
+                asset_name.trim(),
+                display_name.trim(),
+                full_display_name.trim(),
+                category.trim(),
+                mass,
+                properties_json,
+                source_export_id.trim(),
+                source_construction_id.trim(),
+                last_seen_at.trim()
+            ],
+        )?;
+
+        Self::get_game_runtime_part_by_key(&connection, game_id, part_key)
+    }
+
+    pub fn list_game_runtime_construction_exports(
+        &self,
+        game_id: i64,
+    ) -> Result<Vec<GameRuntimeConstructionExportRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                id,
+                game_id,
+                export_id,
+                name,
+                export_kind,
+                intended_path,
+                source_log_path,
+                byte_size,
+                construction_id,
+                exported_at,
+                part_count,
+                mass,
+                is_frozen,
+                is_invulnerable,
+                is_player_character,
+                document_json,
+                last_indexed_at,
+                created_at,
+                updated_at
+            FROM game_runtime_construction_exports
+            WHERE game_id = ?1
+            ORDER BY exported_at DESC, id DESC
+            ",
+        )?;
+
+        let exports = statement
+            .query_map(params![game_id], game_runtime_construction_export_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(exports)
+    }
+
+    pub fn latest_game_runtime_construction_export(
+        &self,
+        game_id: i64,
+    ) -> Result<Option<GameRuntimeConstructionExportRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        connection
+            .query_row(
+                "
+                SELECT
+                    id,
+                    game_id,
+                    export_id,
+                    name,
+                    export_kind,
+                    intended_path,
+                    source_log_path,
+                    byte_size,
+                    construction_id,
+                    exported_at,
+                    part_count,
+                    mass,
+                    is_frozen,
+                    is_invulnerable,
+                    is_player_character,
+                    document_json,
+                    last_indexed_at,
+                    created_at,
+                    updated_at
+                FROM game_runtime_construction_exports
+                WHERE game_id = ?1
+                ORDER BY exported_at DESC, id DESC
+                LIMIT 1
+                ",
+                params![game_id],
+                game_runtime_construction_export_from_row,
+            )
+            .optional()
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn upsert_game_runtime_construction_export(
+        &self,
+        game_id: i64,
+        export_id: &str,
+        name: &str,
+        export_kind: &str,
+        intended_path: &str,
+        source_log_path: &str,
+        byte_size: i64,
+        construction_id: &str,
+        exported_at: &str,
+        part_count: i64,
+        mass: f64,
+        is_frozen: Option<bool>,
+        is_invulnerable: Option<bool>,
+        is_player_character: Option<bool>,
+        document_json: &str,
+        last_indexed_at: &str,
+    ) -> Result<GameRuntimeConstructionExportRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        connection.execute(
+            "
+            INSERT INTO game_runtime_construction_exports (
+                game_id,
+                export_id,
+                name,
+                export_kind,
+                intended_path,
+                source_log_path,
+                byte_size,
+                construction_id,
+                exported_at,
+                part_count,
+                mass,
+                is_frozen,
+                is_invulnerable,
+                is_player_character,
+                document_json,
+                last_indexed_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+            ON CONFLICT(game_id, export_id) DO UPDATE SET
+                name = excluded.name,
+                export_kind = excluded.export_kind,
+                intended_path = excluded.intended_path,
+                source_log_path = excluded.source_log_path,
+                byte_size = excluded.byte_size,
+                construction_id = excluded.construction_id,
+                exported_at = excluded.exported_at,
+                part_count = excluded.part_count,
+                mass = excluded.mass,
+                is_frozen = excluded.is_frozen,
+                is_invulnerable = excluded.is_invulnerable,
+                is_player_character = excluded.is_player_character,
+                document_json = excluded.document_json,
+                last_indexed_at = excluded.last_indexed_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                game_id,
+                export_id.trim(),
+                name.trim(),
+                export_kind.trim(),
+                intended_path.trim(),
+                source_log_path.trim(),
+                byte_size,
+                construction_id.trim(),
+                exported_at.trim(),
+                part_count,
+                mass,
+                is_frozen.map(i64::from),
+                is_invulnerable.map(i64::from),
+                is_player_character.map(i64::from),
+                document_json,
+                last_indexed_at.trim()
+            ],
+        )?;
+
+        Self::get_game_runtime_construction_export_by_export_id(&connection, game_id, export_id)
+    }
+
+    pub fn list_game_constructions(&self, game_id: i64) -> Result<Vec<GameConstructionRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                id,
+                game_id,
+                name,
+                folder_path,
+                construction_path,
+                byte_size,
+                decoded_byte_size,
+                composite_count,
+                part_count,
+                unique_asset_guid_count,
+                attachment_count,
+                link_count,
+                intersection_count,
+                is_frozen,
+                is_invulnerable,
+                summary_json,
+                document_json,
+                last_indexed_at,
+                created_at,
+                updated_at
+            FROM game_constructions
+            WHERE game_id = ?1
+            ORDER BY name COLLATE NOCASE ASC
+            ",
+        )?;
+
+        let constructions = statement
+            .query_map(params![game_id], game_construction_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(constructions)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn upsert_game_construction(
+        &self,
+        game_id: i64,
+        name: &str,
+        folder_path: &str,
+        construction_path: &str,
+        byte_size: i64,
+        decoded_byte_size: i64,
+        composite_count: i64,
+        part_count: i64,
+        unique_asset_guid_count: i64,
+        attachment_count: i64,
+        link_count: i64,
+        intersection_count: i64,
+        is_frozen: Option<bool>,
+        is_invulnerable: Option<bool>,
+        summary_json: &str,
+        document_json: &str,
+        last_indexed_at: &str,
+    ) -> Result<GameConstructionRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        connection.execute(
+            "
+            INSERT INTO game_constructions (
+                game_id,
+                name,
+                folder_path,
+                construction_path,
+                byte_size,
+                decoded_byte_size,
+                composite_count,
+                part_count,
+                unique_asset_guid_count,
+                attachment_count,
+                link_count,
+                intersection_count,
+                is_frozen,
+                is_invulnerable,
+                summary_json,
+                document_json,
+                last_indexed_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
+            ON CONFLICT(game_id, construction_path) DO UPDATE SET
+                name = excluded.name,
+                folder_path = excluded.folder_path,
+                byte_size = excluded.byte_size,
+                decoded_byte_size = excluded.decoded_byte_size,
+                composite_count = excluded.composite_count,
+                part_count = excluded.part_count,
+                unique_asset_guid_count = excluded.unique_asset_guid_count,
+                attachment_count = excluded.attachment_count,
+                link_count = excluded.link_count,
+                intersection_count = excluded.intersection_count,
+                is_frozen = excluded.is_frozen,
+                is_invulnerable = excluded.is_invulnerable,
+                summary_json = excluded.summary_json,
+                document_json = excluded.document_json,
+                last_indexed_at = excluded.last_indexed_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                game_id,
+                name.trim(),
+                folder_path.trim(),
+                construction_path.trim(),
+                byte_size,
+                decoded_byte_size,
+                composite_count,
+                part_count,
+                unique_asset_guid_count,
+                attachment_count,
+                link_count,
+                intersection_count,
+                is_frozen.map(i64::from),
+                is_invulnerable.map(i64::from),
+                summary_json,
+                document_json,
+                last_indexed_at.trim(),
+            ],
+        )?;
+
+        Self::get_game_construction_by_path(&connection, game_id, construction_path)
     }
 
     pub fn create_game_screenshot_capture_request(
@@ -2431,6 +3297,22 @@ impl AppDatabase {
         )
     }
 
+    fn get_game_data_location_by_type(
+        connection: &Connection,
+        game_id: i64,
+        location_type: &str,
+    ) -> Result<GameDataLocationRecord> {
+        connection.query_row(
+            "
+            SELECT id, game_id, location_type, label, directory_path, created_at, updated_at
+            FROM game_data_locations
+            WHERE game_id = ?1 AND location_type = ?2
+            ",
+            params![game_id, location_type],
+            game_data_location_from_row,
+        )
+    }
+
     fn get_game_catalog_object_by_name(
         connection: &Connection,
         game_id: i64,
@@ -2459,6 +3341,149 @@ impl AppDatabase {
             ",
             params![game_id, name.trim()],
             game_catalog_object_from_row,
+        )
+    }
+
+    fn get_game_runtime_part_by_key(
+        connection: &Connection,
+        game_id: i64,
+        part_key: &str,
+    ) -> Result<GameRuntimePartRecord> {
+        connection.query_row(
+            "
+            SELECT
+                id,
+                game_id,
+                part_key,
+                asset_guid,
+                asset_name,
+                display_name,
+                full_display_name,
+                category,
+                mass,
+                properties_json,
+                source_export_id,
+                source_construction_id,
+                last_seen_at,
+                display_image_path,
+                source_image_path,
+                notes,
+                created_at,
+                updated_at
+            FROM game_runtime_parts
+            WHERE game_id = ?1
+                AND part_key = ?2
+            ",
+            params![game_id, part_key.trim()],
+            game_runtime_part_from_row,
+        )
+    }
+
+    fn get_game_runtime_part_by_id(
+        connection: &Connection,
+        game_id: i64,
+        part_id: i64,
+    ) -> Result<GameRuntimePartRecord> {
+        connection.query_row(
+            "
+            SELECT
+                id,
+                game_id,
+                part_key,
+                asset_guid,
+                asset_name,
+                display_name,
+                full_display_name,
+                category,
+                mass,
+                properties_json,
+                source_export_id,
+                source_construction_id,
+                last_seen_at,
+                display_image_path,
+                source_image_path,
+                notes,
+                created_at,
+                updated_at
+            FROM game_runtime_parts
+            WHERE id = ?1
+                AND game_id = ?2
+            ",
+            params![part_id, game_id],
+            game_runtime_part_from_row,
+        )
+    }
+
+    fn get_game_runtime_construction_export_by_export_id(
+        connection: &Connection,
+        game_id: i64,
+        export_id: &str,
+    ) -> Result<GameRuntimeConstructionExportRecord> {
+        connection.query_row(
+            "
+            SELECT
+                id,
+                game_id,
+                export_id,
+                name,
+                export_kind,
+                intended_path,
+                source_log_path,
+                byte_size,
+                construction_id,
+                exported_at,
+                part_count,
+                mass,
+                is_frozen,
+                is_invulnerable,
+                is_player_character,
+                document_json,
+                last_indexed_at,
+                created_at,
+                updated_at
+            FROM game_runtime_construction_exports
+            WHERE game_id = ?1
+                AND export_id = ?2
+            ",
+            params![game_id, export_id.trim()],
+            game_runtime_construction_export_from_row,
+        )
+    }
+
+    fn get_game_construction_by_path(
+        connection: &Connection,
+        game_id: i64,
+        construction_path: &str,
+    ) -> Result<GameConstructionRecord> {
+        connection.query_row(
+            "
+            SELECT
+                id,
+                game_id,
+                name,
+                folder_path,
+                construction_path,
+                byte_size,
+                decoded_byte_size,
+                composite_count,
+                part_count,
+                unique_asset_guid_count,
+                attachment_count,
+                link_count,
+                intersection_count,
+                is_frozen,
+                is_invulnerable,
+                summary_json,
+                document_json,
+                last_indexed_at,
+                created_at,
+                updated_at
+            FROM game_constructions
+            WHERE game_id = ?1
+                AND construction_path = ?2
+            ",
+            params![game_id, construction_path.trim()],
+            game_construction_from_row,
         )
     }
 
@@ -3404,6 +4429,18 @@ fn game_from_row(row: &rusqlite::Row<'_>) -> Result<GameRecord> {
     })
 }
 
+fn game_data_location_from_row(row: &rusqlite::Row<'_>) -> Result<GameDataLocationRecord> {
+    Ok(GameDataLocationRecord {
+        id: row.get(0)?,
+        game_id: row.get(1)?,
+        location_type: row.get(2)?,
+        label: row.get(3)?,
+        directory_path: row.get(4)?,
+        created_at: row.get(5)?,
+        updated_at: row.get(6)?,
+    })
+}
+
 fn game_catalog_object_from_row(row: &rusqlite::Row<'_>) -> Result<GameCatalogObjectRecord> {
     Ok(GameCatalogObjectRecord {
         id: row.get(0)?,
@@ -3420,6 +4457,85 @@ fn game_catalog_object_from_row(row: &rusqlite::Row<'_>) -> Result<GameCatalogOb
         source_screenshot_path: row.get(11)?,
         created_at: row.get(12)?,
         updated_at: row.get(13)?,
+    })
+}
+
+fn game_runtime_part_from_row(row: &rusqlite::Row<'_>) -> Result<GameRuntimePartRecord> {
+    Ok(GameRuntimePartRecord {
+        id: row.get(0)?,
+        game_id: row.get(1)?,
+        part_key: row.get(2)?,
+        asset_guid: row.get(3)?,
+        asset_name: row.get(4)?,
+        display_name: row.get(5)?,
+        full_display_name: row.get(6)?,
+        category: row.get(7)?,
+        mass: row.get(8)?,
+        properties_json: row.get(9)?,
+        source_export_id: row.get(10)?,
+        source_construction_id: row.get(11)?,
+        last_seen_at: row.get(12)?,
+        display_image_path: row.get(13)?,
+        source_image_path: row.get(14)?,
+        notes: row.get(15)?,
+        created_at: row.get(16)?,
+        updated_at: row.get(17)?,
+    })
+}
+
+fn game_runtime_construction_export_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<GameRuntimeConstructionExportRecord> {
+    let is_frozen: Option<i64> = row.get(12)?;
+    let is_invulnerable: Option<i64> = row.get(13)?;
+    let is_player_character: Option<i64> = row.get(14)?;
+    Ok(GameRuntimeConstructionExportRecord {
+        id: row.get(0)?,
+        game_id: row.get(1)?,
+        export_id: row.get(2)?,
+        name: row.get(3)?,
+        export_kind: row.get(4)?,
+        intended_path: row.get(5)?,
+        source_log_path: row.get(6)?,
+        byte_size: row.get(7)?,
+        construction_id: row.get(8)?,
+        exported_at: row.get(9)?,
+        part_count: row.get(10)?,
+        mass: row.get(11)?,
+        is_frozen: is_frozen.map(|value| value != 0),
+        is_invulnerable: is_invulnerable.map(|value| value != 0),
+        is_player_character: is_player_character.map(|value| value != 0),
+        document_json: row.get(15)?,
+        last_indexed_at: row.get(16)?,
+        created_at: row.get(17)?,
+        updated_at: row.get(18)?,
+    })
+}
+
+fn game_construction_from_row(row: &rusqlite::Row<'_>) -> Result<GameConstructionRecord> {
+    let is_frozen: Option<i64> = row.get(13)?;
+    let is_invulnerable: Option<i64> = row.get(14)?;
+    Ok(GameConstructionRecord {
+        id: row.get(0)?,
+        game_id: row.get(1)?,
+        name: row.get(2)?,
+        folder_path: row.get(3)?,
+        construction_path: row.get(4)?,
+        byte_size: row.get(5)?,
+        decoded_byte_size: row.get(6)?,
+        composite_count: row.get(7)?,
+        part_count: row.get(8)?,
+        unique_asset_guid_count: row.get(9)?,
+        attachment_count: row.get(10)?,
+        link_count: row.get(11)?,
+        intersection_count: row.get(12)?,
+        is_frozen: is_frozen.map(|value| value != 0),
+        is_invulnerable: is_invulnerable.map(|value| value != 0),
+        summary_json: row.get(15)?,
+        document_json: row.get(16)?,
+        last_indexed_at: row.get(17)?,
+        created_at: row.get(18)?,
+        updated_at: row.get(19)?,
     })
 }
 

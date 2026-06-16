@@ -44,7 +44,9 @@ Milestone 12 is complete, passed, and successful. It adds project-level local Ma
 
 Milestone 13 is complete, passed, and successful. It consolidates the Projects workspace UI by moving project/conversation navigation into the left hierarchy, moving GitHub and project Markdown configuration into Project Edit, giving the selected chat conversation most of the main panel, and placing conversation attached context plus local Markdown bridge drafts in a collapsible right-hand chat pane. The project row action is `New Chat`; existing chats open from conversation child rows in the left navigation.
 
-Gaming Screenshot Capture is complete, passed, and successful as a post-Milestone 13 feature addendum. It adds a Gaming workspace with GearBlocks, overlay-hidden screenshot capture, unique PNG and capture manifest output under gitignored `game-screenshots/`, SQLite screenshot metadata, Tauri asset-backed thumbnail previews, and right-click screenshot deletion cleanup.
+Gaming Screenshot Capture is complete, passed, and successful as a post-Milestone 13 feature addendum. It adds a Gaming workspace with GearBlocks, overlay-hidden screenshot capture, unique PNG and capture manifest output under gitignored `game-screenshots/`, SQLite screenshot metadata, Tauri asset-backed thumbnail previews, and right-click screenshot deletion cleanup. GearBlocks also exposes selected-game Home controls for Save Location and Alternate Data Location records stored locally in SQLite. The GearBlocks Home screen can decode local `construction.bytes` saves by inflating raw DEFLATE and parsing BSON into a JSON summary, and can install a GearBlocks Lua script mod for runtime construction metadata export.
+
+Overlay Forge 0.2.0 is complete, passed, and successful as a GearBlocks runtime API interface release. It implements support structures and exporter wiring for the documented `SmashHammer.GearBlocks.Construction` namespace reference interfaces. Runtime imports create `apiAttributes`, catalog part details show API attribute availability without values, and DB definitions / runtime construction export context retain the expanded captured getter data. Future issues with specific getters should start from `docs/GEARBLOCKS_RUNTIME_INTERFACES.md`.
 
 Milestone numbering note: Milestone 2 is the Local Projects component. Milestone 3 is the OpenAI Planning Chat component. Milestone 4 is GitHub Integration. Milestone 5 is the Controlled YouTube Component. Milestone 6 is Project Workspace Chat. Milestone 7 is Project Workspace Layout Refinement. Milestone 8 is Projects Navigation Tree Actions and is complete, passed, and successful. Milestone 9 is Manual Context Attachments and is complete, passed, and successful. Milestone 10 is Prompt Preview and is complete, passed, and successful. Milestone 11 is Bridge File Drafting and is complete, passed, and successful. Milestone 12 is Project Markdown Context and is complete, passed, and successful. Milestone 13 is Project Workspace UI Consolidation and is complete, passed, and successful. Do not mistake roadmap list item positions for milestone IDs.
 
@@ -78,6 +80,9 @@ Milestone numbering note: Milestone 2 is the Local Projects component. Milestone
 - Project-level local Markdown context from README and referenced Markdown files
 - Implemented Project Workspace UI Consolidation for focused chat layout
 - Gaming workspace with GearBlocks as the initial game section
+- GearBlocks selected-game Home controls for local Save Location and Alternate Data Location folders
+- GearBlocks selected-game Home construction decoder for local `construction.bytes` saves and runtime Lua exporter installation
+- GearBlocks runtime API getter snapshots for the documented `SmashHammer.GearBlocks.Construction` namespace interfaces
 - Validated Gaming screenshot capture, thumbnail preview, context menu, and delete cleanup
 - Simple Gaming chat overlay screenshot capture that reuses the regular game screenshot flow and attaches the screenshot to the current prompt
 - Centralized Project deferred items in `docs/PROJECT_DEFERRED_ITEMS.md`
@@ -129,6 +134,7 @@ Update this section manually after each validation pass.
 - Complete: SQLite database created automatically at `%APPDATA%\com.overlayforge.desktop\overlay-forge.sqlite3`
 - Complete: scratchpad persistence manually validated by user
 - Complete: Gaming Screenshot Capture validated successfully for capture, preview, and delete cleanup
+- Complete: Overlay Forge 0.2.0 GearBlocks runtime API interface inclusion validated in-game on Rob's vehicle
 - Complete: custom draggable titlebar and window controls build successfully
 - Complete: edge/corner resize handle APIs build successfully
 - Complete: fixed titlebar drag event interception so window control clicks can fire

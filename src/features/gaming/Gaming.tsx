@@ -1,38 +1,60 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChatWorkspace } from "../../components/ChatWorkspace";
 import {
   catalogGamePartsFromScreenshots,
+  clearGameRuntimePartImagesForCategory,
   createGame,
   createGameChatConversation,
   createGameChatScreenshotCapture,
   createGameScreenshotCaptureRequest,
+  decodeGearBlocksConstructionFile,
+  installGearBlocksLuaExporter,
+  importGearBlocksCatalogScreenshotImages,
+  importGearBlocksRuntimePartIndex,
+  listGearBlocksRuntimeExports,
   deleteGameChatConversation,
+  deleteGameDataLocation,
   deleteGameScreenshot,
   deleteGame,
   listGameChatConversations,
+  listGameDataLocations,
   listGameChatMessages,
   listGameCatalogObjects,
+  listGameConstructions,
+  listGearBlocksConstructionFiles,
   listGamePartCategories,
+  listGameRuntimeParts,
   listGameScreenshots,
-  sendGameChatMessage
+  saveGameDataLocation,
+  setGameRuntimePartDisplayImage,
+  sendGameChatMessage,
+  syncGearBlocksRuntimeContext,
+  syncGearBlocksSavedConstructions,
+  updateGameRuntimePartNotes
 } from "../../services/gaming";
 import type {
   Game,
   GameChatConversation,
   GameChatMessage,
   GameCatalogObject,
+  GameConstruction,
+  GameDataLocation,
+  GameDataLocationType,
+  GameRuntimePart,
+  GearBlocksConstructionDecode,
+  GearBlocksConstructionFile,
+  GearBlocksRuntimeExport,
   GamePartCategory,
   GameScreenshotCaptureRequest
 } from "../../services/gaming";
 
 type GamingProps = {
   chatOverlayMode?: boolean;
-  chatOverlayRequestNonce?: number;
-  chatScreenshotCaptureRequestNonce?: number;
   gameSections: Game[];
   navAction: GameNavAction | null;
-  onEnterChatOverlayMode?: () => void;
+  onEnterChatOverlayMode?: (game: Game, conversationId: number) => void;
   onGameCreated: (game: Game) => void;
   onGameChatConversationsChanged: (
     gameId: number,
@@ -57,13 +79,34 @@ type ScreenshotContextMenu = {
   y: number;
 };
 
-type GameView = "home" | "chat" | "screenshots" | "parts";
+type GameView = "home" | "chat" | "screenshots" | "parts" | "constructions";
 const CHAT_SCREENSHOTS_PER_PAGE = 8;
+const GEARBLOCKS_PARTS_CATALOG_METADATA = {
+  gameVersion: "0.8.96622",
+  completeness: "Complete",
+  validation: "Validated"
+};
+const SHOW_GEARBLOCKS_CATALOG_MAINTENANCE_CONTROLS = false;
+const GEARBLOCKS_CONTEXT_SYNC_INTERVAL_MS = 5000;
+const GAME_DATA_LOCATION_OPTIONS: Array<{
+  type: GameDataLocationType;
+  title: string;
+  description: string;
+}> = [
+  {
+    type: "save",
+    title: "Save Location",
+    description: "Primary folder for game saves or build files."
+  },
+  {
+    type: "alternate",
+    title: "Alternate Data Location",
+    description: "Secondary folder for mods, exports, or other game data."
+  }
+];
 
 export function Gaming({
   chatOverlayMode = false,
-  chatOverlayRequestNonce = 0,
-  chatScreenshotCaptureRequestNonce = 0,
   gameSections,
   navAction,
   onEnterChatOverlayMode,
@@ -82,7 +125,28 @@ export function Gaming({
   const [selectedPartCategory, setSelectedPartCategory] = useState("all");
   const [screenshots, setScreenshots] = useState<GameScreenshotCaptureRequest[]>([]);
   const [parts, setParts] = useState<GameCatalogObject[]>([]);
+  const [runtimeParts, setRuntimeParts] = useState<GameRuntimePart[]>([]);
   const [partCategories, setPartCategories] = useState<GamePartCategory[]>([]);
+  const [dataLocations, setDataLocations] = useState<GameDataLocation[]>([]);
+  const [updatingDataLocationType, setUpdatingDataLocationType] =
+    useState<GameDataLocationType | null>(null);
+  const [constructionFiles, setConstructionFiles] = useState<GearBlocksConstructionFile[]>([]);
+  const [gameConstructions, setGameConstructions] = useState<GameConstruction[]>([]);
+  const [isSyncingGameConstructions, setIsSyncingGameConstructions] = useState(false);
+  const [decodedConstruction, setDecodedConstruction] =
+    useState<GearBlocksConstructionDecode | null>(null);
+  const [decodingConstructionPath, setDecodingConstructionPath] = useState("");
+  const [isInstallingLuaExporter, setIsInstallingLuaExporter] = useState(false);
+  const [luaExporterPath, setLuaExporterPath] = useState("");
+  const [runtimeExports, setRuntimeExports] = useState<GearBlocksRuntimeExport[]>([]);
+  const [selectedRuntimeExportId, setSelectedRuntimeExportId] = useState("");
+  const [isImportingRuntimeExports, setIsImportingRuntimeExports] = useState(false);
+  const [isImportingCatalogScreenshot, setIsImportingCatalogScreenshot] = useState(false);
+  const [isClearingRuntimeCategoryImages, setIsClearingRuntimeCategoryImages] = useState(false);
+  const [updatingRuntimePartImageId, setUpdatingRuntimePartImageId] = useState<number | null>(null);
+  const [selectedRuntimePartId, setSelectedRuntimePartId] = useState<number | null>(null);
+  const [runtimePartNotesDraft, setRuntimePartNotesDraft] = useState("");
+  const [isSavingRuntimePartNotes, setIsSavingRuntimePartNotes] = useState(false);
   const [chatConversations, setChatConversations] = useState<GameChatConversation[]>([]);
   const [selectedChatConversationId, setSelectedChatConversationId] = useState<number | null>(null);
   const [chatMessages, setChatMessages] = useState<GameChatMessage[]>([]);
@@ -98,6 +162,7 @@ export function Gaming({
     useState<ScreenshotContextMenu | null>(null);
   const [deletingScreenshotId, setDeletingScreenshotId] = useState<number | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
+  const isAutoSyncingGearBlocksContextRef = useRef(false);
 
   const selectedGame = useMemo(
     () => gameSections.find((game) => game.id === selectedGameId) ?? null,
@@ -109,6 +174,17 @@ export function Gaming({
         ? parts
         : parts.filter((part) => part.category === selectedPartCategory),
     [parts, selectedPartCategory]
+  );
+  const displayedRuntimeParts = useMemo(
+    () =>
+      selectedPartCategory === "all"
+        ? runtimeParts
+        : runtimeParts.filter((part) => part.category === selectedPartCategory),
+    [runtimeParts, selectedPartCategory]
+  );
+  const selectedRuntimePart = useMemo(
+    () => runtimeParts.find((part) => part.id === selectedRuntimePartId) ?? null,
+    [runtimeParts, selectedRuntimePartId]
   );
   const chatScreenshotPageCount = Math.max(
     1,
@@ -122,12 +198,52 @@ export function Gaming({
       ),
     [chatScreenshotPage, screenshots]
   );
+  const selectedRuntimeExport = useMemo(
+    () => runtimeExports.find((runtimeExport) => runtimeExport.id === selectedRuntimeExportId),
+    [runtimeExports, selectedRuntimeExportId]
+  );
+
+  useEffect(() => {
+    if (
+      selectedGame?.slug === "gearblocks" &&
+      gameView === "parts" &&
+      selectedPartCategory === "all" &&
+      partCategories.length > 0
+    ) {
+      setSelectedPartCategory(partCategories[0].name);
+    }
+  }, [gameView, partCategories, selectedGame?.slug, selectedPartCategory]);
+
+  useEffect(() => {
+    if (selectedGame && selectedGame.slug !== "gearblocks" && gameView === "constructions") {
+      setGameView("home");
+    }
+  }, [gameView, selectedGame?.id, selectedGame?.slug]);
 
   useEffect(() => {
     if (!selectedGame) {
       setScreenshots([]);
       setParts([]);
+      setRuntimeParts([]);
       setPartCategories([]);
+      setDataLocations([]);
+      setUpdatingDataLocationType(null);
+      setConstructionFiles([]);
+      setGameConstructions([]);
+      setIsSyncingGameConstructions(false);
+      setDecodedConstruction(null);
+      setDecodingConstructionPath("");
+      setIsInstallingLuaExporter(false);
+      setLuaExporterPath("");
+      setRuntimeExports([]);
+      setSelectedRuntimeExportId("");
+      setIsImportingRuntimeExports(false);
+      setIsImportingCatalogScreenshot(false);
+      setIsClearingRuntimeCategoryImages(false);
+      setUpdatingRuntimePartImageId(null);
+      setSelectedRuntimePartId(null);
+      setRuntimePartNotesDraft("");
+      setIsSavingRuntimePartNotes(false);
       setChatConversations([]);
       setSelectedChatConversationId(null);
       setChatMessages([]);
@@ -145,8 +261,24 @@ export function Gaming({
     listGameCatalogObjects(selectedGame.id)
       .then(setParts)
       .catch((error) => setStatus(formatError(error)));
+    listGameRuntimeParts(selectedGame.id)
+      .then(setRuntimeParts)
+      .catch((error) => setStatus(formatError(error)));
     listGamePartCategories(selectedGame.id)
       .then(setPartCategories)
+      .catch((error) => setStatus(formatError(error)));
+    listGameDataLocations(selectedGame.id)
+      .then((locations) => {
+        setDataLocations(locations);
+        if (selectedGame.slug === "gearblocks") {
+          void refreshGearBlocksConstructionFiles(selectedGame.id);
+          void syncGearBlocksConstructions(selectedGame.id);
+        } else {
+          setConstructionFiles([]);
+          setGameConstructions([]);
+          setDecodedConstruction(null);
+        }
+      })
       .catch((error) => setStatus(formatError(error)));
     listGameChatConversations(selectedGame.id)
       .then((conversations) => {
@@ -160,6 +292,34 @@ export function Gaming({
       })
       .catch((error) => setStatus(formatError(error)));
   }, [selectedGame?.id]);
+
+  useEffect(() => {
+    if (!selectedGame || selectedGame.slug !== "gearblocks") {
+      return;
+    }
+
+    let cancelled = false;
+    const sync = async () => {
+      if (cancelled || isAutoSyncingGearBlocksContextRef.current) {
+        return;
+      }
+      isAutoSyncingGearBlocksContextRef.current = true;
+      try {
+        await syncGearBlocksContextState(selectedGame.id, false);
+      } catch (error) {
+        setStatus(formatError(error));
+      } finally {
+        isAutoSyncingGearBlocksContextRef.current = false;
+      }
+    };
+
+    void sync();
+    const intervalId = window.setInterval(sync, GEARBLOCKS_CONTEXT_SYNC_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [selectedGame?.id, selectedGame?.slug]);
 
   useEffect(() => {
     if (!navAction || !navAction.gameId) {
@@ -182,45 +342,18 @@ export function Gaming({
   }, [navAction?.nonce]);
 
   useEffect(() => {
+    setSelectedRuntimePartId(null);
+  }, [selectedPartCategory]);
+
+  useEffect(() => {
+    setRuntimePartNotesDraft(selectedRuntimePart?.notes ?? "");
+  }, [selectedRuntimePart?.id, selectedRuntimePart?.notes]);
+
+  useEffect(() => {
     if (chatOverlayMode && (!selectedGame || gameView !== "chat" || !selectedChatConversationId)) {
       onExitChatOverlayMode?.();
     }
   }, [chatOverlayMode, selectedGame?.id, gameView, selectedChatConversationId, onExitChatOverlayMode]);
-
-  useEffect(() => {
-    if (
-      chatOverlayRequestNonce > 0 &&
-      selectedGame &&
-      gameView === "chat" &&
-      selectedChatConversationId
-    ) {
-      onEnterChatOverlayMode?.();
-    }
-  }, [
-    chatOverlayRequestNonce,
-    selectedGame?.id,
-    gameView,
-    selectedChatConversationId,
-    onEnterChatOverlayMode
-  ]);
-
-  useEffect(() => {
-    if (
-      chatScreenshotCaptureRequestNonce > 0 &&
-      chatOverlayMode &&
-      selectedGame &&
-      gameView === "chat" &&
-      selectedChatConversationId
-    ) {
-      void capturePromptScreenshot(selectedGame);
-    }
-  }, [
-    chatScreenshotCaptureRequestNonce,
-    chatOverlayMode,
-    selectedGame?.id,
-    gameView,
-    selectedChatConversationId
-  ]);
 
   useEffect(() => {
     setChatScreenshotPage((current) => Math.min(current, chatScreenshotPageCount - 1));
@@ -377,6 +510,60 @@ export function Gaming({
     }
   }
 
+  async function setRuntimePartImage(game: Game, part: GameRuntimePart) {
+    if (updatingRuntimePartImageId !== null) {
+      return;
+    }
+
+    try {
+      const selected = await open({
+        multiple: false,
+        directory: false,
+        title: `Select display image for ${part.displayName || part.assetName || "part"}`,
+        filters: [
+          {
+            name: "Images",
+            extensions: ["png", "jpg", "jpeg", "webp", "bmp"]
+          }
+        ]
+      });
+      const imagePath = Array.isArray(selected) ? selected[0] : selected;
+      if (!imagePath) {
+        return;
+      }
+
+      setUpdatingRuntimePartImageId(part.id);
+      const updated = await setGameRuntimePartDisplayImage(game.id, part.id, imagePath);
+      setRuntimeParts((current) =>
+        current.map((runtimePart) => (runtimePart.id === updated.id ? updated : runtimePart))
+      );
+      setStatus(`Display image set for ${updated.displayName || updated.assetName || updated.partKey}`);
+      showToast("Successful");
+    } catch (error) {
+      setStatus(formatError(error));
+      window.alert(formatError(error));
+    } finally {
+      setUpdatingRuntimePartImageId(null);
+    }
+  }
+
+  async function saveRuntimePartNotes(game: Game, part: GameRuntimePart) {
+    setIsSavingRuntimePartNotes(true);
+    try {
+      const updated = await updateGameRuntimePartNotes(game.id, part.id, runtimePartNotesDraft);
+      setRuntimeParts((current) =>
+        current.map((runtimePart) => (runtimePart.id === updated.id ? updated : runtimePart))
+      );
+      setStatus(`Notes saved for ${updated.displayName || updated.assetName || updated.partKey}`);
+      showToast("Successful");
+    } catch (error) {
+      setStatus(formatError(error));
+      window.alert(formatError(error));
+    } finally {
+      setIsSavingRuntimePartNotes(false);
+    }
+  }
+
   async function createGameChat() {
     if (!selectedGame) {
       setStatus("Select a game first");
@@ -480,6 +667,254 @@ export function Gaming({
     setIsChatScreenshotPickerOpen(false);
   }
 
+  async function browseGameDataLocation(game: Game, locationType: GameDataLocationType) {
+    setUpdatingDataLocationType(locationType);
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        title: `Select ${gameDataLocationTitle(locationType)}`
+      });
+
+      if (!selected || Array.isArray(selected)) {
+        setStatus("Directory selection cancelled");
+        return;
+      }
+
+      const saved = await saveGameDataLocation(game.id, locationType, selected);
+      setDataLocations((current) => upsertGameDataLocation(current, saved));
+      if (game.slug === "gearblocks") {
+        void refreshGearBlocksConstructionFiles(game.id);
+      }
+      setStatus(`${gameDataLocationTitle(locationType)} set`);
+      showToast("Successful");
+    } catch (error) {
+      setStatus(formatError(error));
+      window.alert(formatError(error));
+    } finally {
+      setUpdatingDataLocationType(null);
+    }
+  }
+
+  async function clearGameDataLocation(game: Game, locationType: GameDataLocationType) {
+    setUpdatingDataLocationType(locationType);
+    try {
+      await deleteGameDataLocation(game.id, locationType);
+      setDataLocations((current) =>
+        current.filter((location) => location.locationType !== locationType)
+      );
+      if (game.slug === "gearblocks") {
+        void refreshGearBlocksConstructionFiles(game.id);
+      }
+      setStatus(`${gameDataLocationTitle(locationType)} cleared`);
+    } catch (error) {
+      setStatus(formatError(error));
+      window.alert(formatError(error));
+    } finally {
+      setUpdatingDataLocationType(null);
+    }
+  }
+
+  async function refreshGearBlocksConstructionFiles(gameId: number) {
+    try {
+      const files = await listGearBlocksConstructionFiles(gameId);
+      setConstructionFiles(files);
+      setDecodedConstruction((current) =>
+        current && files.some((file) => file.constructionPath === current.constructionPath)
+          ? current
+          : null
+      );
+    } catch (error) {
+      setStatus(formatError(error));
+    }
+  }
+
+  async function refreshGameConstructions(gameId: number) {
+    try {
+      const constructions = await listGameConstructions(gameId);
+      setGameConstructions(constructions);
+    } catch (error) {
+      setStatus(formatError(error));
+    }
+  }
+
+  async function syncGearBlocksConstructions(gameId: number) {
+    setIsSyncingGameConstructions(true);
+    try {
+      const constructions = await syncGearBlocksSavedConstructions(gameId);
+      setGameConstructions(constructions);
+      setStatus(`Indexed ${constructions.length} GearBlocks construction(s)`);
+    } catch (error) {
+      setStatus(formatError(error));
+      await refreshGameConstructions(gameId);
+    } finally {
+      setIsSyncingGameConstructions(false);
+    }
+  }
+
+  async function syncGearBlocksContextState(gameId: number, showStatus: boolean) {
+    const [sync, categories, files] = await Promise.all([
+      syncGearBlocksRuntimeContext(gameId),
+      listGamePartCategories(gameId),
+      listGearBlocksConstructionFiles(gameId)
+    ]);
+    setRuntimeParts(sync.runtimeParts);
+    setPartCategories(categories);
+    setGameConstructions(sync.constructions);
+    setConstructionFiles(files);
+    setRuntimeExports(
+      sync.runtimeExports.map((runtimeExport) => ({
+        id: runtimeExport.exportId,
+        name: runtimeExport.name,
+        intendedPath: runtimeExport.intendedPath,
+        sourceLogPath: runtimeExport.sourceLogPath,
+        byteSize: runtimeExport.byteSize,
+        document: parseJsonOrFallback(runtimeExport.documentJson, {})
+      }))
+    );
+    setSelectedRuntimeExportId((current) =>
+      current && sync.runtimeExports.some((runtimeExport) => runtimeExport.exportId === current)
+        ? current
+        : sync.runtimeExports[0]?.exportId ?? ""
+    );
+
+    if (showStatus) {
+      setStatus(
+        `Synced ${sync.constructionCount} construction(s), ${sync.runtimeExportCount} runtime export(s), and ${sync.runtimePartCount} part(s)`
+      );
+    }
+  }
+
+  async function decodeGearBlocksConstruction(construction: GearBlocksConstructionFile) {
+    setDecodingConstructionPath(construction.constructionPath);
+    try {
+      const decoded = await decodeGearBlocksConstructionFile(construction.constructionPath);
+      setDecodedConstruction(decoded);
+      setStatus(`Decoded ${decoded.name}`);
+      showToast("Successful");
+    } catch (error) {
+      setStatus(formatError(error));
+      window.alert(formatError(error));
+    } finally {
+      setDecodingConstructionPath("");
+    }
+  }
+
+  async function installGearBlocksExporter(game: Game) {
+    setIsInstallingLuaExporter(true);
+    try {
+      const install = await installGearBlocksLuaExporter(game.id);
+      setLuaExporterPath(install.scriptModPath);
+      setStatus(`Lua exporter installed: ${install.exportDirectory}`);
+      showToast("Successful");
+    } catch (error) {
+      setStatus(formatError(error));
+      window.alert(formatError(error));
+    } finally {
+      setIsInstallingLuaExporter(false);
+    }
+  }
+
+  async function importGearBlocksRuntimeExports(game: Game) {
+    setIsImportingRuntimeExports(true);
+    try {
+      const exports = await listGearBlocksRuntimeExports(game.id);
+      const indexedParts = await importGearBlocksRuntimePartIndex(game.id);
+      const categories = await listGamePartCategories(game.id);
+      setRuntimeExports(exports);
+      setRuntimeParts(indexedParts);
+      setPartCategories(categories);
+      setSelectedRuntimeExportId(exports.length > 0 ? exports[exports.length - 1].id : "");
+      setStatus(
+        `Imported ${exports.length} GearBlocks runtime export(s) and indexed ${indexedParts.length} unique part(s)`
+      );
+      showToast("Successful");
+    } catch (error) {
+      setStatus(formatError(error));
+      window.alert(formatError(error));
+    } finally {
+      setIsImportingRuntimeExports(false);
+    }
+  }
+
+  async function importCatalogScreenshotImages(game: Game) {
+    if (selectedPartCategory === "all") {
+      setStatus("Select a specific GearBlocks category before importing a catalog screenshot");
+      return;
+    }
+
+    setIsImportingCatalogScreenshot(true);
+    try {
+      const selected = await open({
+        multiple: false,
+        directory: false,
+        title: `Select ${selectedPartCategory} catalog screenshot`,
+        filters: [
+          {
+            name: "PNG screenshots",
+            extensions: ["png"]
+          }
+        ]
+      });
+      const imagePath = Array.isArray(selected) ? selected[0] : selected;
+      if (!imagePath) {
+        return;
+      }
+
+      const updatedParts = await importGearBlocksCatalogScreenshotImages(
+        game.id,
+        selectedPartCategory,
+        imagePath
+      );
+      const orderedParts = await listGameRuntimeParts(game.id);
+      setRuntimeParts(orderedParts);
+      setStatus(
+        `Refreshed Player.log and imported ${updatedParts.length} ${selectedPartCategory} catalog image(s)`
+      );
+      showToast("Successful");
+    } catch (error) {
+      setStatus(formatError(error));
+      window.alert(formatError(error));
+    } finally {
+      setIsImportingCatalogScreenshot(false);
+    }
+  }
+
+  async function clearRuntimeCategoryImages(game: Game) {
+    if (selectedPartCategory === "all") {
+      setStatus("Select a specific GearBlocks category before clearing images");
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Remove all display image associations from ${selectedPartCategory} parts? Image files will remain on disk.`
+      )
+    ) {
+      return;
+    }
+
+    setIsClearingRuntimeCategoryImages(true);
+    try {
+      const clearedParts = await clearGameRuntimePartImagesForCategory(
+        game.id,
+        selectedPartCategory
+      );
+      const orderedParts = await listGameRuntimeParts(game.id);
+      setRuntimeParts(orderedParts);
+      setSelectedRuntimePartId((current) =>
+        current && clearedParts.some((part) => part.id === current) ? null : current
+      );
+      setStatus(`Cleared ${clearedParts.length} ${selectedPartCategory} image association(s)`);
+      showToast("Successful");
+    } catch (error) {
+      setStatus(formatError(error));
+      window.alert(formatError(error));
+    } finally {
+      setIsClearingRuntimeCategoryImages(false);
+    }
+  }
+
   function togglePromptScreenshot(screenshotId: number) {
     setSelectedPromptScreenshotIds((current) =>
       current.includes(screenshotId)
@@ -567,6 +1002,15 @@ export function Gaming({
             Chats
             <span className="button-count">{chatConversations.length}</span>
           </button>
+          {selectedGame.slug === "gearblocks" && (
+            <button
+              className={gameView === "constructions" ? "primary-button" : "ghost-button"}
+              onClick={() => setGameView("constructions")}
+              type="button"
+            >
+              Constructions
+            </button>
+          )}
           <button
             className={gameView === "screenshots" ? "primary-button" : "ghost-button"}
             onClick={() => setGameView("screenshots")}
@@ -581,7 +1025,9 @@ export function Gaming({
             type="button"
           >
             Parts
-            <span className="button-count">{parts.length}</span>
+            <span className="button-count">
+              {selectedGame.slug === "gearblocks" ? runtimeParts.length : parts.length}
+            </span>
           </button>
           <button className="ghost-button" type="button">
             Add Reference
@@ -589,7 +1035,10 @@ export function Gaming({
         </div>
         )}
 
-        {!chatOverlayMode && gameView === "parts" && partCategories.length > 0 && (
+        {!chatOverlayMode &&
+          gameView === "parts" &&
+          selectedGame.slug !== "gearblocks" &&
+          partCategories.length > 0 && (
           <div className="game-part-filter-bar" aria-label="Part category filters">
             <button
               className={selectedPartCategory === "all" ? "active" : ""}
@@ -597,7 +1046,7 @@ export function Gaming({
               type="button"
             >
               <span>All</span>
-              <strong>{parts.length}</strong>
+              <strong>{selectedGame.slug === "gearblocks" ? runtimeParts.length : parts.length}</strong>
             </button>
             {partCategories.map((category) => (
               <button
@@ -627,7 +1076,227 @@ export function Gaming({
               </div>
               <span>{screenshots.length} screenshots</span>
               <span>{parts.length} cataloged parts</span>
+              <span>{runtimeParts.length} runtime API parts</span>
               <span>{chatConversations.length} chats</span>
+              {selectedGame.slug === "gearblocks" && (
+                <section className="game-data-locations-panel" aria-label="Game data locations">
+                  <div className="game-data-locations-head">
+                    <div>
+                      <p>Local Data</p>
+                      <h4>GearBlocks locations</h4>
+                    </div>
+                  </div>
+                  <div className="game-data-location-list">
+                    {GAME_DATA_LOCATION_OPTIONS.map((option) => {
+                      const location = dataLocations.find(
+                        (item) => item.locationType === option.type
+                      );
+                      const isUpdating = updatingDataLocationType === option.type;
+
+                      return (
+                        <article className="game-data-location-row" key={option.type}>
+                          <div>
+                            <strong>{option.title}</strong>
+                            <span>{option.description}</span>
+                            <code>{location?.directoryPath || "Not set"}</code>
+                          </div>
+                          <div className="game-data-location-actions">
+                            <button
+                              className="primary-button"
+                              disabled={isUpdating}
+                              onClick={() => void browseGameDataLocation(selectedGame, option.type)}
+                              type="button"
+                            >
+                              Browse
+                            </button>
+                            <button
+                              className="ghost-button"
+                              disabled={isUpdating || !location}
+                              onClick={() => void clearGameDataLocation(selectedGame, option.type)}
+                              type="button"
+                            >
+                              Clear
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+              {selectedGame.slug === "gearblocks" && (
+                <section
+                  className="game-construction-decode-panel"
+                  aria-label="GearBlocks construction decoder"
+                >
+                  <div className="game-data-locations-head">
+                    <div>
+                      <p>Construction Decoder</p>
+                      <h4>Saved constructions</h4>
+                    </div>
+                    <div className="game-construction-head-actions">
+                      <button
+                        className="ghost-button"
+                        disabled={isInstallingLuaExporter}
+                        onClick={() => void installGearBlocksExporter(selectedGame)}
+                        type="button"
+                      >
+                        Install Exporter
+                      </button>
+                      <button
+                        className="ghost-button"
+                        disabled={isImportingRuntimeExports}
+                        onClick={() => void importGearBlocksRuntimeExports(selectedGame)}
+                        type="button"
+                      >
+                        Import Runtime Log
+                      </button>
+                      <button
+                        className="ghost-button"
+                        onClick={() => void refreshGearBlocksConstructionFiles(selectedGame.id)}
+                        type="button"
+                      >
+                        Refresh
+                      </button>
+                    </div>
+                  </div>
+
+                  {luaExporterPath && (
+                    <p className="game-construction-exporter-path">
+                      Lua exporter installed at {luaExporterPath}
+                    </p>
+                  )}
+
+                  {constructionFiles.length === 0 ? (
+                    <p>No saved construction folders found.</p>
+                  ) : (
+                    <div className="game-construction-file-list">
+                      {constructionFiles.map((construction) => (
+                        <article
+                          className={
+                            decodedConstruction?.constructionPath === construction.constructionPath
+                              ? "game-construction-file-row active"
+                              : "game-construction-file-row"
+                          }
+                          key={construction.constructionPath}
+                        >
+                          <div>
+                            <strong>{construction.name}</strong>
+                            <span>{formatBytes(construction.byteSize)}</span>
+                          </div>
+                          <button
+                            className="primary-button"
+                            disabled={decodingConstructionPath === construction.constructionPath}
+                            onClick={() => void decodeGearBlocksConstruction(construction)}
+                            type="button"
+                          >
+                            Decode
+                          </button>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+
+                  {decodedConstruction && (
+                    <div className="game-construction-summary">
+                      <div>
+                        <p>Decoded BSON</p>
+                        <h4>{decodedConstruction.name}</h4>
+                      </div>
+                      <div className="game-construction-summary-grid">
+                        <span>{decodedConstruction.summary.compositeCount} composites</span>
+                        <span>{decodedConstruction.summary.partCount} parts</span>
+                        <span>
+                          {decodedConstruction.summary.uniqueAssetGuidCount} unique asset GUIDs
+                        </span>
+                        <span>{decodedConstruction.summary.attachmentCount} attachments</span>
+                        <span>{decodedConstruction.summary.linkCount} links</span>
+                        <span>{formatBytes(decodedConstruction.decodedByteSize)} decoded</span>
+                      </div>
+                      <p>
+                        Part display names require GearBlocks runtime API resolution after spawning
+                        the save; this local decoder exposes asset GUIDs, transforms, dimensions,
+                        behaviours, attachments, links, and raw BSON JSON.
+                      </p>
+                      <pre>{JSON.stringify(decodedConstruction.document, null, 2)}</pre>
+                    </div>
+                  )}
+
+                  {runtimeExports.length > 0 && (
+                    <div className="game-construction-summary">
+                      <div>
+                        <p>Runtime Exports</p>
+                        <h4>{runtimeExports.length} Player.log export(s)</h4>
+                      </div>
+                      <div className="game-runtime-export-list">
+                        {runtimeExports.map((runtimeExport) => (
+                          <button
+                            className={
+                              runtimeExport.id === selectedRuntimeExportId
+                                ? "game-runtime-export-row active"
+                                : "game-runtime-export-row"
+                            }
+                            key={runtimeExport.id}
+                            onClick={() => setSelectedRuntimeExportId(runtimeExport.id)}
+                            type="button"
+                          >
+                            <span>{runtimeExport.name}</span>
+                            <small>{formatBytes(runtimeExport.byteSize)}</small>
+                          </button>
+                        ))}
+                      </div>
+                      {selectedRuntimeExport && (
+                        <>
+                          <p>
+                            Reconstructed from {selectedRuntimeExport.sourceLogPath}; intended
+                            export path was {selectedRuntimeExport.intendedPath}.
+                          </p>
+                          <pre>{JSON.stringify(selectedRuntimeExport.document, null, 2)}</pre>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </section>
+              )}
+            </section>
+          )}
+
+          {gameView === "constructions" && selectedGame.slug === "gearblocks" && (
+            <section
+              className="game-constructions-panel"
+              aria-label="GearBlocks constructions catalog"
+            >
+              <div className="game-view-head">
+                <div>
+                  <p>Catalog</p>
+                  <h3>Constructions</h3>
+                </div>
+                <button
+                  className="ghost-button"
+                  disabled={isSyncingGameConstructions}
+                  onClick={() => void syncGearBlocksConstructions(selectedGame.id)}
+                  type="button"
+                >
+                  Refresh
+                </button>
+              </div>
+              {gameConstructions.length === 0 ? (
+                <p>No saved constructions indexed yet.</p>
+              ) : (
+                <div className="game-construction-catalog-list">
+                  {gameConstructions.map((construction) => (
+                    <article className="game-construction-catalog-row" key={construction.id}>
+                      <div>
+                        <strong>{construction.name}</strong>
+                        <code>{construction.folderPath}</code>
+                      </div>
+                      <span>{construction.partCount} parts</span>
+                      <span>{construction.compositeCount} composites</span>
+                      <span>{formatBytes(construction.byteSize)}</span>
+                    </article>
+                  ))}
+                </div>
+              )}
             </section>
           )}
 
@@ -732,7 +1401,11 @@ export function Gaming({
               isSending={isSendingChat}
               messages={chatMessages}
               newConversationTitle={newChatTitle}
-              onEnterChatOverlayMode={onEnterChatOverlayMode}
+              onEnterChatOverlayMode={() => {
+                if (selectedChatConversationId) {
+                  onEnterChatOverlayMode?.(selectedGame, selectedChatConversationId);
+                }
+              }}
               onCaptureScreenshot={() => void capturePromptScreenshot(selectedGame)}
               onCreateConversation={() => void createGameChat()}
               onDeleteConversation={(conversation) => void removeGameChat(conversation)}
@@ -746,9 +1419,11 @@ export function Gaming({
               }}
               onSendMessage={() => void sendGameChat()}
               promptContextSummary={
-                selectedPromptScreenshotIds.length > 0
-                  ? `${selectedPromptScreenshotIds.length} screenshot(s) attached`
-                  : ""
+                isCapturingPromptScreenshot
+                  ? "Capturing screenshot..."
+                  : selectedPromptScreenshotIds.length > 0
+                    ? `${selectedPromptScreenshotIds.length} screenshot(s) attached`
+                    : "No screenshots attached"
               }
               selectedConversationId={selectedChatConversationId}
               showFocusedToolbar={false}
@@ -764,43 +1439,298 @@ export function Gaming({
                   <p>Catalog</p>
                   <h3>Parts</h3>
                 </div>
-                <button
-                  className="primary-button"
-                  disabled={isCatalogingParts}
-                  onClick={() => void catalogParts(selectedGame)}
-                  type="button"
-                >
-                  Catalog Parts
-                </button>
-              </div>
-              <div className="game-parts-chart">
-                {parts.length === 0 ? (
-                  <p>No parts cataloged yet.</p>
-                ) : displayedParts.length === 0 ? (
-                  <p>No parts cataloged for this category yet.</p>
-                ) : (
-                  <>
-                    <div className="game-parts-chart-head">
-                      <span>Thumbnail</span>
-                      <span>Part name</span>
-                      <span>Practical physics use</span>
-                    </div>
-                    {displayedParts.map((part) => (
-                      <article className="game-part-row" key={part.id}>
-                        <div className="game-part-thumb">
-                          {part.thumbnailPath ? (
-                            <img alt={`${part.name} source screenshot`} src={convertFileSrc(part.thumbnailPath)} />
-                          ) : (
-                            <span>No image</span>
-                          )}
-                        </div>
-                        <strong className="game-part-name">{part.name}</strong>
-                        <p>{part.description}</p>
-                      </article>
-                    ))}
-                  </>
+                {selectedGame.slug !== "gearblocks" && (
+                  <button
+                    className="primary-button"
+                    disabled={isCatalogingParts}
+                    onClick={() => void catalogParts(selectedGame)}
+                    type="button"
+                  >
+                    Catalog Parts
+                  </button>
                 )}
               </div>
+              {selectedGame.slug === "gearblocks" && (
+                <div className="game-runtime-parts-panel">
+                  <div className="game-runtime-parts-head">
+                    <div>
+                      <p>GearBlocks Runtime API Index</p>
+                      <h4>{runtimeParts.length} unique part(s)</h4>
+                      <div className="game-runtime-catalog-metadata">
+                        <span>Game {GEARBLOCKS_PARTS_CATALOG_METADATA.gameVersion}</span>
+                        <span>{GEARBLOCKS_PARTS_CATALOG_METADATA.completeness}</span>
+                        <span>{GEARBLOCKS_PARTS_CATALOG_METADATA.validation}</span>
+                      </div>
+                    </div>
+                    {SHOW_GEARBLOCKS_CATALOG_MAINTENANCE_CONTROLS && (
+                      <div className="game-runtime-parts-actions">
+                        <button
+                          className="ghost-button"
+                          disabled={isImportingRuntimeExports}
+                          onClick={() => void importGearBlocksRuntimeExports(selectedGame)}
+                          type="button"
+                        >
+                          Import Player.log Parts
+                        </button>
+                        <button
+                          className="ghost-button"
+                          disabled={isImportingCatalogScreenshot || selectedPartCategory === "all"}
+                          onClick={() => void importCatalogScreenshotImages(selectedGame)}
+                          title={
+                            selectedPartCategory === "all"
+                              ? "Select a specific category before importing catalog icons"
+                              : `Import ${selectedPartCategory} catalog icons`
+                          }
+                          type="button"
+                        >
+                          Import Catalog Screenshot
+                        </button>
+                        <button
+                          className="ghost-button"
+                          disabled={isClearingRuntimeCategoryImages || selectedPartCategory === "all"}
+                          onClick={() => void clearRuntimeCategoryImages(selectedGame)}
+                          title={
+                            selectedPartCategory === "all"
+                              ? "Select a specific category before clearing images"
+                              : `Clear ${selectedPartCategory} image associations`
+                          }
+                          type="button"
+                        >
+                          Clear Category Images
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  {runtimeParts.length === 0 ? (
+                    <p>
+                      Export scene parts from the GearBlocks Lua script, then run the maintenance
+                      Player.log import.
+                    </p>
+                  ) : (
+                    <div className="game-runtime-catalog-layout">
+                      <nav
+                        className="game-runtime-category-rail"
+                        aria-label="GearBlocks part categories"
+                      >
+                        {partCategories.map((category) => (
+                          <button
+                            className={
+                              selectedPartCategory === category.name
+                                ? "game-runtime-category-button active"
+                                : "game-runtime-category-button"
+                            }
+                            key={category.name}
+                            onClick={() => {
+                              setSelectedPartCategory(category.name);
+                              setSelectedRuntimePartId(null);
+                            }}
+                            title={`${category.name} (${category.count})`}
+                            type="button"
+                          >
+                            {category.iconPath ? (
+                              <img alt="" src={convertFileSrc(category.iconPath)} />
+                            ) : (
+                              <span>{category.fallbackIcon}</span>
+                            )}
+                          </button>
+                        ))}
+                      </nav>
+
+                      <div className="game-runtime-catalog-main">
+                        {selectedRuntimePart ? (
+                          <div className="game-runtime-part-detail">
+                            <div className="game-runtime-part-detail-head">
+                              <button
+                                className="ghost-button compact-button"
+                                onClick={() => setSelectedRuntimePartId(null)}
+                                type="button"
+                              >
+                                Back to {selectedPartCategory} icons
+                              </button>
+                              <button
+                                className="ghost-button compact-button"
+                                disabled={updatingRuntimePartImageId === selectedRuntimePart.id}
+                                onClick={() =>
+                                  void setRuntimePartImage(selectedGame, selectedRuntimePart)
+                                }
+                                type="button"
+                              >
+                                {selectedRuntimePart.displayImagePath
+                                  ? "Replace Image"
+                                  : "Set Image"}
+                              </button>
+                            </div>
+
+                            <div className="game-runtime-part-detail-layout">
+                              <div className="game-runtime-part-detail-image">
+                                {selectedRuntimePart.displayImagePath ? (
+                                  <img
+                                    alt={`${
+                                      selectedRuntimePart.displayName ||
+                                      selectedRuntimePart.assetName ||
+                                      "Part"
+                                    } catalog icon`}
+                                    src={convertFileSrc(selectedRuntimePart.displayImagePath)}
+                                  />
+                                ) : (
+                                  <span>No image</span>
+                                )}
+                              </div>
+
+                              <div className="game-runtime-part-detail-main">
+                                <div>
+                                  <p>Part Detail</p>
+                                  <h4>
+                                    {selectedRuntimePart.displayName ||
+                                      selectedRuntimePart.assetName ||
+                                      selectedRuntimePart.partKey}
+                                  </h4>
+                                </div>
+                                <dl className="game-runtime-part-definition-grid">
+                                  {runtimePartDetailRows(selectedRuntimePart).map(
+                                    ([label, value]) => (
+                                      <div key={label}>
+                                        <dt>{label}</dt>
+                                        <dd>{value}</dd>
+                                      </div>
+                                    )
+                                  )}
+                                </dl>
+                              </div>
+                            </div>
+
+                            <section
+                              className="game-runtime-part-attributes"
+                              aria-label="Available API attributes"
+                            >
+                              <div>
+                                <p>Catalog Attributes</p>
+                                <h4>
+                                  {runtimePartAvailableAttributes(selectedRuntimePart).length}{" "}
+                                  available getter(s)
+                                </h4>
+                              </div>
+                              <div className="game-runtime-part-attribute-list">
+                                {runtimePartAvailableAttributes(selectedRuntimePart).length > 0 ? (
+                                  runtimePartAvailableAttributes(selectedRuntimePart).map(
+                                    (attribute) => <span key={attribute}>{attribute}</span>
+                                  )
+                                ) : (
+                                  <span>No runtime API attributes indexed yet</span>
+                                )}
+                              </div>
+                            </section>
+
+                            <label className="game-runtime-part-notes">
+                              <span>Notes</span>
+                              <textarea
+                                onChange={(event) => setRuntimePartNotesDraft(event.target.value)}
+                                placeholder="Add practical notes about this part."
+                                value={runtimePartNotesDraft}
+                              />
+                            </label>
+                            <div className="game-runtime-part-detail-actions">
+                              <button
+                                className="primary-button"
+                                disabled={
+                                  isSavingRuntimePartNotes ||
+                                  runtimePartNotesDraft === selectedRuntimePart.notes
+                                }
+                                onClick={() =>
+                                  void saveRuntimePartNotes(selectedGame, selectedRuntimePart)
+                                }
+                                type="button"
+                              >
+                                Save Notes
+                              </button>
+                            </div>
+
+                            <section
+                              className="game-runtime-part-properties"
+                              aria-label="Part properties"
+                            >
+                              <div>
+                                <p>Runtime API Properties</p>
+                                <h4>DB Definitions</h4>
+                              </div>
+                              <pre>
+                                {formatRuntimePartProperties(selectedRuntimePart.propertiesJson)}
+                              </pre>
+                            </section>
+                          </div>
+                        ) : selectedPartCategory === "all" ? (
+                          <p>Select a part category to view the in-game icon layout.</p>
+                        ) : displayedRuntimeParts.length === 0 ? (
+                          <p>No runtime API parts found for this category.</p>
+                        ) : (
+                          <div
+                            className="game-runtime-icon-grid-shell"
+                            aria-label={`${selectedPartCategory} catalog icons`}
+                          >
+                            <div className="game-runtime-icon-grid">
+                              {displayedRuntimeParts.map((part) => (
+                                <button
+                                  className="game-runtime-icon-tile"
+                                  key={part.id}
+                                  onClick={() => setSelectedRuntimePartId(part.id)}
+                                  title={part.displayName || part.assetName || part.partKey}
+                                  type="button"
+                                >
+                                  {part.displayImagePath ? (
+                                    <img
+                                      alt={`${
+                                        part.displayName || part.assetName || "Part"
+                                      } catalog icon`}
+                                      src={convertFileSrc(part.displayImagePath)}
+                                    />
+                                  ) : (
+                                    <span className="game-runtime-icon-placeholder">
+                                      No image
+                                    </span>
+                                  )}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {selectedGame.slug !== "gearblocks" && (
+                <div className="game-parts-chart">
+                  {parts.length === 0 ? (
+                    <p>No parts cataloged yet.</p>
+                  ) : displayedParts.length === 0 ? (
+                    <p>No parts cataloged for this category yet.</p>
+                  ) : (
+                    <>
+                      <div className="game-parts-chart-head">
+                        <span>Thumbnail</span>
+                        <span>Part name</span>
+                        <span>Practical physics use</span>
+                      </div>
+                      {displayedParts.map((part) => (
+                        <article className="game-part-row" key={part.id}>
+                          <div className="game-part-thumb">
+                            {part.thumbnailPath ? (
+                              <img
+                                alt={`${part.name} source screenshot`}
+                                src={convertFileSrc(part.thumbnailPath)}
+                              />
+                            ) : (
+                              <span>No image</span>
+                            )}
+                          </div>
+                          <strong className="game-part-name">{part.name}</strong>
+                          <p>{part.description}</p>
+                        </article>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
             </section>
           )}
 
@@ -974,6 +1904,14 @@ function formatError(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
+function parseJsonOrFallback(value: string, fallback: unknown) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
 function screenshotTimestampLabel(date: Date) {
   const year = date.getFullYear();
   const month = padDatePart(date.getMonth() + 1);
@@ -1001,6 +1939,115 @@ function formatCapturedAt(screenshot: GameScreenshotCaptureRequest) {
   return value || "Unknown capture time";
 }
 
+function gameDataLocationTitle(locationType: GameDataLocationType) {
+  return (
+    GAME_DATA_LOCATION_OPTIONS.find((option) => option.type === locationType)?.title ??
+    "Data Location"
+  );
+}
+
+function upsertGameDataLocation(
+  locations: GameDataLocation[],
+  nextLocation: GameDataLocation
+) {
+  const withoutExisting = locations.filter(
+    (location) => location.locationType !== nextLocation.locationType
+  );
+  return [...withoutExisting, nextLocation].sort(
+    (left, right) =>
+      gameDataLocationSortValue(left.locationType) - gameDataLocationSortValue(right.locationType)
+  );
+}
+
+function gameDataLocationSortValue(locationType: GameDataLocationType) {
+  return locationType === "save" ? 0 : 1;
+}
+
+function formatBytes(value: number) {
+  if (value < 1024) {
+    return `${value} B`;
+  }
+  if (value < 1024 * 1024) {
+    return `${(value / 1024).toFixed(1)} KB`;
+  }
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function runtimePartDetailRows(part: GameRuntimePart): Array<[string, string]> {
+  return [
+    ["ID", String(part.id)],
+    ["Part Key", part.partKey],
+    ["Display Name", part.displayName],
+    ["Full Display Name", part.fullDisplayName],
+    ["Asset Name", part.assetName],
+    ["Asset GUID", part.assetGuid],
+    ["Category", part.category || "Uncategorized"],
+    ["Mass", part.mass.toFixed(2)],
+    ["Source Export ID", part.sourceExportId],
+    ["Source Construction ID", part.sourceConstructionId],
+    ["Last Seen", part.lastSeenAt],
+    ["Display Image Path", part.displayImagePath],
+    ["Source Image Path", part.sourceImagePath],
+    ["Created", part.createdAt],
+    ["Updated", part.updatedAt]
+  ].map(([label, value]) => [label, value || "Not set"]);
+}
+
+function runtimePartAvailableAttributes(part: GameRuntimePart) {
+  const parsed = parseJsonOrFallback(part.propertiesJson, null);
+  const attributes = new Set<string>();
+  collectRuntimePartAvailableAttributes(parsed, attributes);
+  return Array.from(attributes).sort((left, right) => left.localeCompare(right));
+}
+
+function collectRuntimePartAvailableAttributes(value: unknown, attributes: Set<string>) {
+  if (!value || typeof value !== "object") {
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectRuntimePartAvailableAttributes(item, attributes);
+    }
+    return;
+  }
+
+  const object = value as Record<string, unknown>;
+  const apiAttributes = object.apiAttributes;
+  if (Array.isArray(apiAttributes)) {
+    for (const item of apiAttributes) {
+      if (!item || typeof item !== "object") {
+        continue;
+      }
+      const attribute = item as Record<string, unknown>;
+      const interfaceName =
+        typeof attribute.interface === "string" ? attribute.interface.trim() : "";
+      const attributeName = typeof attribute.name === "string" ? attribute.name.trim() : "";
+      if (interfaceName && attributeName) {
+        attributes.add(`${interfaceName}.${attributeName}`);
+      }
+    }
+  }
+
+  for (const [key, child] of Object.entries(object)) {
+    if (key !== "apiAttributes") {
+      collectRuntimePartAvailableAttributes(child, attributes);
+    }
+  }
+}
+
+function formatRuntimePartProperties(propertiesJson: string) {
+  if (!propertiesJson.trim()) {
+    return "{}";
+  }
+
+  try {
+    return JSON.stringify(JSON.parse(propertiesJson), null, 2);
+  } catch {
+    return propertiesJson;
+  }
+}
+
 function GameChatDefaultsPane({ game }: { game: Game }) {
   const isGearBlocks = game.slug === "gearblocks";
 
@@ -1025,6 +2072,16 @@ function GameChatDefaultsPane({ game }: { game: Game }) {
           </div>
           <span>{isGearBlocks ? "On" : "Off"}</span>
         </article>
+
+        {isGearBlocks && (
+          <article className="game-chat-default-item enabled">
+            <div>
+              <strong>Runtime construction context</strong>
+              <span>Latest Overlay Forge exporter data from Player.log is summarized for chat</span>
+            </div>
+            <span>Auto</span>
+          </article>
+        )}
 
         <article className="game-chat-default-item enabled">
           <div>
