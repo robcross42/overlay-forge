@@ -12,6 +12,10 @@ Development bucket for work started on 2026-06-16. Related changes that continue
 
 ### 2026-06-16
 
+#### Added
+
+- Added normalized GearBlocks runtime indexes for part API attributes, discovered `value` fields, properties, and attachments so repeated exports update searchable rows instead of relying only on each part's full JSON blob.
+
 #### Changed
 
 - Bumped Overlay Forge from `0.2.0` to `0.3.0` for the next early-development work set.

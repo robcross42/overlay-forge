@@ -1334,7 +1334,8 @@ fn gearblocks_known_api_index_lua(
     let mut index = serde_json::Map::new();
 
     for part in parts {
-        let Ok(properties) = serde_json::from_str::<serde_json::Value>(&part.properties_json) else {
+        let Ok(properties) = serde_json::from_str::<serde_json::Value>(&part.properties_json)
+        else {
             continue;
         };
         let mut attributes = Vec::new();
@@ -1422,9 +1423,9 @@ fn serde_json_to_lua_literal(value: &serde_json::Value) -> String {
         serde_json::Value::Null => "nil".to_string(),
         serde_json::Value::Bool(value) => value.to_string(),
         serde_json::Value::Number(value) => value.to_string(),
-        serde_json::Value::String(value) => serde_json::to_string(value).unwrap_or_else(|_| {
-            format!("{:?}", value)
-        }),
+        serde_json::Value::String(value) => {
+            serde_json::to_string(value).unwrap_or_else(|_| format!("{:?}", value))
+        }
         serde_json::Value::Array(items) => {
             let items = items
                 .iter()
@@ -3056,6 +3057,11 @@ fn import_runtime_export_parts(
         if part_key.is_empty() {
             continue;
         }
+        let asset_guid = json_string(part.get("assetGuid"));
+        let asset_name = json_string(part.get("assetName"));
+        let display_name = json_string(part.get("displayName"));
+        let full_display_name = json_string(part.get("fullDisplayName"));
+        let category = json_string(part.get("category"));
         let properties_json =
             serde_json::to_string_pretty(&part).map_err(|error| error.to_string())?;
         state
@@ -3063,11 +3069,11 @@ fn import_runtime_export_parts(
             .upsert_game_runtime_part(
                 game_id,
                 &part_key,
-                &json_string(part.get("assetGuid")),
-                &json_string(part.get("assetName")),
-                &json_string(part.get("displayName")),
-                &json_string(part.get("fullDisplayName")),
-                &json_string(part.get("category")),
+                &asset_guid,
+                &asset_name,
+                &display_name,
+                &full_display_name,
+                &category,
                 json_f64(part.get("mass")),
                 &properties_json,
                 &export.id,
@@ -3075,9 +3081,264 @@ fn import_runtime_export_parts(
                 &last_seen_at,
             )
             .map_err(|error| error.to_string())?;
+
+        let context = RuntimePartIndexContext {
+            game_id,
+            part_key,
+            asset_guid,
+            asset_name,
+            display_name,
+            full_display_name,
+            category,
+            source_export_id: export.id.clone(),
+            source_construction_id: source_construction_id.clone(),
+            seen_at: last_seen_at.clone(),
+        };
+        index_runtime_part_discovery(state, &context, &part)?;
     }
 
     Ok(())
+}
+
+struct RuntimePartIndexContext {
+    game_id: i64,
+    part_key: String,
+    asset_guid: String,
+    asset_name: String,
+    display_name: String,
+    full_display_name: String,
+    category: String,
+    source_export_id: String,
+    source_construction_id: String,
+    seen_at: String,
+}
+
+fn index_runtime_part_discovery(
+    state: &AppState,
+    context: &RuntimePartIndexContext,
+    part: &serde_json::Value,
+) -> Result<(), String> {
+    if let Some(attributes) = part
+        .get("apiAttributes")
+        .and_then(serde_json::Value::as_array)
+    {
+        for attribute in attributes {
+            let interface_name = json_string(attribute.get("interface"));
+            let attribute_name = json_string(attribute.get("name"));
+            if interface_name.is_empty() || attribute_name.is_empty() {
+                continue;
+            }
+            state
+                .database
+                .upsert_game_runtime_part_api_attribute(
+                    context.game_id,
+                    &context.part_key,
+                    &context.asset_guid,
+                    &context.asset_name,
+                    &context.display_name,
+                    &context.full_display_name,
+                    &context.category,
+                    &interface_name,
+                    &attribute_name,
+                    &json_string(attribute.get("valueType")),
+                    &json_string(attribute.get("availability")),
+                    &context.source_export_id,
+                    &context.source_construction_id,
+                    &context.seen_at,
+                )
+                .map_err(|error| error.to_string())?;
+        }
+    }
+
+    let mut value_fields = Vec::new();
+    collect_named_value_fields(part, "", &mut value_fields);
+    for (field_path, value) in value_fields {
+        state
+            .database
+            .upsert_game_runtime_part_value(
+                context.game_id,
+                &context.part_key,
+                &context.asset_guid,
+                &context.asset_name,
+                &context.display_name,
+                &context.full_display_name,
+                &context.category,
+                &field_path,
+                json_type_label(value),
+                &value.to_string(),
+                &context.source_export_id,
+                &context.source_construction_id,
+                &context.seen_at,
+            )
+            .map_err(|error| error.to_string())?;
+    }
+
+    if let Some(properties) = part.get("properties") {
+        let mut property_values = Vec::new();
+        collect_leaf_json_values(properties, "", &mut property_values);
+        if property_values.is_empty() && !properties.is_object() && !properties.is_array() {
+            property_values.push(("properties".to_string(), properties));
+        }
+        for (property_path, value) in property_values {
+            state
+                .database
+                .upsert_game_runtime_part_property(
+                    context.game_id,
+                    &context.part_key,
+                    &context.asset_guid,
+                    &context.asset_name,
+                    &context.display_name,
+                    &context.full_display_name,
+                    &context.category,
+                    &property_path,
+                    json_type_label(value),
+                    &value.to_string(),
+                    &context.source_export_id,
+                    &context.source_construction_id,
+                    &context.seen_at,
+                )
+                .map_err(|error| error.to_string())?;
+        }
+    }
+
+    if let Some(attachments) = part.get("attachments") {
+        let mut attachment_values = Vec::new();
+        collect_direct_json_children(attachments, "", &mut attachment_values);
+        for (attachment_path, value) in attachment_values {
+            state
+                .database
+                .upsert_game_runtime_part_attachment(
+                    context.game_id,
+                    &context.part_key,
+                    &context.asset_guid,
+                    &context.asset_name,
+                    &context.display_name,
+                    &context.full_display_name,
+                    &context.category,
+                    &attachment_path,
+                    json_type_label(value),
+                    &value.to_string(),
+                    &context.source_export_id,
+                    &context.source_construction_id,
+                    &context.seen_at,
+                )
+                .map_err(|error| error.to_string())?;
+        }
+    }
+
+    Ok(())
+}
+
+fn collect_named_value_fields<'a>(
+    value: &'a serde_json::Value,
+    path: &str,
+    values: &mut Vec<(String, &'a serde_json::Value)>,
+) {
+    match value {
+        serde_json::Value::Object(object) => {
+            for (key, child) in object {
+                let child_path = json_path_child(path, key);
+                if key == "value" {
+                    values.push((child_path.clone(), child));
+                }
+                collect_named_value_fields(child, &child_path, values);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for (index, child) in items.iter().enumerate() {
+                collect_named_value_fields(child, &json_path_index(path, index), values);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn collect_leaf_json_values<'a>(
+    value: &'a serde_json::Value,
+    path: &str,
+    values: &mut Vec<(String, &'a serde_json::Value)>,
+) {
+    match value {
+        serde_json::Value::Object(object) => {
+            for (key, child) in object {
+                collect_leaf_json_values(child, &json_path_child(path, key), values);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for (index, child) in items.iter().enumerate() {
+                collect_leaf_json_values(child, &json_path_index(path, index), values);
+            }
+        }
+        _ => {
+            if !path.is_empty() {
+                values.push((path.to_string(), value));
+            }
+        }
+    }
+}
+
+fn collect_direct_json_children<'a>(
+    value: &'a serde_json::Value,
+    path: &str,
+    values: &mut Vec<(String, &'a serde_json::Value)>,
+) {
+    match value {
+        serde_json::Value::Object(object) => {
+            if object.is_empty() && !path.is_empty() {
+                values.push((path.to_string(), value));
+            } else {
+                for (key, child) in object {
+                    values.push((json_path_child(path, key), child));
+                }
+            }
+        }
+        serde_json::Value::Array(items) => {
+            if items.is_empty() && !path.is_empty() {
+                values.push((path.to_string(), value));
+            } else {
+                for (index, child) in items.iter().enumerate() {
+                    values.push((json_path_index(path, index), child));
+                }
+            }
+        }
+        _ => {
+            values.push((
+                if path.is_empty() {
+                    "attachments".to_string()
+                } else {
+                    path.to_string()
+                },
+                value,
+            ));
+        }
+    }
+}
+
+fn json_path_child(path: &str, key: &str) -> String {
+    if path.is_empty() {
+        key.to_string()
+    } else {
+        format!("{path}.{key}")
+    }
+}
+
+fn json_path_index(path: &str, index: usize) -> String {
+    if path.is_empty() {
+        format!("[{index}]")
+    } else {
+        format!("{path}[{index}]")
+    }
+}
+
+fn json_type_label(value: &serde_json::Value) -> &'static str {
+    match value {
+        serde_json::Value::Null => "null",
+        serde_json::Value::Bool(_) => "boolean",
+        serde_json::Value::Number(_) => "number",
+        serde_json::Value::String(_) => "string",
+        serde_json::Value::Array(_) => "array",
+        serde_json::Value::Object(_) => "object",
+    }
 }
 
 fn import_latest_gearblocks_runtime_exports(

@@ -426,6 +426,103 @@ GearBlocks runtime API part index populated from Overlay Forge Lua exporter reco
 
 `display_image_path` stores Overlay Forge's copied catalog display image under `game-screenshots/<game-slug>/part-images/`. `source_image_path` stores the original image selected by the user. Screenshot bytes are kept outside SQLite.
 
+### game_runtime_part_api_attributes
+
+```text
+id
+game_id
+part_key
+asset_guid
+asset_name
+display_name
+full_display_name
+category
+interface_name
+attribute_name
+value_type
+availability
+source_export_id
+source_construction_id
+first_seen_at
+last_seen_at
+created_at
+updated_at
+```
+
+GearBlocks runtime API availability index populated from imported runtime export parts after compact `apiAttributeKey` references are hydrated. Rows are unique per `game_id`, `part_key`, `interface_name`, and `attribute_name`, so repeated scene exports update last-seen metadata instead of duplicating known API definitions.
+
+### game_runtime_part_values
+
+```text
+id
+game_id
+part_key
+asset_guid
+asset_name
+display_name
+full_display_name
+category
+field_path
+value_type
+value_json
+source_export_id
+source_construction_id
+first_seen_at
+last_seen_at
+created_at
+updated_at
+```
+
+GearBlocks runtime value-field index populated from any imported part JSON field named `value`. Rows are unique per `game_id`, `part_key`, and `field_path`, allowing Overlay Forge to discover newly exposed value fields while keeping the latest observed value payload searchable outside the full part JSON blob.
+
+### game_runtime_part_properties
+
+```text
+id
+game_id
+part_key
+asset_guid
+asset_name
+display_name
+full_display_name
+category
+property_path
+value_type
+value_json
+source_export_id
+source_construction_id
+first_seen_at
+last_seen_at
+created_at
+updated_at
+```
+
+GearBlocks runtime property index populated from leaf values under each part's `properties` object. Rows are unique per `game_id`, `part_key`, and `property_path`, so new property fields are indexed as they are encountered and existing fields are refreshed with the latest observed value.
+
+### game_runtime_part_attachments
+
+```text
+id
+game_id
+part_key
+asset_guid
+asset_name
+display_name
+full_display_name
+category
+attachment_path
+value_type
+attachment_json
+source_export_id
+source_construction_id
+first_seen_at
+last_seen_at
+created_at
+updated_at
+```
+
+GearBlocks runtime attachment index populated from direct entries under each part's `attachments` field. Rows are unique per `game_id`, `part_key`, and `attachment_path`, which preserves the latest attachment payload without repeatedly expanding the main runtime part table.
+
 ### game_catalog_screenshots
 
 ```text
@@ -508,6 +605,10 @@ CREATE TABLE IF NOT EXISTS game_data_locations
 CREATE TABLE IF NOT EXISTS game_constructions
 CREATE TABLE IF NOT EXISTS game_runtime_construction_exports
 CREATE TABLE IF NOT EXISTS game_runtime_parts
+CREATE TABLE IF NOT EXISTS game_runtime_part_api_attributes
+CREATE TABLE IF NOT EXISTS game_runtime_part_values
+CREATE TABLE IF NOT EXISTS game_runtime_part_properties
+CREATE TABLE IF NOT EXISTS game_runtime_part_attachments
 CREATE TABLE IF NOT EXISTS game_catalog_screenshots
 ```
 

@@ -662,6 +662,87 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS game_runtime_part_api_attributes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                part_key TEXT NOT NULL,
+                asset_guid TEXT NOT NULL DEFAULT '',
+                asset_name TEXT NOT NULL DEFAULT '',
+                display_name TEXT NOT NULL DEFAULT '',
+                full_display_name TEXT NOT NULL DEFAULT '',
+                category TEXT NOT NULL DEFAULT '',
+                interface_name TEXT NOT NULL DEFAULT '',
+                attribute_name TEXT NOT NULL DEFAULT '',
+                value_type TEXT NOT NULL DEFAULT '',
+                availability TEXT NOT NULL DEFAULT '',
+                source_export_id TEXT NOT NULL DEFAULT '',
+                source_construction_id TEXT NOT NULL DEFAULT '',
+                first_seen_at TEXT NOT NULL DEFAULT '',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS game_runtime_part_values (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                part_key TEXT NOT NULL,
+                asset_guid TEXT NOT NULL DEFAULT '',
+                asset_name TEXT NOT NULL DEFAULT '',
+                display_name TEXT NOT NULL DEFAULT '',
+                full_display_name TEXT NOT NULL DEFAULT '',
+                category TEXT NOT NULL DEFAULT '',
+                field_path TEXT NOT NULL DEFAULT '',
+                value_type TEXT NOT NULL DEFAULT '',
+                value_json TEXT NOT NULL DEFAULT 'null',
+                source_export_id TEXT NOT NULL DEFAULT '',
+                source_construction_id TEXT NOT NULL DEFAULT '',
+                first_seen_at TEXT NOT NULL DEFAULT '',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS game_runtime_part_properties (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                part_key TEXT NOT NULL,
+                asset_guid TEXT NOT NULL DEFAULT '',
+                asset_name TEXT NOT NULL DEFAULT '',
+                display_name TEXT NOT NULL DEFAULT '',
+                full_display_name TEXT NOT NULL DEFAULT '',
+                category TEXT NOT NULL DEFAULT '',
+                property_path TEXT NOT NULL DEFAULT '',
+                value_type TEXT NOT NULL DEFAULT '',
+                value_json TEXT NOT NULL DEFAULT 'null',
+                source_export_id TEXT NOT NULL DEFAULT '',
+                source_construction_id TEXT NOT NULL DEFAULT '',
+                first_seen_at TEXT NOT NULL DEFAULT '',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS game_runtime_part_attachments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                part_key TEXT NOT NULL,
+                asset_guid TEXT NOT NULL DEFAULT '',
+                asset_name TEXT NOT NULL DEFAULT '',
+                display_name TEXT NOT NULL DEFAULT '',
+                full_display_name TEXT NOT NULL DEFAULT '',
+                category TEXT NOT NULL DEFAULT '',
+                attachment_path TEXT NOT NULL DEFAULT '',
+                value_type TEXT NOT NULL DEFAULT '',
+                attachment_json TEXT NOT NULL DEFAULT 'null',
+                source_export_id TEXT NOT NULL DEFAULT '',
+                source_construction_id TEXT NOT NULL DEFAULT '',
+                first_seen_at TEXT NOT NULL DEFAULT '',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE TABLE IF NOT EXISTS game_constructions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
@@ -743,6 +824,22 @@ impl AppDatabase {
                 ON game_chat_messages (conversation_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_parts_game_id
                 ON game_runtime_parts (game_id);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_part_api_attributes_game_id
+                ON game_runtime_part_api_attributes (game_id);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_part_api_attributes_interface
+                ON game_runtime_part_api_attributes (game_id, interface_name, attribute_name);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_part_values_game_id
+                ON game_runtime_part_values (game_id);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_part_values_field_path
+                ON game_runtime_part_values (game_id, field_path);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_part_properties_game_id
+                ON game_runtime_part_properties (game_id);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_part_properties_property_path
+                ON game_runtime_part_properties (game_id, property_path);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_part_attachments_game_id
+                ON game_runtime_part_attachments (game_id);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_part_attachments_attachment_path
+                ON game_runtime_part_attachments (game_id, attachment_path);
             CREATE INDEX IF NOT EXISTS idx_game_constructions_game_id
                 ON game_constructions (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_construction_exports_game_id
@@ -852,6 +949,39 @@ impl AppDatabase {
             "
             CREATE UNIQUE INDEX IF NOT EXISTS idx_game_runtime_parts_game_part_key_unique
                 ON game_runtime_parts (game_id, part_key)
+            ",
+            [],
+        )?;
+        connection.execute(
+            "
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_game_runtime_part_api_attributes_unique
+                ON game_runtime_part_api_attributes (
+                    game_id,
+                    part_key,
+                    interface_name,
+                    attribute_name
+                )
+            ",
+            [],
+        )?;
+        connection.execute(
+            "
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_game_runtime_part_values_unique
+                ON game_runtime_part_values (game_id, part_key, field_path)
+            ",
+            [],
+        )?;
+        connection.execute(
+            "
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_game_runtime_part_properties_unique
+                ON game_runtime_part_properties (game_id, part_key, property_path)
+            ",
+            [],
+        )?;
+        connection.execute(
+            "
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_game_runtime_part_attachments_unique
+                ON game_runtime_part_attachments (game_id, part_key, attachment_path)
             ",
             [],
         )?;
@@ -2449,6 +2579,289 @@ impl AppDatabase {
         )?;
 
         Self::get_game_runtime_part_by_key(&connection, game_id, part_key)
+    }
+
+    pub fn upsert_game_runtime_part_api_attribute(
+        &self,
+        game_id: i64,
+        part_key: &str,
+        asset_guid: &str,
+        asset_name: &str,
+        display_name: &str,
+        full_display_name: &str,
+        category: &str,
+        interface_name: &str,
+        attribute_name: &str,
+        value_type: &str,
+        availability: &str,
+        source_export_id: &str,
+        source_construction_id: &str,
+        seen_at: &str,
+    ) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        connection.execute(
+            "
+            INSERT INTO game_runtime_part_api_attributes (
+                game_id,
+                part_key,
+                asset_guid,
+                asset_name,
+                display_name,
+                full_display_name,
+                category,
+                interface_name,
+                attribute_name,
+                value_type,
+                availability,
+                source_export_id,
+                source_construction_id,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?14)
+            ON CONFLICT(game_id, part_key, interface_name, attribute_name) DO UPDATE SET
+                asset_guid = excluded.asset_guid,
+                asset_name = excluded.asset_name,
+                display_name = excluded.display_name,
+                full_display_name = excluded.full_display_name,
+                category = excluded.category,
+                value_type = excluded.value_type,
+                availability = excluded.availability,
+                source_export_id = excluded.source_export_id,
+                source_construction_id = excluded.source_construction_id,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                game_id,
+                part_key.trim(),
+                asset_guid.trim(),
+                asset_name.trim(),
+                display_name.trim(),
+                full_display_name.trim(),
+                category.trim(),
+                interface_name.trim(),
+                attribute_name.trim(),
+                value_type.trim(),
+                availability.trim(),
+                source_export_id.trim(),
+                source_construction_id.trim(),
+                seen_at.trim(),
+            ],
+        )?;
+
+        Ok(())
+    }
+
+    pub fn upsert_game_runtime_part_value(
+        &self,
+        game_id: i64,
+        part_key: &str,
+        asset_guid: &str,
+        asset_name: &str,
+        display_name: &str,
+        full_display_name: &str,
+        category: &str,
+        field_path: &str,
+        value_type: &str,
+        value_json: &str,
+        source_export_id: &str,
+        source_construction_id: &str,
+        seen_at: &str,
+    ) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        connection.execute(
+            "
+            INSERT INTO game_runtime_part_values (
+                game_id,
+                part_key,
+                asset_guid,
+                asset_name,
+                display_name,
+                full_display_name,
+                category,
+                field_path,
+                value_type,
+                value_json,
+                source_export_id,
+                source_construction_id,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?13)
+            ON CONFLICT(game_id, part_key, field_path) DO UPDATE SET
+                asset_guid = excluded.asset_guid,
+                asset_name = excluded.asset_name,
+                display_name = excluded.display_name,
+                full_display_name = excluded.full_display_name,
+                category = excluded.category,
+                value_type = excluded.value_type,
+                value_json = excluded.value_json,
+                source_export_id = excluded.source_export_id,
+                source_construction_id = excluded.source_construction_id,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                game_id,
+                part_key.trim(),
+                asset_guid.trim(),
+                asset_name.trim(),
+                display_name.trim(),
+                full_display_name.trim(),
+                category.trim(),
+                field_path.trim(),
+                value_type.trim(),
+                value_json,
+                source_export_id.trim(),
+                source_construction_id.trim(),
+                seen_at.trim(),
+            ],
+        )?;
+
+        Ok(())
+    }
+
+    pub fn upsert_game_runtime_part_property(
+        &self,
+        game_id: i64,
+        part_key: &str,
+        asset_guid: &str,
+        asset_name: &str,
+        display_name: &str,
+        full_display_name: &str,
+        category: &str,
+        property_path: &str,
+        value_type: &str,
+        value_json: &str,
+        source_export_id: &str,
+        source_construction_id: &str,
+        seen_at: &str,
+    ) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        connection.execute(
+            "
+            INSERT INTO game_runtime_part_properties (
+                game_id,
+                part_key,
+                asset_guid,
+                asset_name,
+                display_name,
+                full_display_name,
+                category,
+                property_path,
+                value_type,
+                value_json,
+                source_export_id,
+                source_construction_id,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?13)
+            ON CONFLICT(game_id, part_key, property_path) DO UPDATE SET
+                asset_guid = excluded.asset_guid,
+                asset_name = excluded.asset_name,
+                display_name = excluded.display_name,
+                full_display_name = excluded.full_display_name,
+                category = excluded.category,
+                value_type = excluded.value_type,
+                value_json = excluded.value_json,
+                source_export_id = excluded.source_export_id,
+                source_construction_id = excluded.source_construction_id,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                game_id,
+                part_key.trim(),
+                asset_guid.trim(),
+                asset_name.trim(),
+                display_name.trim(),
+                full_display_name.trim(),
+                category.trim(),
+                property_path.trim(),
+                value_type.trim(),
+                value_json,
+                source_export_id.trim(),
+                source_construction_id.trim(),
+                seen_at.trim(),
+            ],
+        )?;
+
+        Ok(())
+    }
+
+    pub fn upsert_game_runtime_part_attachment(
+        &self,
+        game_id: i64,
+        part_key: &str,
+        asset_guid: &str,
+        asset_name: &str,
+        display_name: &str,
+        full_display_name: &str,
+        category: &str,
+        attachment_path: &str,
+        value_type: &str,
+        attachment_json: &str,
+        source_export_id: &str,
+        source_construction_id: &str,
+        seen_at: &str,
+    ) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        connection.execute(
+            "
+            INSERT INTO game_runtime_part_attachments (
+                game_id,
+                part_key,
+                asset_guid,
+                asset_name,
+                display_name,
+                full_display_name,
+                category,
+                attachment_path,
+                value_type,
+                attachment_json,
+                source_export_id,
+                source_construction_id,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?13)
+            ON CONFLICT(game_id, part_key, attachment_path) DO UPDATE SET
+                asset_guid = excluded.asset_guid,
+                asset_name = excluded.asset_name,
+                display_name = excluded.display_name,
+                full_display_name = excluded.full_display_name,
+                category = excluded.category,
+                value_type = excluded.value_type,
+                attachment_json = excluded.attachment_json,
+                source_export_id = excluded.source_export_id,
+                source_construction_id = excluded.source_construction_id,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                game_id,
+                part_key.trim(),
+                asset_guid.trim(),
+                asset_name.trim(),
+                display_name.trim(),
+                full_display_name.trim(),
+                category.trim(),
+                attachment_path.trim(),
+                value_type.trim(),
+                attachment_json,
+                source_export_id.trim(),
+                source_construction_id.trim(),
+                seen_at.trim(),
+            ],
+        )?;
+
+        Ok(())
     }
 
     pub fn list_game_runtime_construction_exports(
