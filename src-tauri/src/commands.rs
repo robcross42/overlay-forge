@@ -17,7 +17,7 @@ use bson::{Bson, Document};
 use flate2::read::DeflateDecoder;
 use serde::Serialize;
 use serde_json::json;
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{BufReader, BufWriter, Read};
 use std::path::{Path, PathBuf};
@@ -1303,7 +1303,11 @@ pub fn install_gearblocks_lua_exporter(
     let main_lua = include_str!(
         "../../gearblocks-script-mods/OverlayForgeConstructionExporter/main.lua.template"
     )
-    .replace("{{EXPORT_DIR}}", &lua_long_bracket_path(&export_directory));
+    .replace("{{EXPORT_DIR}}", &lua_long_bracket_path(&export_directory))
+    .replace(
+        "{{KNOWN_API_INDEX}}",
+        &gearblocks_known_api_index_lua(&state, game.id)?,
+    );
     let main_lua_path = script_mod_path.join("main.lua");
     fs::write(&main_lua_path, main_lua).map_err(|error| error.to_string())?;
     fs::write(
@@ -1317,6 +1321,144 @@ pub fn install_gearblocks_lua_exporter(
         main_lua_path: main_lua_path.to_string_lossy().to_string(),
         export_directory: export_directory.to_string_lossy().to_string(),
     })
+}
+
+fn gearblocks_known_api_index_lua(
+    state: &State<'_, AppState>,
+    game_id: i64,
+) -> Result<String, String> {
+    let parts = state
+        .database
+        .list_game_runtime_parts(game_id)
+        .map_err(|error| error.to_string())?;
+    let mut index = serde_json::Map::new();
+
+    for part in parts {
+        let Ok(properties) = serde_json::from_str::<serde_json::Value>(&part.properties_json) else {
+            continue;
+        };
+        let mut attributes = Vec::new();
+        collect_gearblocks_known_api_attributes(&properties, &mut attributes);
+        if attributes.is_empty() {
+            continue;
+        }
+
+        let attributes_json = serde_json::Value::Array(attributes);
+        for key in gearblocks_runtime_part_api_index_keys(&part) {
+            index.insert(key, attributes_json.clone());
+        }
+    }
+
+    Ok(serde_json_to_lua_literal(&serde_json::Value::Object(index)))
+}
+
+fn gearblocks_runtime_part_api_index_keys(part: &GameRuntimePartRecord) -> Vec<String> {
+    let mut keys = Vec::new();
+    if !part.asset_guid.trim().is_empty() && part.asset_guid.trim() != "nil" {
+        keys.push(format!("asset-guid:{}", part.asset_guid.trim()));
+    }
+    if !part.asset_name.trim().is_empty() {
+        keys.push(format!(
+            "asset-name:{}",
+            part.asset_name.trim().to_ascii_lowercase()
+        ));
+    }
+    let display_name = if !part.display_name.trim().is_empty() {
+        part.display_name.trim()
+    } else if !part.full_display_name.trim().is_empty() {
+        part.full_display_name.trim()
+    } else {
+        ""
+    };
+    if !display_name.is_empty() {
+        keys.push(format!(
+            "display:{}:{}",
+            part.category.trim().to_ascii_lowercase(),
+            display_name.to_ascii_lowercase()
+        ));
+    }
+    keys
+}
+
+fn collect_gearblocks_known_api_attributes(
+    value: &serde_json::Value,
+    attributes: &mut Vec<serde_json::Value>,
+) {
+    match value {
+        serde_json::Value::Object(object) => {
+            if let Some(items) = object
+                .get("apiAttributes")
+                .and_then(serde_json::Value::as_array)
+            {
+                for item in items {
+                    let interface = item
+                        .get("interface")
+                        .and_then(serde_json::Value::as_str)
+                        .unwrap_or_default()
+                        .trim();
+                    let name = item
+                        .get("name")
+                        .and_then(serde_json::Value::as_str)
+                        .unwrap_or_default()
+                        .trim();
+                    if interface.is_empty() || name.is_empty() {
+                        continue;
+                    }
+                    attributes.push(json!({
+                        "interface": interface,
+                        "name": name,
+                        "valueType": "available",
+                        "availability": item
+                            .get("availability")
+                            .and_then(serde_json::Value::as_str)
+                            .unwrap_or("known-index")
+                    }));
+                }
+            }
+
+            for (key, child) in object {
+                if key != "apiAttributes" {
+                    collect_gearblocks_known_api_attributes(child, attributes);
+                }
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for item in items {
+                collect_gearblocks_known_api_attributes(item, attributes);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn serde_json_to_lua_literal(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::Null => "nil".to_string(),
+        serde_json::Value::Bool(value) => value.to_string(),
+        serde_json::Value::Number(value) => value.to_string(),
+        serde_json::Value::String(value) => serde_json::to_string(value).unwrap_or_else(|_| {
+            format!("{:?}", value)
+        }),
+        serde_json::Value::Array(items) => {
+            let items = items
+                .iter()
+                .map(serde_json_to_lua_literal)
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("{{{items}}}")
+        }
+        serde_json::Value::Object(object) => {
+            let items = object
+                .iter()
+                .map(|(key, value)| {
+                    let key = serde_json::to_string(key).unwrap_or_else(|_| format!("{key:?}"));
+                    format!("[{key}]={}", serde_json_to_lua_literal(value))
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("{{{items}}}")
+        }
+    }
 }
 
 #[tauri::command]
@@ -2816,14 +2958,6 @@ fn gearblocks_runtime_understanding_context(export: &GearBlocksRuntimeExportReco
     ));
     sections.push(gearblocks_structural_bounds_section(&parts));
     sections.push(gearblocks_functional_parts_section(&parts));
-    if let Some(attribute_section) =
-        gearblocks_construction_api_attributes_section(&export.document)
-    {
-        sections.push(attribute_section);
-    }
-    if let Some(attribute_section) = gearblocks_part_api_attributes_section(&parts_json) {
-        sections.push(attribute_section);
-    }
 
     sections.join("\n\n")
 }
@@ -3230,140 +3364,6 @@ fn gearblocks_functional_parts_section(parts: &[GearBlocksRuntimePart<'_>]) -> S
         "## Functional Parts\nNo functional parts identified.".to_string()
     } else {
         format!("## Functional Parts\n{}", lines.join("\n"))
-    }
-}
-
-fn gearblocks_construction_api_attributes_section(document: &serde_json::Value) -> Option<String> {
-    let attributes = gearblocks_flatten_api_attributes(document);
-    if attributes.is_empty() {
-        return None;
-    }
-
-    let lines = attributes
-        .into_iter()
-        .map(|attribute| format!("- {attribute}"))
-        .collect::<Vec<_>>();
-    Some(format!(
-        "## Construction API Getter Values\n{}",
-        lines.join("\n")
-    ))
-}
-
-fn gearblocks_part_api_attributes_section(parts_json: &[serde_json::Value]) -> Option<String> {
-    let mut lines = Vec::new();
-    for part in parts_json {
-        let attributes = gearblocks_flatten_api_attributes(part);
-        if attributes.is_empty() {
-            continue;
-        }
-        let part_name = preferred_part_name(part);
-        let part_id = json_i64(part.get("id"));
-        let part_index = json_i64(part.get("index"));
-        lines.push(format!(
-            "- #{} idx {} {}: {}",
-            part_id,
-            part_index,
-            part_name,
-            attributes.join("; ")
-        ));
-    }
-
-    if lines.is_empty() {
-        return None;
-    }
-
-    Some(format!("## Part API Getter Values\n{}", lines.join("\n")))
-}
-
-fn gearblocks_flatten_api_attributes(value: &serde_json::Value) -> Vec<String> {
-    let mut attributes = BTreeSet::new();
-    collect_gearblocks_api_attributes(value, "", &mut attributes);
-    attributes.into_iter().collect()
-}
-
-fn collect_gearblocks_api_attributes(
-    value: &serde_json::Value,
-    prefix: &str,
-    attributes: &mut BTreeSet<String>,
-) {
-    match value {
-        serde_json::Value::Object(object) => {
-            if let Some(items) = object
-                .get("apiAttributes")
-                .and_then(|value| value.as_array())
-            {
-                for item in items {
-                    let interface = item
-                        .get("interface")
-                        .and_then(|value| value.as_str())
-                        .unwrap_or("UnknownInterface");
-                    let name = item
-                        .get("name")
-                        .and_then(|value| value.as_str())
-                        .unwrap_or("UnknownAttribute");
-                    let value = item
-                        .get("value")
-                        .map(compact_json_value)
-                        .unwrap_or_else(|| "null".to_string());
-                    let attribute_name = format!("{interface}.{name}");
-                    let label = if prefix.is_empty() {
-                        attribute_name
-                    } else {
-                        format!("{prefix}.{attribute_name}")
-                    };
-                    attributes.insert(format!("{label}={value}"));
-                }
-            }
-
-            for (key, child) in object {
-                if key == "apiAttributes" {
-                    continue;
-                }
-                let next_prefix = match key.as_str() {
-                    "properties" | "paint" | "attachments" | "resizable" | "tweakables" => {
-                        if prefix.is_empty() {
-                            key.to_string()
-                        } else {
-                            format!("{prefix}.{key}")
-                        }
-                    }
-                    "behaviours" | "linkNodes" => {
-                        if prefix.is_empty() {
-                            key.to_string()
-                        } else {
-                            format!("{prefix}.{key}")
-                        }
-                    }
-                    _ => prefix.to_string(),
-                };
-                collect_gearblocks_api_attributes(child, &next_prefix, attributes);
-            }
-        }
-        serde_json::Value::Array(items) => {
-            for (index, item) in items.iter().enumerate() {
-                let next_prefix = if prefix.is_empty() {
-                    String::new()
-                } else {
-                    format!("{prefix}[{}]", index + 1)
-                };
-                collect_gearblocks_api_attributes(item, &next_prefix, attributes);
-            }
-        }
-        _ => {}
-    }
-}
-
-fn compact_json_value(value: &serde_json::Value) -> String {
-    let text = match value {
-        serde_json::Value::String(text) => text.clone(),
-        serde_json::Value::Null => "null".to_string(),
-        value => serde_json::to_string(value).unwrap_or_else(|_| value.to_string()),
-    };
-    let single_line = text.split_whitespace().collect::<Vec<_>>().join(" ");
-    if single_line.chars().count() > 220 {
-        format!("{}...", single_line.chars().take(220).collect::<String>())
-    } else {
-        single_line
     }
 }
 

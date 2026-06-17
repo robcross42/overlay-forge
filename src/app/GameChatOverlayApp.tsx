@@ -202,7 +202,12 @@ export default function GameChatOverlayApp() {
       setSelectedPromptScreenshotIds([]);
       setStatus("Response saved");
     } catch (error) {
-      setMessages((current) => current.filter((message) => message.id !== pendingMessage.id));
+      const persistedMessages = await listGameChatMessages(conversation.id).catch(() => null);
+      if (persistedMessages) {
+        setMessages(persistedMessages);
+      } else {
+        setMessages((current) => current.filter((message) => message.id !== pendingMessage.id));
+      }
       setStatus(formatError(error));
     } finally {
       setIsSending(false);

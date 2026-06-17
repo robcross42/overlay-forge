@@ -92,7 +92,7 @@ The Gaming screenshot feature is validated as a post-Milestone 13 feature addend
 
 Status: **Complete / Passed / Successful**
 
-Overlay Forge 0.2.0 marks the documented `SmashHammer.GearBlocks.Construction` namespace reference interfaces as implemented for runtime export support, including `apiAttributes` getter snapshots, SQLite persistence of expanded runtime export payloads, catalog attribute availability display, and chat-context handoff of captured getter values.
+Overlay Forge 0.2.0 marks the documented `SmashHammer.GearBlocks.Construction` namespace reference interfaces as implemented for runtime export support, including availability-only `apiAttributes`, SQLite persistence of expanded runtime export payloads, catalog attribute availability display, and default chat-context exclusion for API metadata.
 
 ## Product Direction
 
@@ -129,7 +129,7 @@ Milestone 13 is the current passed stable baseline for later work. Do not implem
 
 Gaming Screenshot Capture is a completed, passed, and successful feature addendum on top of Milestone 13. Future Gaming work should preserve the validated screenshot folder layout, SQLite screenshot metadata path, thumbnail rendering through the Tauri asset protocol, overlay-hidden capture behavior, and right-click delete cleanup semantics.
 
-Overlay Forge 0.2.0 GearBlocks runtime API interface support is a completed, passed, and successful feature addendum on top of Milestone 13. Future GearBlocks API work should preserve the runtime exporter/importer boundary, keep catalog views value-free, persist full captured getter values in runtime export records, and use `docs/GEARBLOCKS_RUNTIME_INTERFACES.md` as the first troubleshooting index for interface-specific issues.
+Overlay Forge 0.2.0 GearBlocks runtime API interface support is a completed, passed, and successful feature addendum on top of Milestone 13. Future GearBlocks API work should preserve the runtime exporter/importer boundary, keep catalog views value-free, keep API metadata out of default prompt context, avoid executing getter commands unless a user explicitly requests a future snapshot/include action, and use `docs/GEARBLOCKS_RUNTIME_INTERFACES.md` as the first troubleshooting index for interface-specific issues.
 
 Milestone 4 remains intentionally small. It does not include automatic Codex handoff, GitHub write operations, pull request creation, branch creation, issue management, full repository browsing, GitHub Actions integration, OAuth, multi-account support, advanced sync, vector store/repo indexing, YouTube integration, external calendar integration, cloud sync, or multi-user auth.
 

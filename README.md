@@ -84,7 +84,7 @@ The GearBlocks Home screen includes a Construction Decoder for local `constructi
 
 Status: **Complete / Passed / Successful**
 
-Overlay Forge 0.2.0 marks the documented `SmashHammer.GearBlocks.Construction` namespace reference interfaces as implemented for runtime export support. The GearBlocks Lua exporter emits `apiAttributes` getter snapshots, the runtime importer persists the expanded export payload in SQLite, Parts catalog details show available API attributes without catalog values, and exported construction context retains captured getter values for chat and DB definitions. See `docs/GEARBLOCKS_RUNTIME_INTERFACES.md`.
+Overlay Forge 0.2.0 marks the documented `SmashHammer.GearBlocks.Construction` namespace reference interfaces as implemented for runtime export support. The GearBlocks Lua exporter emits `apiAttributes` availability metadata, the runtime importer persists the expanded export payload in SQLite, and Parts catalog details show available API attributes without catalog values. API metadata is indexed for discovery and is not included in default chat prompt context unless a future explicit include control is added. See `docs/GEARBLOCKS_RUNTIME_INTERFACES.md`.
 
 Completed Milestone 0 capabilities:
 

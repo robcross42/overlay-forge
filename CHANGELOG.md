@@ -24,9 +24,9 @@ Minor version release for the GearBlocks construction runtime API interface incl
 - Changed the GearBlocks Constructions view to list indexed saved constructions with part, composite, and file-size summaries.
 - Fully implemented support structures and exporter wiring for the documented `SmashHammer.GearBlocks.Construction` namespace reference interfaces.
 - Added persisted GearBlocks runtime construction exports backed by SQLite so the full latest `Player.log` export is available to chat context without relying only on ad hoc log parsing.
-- Added automatic GearBlocks context sync that checks file fingerprints and refreshes runtime exports, runtime parts, and saved construction indexes when `Player.log` or saved construction files change while the GearBlocks workspace is selected.
-- Expanded the GearBlocks Lua exporter to emit `apiAttributes` getter snapshots for documented construction interfaces, including catalog-level attribute availability and per-export captured values.
-- Changed the GearBlocks part detail view to list available runtime API attributes by name while keeping actual values in the DB definitions/export payload.
+- Added explicit GearBlocks runtime log import for refreshing runtime exports and runtime parts after the user runs `Export Target` or `Export All` in GearBlocks.
+- Expanded the GearBlocks Lua exporter to emit availability-only `apiAttributes` metadata for documented construction interfaces.
+- Changed the GearBlocks part detail view to list available runtime API attributes by name while keeping API metadata out of default chat prompt context.
 
 #### Documentation
 
@@ -34,7 +34,15 @@ Minor version release for the GearBlocks construction runtime API interface incl
 
 #### Validation
 
-- Validated the GearBlocks runtime API getter snapshot path in-game on Rob's vehicle: catalog part details show API attributes without values, and DB definitions / runtime export context include the expanded captured getter data.
+- Validated the GearBlocks runtime API interface metadata path in-game on Rob's vehicle: catalog part details show API attributes without values, and DB definitions / runtime export context include indexed interface availability metadata.
+
+#### Fixed
+
+- Removed GearBlocks runtime API metadata from default game-chat prompt context; API details should only be included by a future explicit user-controlled include/snapshot action.
+- Changed the GearBlocks Lua exporter API metadata path so `apiAttributes` indexes interface/member availability without executing getter commands to capture values.
+- Added install-time and in-session GearBlocks API availability caching so known runtime parts reuse indexed API metadata instead of re-probing interface availability on every export.
+- Removed automatic GearBlocks runtime log sync from normal game selection / Parts navigation; runtime logs now import only through explicit user actions such as `Import Runtime Log`.
+- Resynced game chat messages after failed sends so persisted user prompts remain accurately reflected instead of disappearing from the local UI state.
 
 ### 2026-06-14
 

@@ -4,6 +4,7 @@
 -- scene parts to JSON files.
 
 local EXPORT_DIR = [[{{EXPORT_DIR}}]]
+local KNOWN_API_INDEX = {{KNOWN_API_INDEX}}
 local LOG_CHUNK_SIZE = 3000
 
 local win = Windows.CreateWindow()
@@ -158,21 +159,16 @@ local function safeTry(getter)
 end
 
 local function addAttribute(attributes, interfaceName, attributeName, getter, normalizer)
-    local ok, value = safeTry(getter)
-    if not ok or value == nil then
-        return false
-    end
-    local exportedValue = value
+    local valueType = "available"
+    local availability = "declared"
     if normalizer ~= nil then
-        exportedValue = normalizer(value)
-    elseif type(value) ~= "boolean" and type(value) ~= "number" and type(value) ~= "string" then
-        exportedValue = tostring(value)
+        availability = "declared-with-normalizer"
     end
     table.insert(attributes, {
         interface = interfaceName,
         name = attributeName,
-        valueType = type(value),
-        value = exportedValue
+        valueType = valueType,
+        availability = availability
     })
     return true
 end
@@ -200,6 +196,76 @@ local function interfaceNamesFromAttributes(attributes)
         end
     end
     return names
+end
+
+local runtimeApiIndex = KNOWN_API_INDEX or {}
+
+local function cloneApiAttributes(attributes)
+    local cloned = {}
+    for _, attribute in ipairs(attributes or {}) do
+        table.insert(cloned, {
+            interface = attribute.interface,
+            name = attribute.name,
+            valueType = attribute.valueType or "available",
+            availability = attribute.availability or "declared"
+        })
+    end
+    return cloned
+end
+
+local function apiIndexKeyForPart(part)
+    if part == nil then
+        return nil
+    end
+    local assetGuid = tostring(safeRead(function() return part.AssetGUID end, ""))
+    if assetGuid ~= "" and assetGuid ~= "nil" then
+        return "asset-guid:" .. assetGuid
+    end
+    local assetName = tostring(safeRead(function() return part.AssetName end, ""))
+    if assetName ~= "" then
+        return "asset-name:" .. string.lower(assetName)
+    end
+    local category = tostring(safeRead(function() return part.Category end, ""))
+    local displayName = tostring(safeRead(function() return part.DisplayName end, safeRead(function() return part.FullDisplayName end, "")))
+    if displayName ~= "" then
+        return "display:" .. string.lower(category) .. ":" .. string.lower(displayName)
+    end
+    return nil
+end
+
+local function collectApiAttributes(value, output)
+    if type(value) ~= "table" then
+        return
+    end
+    if type(value.apiAttributes) == "table" then
+        for _, attribute in ipairs(value.apiAttributes) do
+            if type(attribute) == "table" and attribute.interface ~= nil and attribute.name ~= nil then
+                table.insert(output, {
+                    interface = attribute.interface,
+                    name = attribute.name,
+                    valueType = attribute.valueType or "available",
+                    availability = attribute.availability or "declared"
+                })
+            end
+        end
+    end
+    for key, child in pairs(value) do
+        if key ~= "apiAttributes" then
+            collectApiAttributes(child, output)
+        end
+    end
+end
+
+local function cacheApiAttributesForPart(part, describedPart)
+    local key = apiIndexKeyForPart(part)
+    if key == nil or runtimeApiIndex[key] ~= nil then
+        return
+    end
+    local attributes = {}
+    collectApiAttributes(describedPart, attributes)
+    if #attributes > 0 then
+        runtimeApiIndex[key] = attributes
+    end
 end
 
 local function runtimeRef(value)
@@ -597,6 +663,54 @@ end
 
 local function describePart(part)
     local parentConstruction = safeRead(function() return part.ParentConstruction end, nil)
+    local knownApiAttributes = cloneApiAttributes(runtimeApiIndex[apiIndexKeyForPart(part)])
+    if #knownApiAttributes > 0 then
+        local behaviourRefs = collectRuntimeRefs(safeRead(function() return part.Behaviours end, nil), 128)
+        local linkNodeRefs = collectRuntimeRefs(safeRead(function() return part.LinkNodes end, nil), 128)
+        return {
+            id = safeRead(function() return part.ID end, nil),
+            index = safeRead(function() return part.Idx end, nil),
+            parentConstructionId = safeRead(function() return parentConstruction.ID end, nil),
+            parentConstructionIsPlayerCharacter = safeRead(function() return parentConstruction.IsPlayerCharacter end, false),
+            parentConstructionIsAtomic = safeRead(function() return parentConstruction.IsAtomic end, false),
+            assetGuid = tostring(safeRead(function() return part.AssetGUID end, "")),
+            assetName = safeRead(function() return part.AssetName end, ""),
+            category = safeRead(function() return part.Category end, ""),
+            displayName = safeRead(function() return part.DisplayName end, ""),
+            fullDisplayName = safeRead(function() return part.FullDisplayName end, ""),
+            isDeprecated = safeRead(function() return part.IsDeprecated end, false),
+            isResizable = safeRead(function() return part.IsResizable end, false),
+            mass = safeRead(function() return part.Mass end, 0),
+            strength = safeRead(function() return part.Strength end, 0),
+            unitVolume = safeRead(function() return part.UnitVolume end, 0),
+            isPaintable = safeRead(function() return part.IsPaintable end, false),
+            isMaterialSwappable = safeRead(function() return part.IsMaterialSwappable end, false),
+            properties = nil,
+            paint = nil,
+            attachments = nil,
+            bounds = nil,
+            isVisible = safeRead(function() return part.IsVisible end, false),
+            isSelectable = safeRead(function() return part.IsSelectable end, false),
+            isDestroyable = safeRead(function() return part.IsDestroyable end, false),
+            isCollidable = safeRead(function() return part.IsCollidable end, false),
+            isEnabled = safeRead(function() return part.IsEnabled end, false),
+            stageIndex = safeRead(function() return part.StageIdx end, nil),
+            position = vectorToTable(safeRead(function() return part.Position end, nil)),
+            orientation = quaternionToTable(safeRead(function() return part.Orientation end, nil)),
+            localPosition = vectorToTable(safeRead(function() return part.LocalPosition end, nil)),
+            localOrientation = quaternionToTable(safeRead(function() return part.LocalOrientation end, nil)),
+            currentUnitSize = vectorToTable(safeRead(function() return part.CurrentUnitSize end, nil)),
+            resizable = nil,
+            tweakables = nil,
+            behaviours = behaviourRefs,
+            behaviourByName = {},
+            linkNodes = linkNodeRefs,
+            interfaceNames = interfaceNamesFromAttributes(knownApiAttributes),
+            apiAttributes = knownApiAttributes,
+            apiAttributeSource = "known-index"
+        }
+    end
+
     local attributes = {}
     addAttribute(attributes, "IPart", "AssetGUID", function() return part.AssetGUID end, function(value) return tostring(value) end)
     addAttribute(attributes, "IPart", "AssetName", function() return part.AssetName end)
@@ -659,7 +773,7 @@ local function describePart(part)
         tweakables = describeTweakables(safeRead(function() return part end, nil))
     end
 
-    return {
+    local describedPart = {
         id = safeRead(function() return part.ID end, nil),
         index = safeRead(function() return part.Idx end, nil),
         parentConstructionId = safeRead(function() return parentConstruction.ID end, nil),
@@ -698,8 +812,11 @@ local function describePart(part)
         behaviourByName = behaviourByName,
         linkNodes = linkNodes,
         interfaceNames = interfaceNamesFromAttributes(attributes),
-        apiAttributes = attributes
+        apiAttributes = attributes,
+        apiAttributeSource = "runtime-probe"
     }
+    cacheApiAttributesForPart(part, describedPart)
+    return describedPart
 end
 
 local describeRuntimeOperationSupport

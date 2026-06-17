@@ -13,7 +13,6 @@ import {
   installGearBlocksLuaExporter,
   importGearBlocksCatalogScreenshotImages,
   importGearBlocksRuntimePartIndex,
-  listGearBlocksRuntimeExports,
   deleteGameChatConversation,
   deleteGameDataLocation,
   deleteGameScreenshot,
@@ -30,7 +29,6 @@ import {
   saveGameDataLocation,
   setGameRuntimePartDisplayImage,
   sendGameChatMessage,
-  syncGearBlocksRuntimeContext,
   syncGearBlocksSavedConstructions,
   updateGameRuntimePartNotes
 } from "../../services/gaming";
@@ -87,7 +85,6 @@ const GEARBLOCKS_PARTS_CATALOG_METADATA = {
   validation: "Validated"
 };
 const SHOW_GEARBLOCKS_CATALOG_MAINTENANCE_CONTROLS = false;
-const GEARBLOCKS_CONTEXT_SYNC_INTERVAL_MS = 5000;
 const GAME_DATA_LOCATION_OPTIONS: Array<{
   type: GameDataLocationType;
   title: string;
@@ -162,7 +159,6 @@ export function Gaming({
     useState<ScreenshotContextMenu | null>(null);
   const [deletingScreenshotId, setDeletingScreenshotId] = useState<number | null>(null);
   const toastTimeoutRef = useRef<number | null>(null);
-  const isAutoSyncingGearBlocksContextRef = useRef(false);
 
   const selectedGame = useMemo(
     () => gameSections.find((game) => game.id === selectedGameId) ?? null,
@@ -292,34 +288,6 @@ export function Gaming({
       })
       .catch((error) => setStatus(formatError(error)));
   }, [selectedGame?.id]);
-
-  useEffect(() => {
-    if (!selectedGame || selectedGame.slug !== "gearblocks") {
-      return;
-    }
-
-    let cancelled = false;
-    const sync = async () => {
-      if (cancelled || isAutoSyncingGearBlocksContextRef.current) {
-        return;
-      }
-      isAutoSyncingGearBlocksContextRef.current = true;
-      try {
-        await syncGearBlocksContextState(selectedGame.id, false);
-      } catch (error) {
-        setStatus(formatError(error));
-      } finally {
-        isAutoSyncingGearBlocksContextRef.current = false;
-      }
-    };
-
-    void sync();
-    const intervalId = window.setInterval(sync, GEARBLOCKS_CONTEXT_SYNC_INTERVAL_MS);
-    return () => {
-      cancelled = true;
-      window.clearInterval(intervalId);
-    };
-  }, [selectedGame?.id, selectedGame?.slug]);
 
   useEffect(() => {
     if (!navAction || !navAction.gameId) {
@@ -632,7 +600,14 @@ export function Gaming({
       }
       setStatus("Response saved");
     } catch (error) {
-      setChatMessages((current) => current.filter((message) => message.id !== pendingMessage.id));
+      const persistedMessages = await listGameChatMessages(selectedChatConversationId).catch(
+        () => null
+      );
+      if (persistedMessages) {
+        setChatMessages(persistedMessages);
+      } else {
+        setChatMessages((current) => current.filter((message) => message.id !== pendingMessage.id));
+      }
       setStatus(formatError(error));
     } finally {
       setIsSendingChat(false);
@@ -752,39 +727,6 @@ export function Gaming({
     }
   }
 
-  async function syncGearBlocksContextState(gameId: number, showStatus: boolean) {
-    const [sync, categories, files] = await Promise.all([
-      syncGearBlocksRuntimeContext(gameId),
-      listGamePartCategories(gameId),
-      listGearBlocksConstructionFiles(gameId)
-    ]);
-    setRuntimeParts(sync.runtimeParts);
-    setPartCategories(categories);
-    setGameConstructions(sync.constructions);
-    setConstructionFiles(files);
-    setRuntimeExports(
-      sync.runtimeExports.map((runtimeExport) => ({
-        id: runtimeExport.exportId,
-        name: runtimeExport.name,
-        intendedPath: runtimeExport.intendedPath,
-        sourceLogPath: runtimeExport.sourceLogPath,
-        byteSize: runtimeExport.byteSize,
-        document: parseJsonOrFallback(runtimeExport.documentJson, {})
-      }))
-    );
-    setSelectedRuntimeExportId((current) =>
-      current && sync.runtimeExports.some((runtimeExport) => runtimeExport.exportId === current)
-        ? current
-        : sync.runtimeExports[0]?.exportId ?? ""
-    );
-
-    if (showStatus) {
-      setStatus(
-        `Synced ${sync.constructionCount} construction(s), ${sync.runtimeExportCount} runtime export(s), and ${sync.runtimePartCount} part(s)`
-      );
-    }
-  }
-
   async function decodeGearBlocksConstruction(construction: GearBlocksConstructionFile) {
     setDecodingConstructionPath(construction.constructionPath);
     try {
@@ -818,15 +760,14 @@ export function Gaming({
   async function importGearBlocksRuntimeExports(game: Game) {
     setIsImportingRuntimeExports(true);
     try {
-      const exports = await listGearBlocksRuntimeExports(game.id);
       const indexedParts = await importGearBlocksRuntimePartIndex(game.id);
       const categories = await listGamePartCategories(game.id);
-      setRuntimeExports(exports);
       setRuntimeParts(indexedParts);
       setPartCategories(categories);
-      setSelectedRuntimeExportId(exports.length > 0 ? exports[exports.length - 1].id : "");
+      setRuntimeExports([]);
+      setSelectedRuntimeExportId("");
       setStatus(
-        `Imported ${exports.length} GearBlocks runtime export(s) and indexed ${indexedParts.length} unique part(s)`
+        `Imported GearBlocks runtime log and indexed ${indexedParts.length} unique part(s)`
       );
       showToast("Successful");
     } catch (error) {
@@ -1145,14 +1086,6 @@ export function Gaming({
                       </button>
                       <button
                         className="ghost-button"
-                        disabled={isImportingRuntimeExports}
-                        onClick={() => void importGearBlocksRuntimeExports(selectedGame)}
-                        type="button"
-                      >
-                        Import Runtime Log
-                      </button>
-                      <button
-                        className="ghost-button"
                         onClick={() => void refreshGearBlocksConstructionFiles(selectedGame.id)}
                         type="button"
                       >
@@ -1462,44 +1395,48 @@ export function Gaming({
                         <span>{GEARBLOCKS_PARTS_CATALOG_METADATA.validation}</span>
                       </div>
                     </div>
-                    {SHOW_GEARBLOCKS_CATALOG_MAINTENANCE_CONTROLS && (
-                      <div className="game-runtime-parts-actions">
-                        <button
-                          className="ghost-button"
-                          disabled={isImportingRuntimeExports}
-                          onClick={() => void importGearBlocksRuntimeExports(selectedGame)}
-                          type="button"
-                        >
-                          Import Player.log Parts
-                        </button>
-                        <button
-                          className="ghost-button"
-                          disabled={isImportingCatalogScreenshot || selectedPartCategory === "all"}
-                          onClick={() => void importCatalogScreenshotImages(selectedGame)}
-                          title={
-                            selectedPartCategory === "all"
-                              ? "Select a specific category before importing catalog icons"
-                              : `Import ${selectedPartCategory} catalog icons`
-                          }
-                          type="button"
-                        >
-                          Import Catalog Screenshot
-                        </button>
-                        <button
-                          className="ghost-button"
-                          disabled={isClearingRuntimeCategoryImages || selectedPartCategory === "all"}
-                          onClick={() => void clearRuntimeCategoryImages(selectedGame)}
-                          title={
-                            selectedPartCategory === "all"
-                              ? "Select a specific category before clearing images"
-                              : `Clear ${selectedPartCategory} image associations`
-                          }
-                          type="button"
-                        >
-                          Clear Category Images
-                        </button>
-                      </div>
-                    )}
+                    <div className="game-runtime-parts-actions">
+                      <button
+                        className="ghost-button"
+                        disabled={isImportingRuntimeExports}
+                        onClick={() => void importGearBlocksRuntimeExports(selectedGame)}
+                        type="button"
+                      >
+                        Import Runtime Log
+                      </button>
+                      {SHOW_GEARBLOCKS_CATALOG_MAINTENANCE_CONTROLS && (
+                        <>
+                          <button
+                            className="ghost-button"
+                            disabled={isImportingCatalogScreenshot || selectedPartCategory === "all"}
+                            onClick={() => void importCatalogScreenshotImages(selectedGame)}
+                            title={
+                              selectedPartCategory === "all"
+                                ? "Select a specific category before importing catalog icons"
+                                : `Import ${selectedPartCategory} catalog icons`
+                            }
+                            type="button"
+                          >
+                            Import Catalog Screenshot
+                          </button>
+                          <button
+                            className="ghost-button"
+                            disabled={
+                              isClearingRuntimeCategoryImages || selectedPartCategory === "all"
+                            }
+                            onClick={() => void clearRuntimeCategoryImages(selectedGame)}
+                            title={
+                              selectedPartCategory === "all"
+                                ? "Select a specific category before clearing images"
+                                : `Clear ${selectedPartCategory} image associations`
+                            }
+                            type="button"
+                          >
+                            Clear Category Images
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                   {runtimeParts.length === 0 ? (
                     <p>
@@ -1607,7 +1544,7 @@ export function Gaming({
                                 <p>Catalog Attributes</p>
                                 <h4>
                                   {runtimePartAvailableAttributes(selectedRuntimePart).length}{" "}
-                                  available getter(s)
+                                  available member(s)
                                 </h4>
                               </div>
                               <div className="game-runtime-part-attribute-list">

@@ -70,13 +70,15 @@ The script mod window has two actions:
 - `Export Target`: point at any part in a construction, then export that part's parent construction.
 - `Export All`: export all currently loaded scene parts from `Parts.Instances`, so parts do not need to be attached into one construction before exporting. If scene-wide part enumeration is unavailable, the exporter falls back to all currently loaded constructions from `Constructions.Instances`.
 
-GearBlocks currently blocks `io.open` in the script context, so the exporter falls back to printing marked JSON chunks into `Player.log`. Use Gaming -> GearBlocks -> Home -> Construction Decoder -> Import Runtime Log to reconstruct those runtime exports in Overlay Forge.
+GearBlocks currently blocks `io.open` in the script context, so the exporter falls back to printing marked JSON chunks into `Player.log`. Use Gaming -> GearBlocks -> Parts -> Import Runtime Log after running `Export Target` or `Export All` to reconstruct those runtime exports in Overlay Forge.
 
 The targeted construction exporter walks `IConstruction.Parts`. The scene-wide exporter walks `Parts.Instances`. Both exports include runtime metadata unavailable in the local BSON save, including part asset name, category, display name, full display name, mass, strength, stage index, transforms, behaviours, parent construction hints, and link nodes where exposed by the runtime API.
 
-Exporter payloads also include `apiAttributes` snapshots for documented read-only construction interfaces. The parts catalog uses those snapshots to show which attributes are available for a part without showing values. Runtime construction exports keep the captured values, such as a gear's `CurrentRotationSpeed` / RPM-equivalent getter value at the time of export.
+Exporter payloads also include `apiAttributes` availability metadata for documented construction interfaces. The parts catalog uses that metadata to show which attributes are available for a part without showing values. Runtime construction exports keep the interface/member availability index in SQLite, but API getter values are not included in default chat prompt context and should require an explicit future include/snapshot control.
 
-GearBlocks chat automatically syncs and uses the latest reconstructed runtime export when one is available in `Player.log` or `Player-prev.log`. While the GearBlocks workspace is selected, Overlay Forge watches file fingerprints for those logs and saved construction files, reindexing the SQLite context when they change. Overlay Forge stores the complete export payload in SQLite and derives a semantic construction understanding model from that indexed export:
+On exporter install, Overlay Forge injects the known API index from SQLite into `main.lua`. During export, known parts reuse that index and skip API interface discovery. Unknown parts may be probed once for availability metadata, then cached in the current script session and persisted through the normal runtime-log import path.
+
+After the user imports runtime logs, GearBlocks chat uses the latest reconstructed runtime export indexed in SQLite. Normal game selection and Parts navigation do not automatically scan `Player.log` or `Player-prev.log`; use `Import Runtime Log` after running `Export Target` or `Export All` in GearBlocks. Overlay Forge stores the complete export payload in SQLite and derives a semantic construction understanding model from that indexed export:
 
 - structural frame and connector inventories are aggregated instead of treated as a visual mesh
 - functional systems are classified as suspension, steering, drivetrain, engine, brakes/clutches, wheels/tires, controls/data, bodywork, or unknown

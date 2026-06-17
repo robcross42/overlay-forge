@@ -24,7 +24,7 @@ The Gaming data model adds local game sections plus game-scoped catalog tables f
 
 Gaming Screenshot Capture is complete, passed, and successful for the current GearBlocks workflow. Screenshot metadata, capture manifests, thumbnail preview loading, and screenshot delete cleanup are validated.
 
-Overlay Forge 0.2.0 GearBlocks runtime API interface support is complete, passed, and successful. The expanded getter snapshot payload is stored in existing runtime export JSON fields so interface coverage can grow without a schema migration for each getter.
+Overlay Forge 0.2.0 GearBlocks runtime API interface support is complete, passed, and successful. Availability-only `apiAttributes` metadata is stored in existing runtime export JSON fields so interface coverage can grow without a schema migration for each member.
 
 ## Tables
 
@@ -397,7 +397,7 @@ created_at
 updated_at
 ```
 
-GearBlocks runtime construction export index populated from Overlay Forge Lua exporter records reconstructed from `Player.log` / `Player-prev.log`. `document_json` stores the complete runtime export payload, including `apiAttributes` entries with captured getter values, so chat context can use the latest indexed construction data from SQLite. The GearBlocks workspace periodically checks `Player.log`, `Player-prev.log`, and saved construction file fingerprints while the game section is selected, then reindexes these records when those files change.
+GearBlocks runtime construction export index populated from Overlay Forge Lua exporter records reconstructed from `Player.log` / `Player-prev.log` after the user explicitly imports runtime logs. `document_json` stores the complete runtime export payload, including availability-only `apiAttributes` entries. Chat context uses the latest indexed construction summary from SQLite but excludes API metadata by default. Normal game selection and Parts navigation read the existing SQLite index and do not auto-import changed log files.
 
 ### game_runtime_parts
 
