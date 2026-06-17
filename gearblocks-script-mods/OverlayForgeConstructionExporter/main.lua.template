@@ -263,6 +263,50 @@ local function cacheApiAttributesForPart(part, describedPart)
     end
 end
 
+local function apiAttributeCatalogKeyForDescribedPart(part)
+    if part == nil then
+        return nil
+    end
+    local assetGuid = tostring(part.assetGuid or "")
+    if assetGuid ~= "" and assetGuid ~= "nil" then
+        return "asset-guid:" .. assetGuid
+    end
+    local assetName = tostring(part.assetName or "")
+    if assetName ~= "" then
+        return "asset-name:" .. string.lower(assetName)
+    end
+    local category = tostring(part.category or "")
+    local displayName = tostring(part.displayName or part.fullDisplayName or "")
+    if displayName ~= "" then
+        return "display:" .. string.lower(category) .. ":" .. string.lower(displayName)
+    end
+    return nil
+end
+
+local function attachApiAttributeCatalog(payload)
+    if payload == nil or type(payload.parts) ~= "table" then
+        return payload
+    end
+    local catalog = {}
+    local hasCatalog = false
+    for _, part in ipairs(payload.parts) do
+        local attributes = part.apiAttributes
+        if type(attributes) == "table" and #attributes > 0 then
+            local key = apiAttributeCatalogKeyForDescribedPart(part)
+            if key ~= nil then
+                catalog[key] = attributes
+                part.apiAttributeKey = key
+                part.apiAttributes = nil
+                hasCatalog = true
+            end
+        end
+    end
+    if hasCatalog then
+        payload.apiAttributeCatalog = catalog
+    end
+    return payload
+end
+
 local function runtimeRef(value)
     if value == nil then
         return nil
@@ -1019,6 +1063,7 @@ end
 
 local function exportPayload(payload, label)
     ensureExportDir()
+    attachApiAttributeCatalog(payload)
     local fileName = safeFileName(label or tostring(payload.id or "export")) .. "_" .. safeUtcDate("!%Y%m%d_%H%M%S") .. ".json"
     local path = EXPORT_DIR .. "\\" .. fileName
     local content = encodeJson(payload)

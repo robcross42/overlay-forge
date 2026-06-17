@@ -2790,7 +2790,8 @@ fn parse_gearblocks_runtime_exports_from_log(
             let id = line[index + END_MARKER.len()..].trim();
             if let Some(export) = pending.remove(id) {
                 let content = export.chunks.join("");
-                if let Ok(document) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Ok(mut document) = serde_json::from_str::<serde_json::Value>(&content) {
+                    hydrate_gearblocks_api_attribute_refs(&mut document);
                     let name = Path::new(&export.intended_path)
                         .file_name()
                         .and_then(|value| value.to_str())
@@ -2811,6 +2812,46 @@ fn parse_gearblocks_runtime_exports_from_log(
     }
 
     Ok(exports)
+}
+
+fn hydrate_gearblocks_api_attribute_refs(document: &mut serde_json::Value) {
+    let catalog = document
+        .get("apiAttributeCatalog")
+        .and_then(serde_json::Value::as_object)
+        .cloned();
+    let Some(catalog) = catalog else {
+        return;
+    };
+
+    let Some(parts) = document
+        .get_mut("parts")
+        .and_then(serde_json::Value::as_array_mut)
+    else {
+        return;
+    };
+
+    for part in parts {
+        let has_attributes = part
+            .get("apiAttributes")
+            .and_then(serde_json::Value::as_array)
+            .is_some_and(|attributes| !attributes.is_empty());
+        if has_attributes {
+            continue;
+        }
+
+        let Some(key) = part
+            .get("apiAttributeKey")
+            .and_then(serde_json::Value::as_str)
+        else {
+            continue;
+        };
+        let Some(attributes) = catalog.get(key) else {
+            continue;
+        };
+        if let Some(object) = part.as_object_mut() {
+            object.insert("apiAttributes".to_string(), attributes.clone());
+        }
+    }
 }
 
 struct GearBlocksRuntimePart<'a> {

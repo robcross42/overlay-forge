@@ -21,6 +21,7 @@ Development bucket for work started on 2026-06-16. Related changes that continue
 #### Fixed
 
 - Reduced GearBlocks exporter payload bloat by keeping cached known API indexes limited to top-level part availability metadata and removing the remaining behaviour reference value from `apiAttributes`.
+- Changed the GearBlocks exporter log payload to emit part API availability metadata once in an `apiAttributeCatalog`, with parts referencing compact `apiAttributeKey` values that Overlay Forge expands during import.
 
 ## 0.2.0 - 2026-06-15
 
