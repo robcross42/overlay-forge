@@ -1384,50 +1384,36 @@ fn collect_gearblocks_known_api_attributes(
     value: &serde_json::Value,
     attributes: &mut Vec<serde_json::Value>,
 ) {
-    match value {
-        serde_json::Value::Object(object) => {
-            if let Some(items) = object
-                .get("apiAttributes")
-                .and_then(serde_json::Value::as_array)
-            {
-                for item in items {
-                    let interface = item
-                        .get("interface")
-                        .and_then(serde_json::Value::as_str)
-                        .unwrap_or_default()
-                        .trim();
-                    let name = item
-                        .get("name")
-                        .and_then(serde_json::Value::as_str)
-                        .unwrap_or_default()
-                        .trim();
-                    if interface.is_empty() || name.is_empty() {
-                        continue;
-                    }
-                    attributes.push(json!({
-                        "interface": interface,
-                        "name": name,
-                        "valueType": "available",
-                        "availability": item
-                            .get("availability")
-                            .and_then(serde_json::Value::as_str)
-                            .unwrap_or("known-index")
-                    }));
-                }
-            }
+    let Some(items) = value
+        .get("apiAttributes")
+        .and_then(serde_json::Value::as_array)
+    else {
+        return;
+    };
 
-            for (key, child) in object {
-                if key != "apiAttributes" {
-                    collect_gearblocks_known_api_attributes(child, attributes);
-                }
-            }
+    for item in items {
+        let interface = item
+            .get("interface")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default()
+            .trim();
+        let name = item
+            .get("name")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default()
+            .trim();
+        if interface.is_empty() || name.is_empty() {
+            continue;
         }
-        serde_json::Value::Array(items) => {
-            for item in items {
-                collect_gearblocks_known_api_attributes(item, attributes);
-            }
-        }
-        _ => {}
+        attributes.push(json!({
+            "interface": interface,
+            "name": name,
+            "valueType": "available",
+            "availability": item
+                .get("availability")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("known-index")
+        }));
     }
 }
 

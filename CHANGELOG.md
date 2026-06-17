@@ -18,6 +18,10 @@ Development bucket for work started on 2026-06-16. Related changes that continue
 - Marked the 2026-06-16 work session as the `0.3.0` changelog bucket, including related early-AM rollover changes.
 - Added project rules for cutting a new `0.x.0` minor version bucket when a new chat starts on a later date than the latest changelog version heading.
 
+#### Fixed
+
+- Reduced GearBlocks exporter payload bloat by keeping cached known API indexes limited to top-level part availability metadata and removing the remaining behaviour reference value from `apiAttributes`.
+
 ## 0.2.0 - 2026-06-15
 
 Minor version release for the GearBlocks construction runtime API interface inclusion.

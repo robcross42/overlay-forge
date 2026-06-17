@@ -249,11 +249,6 @@ local function collectApiAttributes(value, output)
             end
         end
     end
-    for key, child in pairs(value) do
-        if key ~= "apiAttributes" then
-            collectApiAttributes(child, output)
-        end
-    end
 end
 
 local function cacheApiAttributesForPart(part, describedPart)
@@ -752,8 +747,8 @@ local function describePart(part)
                 table.insert(attributes, {
                     interface = "IPart",
                     name = "GetBehaviour(\"" .. tostring(describedBehaviour.name) .. "\")",
-                    valueType = "userdata",
-                    value = behaviourByName[describedBehaviour.name]
+                    valueType = "available",
+                    availability = "declared"
                 })
             end
         end
