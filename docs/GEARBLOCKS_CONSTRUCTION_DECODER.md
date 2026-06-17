@@ -82,6 +82,8 @@ After the user refreshes runtime logs, GearBlocks chat uses the latest reconstru
 
 The intended iterative workflow is to load the current build in GearBlocks once, make changes in-game, run the exporter again, then click `Refresh Runtime Log` in Overlay Forge. Runtime part reference rows, API availability rows, value fields, properties, and attachments are upserted by stable keys, so repeated refreshes update the current SQLite reference data instead of requiring a full catalog rebuild. If a build change removes parts, run a full `Export All` refresh so the latest chat context reflects the whole current scene.
 
+When GearBlocks saves a construction, Overlay Forge can also use the saved `construction.bytes` file as a current-build signal. GearBlocks chat decodes the most recently modified saved construction file before building its prompt context, so saved part additions and removals can be reflected even when a runtime log export is partial. This saved-file context does not replace `Refresh Runtime Log`; it complements it by covering saved structure/removal changes while runtime exports continue to provide live metadata unavailable in the save file.
+
 The derived semantic model includes:
 
 - structural frame and connector inventories are aggregated instead of treated as a visual mesh

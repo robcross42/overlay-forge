@@ -16,7 +16,7 @@ use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
 use bson::{Bson, Document};
 use flate2::read::DeflateDecoder;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 use std::fs::{self, File};
@@ -127,7 +127,7 @@ pub struct GearBlocksRuntimeContextSyncRecord {
     pub constructions: Vec<GameConstructionRecord>,
 }
 
-#[derive(Serialize)]
+#[derive(Deserialize, Serialize)]
 pub struct GearBlocksConstructionSummaryRecord {
     #[serde(rename = "isFrozen")]
     pub is_frozen: Option<bool>,
@@ -148,7 +148,7 @@ pub struct GearBlocksConstructionSummaryRecord {
     pub parts: Vec<GearBlocksConstructionPartSummaryRecord>,
 }
 
-#[derive(Serialize)]
+#[derive(Deserialize, Serialize)]
 pub struct GearBlocksConstructionPartSummaryRecord {
     pub index: usize,
     #[serde(rename = "compositeIndex")]
@@ -1178,32 +1178,7 @@ fn sync_gearblocks_saved_constructions_for_game(
 
     for file in files {
         let decoded = decode_gearblocks_construction_path(Path::new(&file.construction_path))?;
-        let summary_json =
-            serde_json::to_string_pretty(&decoded.summary).map_err(|error| error.to_string())?;
-        let document_json =
-            serde_json::to_string_pretty(&decoded.document).map_err(|error| error.to_string())?;
-        let record = state
-            .database
-            .upsert_game_construction(
-                game_id,
-                &decoded.name,
-                &decoded.folder_path,
-                &decoded.construction_path,
-                decoded.byte_size as i64,
-                decoded.decoded_byte_size as i64,
-                decoded.summary.composite_count as i64,
-                decoded.summary.part_count as i64,
-                decoded.summary.unique_asset_guid_count as i64,
-                decoded.summary.attachment_count as i64,
-                decoded.summary.link_count as i64,
-                decoded.summary.intersection_count as i64,
-                decoded.summary.is_frozen,
-                decoded.summary.is_invulnerable,
-                &summary_json,
-                &document_json,
-                &indexed_at,
-            )
-            .map_err(|error| error.to_string())?;
+        let record = index_decoded_gearblocks_construction(state, game_id, &decoded, &indexed_at)?;
         records.push(record);
     }
 
@@ -1213,6 +1188,40 @@ fn sync_gearblocks_saved_constructions_for_game(
             .cmp(&right.name.to_ascii_lowercase())
     });
     Ok(records)
+}
+
+fn index_decoded_gearblocks_construction(
+    state: &AppState,
+    game_id: i64,
+    decoded: &GearBlocksConstructionDecodeRecord,
+    indexed_at: &str,
+) -> Result<GameConstructionRecord, String> {
+    let summary_json =
+        serde_json::to_string_pretty(&decoded.summary).map_err(|error| error.to_string())?;
+    let document_json =
+        serde_json::to_string_pretty(&decoded.document).map_err(|error| error.to_string())?;
+    state
+        .database
+        .upsert_game_construction(
+            game_id,
+            &decoded.name,
+            &decoded.folder_path,
+            &decoded.construction_path,
+            decoded.byte_size as i64,
+            decoded.decoded_byte_size as i64,
+            decoded.summary.composite_count as i64,
+            decoded.summary.part_count as i64,
+            decoded.summary.unique_asset_guid_count as i64,
+            decoded.summary.attachment_count as i64,
+            decoded.summary.link_count as i64,
+            decoded.summary.intersection_count as i64,
+            decoded.summary.is_frozen,
+            decoded.summary.is_invulnerable,
+            &summary_json,
+            &document_json,
+            indexed_at,
+        )
+        .map_err(|error| error.to_string())
 }
 
 fn gearblocks_runtime_context_fingerprint(
@@ -2231,11 +2240,215 @@ fn game_custom_prompt_context(
 
 fn gearblocks_prompt_context(state: &State<'_, AppState>, game_id: i64) -> Result<String, String> {
     let mut sections = vec![gearblocks_parts_catalog_prompt_context()?];
+    if let Some(saved_context) = gearblocks_latest_saved_construction_context(state, game_id)? {
+        sections.push(saved_context);
+    }
     if let Some(runtime_context) = gearblocks_latest_runtime_understanding_context(state, game_id)?
     {
         sections.push(runtime_context);
     }
     Ok(sections.join("\n\n---\n\n"))
+}
+
+fn gearblocks_latest_saved_construction_context(
+    state: &AppState,
+    game_id: i64,
+) -> Result<Option<String>, String> {
+    let root = gearblocks_saved_constructions_root(state, game_id)?;
+    let Some(file) = latest_gearblocks_construction_file_in_root(&root)? else {
+        return Ok(None);
+    };
+    let previous_records = state
+        .database
+        .list_game_constructions(game_id)
+        .map_err(|error| error.to_string())?;
+    let previous_summary = previous_records
+        .iter()
+        .find(|record| record.construction_path == file.construction_path)
+        .and_then(|record| {
+            serde_json::from_str::<GearBlocksConstructionSummaryRecord>(&record.summary_json).ok()
+        });
+    let decoded = decode_gearblocks_construction_path(Path::new(&file.construction_path))?;
+    let indexed_at = unix_timestamp_label();
+    index_decoded_gearblocks_construction(state, game_id, &decoded, &indexed_at)?;
+
+    Ok(Some(gearblocks_saved_construction_context(
+        &decoded,
+        previous_summary.as_ref(),
+    )))
+}
+
+fn latest_gearblocks_construction_file_in_root(
+    root: &Path,
+) -> Result<Option<GearBlocksConstructionFileRecord>, String> {
+    let mut latest: Option<(SystemTime, GearBlocksConstructionFileRecord)> = None;
+    for file in list_gearblocks_construction_files_in_root(root)? {
+        let modified = fs::metadata(&file.construction_path)
+            .and_then(|metadata| metadata.modified())
+            .unwrap_or(UNIX_EPOCH);
+        if latest
+            .as_ref()
+            .is_none_or(|(latest_modified, _)| modified > *latest_modified)
+        {
+            latest = Some((modified, file));
+        }
+    }
+
+    Ok(latest.map(|(_, file)| file))
+}
+
+fn gearblocks_saved_construction_context(
+    decoded: &GearBlocksConstructionDecodeRecord,
+    previous_summary: Option<&GearBlocksConstructionSummaryRecord>,
+) -> String {
+    let summary = &decoded.summary;
+    let mut sections = Vec::new();
+    sections.push("# GearBlocks Saved Construction".to_string());
+    sections.push(format!(
+        "Source: latest modified saved construction file `{}`. This reflects the saved `construction.bytes` state, including saved part additions and removals, but does not include live runtime-only API metadata.",
+        decoded.construction_path
+    ));
+    sections.push(format!(
+        "Saved construction `{}`: {} composite(s), {} part(s), {} unique asset GUID(s), {} attachment(s), {} link(s), {} intersection(s). Frozen: {}. Invulnerable: {}.",
+        decoded.name,
+        summary.composite_count,
+        summary.part_count,
+        summary.unique_asset_guid_count,
+        summary.attachment_count,
+        summary.link_count,
+        summary.intersection_count,
+        option_bool_label(summary.is_frozen),
+        option_bool_label(summary.is_invulnerable)
+    ));
+
+    if let Some(previous) = previous_summary {
+        sections.push(gearblocks_saved_construction_change_summary(
+            previous, summary,
+        ));
+    }
+    sections.push(gearblocks_saved_construction_asset_inventory(summary));
+
+    sections.join("\n\n")
+}
+
+fn gearblocks_saved_construction_change_summary(
+    previous: &GearBlocksConstructionSummaryRecord,
+    current: &GearBlocksConstructionSummaryRecord,
+) -> String {
+    let previous_counts = gearblocks_saved_asset_guid_counts(previous);
+    let current_counts = gearblocks_saved_asset_guid_counts(current);
+    let mut added = Vec::new();
+    let mut removed = Vec::new();
+
+    for (asset_guid, count) in &current_counts {
+        let previous_count = previous_counts.get(asset_guid).copied().unwrap_or_default();
+        if *count > previous_count {
+            added.push(format!("{} x{}", asset_guid, count - previous_count));
+        }
+    }
+    for (asset_guid, count) in &previous_counts {
+        let current_count = current_counts.get(asset_guid).copied().unwrap_or_default();
+        if *count > current_count {
+            removed.push(format!("{} x{}", asset_guid, count - current_count));
+        }
+    }
+    added.sort();
+    removed.sort();
+
+    let mut lines = vec![format!(
+        "Part count changed by {:+}.",
+        current.part_count as i64 - previous.part_count as i64
+    )];
+    if !added.is_empty() {
+        lines.push(format!("Added asset GUID counts: {}.", added.join(", ")));
+    }
+    if !removed.is_empty() {
+        lines.push(format!(
+            "Removed asset GUID counts: {}.",
+            removed.join(", ")
+        ));
+    }
+    if added.is_empty() && removed.is_empty() && current.part_count == previous.part_count {
+        lines.push(
+            "No saved part count or asset GUID count changes detected since the previous index."
+                .to_string(),
+        );
+    }
+
+    format!(
+        "## Saved File Change Since Previous Index\n{}",
+        lines.join("\n")
+    )
+}
+
+fn gearblocks_saved_asset_guid_counts(
+    summary: &GearBlocksConstructionSummaryRecord,
+) -> HashMap<String, usize> {
+    let mut counts = HashMap::new();
+    for part in &summary.parts {
+        let key = if part.asset_guid.trim().is_empty() {
+            "unknown".to_string()
+        } else {
+            part.asset_guid.clone()
+        };
+        *counts.entry(key).or_default() += 1;
+    }
+    counts
+}
+
+fn gearblocks_saved_construction_asset_inventory(
+    summary: &GearBlocksConstructionSummaryRecord,
+) -> String {
+    let mut rows = summary
+        .parts
+        .iter()
+        .map(|part| {
+            let dimensions = if part.dimensions.is_empty() {
+                "dims=unknown".to_string()
+            } else {
+                format!(
+                    "dims=({})",
+                    part.dimensions
+                        .iter()
+                        .map(|value| format!("{value:.2}"))
+                        .collect::<Vec<_>>()
+                        .join(",")
+                )
+            };
+            let behaviours = if part.behaviours.is_empty() {
+                "behaviours=none".to_string()
+            } else {
+                format!("behaviours={}", part.behaviours.join(", "))
+            };
+            format!(
+                "- idx {} composite {}.{} assetGuid={} {}; {}",
+                part.index,
+                part.composite_index,
+                part.composite_part_index,
+                if part.asset_guid.is_empty() {
+                    "unknown"
+                } else {
+                    &part.asset_guid
+                },
+                dimensions,
+                behaviours
+            )
+        })
+        .take(140)
+        .collect::<Vec<_>>();
+
+    if summary.parts.len() > rows.len() {
+        rows.push(format!(
+            "- {} additional saved part(s) omitted from prompt context for size.",
+            summary.parts.len() - rows.len()
+        ));
+    }
+
+    if rows.is_empty() {
+        "## Saved Parts\nNo saved parts identified.".to_string()
+    } else {
+        format!("## Saved Parts\n{}", rows.join("\n"))
+    }
 }
 
 fn configured_openai_api_key(state: &State<'_, AppState>) -> Result<String, String> {
@@ -3729,6 +3942,14 @@ fn json_optional_bool(value: Option<&serde_json::Value>) -> Option<bool> {
 
 fn json_bool_label(value: Option<&serde_json::Value>) -> &'static str {
     match value.and_then(|value| value.as_bool()) {
+        Some(true) => "true",
+        Some(false) => "false",
+        None => "unknown",
+    }
+}
+
+fn option_bool_label(value: Option<bool>) -> &'static str {
+    match value {
         Some(true) => "true",
         Some(false) => "false",
         None => "unknown",

@@ -381,6 +381,8 @@ updated_at
 
 GearBlocks saved construction index populated from each construction folder under `SavedConstructions`. Overlay Forge decodes each `construction.bytes` / `construction.byte` file with the local raw DEFLATE + BSON decoder and stores both a compact summary and the decoded JSON document for later construction catalog features.
 
+GearBlocks chat refreshes the most recently modified saved construction file before building prompt context. This saved-file context reflects saved part additions and removals from `construction.bytes`, while runtime-log context remains responsible for live runtime metadata such as display names, runtime transforms, API availability, and other values only exposed after loading the build in-game.
+
 ### game_runtime_construction_exports
 
 ```text
