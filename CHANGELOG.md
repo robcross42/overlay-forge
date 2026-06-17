@@ -6,6 +6,17 @@ Unreleased changes are grouped by day using `YYYY-MM-DD` headings so a single da
 
 ## Unreleased
 
+## 0.3.0 - 2026-06-16
+
+Development bucket for work started on 2026-06-16. Related changes that continue into the early AM hours before the work session ends are included in this `0.3.0` bucket.
+
+### 2026-06-16
+
+#### Changed
+
+- Bumped Overlay Forge from `0.2.0` to `0.3.0` for the next early-development work set.
+- Marked the 2026-06-16 work session as the `0.3.0` changelog bucket, including related early-AM rollover changes.
+
 ## 0.2.0 - 2026-06-15
 
 Minor version release for the GearBlocks construction runtime API interface inclusion.
