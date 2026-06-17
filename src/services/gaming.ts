@@ -206,6 +206,32 @@ export type GearBlocksApiCatalog = {
   enumValues: GearBlocksApiEnumValue[];
 };
 
+export type GameRuntimePartApiMember = {
+  id: number;
+  gameId: number;
+  partKey: string;
+  apiMemberId: number;
+  availability: string;
+  sourceExportId: string;
+  sourceConstructionId: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  namespace: string;
+  typeName: string;
+  typeKind: string;
+  memberKey: string;
+  memberName: string;
+  signature: string;
+  memberKind: string;
+  isReadable: boolean;
+  isWritable: boolean;
+  isInvokable: boolean;
+  isMutating: boolean;
+  docsUrl: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type GearBlocksRuntimeContextSync = {
   changed: boolean;
   runtimeExportCount: number;
@@ -377,6 +403,13 @@ export function importGearBlocksCatalogScreenshotImages(
 
 export function listGameRuntimeParts(gameId: number) {
   return invoke<GameRuntimePart[]>("list_game_runtime_parts", { gameId });
+}
+
+export function listGameRuntimePartApiMembers(gameId: number, partId: number) {
+  return invoke<GameRuntimePartApiMember[]>("list_game_runtime_part_api_members", {
+    gameId,
+    partId
+  });
 }
 
 export function setGameRuntimePartDisplayImage(

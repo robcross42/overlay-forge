@@ -32,6 +32,8 @@ The indexed GearBlocks API catalog is available through the backend command laye
 
 The GearBlocks Gaming workspace includes an API tab that reads this payload and displays type coverage, member signatures, parsed method parameters, mutating/readable flags, and enum values.
 
+GearBlocks runtime part detail views can query `game_runtime_part_api_members` through the command layer to display canonical API member availability for the selected part, falling back to raw exported `apiAttributes` only when bridge rows are not available.
+
 ## Tables
 
 ### scratchpad

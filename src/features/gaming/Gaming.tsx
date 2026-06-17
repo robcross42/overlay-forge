@@ -22,6 +22,7 @@ import {
   listGameChatMessages,
   listGameCatalogObjects,
   listGameConstructions,
+  listGameRuntimePartApiMembers,
   listGearBlocksApiCatalog,
   listGearBlocksConstructionFiles,
   listGamePartCategories,
@@ -42,6 +43,7 @@ import type {
   GameDataLocation,
   GameDataLocationType,
   GameRuntimePart,
+  GameRuntimePartApiMember,
   GearBlocksApiCatalog,
   GearBlocksApiMember,
   GearBlocksConstructionDecode,
@@ -152,6 +154,10 @@ export function Gaming({
   const [isClearingRuntimeCategoryImages, setIsClearingRuntimeCategoryImages] = useState(false);
   const [updatingRuntimePartImageId, setUpdatingRuntimePartImageId] = useState<number | null>(null);
   const [selectedRuntimePartId, setSelectedRuntimePartId] = useState<number | null>(null);
+  const [selectedRuntimePartApiMembers, setSelectedRuntimePartApiMembers] = useState<
+    GameRuntimePartApiMember[]
+  >([]);
+  const [isLoadingRuntimePartApiMembers, setIsLoadingRuntimePartApiMembers] = useState(false);
   const [runtimePartNotesDraft, setRuntimePartNotesDraft] = useState("");
   const [isSavingRuntimePartNotes, setIsSavingRuntimePartNotes] = useState(false);
   const [chatConversations, setChatConversations] = useState<GameChatConversation[]>([]);
@@ -293,6 +299,8 @@ export function Gaming({
       setIsClearingRuntimeCategoryImages(false);
       setUpdatingRuntimePartImageId(null);
       setSelectedRuntimePartId(null);
+      setSelectedRuntimePartApiMembers([]);
+      setIsLoadingRuntimePartApiMembers(false);
       setRuntimePartNotesDraft("");
       setIsSavingRuntimePartNotes(false);
       setChatConversations([]);
@@ -374,6 +382,38 @@ export function Gaming({
   useEffect(() => {
     setRuntimePartNotesDraft(selectedRuntimePart?.notes ?? "");
   }, [selectedRuntimePart?.id, selectedRuntimePart?.notes]);
+
+  useEffect(() => {
+    if (!selectedGame || selectedGame.slug !== "gearblocks" || !selectedRuntimePart) {
+      setSelectedRuntimePartApiMembers([]);
+      setIsLoadingRuntimePartApiMembers(false);
+      return;
+    }
+
+    let isCancelled = false;
+    setIsLoadingRuntimePartApiMembers(true);
+    listGameRuntimePartApiMembers(selectedGame.id, selectedRuntimePart.id)
+      .then((members) => {
+        if (!isCancelled) {
+          setSelectedRuntimePartApiMembers(members);
+        }
+      })
+      .catch((error) => {
+        if (!isCancelled) {
+          setSelectedRuntimePartApiMembers([]);
+          setStatus(formatError(error));
+        }
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsLoadingRuntimePartApiMembers(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedGame?.id, selectedGame?.slug, selectedRuntimePart?.id]);
 
   useEffect(() => {
     if (chatOverlayMode && (!selectedGame || gameView !== "chat" || !selectedChatConversationId)) {
@@ -1742,21 +1782,47 @@ export function Gaming({
                               aria-label="Available API attributes"
                             >
                               <div>
-                                <p>Catalog Attributes</p>
+                                <p>Canonical API Members</p>
                                 <h4>
-                                  {runtimePartAvailableAttributes(selectedRuntimePart).length}{" "}
-                                  available member(s)
+                                  {selectedRuntimePartApiMembers.length ||
+                                    runtimePartAvailableAttributes(selectedRuntimePart).length}{" "}
+                                  indexed member(s)
                                 </h4>
                               </div>
-                              <div className="game-runtime-part-attribute-list">
-                                {runtimePartAvailableAttributes(selectedRuntimePart).length > 0 ? (
-                                  runtimePartAvailableAttributes(selectedRuntimePart).map(
-                                    (attribute) => <span key={attribute}>{attribute}</span>
-                                  )
-                                ) : (
-                                  <span>No runtime API attributes indexed yet</span>
-                                )}
-                              </div>
+                              {isLoadingRuntimePartApiMembers ? (
+                                <p>Loading indexed API members.</p>
+                              ) : selectedRuntimePartApiMembers.length > 0 ? (
+                                <div className="game-runtime-part-api-member-list">
+                                  {selectedRuntimePartApiMembers.map((member) => (
+                                    <article
+                                      className="game-runtime-part-api-member-row"
+                                      key={member.id}
+                                    >
+                                      <div>
+                                        <strong>
+                                          {member.typeName}.{member.memberName}
+                                        </strong>
+                                        <code>{member.signature || member.memberKey}</code>
+                                        <small>
+                                          {member.availability || "available"} · last seen{" "}
+                                          {member.lastSeenAt || "unknown"}
+                                        </small>
+                                      </div>
+                                      <RuntimePartApiMemberFlags member={member} />
+                                    </article>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="game-runtime-part-attribute-list">
+                                  {runtimePartAvailableAttributes(selectedRuntimePart).length > 0 ? (
+                                    runtimePartAvailableAttributes(selectedRuntimePart).map(
+                                      (attribute) => <span key={attribute}>{attribute}</span>
+                                    )
+                                  ) : (
+                                    <span>No runtime API attributes indexed yet</span>
+                                  )}
+                                </div>
+                              )}
                             </section>
 
                             <label className="game-runtime-part-notes">
@@ -2187,6 +2253,24 @@ function formatRuntimePartProperties(propertiesJson: string) {
 }
 
 function ApiMemberFlags({ member }: { member: GearBlocksApiMember }) {
+  const flags = [
+    member.memberKind,
+    member.isReadable ? "read" : "",
+    member.isWritable ? "write" : "",
+    member.isInvokable ? "call" : "",
+    member.isMutating ? "mutates" : ""
+  ].filter(Boolean);
+
+  return (
+    <div className="game-api-member-flags">
+      {flags.map((flag) => (
+        <span key={flag}>{flag}</span>
+      ))}
+    </div>
+  );
+}
+
+function RuntimePartApiMemberFlags({ member }: { member: GameRuntimePartApiMember }) {
   const flags = [
     member.memberKind,
     member.isReadable ? "read" : "",

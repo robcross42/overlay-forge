@@ -412,6 +412,52 @@ pub struct GearBlocksApiCatalogRecord {
 }
 
 #[derive(Clone, Serialize)]
+pub struct GameRuntimePartApiMemberRecord {
+    pub id: i64,
+    #[serde(rename = "gameId")]
+    pub game_id: i64,
+    #[serde(rename = "partKey")]
+    pub part_key: String,
+    #[serde(rename = "apiMemberId")]
+    pub api_member_id: i64,
+    pub availability: String,
+    #[serde(rename = "sourceExportId")]
+    pub source_export_id: String,
+    #[serde(rename = "sourceConstructionId")]
+    pub source_construction_id: String,
+    #[serde(rename = "firstSeenAt")]
+    pub first_seen_at: String,
+    #[serde(rename = "lastSeenAt")]
+    pub last_seen_at: String,
+    pub namespace: String,
+    #[serde(rename = "typeName")]
+    pub type_name: String,
+    #[serde(rename = "typeKind")]
+    pub type_kind: String,
+    #[serde(rename = "memberKey")]
+    pub member_key: String,
+    #[serde(rename = "memberName")]
+    pub member_name: String,
+    pub signature: String,
+    #[serde(rename = "memberKind")]
+    pub member_kind: String,
+    #[serde(rename = "isReadable")]
+    pub is_readable: bool,
+    #[serde(rename = "isWritable")]
+    pub is_writable: bool,
+    #[serde(rename = "isInvokable")]
+    pub is_invokable: bool,
+    #[serde(rename = "isMutating")]
+    pub is_mutating: bool,
+    #[serde(rename = "docsUrl")]
+    pub docs_url: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+#[derive(Clone, Serialize)]
 pub struct GameConstructionRecord {
     pub id: i64,
     #[serde(rename = "gameId")]
@@ -2968,6 +3014,79 @@ impl AppDatabase {
             parameters,
             enum_values,
         })
+    }
+
+    pub fn list_game_runtime_part_api_members(
+        &self,
+        game_id: i64,
+        part_id: i64,
+    ) -> Result<Vec<GameRuntimePartApiMemberRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        let part_key = connection
+            .query_row(
+                "
+                SELECT part_key
+                FROM game_runtime_parts
+                WHERE id = ?1
+                    AND game_id = ?2
+                ",
+                params![part_id, game_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+
+        let Some(part_key) = part_key else {
+            return Ok(Vec::new());
+        };
+
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                observed.id,
+                observed.game_id,
+                observed.part_key,
+                observed.api_member_id,
+                observed.availability,
+                observed.source_export_id,
+                observed.source_construction_id,
+                observed.first_seen_at,
+                observed.last_seen_at,
+                types.namespace,
+                types.type_name,
+                types.type_kind,
+                members.member_key,
+                members.member_name,
+                members.signature,
+                members.member_kind,
+                members.is_readable,
+                members.is_writable,
+                members.is_invokable,
+                members.is_mutating,
+                members.docs_url,
+                observed.created_at,
+                observed.updated_at
+            FROM game_runtime_part_api_members observed
+            INNER JOIN gearblocks_api_members members
+                ON members.id = observed.api_member_id
+            INNER JOIN gearblocks_api_types types
+                ON types.id = members.type_id
+            WHERE observed.game_id = ?1
+                AND observed.part_key = ?2
+            ORDER BY
+                types.type_name COLLATE NOCASE ASC,
+                members.member_kind COLLATE NOCASE ASC,
+                members.member_name COLLATE NOCASE ASC,
+                members.signature COLLATE NOCASE ASC
+            ",
+        )?;
+        let members = statement
+            .query_map(
+                params![game_id, part_key.trim()],
+                game_runtime_part_api_member_from_row,
+            )?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(members)
     }
 
     pub fn get_game_runtime_part(&self, id: i64) -> Result<Option<GameRuntimePartRecord>> {
@@ -5784,6 +5903,40 @@ fn gearblocks_api_enum_value_from_row(
         source_version: row.get(8)?,
         created_at: row.get(9)?,
         updated_at: row.get(10)?,
+    })
+}
+
+fn game_runtime_part_api_member_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<GameRuntimePartApiMemberRecord> {
+    let is_readable: i64 = row.get(16)?;
+    let is_writable: i64 = row.get(17)?;
+    let is_invokable: i64 = row.get(18)?;
+    let is_mutating: i64 = row.get(19)?;
+    Ok(GameRuntimePartApiMemberRecord {
+        id: row.get(0)?,
+        game_id: row.get(1)?,
+        part_key: row.get(2)?,
+        api_member_id: row.get(3)?,
+        availability: row.get(4)?,
+        source_export_id: row.get(5)?,
+        source_construction_id: row.get(6)?,
+        first_seen_at: row.get(7)?,
+        last_seen_at: row.get(8)?,
+        namespace: row.get(9)?,
+        type_name: row.get(10)?,
+        type_kind: row.get(11)?,
+        member_key: row.get(12)?,
+        member_name: row.get(13)?,
+        signature: row.get(14)?,
+        member_kind: row.get(15)?,
+        is_readable: is_readable != 0,
+        is_writable: is_writable != 0,
+        is_invokable: is_invokable != 0,
+        is_mutating: is_mutating != 0,
+        docs_url: row.get(20)?,
+        created_at: row.get(21)?,
+        updated_at: row.get(22)?,
     })
 }
 

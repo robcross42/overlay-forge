@@ -1,11 +1,12 @@
 use crate::db::{
     BridgeFileDraftRecord, CalendarEventRecord, GameCatalogObjectRecord,
     GameChatConversationRecord, GameChatMessageRecord, GameConstructionRecord,
-    GameDataLocationRecord, GameRecord, GameRuntimeConstructionExportRecord, GameRuntimePartRecord,
-    GameScreenshotCaptureRequestRecord, GearBlocksApiCatalogRecord, NoteRecord,
-    PlanningConversationContextRecord, PlanningConversationRecord, PlanningMessageRecord,
-    PlanningPromptPreviewRecord, ProjectGitHubRepositoryRecord, ProjectMarkdownContextPayload,
-    ProjectMarkdownContextRecord, ProjectRecord, TaskRecord, YouTubeReferenceRecord,
+    GameDataLocationRecord, GameRecord, GameRuntimeConstructionExportRecord,
+    GameRuntimePartApiMemberRecord, GameRuntimePartRecord, GameScreenshotCaptureRequestRecord,
+    GearBlocksApiCatalogRecord, NoteRecord, PlanningConversationContextRecord,
+    PlanningConversationRecord, PlanningMessageRecord, PlanningPromptPreviewRecord,
+    ProjectGitHubRepositoryRecord, ProjectMarkdownContextPayload, ProjectMarkdownContextRecord,
+    ProjectRecord, TaskRecord, YouTubeReferenceRecord,
 };
 use crate::github;
 use crate::hotkeys;
@@ -1520,6 +1521,24 @@ pub fn list_game_runtime_parts(
     } else {
         Ok(parts)
     }
+}
+
+#[tauri::command]
+pub fn list_game_runtime_part_api_members(
+    game_id: i64,
+    part_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<GameRuntimePartApiMemberRecord>, String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    require_gearblocks_game(&game)?;
+
+    state
+        .database
+        .list_game_runtime_part_api_members(game.id, part_id)
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
