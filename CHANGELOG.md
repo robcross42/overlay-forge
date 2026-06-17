@@ -15,6 +15,7 @@ Development bucket for work started on 2026-06-16. Related changes that continue
 #### Added
 
 - Added normalized GearBlocks runtime indexes for part API attributes, discovered `value` fields, properties, and attachments so repeated exports update searchable rows instead of relying only on each part's full JSON blob.
+- Added canonical GearBlocks API catalog tables for documented construction namespace types, members, and parameters, plus a runtime part/member bridge that maps observed API availability back to canonical member IDs.
 
 #### Changed
 

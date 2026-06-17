@@ -3147,6 +3147,19 @@ fn index_runtime_part_discovery(
                     &context.seen_at,
                 )
                 .map_err(|error| error.to_string())?;
+            state
+                .database
+                .upsert_game_runtime_part_api_member(
+                    context.game_id,
+                    &context.part_key,
+                    &interface_name,
+                    &attribute_name,
+                    &json_string(attribute.get("availability")),
+                    &context.source_export_id,
+                    &context.source_construction_id,
+                    &context.seen_at,
+                )
+                .map_err(|error| error.to_string())?;
         }
     }
 

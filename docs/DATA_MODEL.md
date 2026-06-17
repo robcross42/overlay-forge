@@ -26,6 +26,8 @@ Gaming Screenshot Capture is complete, passed, and successful for the current Ge
 
 Overlay Forge 0.2.0 GearBlocks runtime API interface support is complete, passed, and successful. Availability-only `apiAttributes` metadata is stored in existing runtime export JSON fields so interface coverage can grow without a schema migration for each member.
 
+Overlay Forge 0.3.0 starts the canonical GearBlocks API database catalog. The documented construction namespace interfaces are seeded into SQLite as API types, members, and parameters, and runtime part API availability can now map observed part support back to canonical member IDs.
+
 ## Tables
 
 ### scratchpad
@@ -523,6 +525,81 @@ updated_at
 
 GearBlocks runtime attachment index populated from direct entries under each part's `attachments` field. Rows are unique per `game_id`, `part_key`, and `attachment_path`, which preserves the latest attachment payload without repeatedly expanding the main runtime part table.
 
+### gearblocks_api_types
+
+```text
+id
+namespace
+type_name
+type_kind
+docs_url
+source
+source_version
+notes
+created_at
+updated_at
+```
+
+Canonical GearBlocks API type catalog seeded from Overlay Forge's documented `SmashHammer.GearBlocks.Construction` interface registry. Rows are unique per `namespace` and `type_name`.
+
+### gearblocks_api_members
+
+```text
+id
+type_id
+member_key
+member_name
+signature
+member_kind
+return_type
+is_readable
+is_writable
+is_invokable
+is_mutating
+docs_url
+source
+source_version
+notes
+created_at
+updated_at
+```
+
+Canonical GearBlocks API member catalog. `member_key` stores the exact documented member/signature string, while `member_name` stores the base property or method name. Methods are marked invokable and parsed into parameters; properties are marked readable. Mutating operations are flagged by operation interfaces and known mutating method prefixes.
+
+### gearblocks_api_parameters
+
+```text
+id
+member_id
+position
+parameter_name
+parameter_type
+default_value
+is_optional
+created_at
+updated_at
+```
+
+Canonical GearBlocks API method parameter catalog. Rows are parsed from documented member signatures and are unique per `member_id` and `position`.
+
+### game_runtime_part_api_members
+
+```text
+id
+game_id
+part_key
+api_member_id
+availability
+source_export_id
+source_construction_id
+first_seen_at
+last_seen_at
+created_at
+updated_at
+```
+
+Runtime bridge from observed part API availability to canonical GearBlocks API members. Rows are unique per `game_id`, `part_key`, and `api_member_id`, so repeated exports refresh last-seen metadata without duplicating known part/member support.
+
 ### game_catalog_screenshots
 
 ```text
@@ -609,6 +686,10 @@ CREATE TABLE IF NOT EXISTS game_runtime_part_api_attributes
 CREATE TABLE IF NOT EXISTS game_runtime_part_values
 CREATE TABLE IF NOT EXISTS game_runtime_part_properties
 CREATE TABLE IF NOT EXISTS game_runtime_part_attachments
+CREATE TABLE IF NOT EXISTS gearblocks_api_types
+CREATE TABLE IF NOT EXISTS gearblocks_api_members
+CREATE TABLE IF NOT EXISTS gearblocks_api_parameters
+CREATE TABLE IF NOT EXISTS game_runtime_part_api_members
 CREATE TABLE IF NOT EXISTS game_catalog_screenshots
 ```
 

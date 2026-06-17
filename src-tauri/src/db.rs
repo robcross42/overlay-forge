@@ -1,3 +1,4 @@
+use crate::gearblocks_api;
 use rusqlite::{params, Connection, OptionalExtension, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -743,6 +744,65 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS gearblocks_api_types (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                namespace TEXT NOT NULL,
+                type_name TEXT NOT NULL,
+                type_kind TEXT NOT NULL DEFAULT 'interface',
+                docs_url TEXT NOT NULL DEFAULT '',
+                source TEXT NOT NULL DEFAULT '',
+                source_version TEXT NOT NULL DEFAULT '',
+                notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS gearblocks_api_members (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type_id INTEGER NOT NULL,
+                member_key TEXT NOT NULL,
+                member_name TEXT NOT NULL,
+                signature TEXT NOT NULL DEFAULT '',
+                member_kind TEXT NOT NULL DEFAULT '',
+                return_type TEXT NOT NULL DEFAULT '',
+                is_readable INTEGER NOT NULL DEFAULT 0,
+                is_writable INTEGER NOT NULL DEFAULT 0,
+                is_invokable INTEGER NOT NULL DEFAULT 0,
+                is_mutating INTEGER NOT NULL DEFAULT 0,
+                docs_url TEXT NOT NULL DEFAULT '',
+                source TEXT NOT NULL DEFAULT '',
+                source_version TEXT NOT NULL DEFAULT '',
+                notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS gearblocks_api_parameters (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                member_id INTEGER NOT NULL,
+                position INTEGER NOT NULL,
+                parameter_name TEXT NOT NULL DEFAULT '',
+                parameter_type TEXT NOT NULL DEFAULT '',
+                default_value TEXT NOT NULL DEFAULT '',
+                is_optional INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS game_runtime_part_api_members (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                part_key TEXT NOT NULL,
+                api_member_id INTEGER NOT NULL,
+                availability TEXT NOT NULL DEFAULT '',
+                source_export_id TEXT NOT NULL DEFAULT '',
+                source_construction_id TEXT NOT NULL DEFAULT '',
+                first_seen_at TEXT NOT NULL DEFAULT '',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE TABLE IF NOT EXISTS game_constructions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
@@ -840,6 +900,18 @@ impl AppDatabase {
                 ON game_runtime_part_attachments (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_part_attachments_attachment_path
                 ON game_runtime_part_attachments (game_id, attachment_path);
+            CREATE INDEX IF NOT EXISTS idx_gearblocks_api_types_namespace
+                ON gearblocks_api_types (namespace, type_name);
+            CREATE INDEX IF NOT EXISTS idx_gearblocks_api_members_type_id
+                ON gearblocks_api_members (type_id);
+            CREATE INDEX IF NOT EXISTS idx_gearblocks_api_members_member_name
+                ON gearblocks_api_members (member_name);
+            CREATE INDEX IF NOT EXISTS idx_gearblocks_api_parameters_member_id
+                ON gearblocks_api_parameters (member_id);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_part_api_members_game_id
+                ON game_runtime_part_api_members (game_id);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_part_api_members_api_member_id
+                ON game_runtime_part_api_members (api_member_id);
             CREATE INDEX IF NOT EXISTS idx_game_constructions_game_id
                 ON game_constructions (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_construction_exports_game_id
@@ -987,6 +1059,34 @@ impl AppDatabase {
         )?;
         connection.execute(
             "
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_gearblocks_api_types_unique
+                ON gearblocks_api_types (namespace, type_name)
+            ",
+            [],
+        )?;
+        connection.execute(
+            "
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_gearblocks_api_members_unique
+                ON gearblocks_api_members (type_id, member_key)
+            ",
+            [],
+        )?;
+        connection.execute(
+            "
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_gearblocks_api_parameters_unique
+                ON gearblocks_api_parameters (member_id, position)
+            ",
+            [],
+        )?;
+        connection.execute(
+            "
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_game_runtime_part_api_members_unique
+                ON game_runtime_part_api_members (game_id, part_key, api_member_id)
+            ",
+            [],
+        )?;
+        connection.execute(
+            "
             CREATE UNIQUE INDEX IF NOT EXISTS idx_game_constructions_game_path_unique
                 ON game_constructions (game_id, construction_path)
             ",
@@ -999,6 +1099,7 @@ impl AppDatabase {
             ",
             [],
         )?;
+        Self::seed_gearblocks_api_catalog(&connection)?;
 
         Ok(Self {
             connection: Mutex::new(connection),
@@ -1008,6 +1109,143 @@ impl AppDatabase {
 
     pub fn is_ready(&self) -> bool {
         self.ready
+    }
+
+    fn seed_gearblocks_api_catalog(connection: &Connection) -> Result<()> {
+        for definition in gearblocks_api::CONSTRUCTION_INTERFACE_DEFINITIONS {
+            let namespace = "SmashHammer.GearBlocks.Construction";
+            let docs_url = gearblocks_api_docs_url(definition.docs_url);
+            connection.execute(
+                "
+                INSERT INTO gearblocks_api_types (
+                    namespace,
+                    type_name,
+                    type_kind,
+                    docs_url,
+                    source,
+                    source_version
+                )
+                VALUES (?1, ?2, 'interface', ?3, 'docs', '0.8.96622')
+                ON CONFLICT(namespace, type_name) DO UPDATE SET
+                    type_kind = excluded.type_kind,
+                    docs_url = excluded.docs_url,
+                    source = excluded.source,
+                    source_version = excluded.source_version,
+                    updated_at = CURRENT_TIMESTAMP
+                ",
+                params![namespace, definition.name, docs_url],
+            )?;
+
+            let type_id = connection.query_row(
+                "
+                SELECT id
+                FROM gearblocks_api_types
+                WHERE namespace = ?1
+                    AND type_name = ?2
+                ",
+                params![namespace, definition.name],
+                |row| row.get::<_, i64>(0),
+            )?;
+
+            for raw_member in definition.members {
+                let parsed = parse_gearblocks_api_member(raw_member, definition.name);
+                connection.execute(
+                    "
+                    INSERT INTO gearblocks_api_members (
+                        type_id,
+                        member_key,
+                        member_name,
+                        signature,
+                        member_kind,
+                        return_type,
+                        is_readable,
+                        is_writable,
+                        is_invokable,
+                        is_mutating,
+                        docs_url,
+                        source,
+                        source_version
+                    )
+                    VALUES (?1, ?2, ?3, ?4, ?5, '', ?6, 0, ?7, ?8, ?9, 'docs', '0.8.96622')
+                    ON CONFLICT(type_id, member_key) DO UPDATE SET
+                        member_name = excluded.member_name,
+                        signature = excluded.signature,
+                        member_kind = excluded.member_kind,
+                        return_type = excluded.return_type,
+                        is_readable = excluded.is_readable,
+                        is_writable = excluded.is_writable,
+                        is_invokable = excluded.is_invokable,
+                        is_mutating = excluded.is_mutating,
+                        docs_url = excluded.docs_url,
+                        source = excluded.source,
+                        source_version = excluded.source_version,
+                        updated_at = CURRENT_TIMESTAMP
+                    ",
+                    params![
+                        type_id,
+                        parsed.member_key,
+                        parsed.member_name,
+                        parsed.signature,
+                        parsed.member_kind,
+                        parsed.is_readable,
+                        parsed.is_invokable,
+                        parsed.is_mutating,
+                        docs_url,
+                    ],
+                )?;
+
+                let member_id = connection.query_row(
+                    "
+                    SELECT id
+                    FROM gearblocks_api_members
+                    WHERE type_id = ?1
+                        AND member_key = ?2
+                    ",
+                    params![type_id, parsed.member_key],
+                    |row| row.get::<_, i64>(0),
+                )?;
+
+                connection.execute(
+                    "
+                    DELETE FROM gearblocks_api_parameters
+                    WHERE member_id = ?1
+                    ",
+                    params![member_id],
+                )?;
+
+                for parameter in parsed.parameters {
+                    connection.execute(
+                        "
+                        INSERT INTO gearblocks_api_parameters (
+                            member_id,
+                            position,
+                            parameter_name,
+                            parameter_type,
+                            default_value,
+                            is_optional
+                        )
+                        VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                        ON CONFLICT(member_id, position) DO UPDATE SET
+                            parameter_name = excluded.parameter_name,
+                            parameter_type = excluded.parameter_type,
+                            default_value = excluded.default_value,
+                            is_optional = excluded.is_optional,
+                            updated_at = CURRENT_TIMESTAMP
+                        ",
+                        params![
+                            member_id,
+                            parameter.position,
+                            parameter.name,
+                            parameter.parameter_type,
+                            parameter.default_value,
+                            parameter.is_optional,
+                        ],
+                    )?;
+                }
+            }
+        }
+
+        Ok(())
     }
 
     pub fn get_app_setting(&self, key: &str) -> Result<Option<String>> {
@@ -2650,6 +2888,81 @@ impl AppDatabase {
                 seen_at.trim(),
             ],
         )?;
+
+        Ok(())
+    }
+
+    pub fn upsert_game_runtime_part_api_member(
+        &self,
+        game_id: i64,
+        part_key: &str,
+        interface_name: &str,
+        attribute_name: &str,
+        availability: &str,
+        source_export_id: &str,
+        source_construction_id: &str,
+        seen_at: &str,
+    ) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        let observed_member_name = gearblocks_observed_member_name(attribute_name);
+        let mut statement = connection.prepare(
+            "
+                SELECT DISTINCT members.id
+                FROM gearblocks_api_members members
+                INNER JOIN gearblocks_api_types types
+                    ON types.id = members.type_id
+                WHERE types.namespace = 'SmashHammer.GearBlocks.Construction'
+                    AND types.type_name = ?1
+                    AND (
+                        members.member_key = ?2
+                        OR members.member_name = ?3
+                    )
+                ",
+        )?;
+        let api_member_ids = statement
+            .query_map(
+                params![
+                    interface_name.trim(),
+                    attribute_name.trim(),
+                    observed_member_name
+                ],
+                |row| row.get::<_, i64>(0),
+            )?
+            .collect::<Result<Vec<_>>>()?;
+
+        for api_member_id in api_member_ids {
+            connection.execute(
+                "
+                INSERT INTO game_runtime_part_api_members (
+                    game_id,
+                    part_key,
+                    api_member_id,
+                    availability,
+                    source_export_id,
+                    source_construction_id,
+                    first_seen_at,
+                    last_seen_at
+                )
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)
+                ON CONFLICT(game_id, part_key, api_member_id) DO UPDATE SET
+                    availability = excluded.availability,
+                    source_export_id = excluded.source_export_id,
+                    source_construction_id = excluded.source_construction_id,
+                    last_seen_at = excluded.last_seen_at,
+                    updated_at = CURRENT_TIMESTAMP
+                ",
+                params![
+                    game_id,
+                    part_key.trim(),
+                    api_member_id,
+                    availability.trim(),
+                    source_export_id.trim(),
+                    source_construction_id.trim(),
+                    seen_at.trim(),
+                ],
+            )?;
+        }
 
         Ok(())
     }
@@ -4814,6 +5127,167 @@ fn planning_context_dedupe_key(context: &PlanningConversationContextRecord) -> S
             context.context_type,
             context.label.trim().to_lowercase()
         ),
+    }
+}
+
+struct ParsedGearBlocksApiMember {
+    member_key: String,
+    member_name: String,
+    signature: String,
+    member_kind: &'static str,
+    is_readable: i64,
+    is_invokable: i64,
+    is_mutating: i64,
+    parameters: Vec<ParsedGearBlocksApiParameter>,
+}
+
+struct ParsedGearBlocksApiParameter {
+    position: i64,
+    name: String,
+    parameter_type: String,
+    default_value: String,
+    is_optional: i64,
+}
+
+fn parse_gearblocks_api_member(raw_member: &str, type_name: &str) -> ParsedGearBlocksApiMember {
+    let signature = raw_member.trim().to_string();
+    let is_method = signature.contains('(') && signature.ends_with(')');
+    let member_name = if is_method {
+        signature
+            .split('(')
+            .next()
+            .unwrap_or_default()
+            .trim()
+            .to_string()
+    } else {
+        signature.clone()
+    };
+
+    ParsedGearBlocksApiMember {
+        member_key: signature.clone(),
+        member_name: member_name.clone(),
+        signature: signature.clone(),
+        member_kind: if is_method { "method" } else { "property" },
+        is_readable: if is_method { 0 } else { 1 },
+        is_invokable: if is_method { 1 } else { 0 },
+        is_mutating: if is_mutating_gearblocks_api_member(type_name, &member_name) {
+            1
+        } else {
+            0
+        },
+        parameters: if is_method {
+            parse_gearblocks_api_parameters(&signature)
+        } else {
+            Vec::new()
+        },
+    }
+}
+
+fn gearblocks_observed_member_name(attribute_name: &str) -> String {
+    attribute_name
+        .split('(')
+        .next()
+        .unwrap_or_default()
+        .trim()
+        .to_string()
+}
+
+fn parse_gearblocks_api_parameters(signature: &str) -> Vec<ParsedGearBlocksApiParameter> {
+    let Some(start) = signature.find('(') else {
+        return Vec::new();
+    };
+    let Some(end) = signature.rfind(')') else {
+        return Vec::new();
+    };
+    let parameters_text = signature[start + 1..end].trim();
+    if parameters_text.is_empty() {
+        return Vec::new();
+    }
+
+    split_gearblocks_parameter_list(parameters_text)
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, parameter)| {
+            let mut parts = parameter.splitn(2, '=');
+            let declaration = parts.next().unwrap_or_default().trim();
+            let default_value = parts.next().unwrap_or_default().trim().to_string();
+            let mut declaration_parts = declaration.rsplitn(2, ' ');
+            let name = declaration_parts.next().unwrap_or_default().trim();
+            let parameter_type = declaration_parts.next().unwrap_or_default().trim();
+            if name.is_empty() {
+                None
+            } else {
+                Some(ParsedGearBlocksApiParameter {
+                    position: index as i64,
+                    name: name.to_string(),
+                    parameter_type: parameter_type.to_string(),
+                    is_optional: if default_value.is_empty() { 0 } else { 1 },
+                    default_value,
+                })
+            }
+        })
+        .collect()
+}
+
+fn split_gearblocks_parameter_list(parameters_text: &str) -> Vec<String> {
+    let mut parameters = Vec::new();
+    let mut current = String::new();
+    let mut generic_depth = 0_i64;
+    for character in parameters_text.chars() {
+        match character {
+            '<' => {
+                generic_depth += 1;
+                current.push(character);
+            }
+            '>' => {
+                generic_depth = (generic_depth - 1).max(0);
+                current.push(character);
+            }
+            ',' if generic_depth == 0 => {
+                let parameter = current.trim();
+                if !parameter.is_empty() {
+                    parameters.push(parameter.to_string());
+                }
+                current.clear();
+            }
+            _ => current.push(character),
+        }
+    }
+    let parameter = current.trim();
+    if !parameter.is_empty() {
+        parameters.push(parameter.to_string());
+    }
+    parameters
+}
+
+fn is_mutating_gearblocks_api_member(type_name: &str, member_name: &str) -> bool {
+    if type_name.ends_with("Operations") {
+        return true;
+    }
+    [
+        "Assign",
+        "Charge",
+        "Create",
+        "Delete",
+        "Destroy",
+        "Discharge",
+        "Duplicate",
+        "Freeze",
+        "Replace",
+        "Set",
+        "Spawn",
+        "Sync",
+        "Toggle",
+    ]
+    .iter()
+    .any(|prefix| member_name.starts_with(prefix))
+}
+
+fn gearblocks_api_docs_url(page: &str) -> String {
+    if page.starts_with("http://") || page.starts_with("https://") {
+        page.to_string()
+    } else {
+        format!("https://www.gearblocksgame.com/apidoc/{page}")
     }
 }
 
