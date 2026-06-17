@@ -18,6 +18,7 @@ Development bucket for work started on 2026-06-16. Related changes that continue
 - Added canonical GearBlocks API catalog tables for documented construction namespace types, members, and parameters, plus a runtime part/member bridge that maps observed API availability back to canonical member IDs.
 - Expanded the canonical GearBlocks API catalog seed to include documented construction namespace classes and enum values, including Lua constant names where documented.
 - Added a backend command and TypeScript service payload for browsing the indexed GearBlocks API catalog types, members, parameters, and enum values.
+- Added a GearBlocks API tab for browsing indexed API types, members, method parameters, and enum values from the Gaming workspace.
 
 #### Changed
 

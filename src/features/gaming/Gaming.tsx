@@ -22,6 +22,7 @@ import {
   listGameChatMessages,
   listGameCatalogObjects,
   listGameConstructions,
+  listGearBlocksApiCatalog,
   listGearBlocksConstructionFiles,
   listGamePartCategories,
   listGameRuntimeParts,
@@ -41,6 +42,8 @@ import type {
   GameDataLocation,
   GameDataLocationType,
   GameRuntimePart,
+  GearBlocksApiCatalog,
+  GearBlocksApiMember,
   GearBlocksConstructionDecode,
   GearBlocksConstructionFile,
   GearBlocksRuntimeExport,
@@ -77,7 +80,7 @@ type ScreenshotContextMenu = {
   y: number;
 };
 
-type GameView = "home" | "chat" | "screenshots" | "parts" | "constructions";
+type GameView = "home" | "chat" | "screenshots" | "parts" | "constructions" | "api";
 const CHAT_SCREENSHOTS_PER_PAGE = 8;
 const GEARBLOCKS_PARTS_CATALOG_METADATA = {
   gameVersion: "0.8.96622",
@@ -137,6 +140,13 @@ export function Gaming({
   const [luaExporterPath, setLuaExporterPath] = useState("");
   const [runtimeExports, setRuntimeExports] = useState<GearBlocksRuntimeExport[]>([]);
   const [selectedRuntimeExportId, setSelectedRuntimeExportId] = useState("");
+  const [gearBlocksApiCatalog, setGearBlocksApiCatalog] = useState<GearBlocksApiCatalog | null>(
+    null
+  );
+  const [selectedGearBlocksApiTypeId, setSelectedGearBlocksApiTypeId] = useState<number | null>(
+    null
+  );
+  const [isLoadingGearBlocksApiCatalog, setIsLoadingGearBlocksApiCatalog] = useState(false);
   const [isImportingRuntimeExports, setIsImportingRuntimeExports] = useState(false);
   const [isImportingCatalogScreenshot, setIsImportingCatalogScreenshot] = useState(false);
   const [isClearingRuntimeCategoryImages, setIsClearingRuntimeCategoryImages] = useState(false);
@@ -198,6 +208,44 @@ export function Gaming({
     () => runtimeExports.find((runtimeExport) => runtimeExport.id === selectedRuntimeExportId),
     [runtimeExports, selectedRuntimeExportId]
   );
+  const selectedGearBlocksApiType = useMemo(
+    () =>
+      gearBlocksApiCatalog?.types.find((type) => type.id === selectedGearBlocksApiTypeId) ?? null,
+    [gearBlocksApiCatalog, selectedGearBlocksApiTypeId]
+  );
+  const selectedGearBlocksApiMembers = useMemo(
+    () =>
+      selectedGearBlocksApiType && gearBlocksApiCatalog
+        ? gearBlocksApiCatalog.members.filter(
+            (member) => member.typeId === selectedGearBlocksApiType.id
+          )
+        : [],
+    [gearBlocksApiCatalog, selectedGearBlocksApiType]
+  );
+  const selectedGearBlocksApiEnumValues = useMemo(
+    () =>
+      selectedGearBlocksApiType && gearBlocksApiCatalog
+        ? gearBlocksApiCatalog.enumValues.filter(
+            (value) => value.typeId === selectedGearBlocksApiType.id
+          )
+        : [],
+    [gearBlocksApiCatalog, selectedGearBlocksApiType]
+  );
+  const selectedGearBlocksApiMemberParameters = useMemo(() => {
+    if (!gearBlocksApiCatalog) {
+      return new Map<number, string[]>();
+    }
+    const parameters = new Map<number, string[]>();
+    for (const parameter of gearBlocksApiCatalog.parameters) {
+      const label = `${parameter.parameterType} ${parameter.parameterName}${
+        parameter.defaultValue ? `=${parameter.defaultValue}` : ""
+      }`;
+      const current = parameters.get(parameter.memberId) ?? [];
+      current.push(label.trim());
+      parameters.set(parameter.memberId, current);
+    }
+    return parameters;
+  }, [gearBlocksApiCatalog]);
 
   useEffect(() => {
     if (
@@ -211,7 +259,11 @@ export function Gaming({
   }, [gameView, partCategories, selectedGame?.slug, selectedPartCategory]);
 
   useEffect(() => {
-    if (selectedGame && selectedGame.slug !== "gearblocks" && gameView === "constructions") {
+    if (
+      selectedGame &&
+      selectedGame.slug !== "gearblocks" &&
+      (gameView === "constructions" || gameView === "api")
+    ) {
       setGameView("home");
     }
   }, [gameView, selectedGame?.id, selectedGame?.slug]);
@@ -233,6 +285,9 @@ export function Gaming({
       setLuaExporterPath("");
       setRuntimeExports([]);
       setSelectedRuntimeExportId("");
+      setGearBlocksApiCatalog(null);
+      setSelectedGearBlocksApiTypeId(null);
+      setIsLoadingGearBlocksApiCatalog(false);
       setIsImportingRuntimeExports(false);
       setIsImportingCatalogScreenshot(false);
       setIsClearingRuntimeCategoryImages(false);
@@ -269,10 +324,13 @@ export function Gaming({
         if (selectedGame.slug === "gearblocks") {
           void refreshGearBlocksConstructionFiles(selectedGame.id);
           void syncGearBlocksConstructions(selectedGame.id);
+          void refreshGearBlocksApiCatalog();
         } else {
           setConstructionFiles([]);
           setGameConstructions([]);
           setDecodedConstruction(null);
+          setGearBlocksApiCatalog(null);
+          setSelectedGearBlocksApiTypeId(null);
         }
       })
       .catch((error) => setStatus(formatError(error)));
@@ -713,6 +771,23 @@ export function Gaming({
     }
   }
 
+  async function refreshGearBlocksApiCatalog() {
+    setIsLoadingGearBlocksApiCatalog(true);
+    try {
+      const catalog = await listGearBlocksApiCatalog();
+      setGearBlocksApiCatalog(catalog);
+      setSelectedGearBlocksApiTypeId((current) =>
+        current && catalog.types.some((type) => type.id === current)
+          ? current
+          : catalog.types[0]?.id ?? null
+      );
+    } catch (error) {
+      setStatus(formatError(error));
+    } finally {
+      setIsLoadingGearBlocksApiCatalog(false);
+    }
+  }
+
   async function syncGearBlocksConstructions(gameId: number) {
     setIsSyncingGameConstructions(true);
     try {
@@ -950,6 +1025,16 @@ export function Gaming({
               type="button"
             >
               Constructions
+            </button>
+          )}
+          {selectedGame.slug === "gearblocks" && (
+            <button
+              className={gameView === "api" ? "primary-button" : "ghost-button"}
+              onClick={() => setGameView("api")}
+              type="button"
+            >
+              API
+              <span className="button-count">{gearBlocksApiCatalog?.types.length ?? 0}</span>
             </button>
           )}
           <button
@@ -1229,6 +1314,122 @@ export function Gaming({
                     </article>
                   ))}
                 </div>
+              )}
+            </section>
+          )}
+
+          {gameView === "api" && selectedGame.slug === "gearblocks" && (
+            <section className="game-api-panel" aria-label="GearBlocks API catalog">
+              <div className="game-view-head">
+                <div>
+                  <p>GearBlocks</p>
+                  <h3>API Catalog</h3>
+                </div>
+                <button
+                  className="ghost-button"
+                  disabled={isLoadingGearBlocksApiCatalog}
+                  onClick={() => void refreshGearBlocksApiCatalog()}
+                  type="button"
+                >
+                  Refresh
+                </button>
+              </div>
+
+              {!gearBlocksApiCatalog ? (
+                <p>Loading GearBlocks API catalog.</p>
+              ) : (
+                <>
+                  <div className="game-api-summary-grid" aria-label="GearBlocks API summary">
+                    <span>{gearBlocksApiCatalog.types.length} types</span>
+                    <span>{gearBlocksApiCatalog.members.length} members</span>
+                    <span>{gearBlocksApiCatalog.parameters.length} parameters</span>
+                    <span>{gearBlocksApiCatalog.enumValues.length} enum values</span>
+                  </div>
+
+                  <div className="game-api-layout">
+                    <nav className="game-api-type-list" aria-label="GearBlocks API types">
+                      {gearBlocksApiCatalog.types.map((apiType) => (
+                        <button
+                          className={
+                            selectedGearBlocksApiType?.id === apiType.id
+                              ? "game-api-type-row active"
+                              : "game-api-type-row"
+                          }
+                          key={apiType.id}
+                          onClick={() => setSelectedGearBlocksApiTypeId(apiType.id)}
+                          type="button"
+                        >
+                          <span>{apiType.typeName}</span>
+                          <small>
+                            {apiType.typeKind}
+                            {apiType.memberCount > 0 ? ` · ${apiType.memberCount}` : ""}
+                            {apiType.enumValueCount > 0 ? ` · ${apiType.enumValueCount}` : ""}
+                          </small>
+                        </button>
+                      ))}
+                    </nav>
+
+                    <div className="game-api-detail">
+                      {selectedGearBlocksApiType ? (
+                        <>
+                          <div className="game-api-detail-head">
+                            <div>
+                              <p>{selectedGearBlocksApiType.namespace}</p>
+                              <h4>{selectedGearBlocksApiType.typeName}</h4>
+                            </div>
+                            <span>{selectedGearBlocksApiType.typeKind}</span>
+                          </div>
+
+                          {selectedGearBlocksApiType.notes && (
+                            <p className="game-api-notes">{selectedGearBlocksApiType.notes}</p>
+                          )}
+
+                          {selectedGearBlocksApiMembers.length > 0 && (
+                            <div className="game-api-member-list">
+                              {selectedGearBlocksApiMembers.map((member) => (
+                                <article className="game-api-member-row" key={member.id}>
+                                  <div>
+                                    <strong>{member.memberName}</strong>
+                                    <code>{member.signature || member.memberKey}</code>
+                                    {selectedGearBlocksApiMemberParameters.has(member.id) && (
+                                      <small>
+                                        {selectedGearBlocksApiMemberParameters
+                                          .get(member.id)
+                                          ?.join(", ")}
+                                      </small>
+                                    )}
+                                  </div>
+                                  <ApiMemberFlags member={member} />
+                                </article>
+                              ))}
+                            </div>
+                          )}
+
+                          {selectedGearBlocksApiEnumValues.length > 0 && (
+                            <div className="game-api-enum-list">
+                              {selectedGearBlocksApiEnumValues.map((value) => (
+                                <article className="game-api-enum-row" key={value.id}>
+                                  <div>
+                                    <strong>{value.valueName}</strong>
+                                    <span>{value.description}</span>
+                                  </div>
+                                  <code>{value.luaName || value.numericValue || "value"}</code>
+                                </article>
+                              ))}
+                            </div>
+                          )}
+
+                          {selectedGearBlocksApiMembers.length === 0 &&
+                            selectedGearBlocksApiEnumValues.length === 0 && (
+                              <p>No members or enum values indexed for this type yet.</p>
+                            )}
+                        </>
+                      ) : (
+                        <p>No GearBlocks API types indexed yet.</p>
+                      )}
+                    </div>
+                  </div>
+                </>
               )}
             </section>
           )}
@@ -1983,6 +2184,24 @@ function formatRuntimePartProperties(propertiesJson: string) {
   } catch {
     return propertiesJson;
   }
+}
+
+function ApiMemberFlags({ member }: { member: GearBlocksApiMember }) {
+  const flags = [
+    member.memberKind,
+    member.isReadable ? "read" : "",
+    member.isWritable ? "write" : "",
+    member.isInvokable ? "call" : "",
+    member.isMutating ? "mutates" : ""
+  ].filter(Boolean);
+
+  return (
+    <div className="game-api-member-flags">
+      {flags.map((flag) => (
+        <span key={flag}>{flag}</span>
+      ))}
+    </div>
+  );
 }
 
 function GameChatDefaultsPane({ game }: { game: Game }) {

@@ -30,6 +30,8 @@ Overlay Forge 0.3.0 starts the canonical GearBlocks API database catalog. The do
 
 The indexed GearBlocks API catalog is available through the backend command layer as a single payload containing types, members, parameters, and enum values, so future UI and prompt tooling can browse the canonical definitions without reparsing source docs.
 
+The GearBlocks Gaming workspace includes an API tab that reads this payload and displays type coverage, member signatures, parsed method parameters, mutating/readable flags, and enum values.
+
 ## Tables
 
 ### scratchpad
