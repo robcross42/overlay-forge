@@ -8,20 +8,13 @@ Unreleased changes are grouped by day using `YYYY-MM-DD` headings so a single da
 
 ## 0.4.0 - 2026-06-17
 
-Development bucket for work started on 2026-06-17.
+Development bucket for work starting on 2026-06-17 after the completed `0.3.0` session.
 
 ### 2026-06-17
 
 #### Changed
 
 - Bumped Overlay Forge from `0.3.0` to `0.4.0` for the next early-development work session.
-- Renamed the GearBlocks runtime log action to `Refresh Runtime Log` so the workflow is clear: export the current in-game build state, then refresh Overlay Forge's indexed runtime context without rebuilding the whole reference catalog.
-- Restored GearBlocks saved construction refresh for chat context by decoding the latest modified `construction.bytes` before building the prompt, including saved-file part additions/removals alongside runtime export context.
-
-#### Documentation
-
-- Documented the GearBlocks runtime refresh workflow for syncing current build changes into chat context after an explicit in-game export.
-- Documented that saved construction refresh reflects removals after the build is saved, while runtime log refresh remains the source for live runtime metadata.
 
 ## 0.3.0 - 2026-06-16
 
@@ -48,6 +41,18 @@ Development bucket for work started on 2026-06-16. Related changes that continue
 
 - Reduced GearBlocks exporter payload bloat by keeping cached known API indexes limited to top-level part availability metadata and removing the remaining behaviour reference value from `apiAttributes`.
 - Changed the GearBlocks exporter log payload to emit part API availability metadata once in an `apiAttributeCatalog`, with parts referencing compact `apiAttributeKey` values that Overlay Forge expands during import.
+
+### 2026-06-17
+
+#### Changed
+
+- Renamed the GearBlocks runtime log action to `Refresh Runtime Log` so the workflow is clear: export the current in-game build state, then refresh Overlay Forge's indexed runtime context without rebuilding the whole reference catalog.
+- Restored GearBlocks saved construction refresh for chat context by decoding the latest modified `construction.bytes` before building the prompt, including saved-file part additions/removals alongside runtime export context.
+
+#### Documentation
+
+- Documented the GearBlocks runtime refresh workflow for syncing current build changes into chat context after an explicit in-game export.
+- Documented that saved construction refresh reflects removals after the build is saved, while runtime log refresh remains the source for live runtime metadata.
 
 ## 0.2.0 - 2026-06-15
 
