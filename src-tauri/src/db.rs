@@ -789,6 +789,20 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS gearblocks_api_enum_values (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type_id INTEGER NOT NULL,
+                position INTEGER NOT NULL,
+                value_name TEXT NOT NULL,
+                numeric_value TEXT NOT NULL DEFAULT '',
+                lua_name TEXT NOT NULL DEFAULT '',
+                description TEXT NOT NULL DEFAULT '',
+                source TEXT NOT NULL DEFAULT '',
+                source_version TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE TABLE IF NOT EXISTS game_runtime_part_api_members (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
@@ -908,6 +922,8 @@ impl AppDatabase {
                 ON gearblocks_api_members (member_name);
             CREATE INDEX IF NOT EXISTS idx_gearblocks_api_parameters_member_id
                 ON gearblocks_api_parameters (member_id);
+            CREATE INDEX IF NOT EXISTS idx_gearblocks_api_enum_values_type_id
+                ON gearblocks_api_enum_values (type_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_part_api_members_game_id
                 ON game_runtime_part_api_members (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_part_api_members_api_member_id
@@ -1080,6 +1096,13 @@ impl AppDatabase {
         )?;
         connection.execute(
             "
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_gearblocks_api_enum_values_unique
+                ON gearblocks_api_enum_values (type_id, value_name)
+            ",
+            [],
+        )?;
+        connection.execute(
+            "
             CREATE UNIQUE INDEX IF NOT EXISTS idx_game_runtime_part_api_members_unique
                 ON game_runtime_part_api_members (game_id, part_key, api_member_id)
             ",
@@ -1112,39 +1135,31 @@ impl AppDatabase {
     }
 
     fn seed_gearblocks_api_catalog(connection: &Connection) -> Result<()> {
-        for definition in gearblocks_api::CONSTRUCTION_INTERFACE_DEFINITIONS {
-            let namespace = "SmashHammer.GearBlocks.Construction";
-            let docs_url = gearblocks_api_docs_url(definition.docs_url);
-            connection.execute(
-                "
-                INSERT INTO gearblocks_api_types (
-                    namespace,
-                    type_name,
-                    type_kind,
-                    docs_url,
-                    source,
-                    source_version
-                )
-                VALUES (?1, ?2, 'interface', ?3, 'docs', '0.8.96622')
-                ON CONFLICT(namespace, type_name) DO UPDATE SET
-                    type_kind = excluded.type_kind,
-                    docs_url = excluded.docs_url,
-                    source = excluded.source,
-                    source_version = excluded.source_version,
-                    updated_at = CURRENT_TIMESTAMP
-                ",
-                params![namespace, definition.name, docs_url],
+        let namespace = "SmashHammer.GearBlocks.Construction";
+        for definition in gearblocks_api::CONSTRUCTION_CLASS_DEFINITIONS {
+            Self::seed_gearblocks_api_type(
+                connection,
+                namespace,
+                definition.name,
+                definition.type_kind,
+                definition.docs_url,
+                "docs",
+                "0.8.96622",
+                definition.summary,
             )?;
+        }
 
-            let type_id = connection.query_row(
-                "
-                SELECT id
-                FROM gearblocks_api_types
-                WHERE namespace = ?1
-                    AND type_name = ?2
-                ",
-                params![namespace, definition.name],
-                |row| row.get::<_, i64>(0),
+        for definition in gearblocks_api::CONSTRUCTION_INTERFACE_DEFINITIONS {
+            let docs_url = gearblocks_api_docs_url(definition.docs_url);
+            let type_id = Self::seed_gearblocks_api_type(
+                connection,
+                namespace,
+                definition.name,
+                "interface",
+                &docs_url,
+                "docs",
+                "0.8.96622",
+                "",
             )?;
 
             for raw_member in definition.members {
@@ -1245,7 +1260,118 @@ impl AppDatabase {
             }
         }
 
+        for definition in gearblocks_api::CONSTRUCTION_ENUM_DEFINITIONS {
+            let type_id = Self::seed_gearblocks_api_type(
+                connection,
+                namespace,
+                definition.name,
+                "enum",
+                definition.docs_url,
+                "docs",
+                "0.8.96622",
+                &format!(
+                    "{} Underlying type: {}.",
+                    definition.summary, definition.underlying_type
+                ),
+            )?;
+
+            connection.execute(
+                "
+                DELETE FROM gearblocks_api_enum_values
+                WHERE type_id = ?1
+                ",
+                params![type_id],
+            )?;
+
+            for (index, value) in definition.values.iter().enumerate() {
+                connection.execute(
+                    "
+                    INSERT INTO gearblocks_api_enum_values (
+                        type_id,
+                        position,
+                        value_name,
+                        numeric_value,
+                        lua_name,
+                        description,
+                        source,
+                        source_version
+                    )
+                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'docs', '0.8.96622')
+                    ON CONFLICT(type_id, value_name) DO UPDATE SET
+                        position = excluded.position,
+                        numeric_value = excluded.numeric_value,
+                        lua_name = excluded.lua_name,
+                        description = excluded.description,
+                        source = excluded.source,
+                        source_version = excluded.source_version,
+                        updated_at = CURRENT_TIMESTAMP
+                    ",
+                    params![
+                        type_id,
+                        index as i64,
+                        value.name,
+                        value.numeric_value,
+                        value.lua_name,
+                        value.description,
+                    ],
+                )?;
+            }
+        }
+
         Ok(())
+    }
+
+    fn seed_gearblocks_api_type(
+        connection: &Connection,
+        namespace: &str,
+        type_name: &str,
+        type_kind: &str,
+        docs_url: &str,
+        source: &str,
+        source_version: &str,
+        notes: &str,
+    ) -> Result<i64> {
+        connection.execute(
+            "
+            INSERT INTO gearblocks_api_types (
+                namespace,
+                type_name,
+                type_kind,
+                docs_url,
+                source,
+                source_version,
+                notes
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            ON CONFLICT(namespace, type_name) DO UPDATE SET
+                type_kind = excluded.type_kind,
+                docs_url = excluded.docs_url,
+                source = excluded.source,
+                source_version = excluded.source_version,
+                notes = excluded.notes,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                namespace.trim(),
+                type_name.trim(),
+                type_kind.trim(),
+                gearblocks_api_docs_url(docs_url),
+                source.trim(),
+                source_version.trim(),
+                notes.trim(),
+            ],
+        )?;
+
+        connection.query_row(
+            "
+            SELECT id
+            FROM gearblocks_api_types
+            WHERE namespace = ?1
+                AND type_name = ?2
+            ",
+            params![namespace.trim(), type_name.trim()],
+            |row| row.get::<_, i64>(0),
+        )
     }
 
     pub fn get_app_setting(&self, key: &str) -> Result<Option<String>> {

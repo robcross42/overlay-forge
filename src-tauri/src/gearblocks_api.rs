@@ -14,6 +14,34 @@ pub struct GearBlocksInterfaceDefinition {
     pub members: &'static [&'static str],
 }
 
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GearBlocksTypeDefinition {
+    pub name: &'static str,
+    pub type_kind: &'static str,
+    pub docs_url: &'static str,
+    pub summary: &'static str,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GearBlocksEnumDefinition {
+    pub name: &'static str,
+    pub docs_url: &'static str,
+    pub underlying_type: &'static str,
+    pub summary: &'static str,
+    pub values: &'static [GearBlocksEnumValueDefinition],
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GearBlocksEnumValueDefinition {
+    pub name: &'static str,
+    pub numeric_value: &'static str,
+    pub lua_name: &'static str,
+    pub description: &'static str,
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GearBlocksVector3 {
@@ -409,6 +437,135 @@ pub const CONSTRUCTION_INTERFACE_DEFINITIONS: &[GearBlocksInterfaceDefinition] =
     interface_definition("ITweakables", "interface_smash_hammer_1_1_gear_blocks_1_1_construction_1_1_i_tweakables.html", &["GetTweakable(string label)", "NumTweakables", "SyncTweakables()", "Tweakables"]),
 ];
 
+pub const CONSTRUCTION_CLASS_DEFINITIONS: &[GearBlocksTypeDefinition] = &[
+    type_definition(
+        "AttachmentOperationsAsset",
+        "class",
+        CONSTRUCTION_NAMESPACE_DOCS_URL,
+        "Attachment operations.",
+    ),
+    type_definition(
+        "Construction",
+        "class",
+        CONSTRUCTION_NAMESPACE_DOCS_URL,
+        "A construction is made up of one or more parts assembled together.",
+    ),
+    type_definition(
+        "ConstructionOperationsAsset",
+        "class",
+        CONSTRUCTION_NAMESPACE_DOCS_URL,
+        "Construction operations.",
+    ),
+    type_definition(
+        "ControlAnalogBehaviour",
+        "class",
+        CONSTRUCTION_NAMESPACE_DOCS_URL,
+        "A part behaviour that can be analog controlled.",
+    ),
+    type_definition(
+        "ControlAnalogDualAxisBehaviour",
+        "class",
+        CONSTRUCTION_NAMESPACE_DOCS_URL,
+        "A part behaviour that can be analog controlled on two axes.",
+    ),
+    type_definition(
+        "ControlKeyBehaviour",
+        "class",
+        CONSTRUCTION_NAMESPACE_DOCS_URL,
+        "A part behaviour that can be triggered.",
+    ),
+    type_definition(
+        "ControlMultiKeyBehaviour",
+        "class",
+        CONSTRUCTION_NAMESPACE_DOCS_URL,
+        "A part behaviour that can respond to multiple key presses.",
+    ),
+    type_definition(
+        "DataSourceBehaviour",
+        "class",
+        CONSTRUCTION_NAMESPACE_DOCS_URL,
+        "A part data source.",
+    ),
+    type_definition(
+        "PartBehaviourActivatableBase",
+        "class",
+        CONSTRUCTION_NAMESPACE_DOCS_URL,
+        "A part behaviour that can be activated or deactivated.",
+    ),
+    type_definition(
+        "PartBehaviourBase",
+        "class",
+        CONSTRUCTION_NAMESPACE_DOCS_URL,
+        "A part behaviour.",
+    ),
+    type_definition(
+        "PartBehaviourControllableBase",
+        "class",
+        CONSTRUCTION_NAMESPACE_DOCS_URL,
+        "A part behaviour that can be controlled.",
+    ),
+    type_definition(
+        "PartBehaviourOperationsAsset",
+        "class",
+        CONSTRUCTION_NAMESPACE_DOCS_URL,
+        "Part behaviour operations.",
+    ),
+    type_definition(
+        "PartColliderRegistry",
+        "class",
+        CONSTRUCTION_NAMESPACE_DOCS_URL,
+        "A registry of all part colliders in the scene.",
+    ),
+    type_definition(
+        "PartDescriptor",
+        "class",
+        CONSTRUCTION_NAMESPACE_DOCS_URL,
+        "An individual component such as a beam, wheel, or motor.",
+    ),
+    type_definition(
+        "PartDescriptorProcedural",
+        "class",
+        CONSTRUCTION_NAMESPACE_DOCS_URL,
+        "A resizable procedurally generated part.",
+    ),
+    type_definition(
+        "PopulateConstructionsAsset",
+        "class",
+        CONSTRUCTION_NAMESPACE_DOCS_URL,
+        "Populate constructions.",
+    ),
+];
+
+pub const CONSTRUCTION_ENUM_DEFINITIONS: &[GearBlocksEnumDefinition] = &[
+    enum_definition(
+        "AttachmentTypeFlags",
+        CONSTRUCTION_NAMESPACE_DOCS_URL,
+        "byte",
+        "Attachment type.",
+        &[
+            enum_value_definition("Fixed", "0x01", "attachType_Fixed", "No relative movement allowed; parts are connected rigidly together."),
+            enum_value_definition("RotaryBearing", "0x02", "attachType_RotaryBearing", "Allows relative rotation around a single axis."),
+            enum_value_definition("LinearBearing", "0x04", "attachType_LinearBearing", "Allows relative translation along the sliding direction."),
+            enum_value_definition("LinearRotaryBearing", "0x08", "attachType_LinearRotaryBearing", "Allows both translation and rotation."),
+            enum_value_definition("SphericalBearing", "0x10", "attachType_SphericalBearing", "Allows relative rotation in multiple directions while remaining locked in position."),
+            enum_value_definition("ConstantVelocityJoint", "0x20", "attachType_ConstantVelocityJoint", "Allows relative rotation in multiple directions except around the primary axis."),
+            enum_value_definition("KnuckleJoint", "0x40", "attachType_KnuckleJoint", "Allows relative rotation around a single axis with a limited range of motion."),
+            enum_value_definition("Null", "0x80", "attachType_Null", "Parts are not physically attached but remain part of the same construction."),
+        ],
+    ),
+    enum_definition(
+        "SetStageMode",
+        CONSTRUCTION_NAMESPACE_DOCS_URL,
+        "byte",
+        "Stage set mode.",
+        &[
+            enum_value_definition("SetAll", "", "setStgMode_SetAll", "Set all parts to the specified stage index."),
+            enum_value_definition("Increment", "", "setStgMode_Increment", "Increment each part's stage index by one."),
+            enum_value_definition("Decrement", "", "setStgMode_Decrement", "Decrement each part's stage index by one."),
+        ],
+    ),
+];
+
 const fn interface_definition(
     name: &'static str,
     page: &'static str,
@@ -418,5 +575,49 @@ const fn interface_definition(
         name,
         docs_url: page,
         members,
+    }
+}
+
+const fn type_definition(
+    name: &'static str,
+    type_kind: &'static str,
+    docs_url: &'static str,
+    summary: &'static str,
+) -> GearBlocksTypeDefinition {
+    GearBlocksTypeDefinition {
+        name,
+        type_kind,
+        docs_url,
+        summary,
+    }
+}
+
+const fn enum_definition(
+    name: &'static str,
+    docs_url: &'static str,
+    underlying_type: &'static str,
+    summary: &'static str,
+    values: &'static [GearBlocksEnumValueDefinition],
+) -> GearBlocksEnumDefinition {
+    GearBlocksEnumDefinition {
+        name,
+        docs_url,
+        underlying_type,
+        summary,
+        values,
+    }
+}
+
+const fn enum_value_definition(
+    name: &'static str,
+    numeric_value: &'static str,
+    lua_name: &'static str,
+    description: &'static str,
+) -> GearBlocksEnumValueDefinition {
+    GearBlocksEnumValueDefinition {
+        name,
+        numeric_value,
+        lua_name,
+        description,
     }
 }

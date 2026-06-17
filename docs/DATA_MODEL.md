@@ -26,7 +26,7 @@ Gaming Screenshot Capture is complete, passed, and successful for the current Ge
 
 Overlay Forge 0.2.0 GearBlocks runtime API interface support is complete, passed, and successful. Availability-only `apiAttributes` metadata is stored in existing runtime export JSON fields so interface coverage can grow without a schema migration for each member.
 
-Overlay Forge 0.3.0 starts the canonical GearBlocks API database catalog. The documented construction namespace interfaces are seeded into SQLite as API types, members, and parameters, and runtime part API availability can now map observed part support back to canonical member IDs.
+Overlay Forge 0.3.0 starts the canonical GearBlocks API database catalog. The documented construction namespace classes, interfaces, and enums are seeded into SQLite as API types, members, parameters, and enum values, and runtime part API availability can now map observed part support back to canonical member IDs.
 
 ## Tables
 
@@ -540,7 +540,7 @@ created_at
 updated_at
 ```
 
-Canonical GearBlocks API type catalog seeded from Overlay Forge's documented `SmashHammer.GearBlocks.Construction` interface registry. Rows are unique per `namespace` and `type_name`.
+Canonical GearBlocks API type catalog seeded from Overlay Forge's documented `SmashHammer.GearBlocks.Construction` registry. Type rows include documented classes, interfaces, and enums. Rows are unique per `namespace` and `type_name`.
 
 ### gearblocks_api_members
 
@@ -581,6 +581,24 @@ updated_at
 ```
 
 Canonical GearBlocks API method parameter catalog. Rows are parsed from documented member signatures and are unique per `member_id` and `position`.
+
+### gearblocks_api_enum_values
+
+```text
+id
+type_id
+position
+value_name
+numeric_value
+lua_name
+description
+source
+source_version
+created_at
+updated_at
+```
+
+Canonical GearBlocks API enum value catalog. Values are seeded from the documented construction namespace enums, including Lua constant names where the official docs expose them. Rows are unique per enum `type_id` and `value_name`.
 
 ### game_runtime_part_api_members
 
@@ -689,6 +707,7 @@ CREATE TABLE IF NOT EXISTS game_runtime_part_attachments
 CREATE TABLE IF NOT EXISTS gearblocks_api_types
 CREATE TABLE IF NOT EXISTS gearblocks_api_members
 CREATE TABLE IF NOT EXISTS gearblocks_api_parameters
+CREATE TABLE IF NOT EXISTS gearblocks_api_enum_values
 CREATE TABLE IF NOT EXISTS game_runtime_part_api_members
 CREATE TABLE IF NOT EXISTS game_catalog_screenshots
 ```
