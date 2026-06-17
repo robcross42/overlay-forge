@@ -882,7 +882,7 @@ export function Gaming({
       setRuntimeExports([]);
       setSelectedRuntimeExportId("");
       setStatus(
-        `Imported GearBlocks runtime log and indexed ${indexedParts.length} unique part(s)`
+        `Refreshed GearBlocks runtime log and indexed ${indexedParts.length} unique part reference(s)`
       );
       showToast("Successful");
     } catch (error) {
@@ -1643,7 +1643,7 @@ export function Gaming({
                         onClick={() => void importGearBlocksRuntimeExports(selectedGame)}
                         type="button"
                       >
-                        Import Runtime Log
+                        Refresh Runtime Log
                       </button>
                       {SHOW_GEARBLOCKS_CATALOG_MAINTENANCE_CONTROLS && (
                         <>

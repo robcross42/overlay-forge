@@ -6,6 +6,21 @@ Unreleased changes are grouped by day using `YYYY-MM-DD` headings so a single da
 
 ## Unreleased
 
+## 0.4.0 - 2026-06-17
+
+Development bucket for work started on 2026-06-17.
+
+### 2026-06-17
+
+#### Changed
+
+- Bumped Overlay Forge from `0.3.0` to `0.4.0` for the next early-development work session.
+- Renamed the GearBlocks runtime log action to `Refresh Runtime Log` so the workflow is clear: export the current in-game build state, then refresh Overlay Forge's indexed runtime context without rebuilding the whole reference catalog.
+
+#### Documentation
+
+- Documented the GearBlocks runtime refresh workflow for syncing current build changes into chat context after an explicit in-game export.
+
 ## 0.3.0 - 2026-06-16
 
 Development bucket for work started on 2026-06-16. Related changes that continue into the early AM hours before the work session ends are included in this `0.3.0` bucket.

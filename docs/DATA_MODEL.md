@@ -405,7 +405,9 @@ created_at
 updated_at
 ```
 
-GearBlocks runtime construction export index populated from Overlay Forge Lua exporter records reconstructed from `Player.log` / `Player-prev.log` after the user explicitly imports runtime logs. `document_json` stores the complete runtime export payload, including availability-only `apiAttributes` entries. Chat context uses the latest indexed construction summary from SQLite but excludes API metadata by default. Normal game selection and Parts navigation read the existing SQLite index and do not auto-import changed log files.
+GearBlocks runtime construction export index populated from Overlay Forge Lua exporter records reconstructed from `Player.log` / `Player-prev.log` after the user explicitly refreshes runtime logs. `document_json` stores the complete runtime export payload, including availability-only `apiAttributes` entries. Chat context uses the latest indexed construction summary from SQLite but excludes API metadata by default. Normal game selection and Parts navigation read the existing SQLite index and do not auto-import changed log files.
+
+The intended iterative GearBlocks workflow is to load the current build in-game, run `Export Target` or `Export All`, then use `Refresh Runtime Log` in Overlay Forge after subsequent build changes. Runtime part reference data and normalized detail indexes are upserted by stable keys, so unchanged catalog references are retained while refreshed exports update the latest observed build context. Use a full `Export All` refresh when removed parts need to disappear from the latest chat context.
 
 ### game_runtime_parts
 
