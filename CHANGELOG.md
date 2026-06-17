@@ -16,6 +16,7 @@ Development bucket for work started on 2026-06-16. Related changes that continue
 
 - Bumped Overlay Forge from `0.2.0` to `0.3.0` for the next early-development work set.
 - Marked the 2026-06-16 work session as the `0.3.0` changelog bucket, including related early-AM rollover changes.
+- Added project rules for cutting a new `0.x.0` minor version bucket when a new chat starts on a later date than the latest changelog version heading.
 
 ## 0.2.0 - 2026-06-15
 
