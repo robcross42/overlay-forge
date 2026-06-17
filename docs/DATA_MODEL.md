@@ -28,6 +28,8 @@ Overlay Forge 0.2.0 GearBlocks runtime API interface support is complete, passed
 
 Overlay Forge 0.3.0 starts the canonical GearBlocks API database catalog. The documented construction namespace classes, interfaces, and enums are seeded into SQLite as API types, members, parameters, and enum values, and runtime part API availability can now map observed part support back to canonical member IDs.
 
+The indexed GearBlocks API catalog is available through the backend command layer as a single payload containing types, members, parameters, and enum values, so future UI and prompt tooling can browse the canonical definitions without reparsing source docs.
+
 ## Tables
 
 ### scratchpad

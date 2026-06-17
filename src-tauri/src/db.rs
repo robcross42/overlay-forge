@@ -301,6 +301,117 @@ pub struct GameRuntimeConstructionExportRecord {
 }
 
 #[derive(Clone, Serialize)]
+pub struct GearBlocksApiTypeRecord {
+    pub id: i64,
+    pub namespace: String,
+    #[serde(rename = "typeName")]
+    pub type_name: String,
+    #[serde(rename = "typeKind")]
+    pub type_kind: String,
+    #[serde(rename = "docsUrl")]
+    pub docs_url: String,
+    pub source: String,
+    #[serde(rename = "sourceVersion")]
+    pub source_version: String,
+    pub notes: String,
+    #[serde(rename = "memberCount")]
+    pub member_count: i64,
+    #[serde(rename = "enumValueCount")]
+    pub enum_value_count: i64,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct GearBlocksApiMemberRecord {
+    pub id: i64,
+    #[serde(rename = "typeId")]
+    pub type_id: i64,
+    #[serde(rename = "typeName")]
+    pub type_name: String,
+    #[serde(rename = "memberKey")]
+    pub member_key: String,
+    #[serde(rename = "memberName")]
+    pub member_name: String,
+    pub signature: String,
+    #[serde(rename = "memberKind")]
+    pub member_kind: String,
+    #[serde(rename = "returnType")]
+    pub return_type: String,
+    #[serde(rename = "isReadable")]
+    pub is_readable: bool,
+    #[serde(rename = "isWritable")]
+    pub is_writable: bool,
+    #[serde(rename = "isInvokable")]
+    pub is_invokable: bool,
+    #[serde(rename = "isMutating")]
+    pub is_mutating: bool,
+    #[serde(rename = "docsUrl")]
+    pub docs_url: String,
+    pub source: String,
+    #[serde(rename = "sourceVersion")]
+    pub source_version: String,
+    pub notes: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct GearBlocksApiParameterRecord {
+    pub id: i64,
+    #[serde(rename = "memberId")]
+    pub member_id: i64,
+    pub position: i64,
+    #[serde(rename = "parameterName")]
+    pub parameter_name: String,
+    #[serde(rename = "parameterType")]
+    pub parameter_type: String,
+    #[serde(rename = "defaultValue")]
+    pub default_value: String,
+    #[serde(rename = "isOptional")]
+    pub is_optional: bool,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct GearBlocksApiEnumValueRecord {
+    pub id: i64,
+    #[serde(rename = "typeId")]
+    pub type_id: i64,
+    pub position: i64,
+    #[serde(rename = "valueName")]
+    pub value_name: String,
+    #[serde(rename = "numericValue")]
+    pub numeric_value: String,
+    #[serde(rename = "luaName")]
+    pub lua_name: String,
+    pub description: String,
+    pub source: String,
+    #[serde(rename = "sourceVersion")]
+    pub source_version: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GearBlocksApiCatalogRecord {
+    pub types: Vec<GearBlocksApiTypeRecord>,
+    pub members: Vec<GearBlocksApiMemberRecord>,
+    pub parameters: Vec<GearBlocksApiParameterRecord>,
+    pub enum_values: Vec<GearBlocksApiEnumValueRecord>,
+}
+
+#[derive(Clone, Serialize)]
 pub struct GameConstructionRecord {
     pub id: i64,
     #[serde(rename = "gameId")]
@@ -2733,6 +2844,130 @@ impl AppDatabase {
             .collect::<Result<Vec<_>>>()?;
 
         Ok(parts)
+    }
+
+    pub fn list_gearblocks_api_catalog(&self) -> Result<GearBlocksApiCatalogRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        let mut type_statement = connection.prepare(
+            "
+            SELECT
+                types.id,
+                types.namespace,
+                types.type_name,
+                types.type_kind,
+                types.docs_url,
+                types.source,
+                types.source_version,
+                types.notes,
+                COUNT(DISTINCT members.id) AS member_count,
+                COUNT(DISTINCT enum_values.id) AS enum_value_count,
+                types.created_at,
+                types.updated_at
+            FROM gearblocks_api_types types
+            LEFT JOIN gearblocks_api_members members
+                ON members.type_id = types.id
+            LEFT JOIN gearblocks_api_enum_values enum_values
+                ON enum_values.type_id = types.id
+            GROUP BY types.id
+            ORDER BY
+                types.namespace COLLATE NOCASE ASC,
+                CASE types.type_kind
+                    WHEN 'class' THEN 0
+                    WHEN 'interface' THEN 1
+                    WHEN 'enum' THEN 2
+                    ELSE 3
+                END,
+                types.type_name COLLATE NOCASE ASC
+            ",
+        )?;
+        let types = type_statement
+            .query_map([], gearblocks_api_type_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+
+        let mut member_statement = connection.prepare(
+            "
+            SELECT
+                members.id,
+                members.type_id,
+                types.type_name,
+                members.member_key,
+                members.member_name,
+                members.signature,
+                members.member_kind,
+                members.return_type,
+                members.is_readable,
+                members.is_writable,
+                members.is_invokable,
+                members.is_mutating,
+                members.docs_url,
+                members.source,
+                members.source_version,
+                members.notes,
+                members.created_at,
+                members.updated_at
+            FROM gearblocks_api_members members
+            INNER JOIN gearblocks_api_types types
+                ON types.id = members.type_id
+            ORDER BY
+                types.namespace COLLATE NOCASE ASC,
+                types.type_name COLLATE NOCASE ASC,
+                members.member_kind COLLATE NOCASE ASC,
+                members.member_name COLLATE NOCASE ASC,
+                members.signature COLLATE NOCASE ASC
+            ",
+        )?;
+        let members = member_statement
+            .query_map([], gearblocks_api_member_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+
+        let mut parameter_statement = connection.prepare(
+            "
+            SELECT
+                id,
+                member_id,
+                position,
+                parameter_name,
+                parameter_type,
+                default_value,
+                is_optional,
+                created_at,
+                updated_at
+            FROM gearblocks_api_parameters
+            ORDER BY member_id ASC, position ASC
+            ",
+        )?;
+        let parameters = parameter_statement
+            .query_map([], gearblocks_api_parameter_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+
+        let mut enum_value_statement = connection.prepare(
+            "
+            SELECT
+                id,
+                type_id,
+                position,
+                value_name,
+                numeric_value,
+                lua_name,
+                description,
+                source,
+                source_version,
+                created_at,
+                updated_at
+            FROM gearblocks_api_enum_values
+            ORDER BY type_id ASC, position ASC, value_name COLLATE NOCASE ASC
+            ",
+        )?;
+        let enum_values = enum_value_statement
+            .query_map([], gearblocks_api_enum_value_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(GearBlocksApiCatalogRecord {
+            types,
+            members,
+            parameters,
+            enum_values,
+        })
     }
 
     pub fn get_game_runtime_part(&self, id: i64) -> Result<Option<GameRuntimePartRecord>> {
@@ -5470,6 +5705,85 @@ fn game_catalog_object_from_row(row: &rusqlite::Row<'_>) -> Result<GameCatalogOb
         source_screenshot_path: row.get(11)?,
         created_at: row.get(12)?,
         updated_at: row.get(13)?,
+    })
+}
+
+fn gearblocks_api_type_from_row(row: &rusqlite::Row<'_>) -> Result<GearBlocksApiTypeRecord> {
+    Ok(GearBlocksApiTypeRecord {
+        id: row.get(0)?,
+        namespace: row.get(1)?,
+        type_name: row.get(2)?,
+        type_kind: row.get(3)?,
+        docs_url: row.get(4)?,
+        source: row.get(5)?,
+        source_version: row.get(6)?,
+        notes: row.get(7)?,
+        member_count: row.get(8)?,
+        enum_value_count: row.get(9)?,
+        created_at: row.get(10)?,
+        updated_at: row.get(11)?,
+    })
+}
+
+fn gearblocks_api_member_from_row(row: &rusqlite::Row<'_>) -> Result<GearBlocksApiMemberRecord> {
+    let is_readable: i64 = row.get(8)?;
+    let is_writable: i64 = row.get(9)?;
+    let is_invokable: i64 = row.get(10)?;
+    let is_mutating: i64 = row.get(11)?;
+    Ok(GearBlocksApiMemberRecord {
+        id: row.get(0)?,
+        type_id: row.get(1)?,
+        type_name: row.get(2)?,
+        member_key: row.get(3)?,
+        member_name: row.get(4)?,
+        signature: row.get(5)?,
+        member_kind: row.get(6)?,
+        return_type: row.get(7)?,
+        is_readable: is_readable != 0,
+        is_writable: is_writable != 0,
+        is_invokable: is_invokable != 0,
+        is_mutating: is_mutating != 0,
+        docs_url: row.get(12)?,
+        source: row.get(13)?,
+        source_version: row.get(14)?,
+        notes: row.get(15)?,
+        created_at: row.get(16)?,
+        updated_at: row.get(17)?,
+    })
+}
+
+fn gearblocks_api_parameter_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<GearBlocksApiParameterRecord> {
+    let is_optional: i64 = row.get(6)?;
+    Ok(GearBlocksApiParameterRecord {
+        id: row.get(0)?,
+        member_id: row.get(1)?,
+        position: row.get(2)?,
+        parameter_name: row.get(3)?,
+        parameter_type: row.get(4)?,
+        default_value: row.get(5)?,
+        is_optional: is_optional != 0,
+        created_at: row.get(7)?,
+        updated_at: row.get(8)?,
+    })
+}
+
+fn gearblocks_api_enum_value_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<GearBlocksApiEnumValueRecord> {
+    Ok(GearBlocksApiEnumValueRecord {
+        id: row.get(0)?,
+        type_id: row.get(1)?,
+        position: row.get(2)?,
+        value_name: row.get(3)?,
+        numeric_value: row.get(4)?,
+        lua_name: row.get(5)?,
+        description: row.get(6)?,
+        source: row.get(7)?,
+        source_version: row.get(8)?,
+        created_at: row.get(9)?,
+        updated_at: row.get(10)?,
     })
 }
 

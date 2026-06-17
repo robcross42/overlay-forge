@@ -137,6 +137,75 @@ export type GameRuntimeConstructionExport = {
   updatedAt: string;
 };
 
+export type GearBlocksApiType = {
+  id: number;
+  namespace: string;
+  typeName: string;
+  typeKind: string;
+  docsUrl: string;
+  source: string;
+  sourceVersion: string;
+  notes: string;
+  memberCount: number;
+  enumValueCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GearBlocksApiMember = {
+  id: number;
+  typeId: number;
+  typeName: string;
+  memberKey: string;
+  memberName: string;
+  signature: string;
+  memberKind: string;
+  returnType: string;
+  isReadable: boolean;
+  isWritable: boolean;
+  isInvokable: boolean;
+  isMutating: boolean;
+  docsUrl: string;
+  source: string;
+  sourceVersion: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GearBlocksApiParameter = {
+  id: number;
+  memberId: number;
+  position: number;
+  parameterName: string;
+  parameterType: string;
+  defaultValue: string;
+  isOptional: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GearBlocksApiEnumValue = {
+  id: number;
+  typeId: number;
+  position: number;
+  valueName: string;
+  numericValue: string;
+  luaName: string;
+  description: string;
+  source: string;
+  sourceVersion: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GearBlocksApiCatalog = {
+  types: GearBlocksApiType[];
+  members: GearBlocksApiMember[];
+  parameters: GearBlocksApiParameter[];
+  enumValues: GearBlocksApiEnumValue[];
+};
+
 export type GearBlocksRuntimeContextSync = {
   changed: boolean;
   runtimeExportCount: number;
@@ -284,6 +353,10 @@ export function installGearBlocksLuaExporter(gameId: number) {
 
 export function listGearBlocksRuntimeExports(gameId: number) {
   return invoke<GearBlocksRuntimeExport[]>("list_gearblocks_runtime_exports", { gameId });
+}
+
+export function listGearBlocksApiCatalog() {
+  return invoke<GearBlocksApiCatalog>("list_gearblocks_api_catalog");
 }
 
 export function importGearBlocksRuntimePartIndex(gameId: number) {

@@ -2,10 +2,10 @@ use crate::db::{
     BridgeFileDraftRecord, CalendarEventRecord, GameCatalogObjectRecord,
     GameChatConversationRecord, GameChatMessageRecord, GameConstructionRecord,
     GameDataLocationRecord, GameRecord, GameRuntimeConstructionExportRecord, GameRuntimePartRecord,
-    GameScreenshotCaptureRequestRecord, NoteRecord, PlanningConversationContextRecord,
-    PlanningConversationRecord, PlanningMessageRecord, PlanningPromptPreviewRecord,
-    ProjectGitHubRepositoryRecord, ProjectMarkdownContextPayload, ProjectMarkdownContextRecord,
-    ProjectRecord, TaskRecord, YouTubeReferenceRecord,
+    GameScreenshotCaptureRequestRecord, GearBlocksApiCatalogRecord, NoteRecord,
+    PlanningConversationContextRecord, PlanningConversationRecord, PlanningMessageRecord,
+    PlanningPromptPreviewRecord, ProjectGitHubRepositoryRecord, ProjectMarkdownContextPayload,
+    ProjectMarkdownContextRecord, ProjectRecord, TaskRecord, YouTubeReferenceRecord,
 };
 use crate::github;
 use crate::hotkeys;
@@ -1468,6 +1468,16 @@ pub fn list_gearblocks_runtime_exports(
     }
 
     Ok(exports)
+}
+
+#[tauri::command]
+pub fn list_gearblocks_api_catalog(
+    state: State<'_, AppState>,
+) -> Result<GearBlocksApiCatalogRecord, String> {
+    state
+        .database
+        .list_gearblocks_api_catalog()
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
