@@ -6,7 +6,7 @@ This file is the manual bridge between Overlay Forge project state and ChatGPT/C
 
 Provide this file to ChatGPT or Codex when a new chat needs current project context. Keep it concise and update it after meaningful architecture, milestone, or validation changes.
 
-Future changelog updates must follow `docs/PROJECT_RULES.md`: under `## Unreleased`, group new entries by `YYYY-MM-DD` date headings so all changes from one day can be reviewed together.
+Future changelog and versioning updates must follow `AGENTS.md`. `docs/PROJECT_RULES.md` is retained as a compatibility pointer to that root instruction file.
 
 ## Current Milestone
 

@@ -10,6 +10,13 @@ Unreleased changes are grouped by day using `YYYY-MM-DD` headings so a single da
 
 Development bucket for work starting on 2026-06-17 after the completed `0.3.0` session.
 
+### 2026-06-18
+
+#### Documentation
+
+- Clarified session versioning so an unused version bucket stays active until substantive work for that version is committed and pushed.
+- Converted the project rules into a root `AGENTS.md` instruction file and kept `docs/PROJECT_RULES.md` as a compatibility pointer.
+
 ### 2026-06-17
 
 #### Changed

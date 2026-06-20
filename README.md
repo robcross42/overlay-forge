@@ -136,6 +136,7 @@ When using this repository as context in ChatGPT or Codex, do not rely only on t
 
 Required Markdown context files:
 
+- `AGENTS.md`
 - `README.md`
 - `CHANGELOG.md`
 - `bridge-files/OPENAI_APP_BRIDGE.md`
