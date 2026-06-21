@@ -80,7 +80,17 @@ GearBlocks also exposes selected-game Home controls for setting its Save Locatio
 
 The GearBlocks Home screen includes a Construction Decoder for local `construction.bytes` saves. Overlay Forge inflates the raw DEFLATE payload, parses the BSON document, and presents a compact construction summary plus decoded JSON. The same panel can install an Overlay Forge GearBlocks script mod that exports richer whole-scene runtime metadata from the loaded scene. Use `Refresh Scene Context` in Overlay Forge to request a fresh in-game scene export and index the newest scene before asking scene-specific chat questions. See `docs/GEARBLOCKS_CONSTRUCTION_DECODER.md`.
 
-The GearBlocks Tools view can install `OverlayForgeTools`, a no-window GearBlocks script mod that lets Overlay Forge send whitelisted BuilderToolExt and WeldTool actions to the remembered GearBlocks window.
+The GearBlocks Tools view installs the same Overlay Forge GearBlocks script used for scene context. The script opens one movable, resizable GearBlocks window with a compact home menu for Scene, Builder, Weld, and Status. Selecting a menu item replaces the window content with that tool view and a Back button so scene export, BuilderToolExt helpers, and WeldTool controls do not require multiple GearBlocks script windows.
+
+GearBlocks Home also shows read-only status checks for BepInEx and GearLib. Both are third-party, user-installed dependencies for future GearLib-based features. Overlay Forge does not bundle or install BepInEx or GearLib; it only detects expected files in the GearBlocks install root and links users to upstream project guidance. The BepInEx check also reads `BepInEx\LogOutput.log` and `BepInEx\ErrorLog.log` to report the installed BepInEx version, whether the install structure looks correct, and whether the BepInEx chainloader successfully activated.
+
+**Smoking Cessation**
+
+Overlay Forge includes a local Smoking Cessation module for recording cigarette events in SQLite, tracking the current cigarette inventory, reviewing daily, weekly, monthly, and yearly charts, and showing the current cessation aid marker. The initial marker records `Nicoderm Step 1` started at `2026-06-21 15:00:00 EDT`. Settings exposes a configurable `Record Cigarette` keybind so a cigarette can be logged without opening the module. Recording a cigarette decrements the current inventory count, and the module estimates run-out time from recent cigarette spacing. Recording or deleting a cigarette automatically updates a ChatGPT-readable Markdown export at `%APPDATA%\com.overlayforge.desktop\chatgpt-exports\smoking-cessation.md`.
+
+**Scheduler**
+
+Overlay Forge includes a local scheduler framework for bounded backend jobs. Scheduler records are stored in SQLite using new convention-based tables: `def_scheduler_type`, `obj_scheduler`, and `obj_scheduler_run`. The first scheduled job refreshes the Smoking Cessation ChatGPT Markdown export on startup and every 60 seconds. Scheduler types are dispatched through known Rust handlers only; SQLite rows do not execute arbitrary commands or scripts.
 
 **Overlay Forge 0.2.0 - GearBlocks Runtime API Interfaces**
 
@@ -209,6 +219,8 @@ Ctrl+Shift+C
 It opens or refocuses the simplified Gaming chat overlay for the currently selected existing game chat.
 
 Global shortcuts can be configured from Settings -> Keybinds. Each function uses `key1`, `key2`, and `key3` as the ordered parts of one shortcut, such as `Ctrl`, `Shift`, `Space`. Mouse buttons are supported for shortcut parts, including `Mouse4`, `Mouse5`, and modifier combinations such as `Ctrl+Mouse4`.
+
+The Smoking Cessation module adds a `Record Cigarette` shortcut action. It starts unassigned and can be mapped from Settings.
 
 ## Local Data
 

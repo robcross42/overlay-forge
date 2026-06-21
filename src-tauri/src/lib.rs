@@ -17,32 +17,36 @@ use commands::{
     decode_gearblocks_construction_file, decode_gearblocks_construction_folder,
     delete_bridge_file_draft, delete_calendar_event, delete_game, delete_game_chat_conversation,
     delete_game_data_location, delete_game_screenshot, delete_note, delete_planning_conversation,
-    delete_project, delete_project_github_repository, delete_project_markdown_context, delete_task,
-    delete_youtube_reference, fetch_project_github_metadata, focus_game_chat_overlay_window,
-    focus_last_game_window, get_active_game_chat_overlay, get_bridge_file_draft,
-    get_milestone_status, get_openai_api_key_status, get_project_github_repository,
-    get_project_markdown_context, get_scratchpad, get_youtube_reference,
-    import_gearblocks_catalog_screenshot_images, import_gearblocks_runtime_part_index,
-    install_gearblocks_lua_exporter, install_gearblocks_overlay_tools, list_bridge_file_drafts,
+    delete_project, delete_project_github_repository, delete_project_markdown_context,
+    delete_smoking_event, delete_task, delete_youtube_reference,
+    export_smoking_cessation_chatgpt_context, fetch_project_github_metadata,
+    focus_game_chat_overlay_window, focus_last_game_window, get_active_game_chat_overlay,
+    get_bridge_file_draft, get_gearblocks_third_party_dependency_status, get_milestone_status,
+    get_openai_api_key_status, get_project_github_repository, get_project_markdown_context,
+    get_scratchpad, get_smoking_cessation_settings, get_youtube_reference,
+    import_gearblocks_catalog_screenshot_images, import_gearblocks_runtime_context,
+    import_gearblocks_runtime_part_index, install_gearblocks_lua_exporter, list_bridge_file_drafts,
     list_calendar_events, list_game_catalog_objects, list_game_chat_conversations,
     list_game_chat_messages, list_game_constructions, list_game_data_locations,
     list_game_part_categories, list_game_runtime_part_api_members, list_game_runtime_parts,
     list_game_screenshots, list_games, list_gearblocks_api_catalog,
     list_gearblocks_construction_files, list_gearblocks_runtime_exports, list_keybinds, list_notes,
     list_planning_conversation_context, list_planning_conversations, list_planning_messages,
-    list_projects, list_tasks, list_youtube_references, load_project_markdown_context,
-    open_game_chat_overlay_window, open_youtube_reference, preview_planning_chat_prompt,
-    remove_planning_conversation_context, reset_keybinds, save_game_data_location, save_keybinds,
-    save_openai_api_key, save_project_github_repository, save_project_markdown_context,
-    save_scratchpad, send_game_chat_message, send_gearblocks_overlay_tool_action,
-    send_planning_message, set_game_runtime_part_display_image, set_overlay_window_opacity,
-    shutdown_app, start_manual_overlay_drag, sync_gearblocks_runtime_context,
-    sync_gearblocks_saved_constructions, update_calendar_event, update_game_runtime_part_notes,
-    update_note, update_project, update_task, update_youtube_reference,
+    list_projects, list_schedulers, list_smoking_events, list_tasks, list_youtube_references,
+    load_project_markdown_context, open_game_chat_overlay_window, open_youtube_reference,
+    preview_planning_chat_prompt, record_smoking_event, remove_planning_conversation_context,
+    reset_keybinds, save_game_data_location, save_keybinds, save_openai_api_key,
+    save_project_github_repository, save_project_markdown_context, save_scratchpad,
+    send_game_chat_message, send_planning_message, set_game_runtime_part_display_image,
+    set_overlay_window_opacity, shutdown_app, start_manual_overlay_drag, start_scheduler_worker,
+    sync_gearblocks_runtime_context, sync_gearblocks_saved_constructions,
+    toggle_game_chat_overlay_window, update_calendar_event, update_game_runtime_part_notes,
+    update_note, update_project, update_smoking_cigarette_count, update_task,
+    update_youtube_reference,
 };
 use db::AppDatabase;
 use serde::Serialize;
-use tauri::Manager;
+use tauri::{Manager, WindowEvent};
 
 #[derive(Clone, Serialize)]
 pub struct GameChatOverlaySelection {
@@ -90,12 +94,34 @@ pub fn run() {
                 active_game_chat_overlay: Mutex::new(None),
             });
             hotkeys::register_toggle_hotkey(app)?;
+            commands::start_gearblocks_runtime_import_monitor(app.handle().clone());
+            start_scheduler_worker(app.handle().clone());
 
             if let Some(window) = app.get_webview_window("main") {
                 window.set_always_on_top(true)?;
             }
             if let Some(window) = app.get_webview_window("game-chat") {
                 window.set_always_on_top(true)?;
+                let app_handle = app.handle().clone();
+                window.on_window_event(move |event| {
+                    if let WindowEvent::Moved(position) = event {
+                        let state = app_handle.state::<AppState>();
+                        let selection = state
+                            .active_game_chat_overlay
+                            .lock()
+                            .ok()
+                            .and_then(|selection| selection.clone());
+                        if let Some(selection) = selection {
+                            if let Err(error) = state.database.update_game_chat_overlay_position(
+                                selection.conversation_id,
+                                position.x,
+                                position.y,
+                            ) {
+                                eprintln!("Could not save game chat overlay position: {error}");
+                            }
+                        }
+                    }
+                });
             }
 
             Ok(())
@@ -111,12 +137,14 @@ pub fn run() {
             save_keybinds,
             reset_keybinds,
             get_milestone_status,
+            list_schedulers,
             shutdown_app,
             start_manual_overlay_drag,
             set_overlay_window_opacity,
             focus_last_game_window,
             open_game_chat_overlay_window,
             focus_game_chat_overlay_window,
+            toggle_game_chat_overlay_window,
             get_active_game_chat_overlay,
             list_tasks,
             create_task,
@@ -161,6 +189,12 @@ pub fn run() {
             update_youtube_reference,
             delete_youtube_reference,
             open_youtube_reference,
+            list_smoking_events,
+            record_smoking_event,
+            delete_smoking_event,
+            get_smoking_cessation_settings,
+            update_smoking_cigarette_count,
+            export_smoking_cessation_chatgpt_context,
             list_games,
             create_game,
             delete_game,
@@ -171,11 +205,11 @@ pub fn run() {
             list_game_constructions,
             sync_gearblocks_saved_constructions,
             sync_gearblocks_runtime_context,
+            import_gearblocks_runtime_context,
             decode_gearblocks_construction_file,
             decode_gearblocks_construction_folder,
             install_gearblocks_lua_exporter,
-            install_gearblocks_overlay_tools,
-            send_gearblocks_overlay_tool_action,
+            get_gearblocks_third_party_dependency_status,
             list_gearblocks_runtime_exports,
             list_gearblocks_api_catalog,
             import_gearblocks_runtime_part_index,

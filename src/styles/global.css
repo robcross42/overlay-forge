@@ -1457,6 +1457,89 @@ select.text-input option:hover {
   font-weight: 700;
 }
 
+.game-third-party-panel {
+  display: grid;
+  flex: 1 0 100%;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(220, 230, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(12, 17, 27, 0.44);
+}
+
+.game-third-party-panel > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.game-third-party-panel > code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 0.78rem;
+}
+
+.game-third-party-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.game-third-party-list > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.game-third-party-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(220, 230, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(8, 12, 20, 0.46);
+}
+
+.game-third-party-row.detected {
+  border-color: rgba(91, 219, 155, 0.38);
+  background: rgba(35, 126, 82, 0.16);
+}
+
+.game-third-party-row > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.game-third-party-row strong {
+  color: var(--text);
+  font-size: 0.86rem;
+}
+
+.game-third-party-row span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.game-third-party-row > span {
+  color: var(--text);
+  text-align: right;
+}
+
+.game-third-party-row code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
 .game-data-locations-panel {
   display: grid;
   flex: 1 0 100%;
@@ -1825,12 +1908,12 @@ select.text-input option:hover {
   background: rgba(255, 255, 255, 0.04);
 }
 
-.game-script-tool-card p,
+.game-script-tool-card > div p,
 .game-script-tool-card h4 {
   margin: 0;
 }
 
-.game-script-tool-card p {
+.game-script-tool-card > div p {
   color: var(--muted);
   font-size: 0.72rem;
   font-weight: 800;
@@ -1843,6 +1926,13 @@ select.text-input option:hover {
   font-size: 1rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.game-script-tool-card > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
 }
 
 .game-script-tool-actions {
@@ -1864,6 +1954,280 @@ select.text-input option:hover {
   padding-left: 9px;
   overflow-wrap: anywhere;
   white-space: normal;
+}
+
+.cessation-dashboard {
+  display: grid;
+  grid-auto-rows: max-content;
+  align-content: start;
+  gap: 12px;
+  min-height: 0;
+  padding: 18px;
+  overflow: auto;
+}
+
+.cessation-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+}
+
+.cessation-summary article,
+.cessation-patch-card,
+.cessation-chart-card,
+.cessation-history {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.cessation-summary article {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.cessation-summary span,
+.cessation-patch-card p,
+.cessation-chart-card p,
+.cessation-history p,
+.cessation-event-row span {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.cessation-summary strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 1.1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cessation-patch-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+}
+
+.cessation-export-card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.cessation-export-card p,
+.cessation-export-card h4 {
+  margin: 0;
+}
+
+.cessation-export-card p {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.cessation-export-card h4 {
+  color: var(--text);
+  font-size: 0.96rem;
+}
+
+.cessation-export-card code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.cessation-patch-card h4,
+.cessation-history h4,
+.cessation-chart-card h4 {
+  margin: 3px 0 0;
+  color: var(--text);
+  font-size: 0.96rem;
+}
+
+.cessation-patch-card strong {
+  color: var(--accent-strong);
+  font-size: 0.84rem;
+  text-align: right;
+}
+
+.cessation-actions {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.cessation-count-input {
+  display: grid;
+  gap: 4px;
+  min-width: 150px;
+}
+
+.cessation-count-input span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.cessation-chart-card,
+.cessation-history {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+}
+
+.segmented-control {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.segmented-control button {
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.segmented-control button.active {
+  background: var(--accent);
+  color: #071016;
+}
+
+.cessation-chart {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cessation-chart > p,
+.cessation-history > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.cessation-chart-row {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cessation-chart-row span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cessation-chart-row div {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.cessation-chart-row i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.cessation-chart-row strong {
+  color: var(--text);
+  font-size: 0.8rem;
+  text-align: right;
+}
+
+.cessation-line-chart {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  min-height: 100px;
+}
+
+.cessation-line-chart svg {
+  display: block;
+  width: 100%;
+  height: 96px;
+  min-height: 96px;
+  overflow: hidden;
+  border: 1px solid rgba(220, 230, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(8, 12, 20, 0.46);
+}
+
+.cessation-line-chart polyline {
+  fill: none;
+  stroke: var(--accent);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.4;
+  vector-effect: non-scaling-stroke;
+}
+
+.cessation-line-chart > span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.cessation-event-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cessation-event-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(220, 230, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(12, 17, 27, 0.42);
+}
+
+.cessation-event-row > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.cessation-event-row strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.86rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .game-api-summary-grid {

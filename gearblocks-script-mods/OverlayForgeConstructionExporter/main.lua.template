@@ -1,25 +1,61 @@
--- Overlay Forge Construction Exporter
+-- Overlay Forge GearBlocks Script
 -- Installed by Overlay Forge. Load from GearBlocks SCRIPT MODS, then use the
--- exporter window to export all live scene parts for Overlay Forge chat
--- context.
+-- single Overlay Forge window for scene export, builder controls, and weld
+-- controls.
 
 local EXPORT_DIR = [[{{EXPORT_DIR}}]]
 local KNOWN_API_INDEX = {{KNOWN_API_INDEX}}
 local LOG_CHUNK_SIZE = 3000
 
-local win = Windows.CreateWindow()
-win.SetAlignment( align_HorizCentre, 0, 420 )
-win.SetAlignment( align_VertCentre, 0, 210 )
-win.Title = "Overlay Forge Exporter"
+local attachTypes =
+{
+    { attachType_Fixed, "Fixed" },
+    { attachType_RotaryBearing, "Rotary Bearing" },
+    { attachType_LinearBearing, "Linear Bearing" },
+    { attachType_LinearRotaryBearing, "Linear Rotary Bearing" },
+    { attachType_SphericalBearing, "Spherical Bearing" },
+    { attachType_ConstantVelocityJoint, "CV Joint" },
+    { attachType_KnuckleJoint, "Knuckle Joint" },
+    { attachType_Null, "Null" }
+}
 
-local statusLabel = win.CreateLabel()
-statusLabel.SetAlignment( align_HorizEdges, 12, 12 )
-statusLabel.SetAlignment( align_TopEdge, 12, 44 )
-statusLabel.Alignment = textAnc_MiddleLeft
+local partSelection
+local currentTargetedPart
+local weldOwnerPart
 
-local exportAllButton = win.CreateTextButton()
-exportAllButton.SetAlignment( align_HorizCentre, 0, 240 )
-exportAllButton.SetAlignment( align_TopEdge, 64, 36 )
+local prevSelectionStepDistance = 0
+local prevSelectionStepAngle = 0
+local prevSelectionResizeStepOverride = 0
+local prevPivotPosition = Vector3.Zero
+local prevPivotOrientation = Quaternion.Identity
+local prevPivotPartSize = Vector3.Zero
+
+local minResizeUnitStep = 0.05
+
+local activeSection = "home"
+local sectionElements = {
+    home = {},
+    scene = {},
+    builder = {},
+    weld = {},
+    status = {}
+}
+
+local sectionTitles = {
+    home = "Overlay Forge",
+    scene = "Scene",
+    builder = "Builder",
+    weld = "Weld",
+    status = "Status"
+}
+
+local sectionSizes = {
+    home = { width = 320, height = 280, minWidth = 280, minHeight = 220 },
+    scene = { width = 420, height = 300, minWidth = 340, minHeight = 260 },
+    builder = { width = 560, height = 520, minWidth = 480, minHeight = 420 },
+    weld = { width = 420, height = 360, minWidth = 340, minHeight = 300 },
+    status = { width = 420, height = 360, minWidth = 340, minHeight = 300 }
+}
 
 local function setText(element, text)
     if element == nil then
@@ -55,12 +91,351 @@ local function showWindow(window, isVisible)
     end
 end
 
-setText(statusLabel, "Overlay Forge scene exporter ready.")
+local function setVisible(element, isVisible)
+    if element == nil then
+        return
+    end
+    pcall(function() element.IsVisible = isVisible end)
+    pcall(function() element.isVisible = isVisible end)
+end
+
+local function track(section, element)
+    table.insert(sectionElements[section], element)
+    return element
+end
+
+local function round(val)
+    return math.floor(val + 0.5)
+end
+
+local function round2(val, roundTo)
+    if math.abs(roundTo) > 0 then
+        return round(val / roundTo) * roundTo
+    end
+
+    return val
+end
+
+local function applyWindowMinimumSize(window, section)
+    local size = sectionSizes[section] or sectionSizes.home
+    pcall(function() window.MinResizeWidth = size.minWidth end)
+    pcall(function() window.MinResizeHeight = size.minHeight end)
+end
+
+local function centerWindowForSection(window, section)
+    local size = sectionSizes[section] or sectionSizes.home
+    applyWindowMinimumSize(window, section)
+    pcall(function() window.SetAlignment( align_HorizCentre, 0, size.width ) end)
+    pcall(function() window.SetAlignment( align_VertCentre, 0, size.height ) end)
+end
+
+local win = Windows.CreateWindow()
+win.Title = "Overlay Forge"
+pcall(function() win.IsMovable = true end)
+pcall(function() win.IsResizable = true end)
+pcall(function() win.IsCollapsible = true end)
+centerWindowForSection(win, "home")
+
+local backButton = win.CreateTextButton()
+backButton.SetAlignment( align_LeftEdge, 12, 78 )
+backButton.SetAlignment( align_TopEdge, 12, 30 )
+setText(backButton, "Back")
+
+local homeSceneButton = track("home", win.CreateTextButton())
+homeSceneButton.SetAlignment( align_HorizEdges, 18, 18 )
+homeSceneButton.SetAlignment( align_TopEdge, 34, 38 )
+setText(homeSceneButton, "Scene")
+
+local homeBuilderButton = track("home", win.CreateTextButton())
+homeBuilderButton.SetAlignment( align_HorizEdges, 18, 18 )
+homeBuilderButton.SetAlignment( align_TopEdge, 82, 38 )
+setText(homeBuilderButton, "Builder")
+
+local homeWeldButton = track("home", win.CreateTextButton())
+homeWeldButton.SetAlignment( align_HorizEdges, 18, 18 )
+homeWeldButton.SetAlignment( align_TopEdge, 130, 38 )
+setText(homeWeldButton, "Weld")
+
+local homeStatusButton = track("home", win.CreateTextButton())
+homeStatusButton.SetAlignment( align_HorizEdges, 18, 18 )
+homeStatusButton.SetAlignment( align_TopEdge, 178, 38 )
+setText(homeStatusButton, "Status")
+
+local sceneHeadingLabel = track("scene", win.CreateLabel())
+sceneHeadingLabel.SetAlignment( align_HorizEdges, 14, 14 )
+sceneHeadingLabel.SetAlignment( align_TopEdge, 58, 28 )
+sceneHeadingLabel.Alignment = textAnc_MiddleLeft
+sceneHeadingLabel.FontStyle = fontStyle_Bold
+setText(sceneHeadingLabel, "Scene Context")
+
+local exportAllButton = track("scene", win.CreateTextButton())
+exportAllButton.SetAlignment( align_LeftEdge, 14, 170 )
+exportAllButton.SetAlignment( align_TopEdge, 96, 34 )
 setText(exportAllButton, "Export Scene")
+
+local sceneHelpLabel = track("scene", win.CreateLabel())
+sceneHelpLabel.SetAlignment( align_HorizEdges, 14, 14 )
+sceneHelpLabel.SetAlignment( align_TopEdge, 140, 54 )
+sceneHelpLabel.Alignment = textAnc_UpperLeft
+sceneHelpLabel.LineSpacing = 1.05
+setText(sceneHelpLabel, "Exports all currently loaded scene parts for Overlay Forge chat context. Overlay Forge can also request this with Ctrl+Shift+E during Refresh Scene Context.")
+
+local sceneResultLabel = track("scene", win.CreateLabel())
+sceneResultLabel.SetAlignment( align_HorizEdges, 14, 14 )
+sceneResultLabel.SetAlignment( align_TopEdge, 208, 58 )
+sceneResultLabel.Alignment = textAnc_UpperLeft
+sceneResultLabel.LineSpacing = 1.05
+setText(sceneResultLabel, "No export run yet.")
+
+local builderHeadingLabel = track("builder", win.CreateLabel())
+builderHeadingLabel.SetAlignment( align_HorizEdges, 14, 14 )
+builderHeadingLabel.SetAlignment( align_TopEdge, 58, 26 )
+builderHeadingLabel.Alignment = textAnc_MiddleLeft
+builderHeadingLabel.FontStyle = fontStyle_Bold
+setText(builderHeadingLabel, "Builder Tool")
+
+local manipulatorOrientationLabel = track("builder", win.CreateLabel())
+manipulatorOrientationLabel.SetAlignment( align_LeftEdge, 14, 180 )
+manipulatorOrientationLabel.SetAlignment( align_TopEdge, 94, 28 )
+manipulatorOrientationLabel.Alignment = textAnc_MiddleLeft
+setText(manipulatorOrientationLabel, "Manipulator Orientation")
+
+local manipulatorOrientationDropdown = track("builder", win.CreateDropdown())
+manipulatorOrientationDropdown.SetAlignment( align_RightEdge, 14, 180 )
+manipulatorOrientationDropdown.SetAlignment( align_TopEdge, 94, 28 )
+manipulatorOrientationDropdown.AddOptions({ "Local", "Global" })
+manipulatorOrientationDropdown.Value = ManipulatorOrientationMode.Value
+
+local stepIntervalLabel = track("builder", win.CreateLabel())
+stepIntervalLabel.SetAlignment( align_LeftEdge, 14, 135 )
+stepIntervalLabel.SetAlignment( align_TopEdge, 132, 28 )
+stepIntervalLabel.Alignment = textAnc_MiddleLeft
+setText(stepIntervalLabel, "Step Interval")
+
+local translationStepNumberField = track("builder", win.CreateNumberField())
+translationStepNumberField.SetAlignment( align_LeftEdge, 155, 92 )
+translationStepNumberField.SetAlignment( align_TopEdge, 132, 28 )
+translationStepNumberField.MaxNumDecimalPlaces = 3
+translationStepNumberField.Value = 0
+
+local rotationStepNumberField = track("builder", win.CreateNumberField())
+rotationStepNumberField.SetAlignment( align_LeftEdge, 255, 92 )
+rotationStepNumberField.SetAlignment( align_TopEdge, 132, 28 )
+rotationStepNumberField.MaxNumDecimalPlaces = 2
+rotationStepNumberField.Value = 0
+
+local stepHintLabel = track("builder", win.CreateLabel())
+stepHintLabel.SetAlignment( align_LeftEdge, 355, 160 )
+stepHintLabel.SetAlignment( align_TopEdge, 132, 28 )
+stepHintLabel.Alignment = textAnc_MiddleLeft
+setText(stepHintLabel, "Pos / Rot")
+
+local pivotPositionLabel = track("builder", win.CreateLabel())
+pivotPositionLabel.SetAlignment( align_LeftEdge, 14, 135 )
+pivotPositionLabel.SetAlignment( align_TopEdge, 170, 28 )
+pivotPositionLabel.Alignment = textAnc_MiddleLeft
+setText(pivotPositionLabel, "Pivot Position")
+
+local pivotPositionXNumberField = track("builder", win.CreateNumberField())
+pivotPositionXNumberField.SetAlignment( align_LeftEdge, 155, 72 )
+pivotPositionXNumberField.SetAlignment( align_TopEdge, 170, 28 )
+pivotPositionXNumberField.MaxNumDecimalPlaces = 3
+
+local pivotPositionYNumberField = track("builder", win.CreateNumberField())
+pivotPositionYNumberField.SetAlignment( align_LeftEdge, 233, 72 )
+pivotPositionYNumberField.SetAlignment( align_TopEdge, 170, 28 )
+pivotPositionYNumberField.MaxNumDecimalPlaces = 3
+
+local pivotPositionZNumberField = track("builder", win.CreateNumberField())
+pivotPositionZNumberField.SetAlignment( align_LeftEdge, 311, 72 )
+pivotPositionZNumberField.SetAlignment( align_TopEdge, 170, 28 )
+pivotPositionZNumberField.MaxNumDecimalPlaces = 3
+
+local snapPivotPositionButton = track("builder", win.CreateTextButton())
+snapPivotPositionButton.SetAlignment( align_RightEdge, 14, 126 )
+snapPivotPositionButton.SetAlignment( align_TopEdge, 170, 28 )
+setText(snapPivotPositionButton, "Snap")
+
+local pivotOrientationLabel = track("builder", win.CreateLabel())
+pivotOrientationLabel.SetAlignment( align_LeftEdge, 14, 135 )
+pivotOrientationLabel.SetAlignment( align_TopEdge, 208, 28 )
+pivotOrientationLabel.Alignment = textAnc_MiddleLeft
+setText(pivotOrientationLabel, "Pivot Rotation")
+
+local pivotOrientationXNumberField = track("builder", win.CreateNumberField())
+pivotOrientationXNumberField.SetAlignment( align_LeftEdge, 155, 72 )
+pivotOrientationXNumberField.SetAlignment( align_TopEdge, 208, 28 )
+pivotOrientationXNumberField.MaxNumDecimalPlaces = 2
+
+local pivotOrientationYNumberField = track("builder", win.CreateNumberField())
+pivotOrientationYNumberField.SetAlignment( align_LeftEdge, 233, 72 )
+pivotOrientationYNumberField.SetAlignment( align_TopEdge, 208, 28 )
+pivotOrientationYNumberField.MaxNumDecimalPlaces = 2
+
+local pivotOrientationZNumberField = track("builder", win.CreateNumberField())
+pivotOrientationZNumberField.SetAlignment( align_LeftEdge, 311, 72 )
+pivotOrientationZNumberField.SetAlignment( align_TopEdge, 208, 28 )
+pivotOrientationZNumberField.MaxNumDecimalPlaces = 2
+
+local snapPivotOrientationButton = track("builder", win.CreateTextButton())
+snapPivotOrientationButton.SetAlignment( align_RightEdge, 14, 126 )
+snapPivotOrientationButton.SetAlignment( align_TopEdge, 208, 28 )
+setText(snapPivotOrientationButton, "Snap")
+
+local moveToGroundButton = track("builder", win.CreateTextButton())
+moveToGroundButton.SetAlignment( align_LeftEdge, 14, 170 )
+moveToGroundButton.SetAlignment( align_TopEdge, 246, 30 )
+setText(moveToGroundButton, "Move to Ground")
+
+local resizeStepOverrideLabel = track("builder", win.CreateLabel())
+resizeStepOverrideLabel.SetAlignment( align_LeftEdge, 14, 135 )
+resizeStepOverrideLabel.SetAlignment( align_TopEdge, 286, 28 )
+resizeStepOverrideLabel.Alignment = textAnc_MiddleLeft
+setText(resizeStepOverrideLabel, "Resize Step")
+
+local resizeStepOverrideNumberField = track("builder", win.CreateNumberField())
+resizeStepOverrideNumberField.SetAlignment( align_LeftEdge, 155, 92 )
+resizeStepOverrideNumberField.SetAlignment( align_TopEdge, 286, 28 )
+resizeStepOverrideNumberField.MaxNumDecimalPlaces = 2
+resizeStepOverrideNumberField.Value = 0
+
+local sizeClampEnabledToggle = track("builder", win.CreateLabelledToggle())
+sizeClampEnabledToggle.SetAlignment( align_LeftEdge, 255, 150 )
+sizeClampEnabledToggle.SetAlignment( align_TopEdge, 286, 28 )
+setText(sizeClampEnabledToggle, "Clamp Resize")
+sizeClampEnabledToggle.Value = SelectionResizeClampEnabled.Value
+
+local pivotPartSizeLabel = track("builder", win.CreateLabel())
+pivotPartSizeLabel.SetAlignment( align_LeftEdge, 14, 135 )
+pivotPartSizeLabel.SetAlignment( align_TopEdge, 324, 28 )
+pivotPartSizeLabel.Alignment = textAnc_MiddleLeft
+setText(pivotPartSizeLabel, "Unit Size")
+
+local pivotPartSizeXNumberField = track("builder", win.CreateNumberField())
+pivotPartSizeXNumberField.SetAlignment( align_LeftEdge, 155, 72 )
+pivotPartSizeXNumberField.SetAlignment( align_TopEdge, 324, 28 )
+pivotPartSizeXNumberField.MaxNumDecimalPlaces = 2
+
+local pivotPartSizeYNumberField = track("builder", win.CreateNumberField())
+pivotPartSizeYNumberField.SetAlignment( align_LeftEdge, 233, 72 )
+pivotPartSizeYNumberField.SetAlignment( align_TopEdge, 324, 28 )
+pivotPartSizeYNumberField.MaxNumDecimalPlaces = 2
+
+local pivotPartSizeZNumberField = track("builder", win.CreateNumberField())
+pivotPartSizeZNumberField.SetAlignment( align_LeftEdge, 311, 72 )
+pivotPartSizeZNumberField.SetAlignment( align_TopEdge, 324, 28 )
+pivotPartSizeZNumberField.MaxNumDecimalPlaces = 2
+
+local snapPivotPartSizeButton = track("builder", win.CreateTextButton())
+snapPivotPartSizeButton.SetAlignment( align_RightEdge, 14, 126 )
+snapPivotPartSizeButton.SetAlignment( align_TopEdge, 324, 28 )
+setText(snapPivotPartSizeButton, "Snap")
+
+local partPenetrationTestToggle = track("builder", win.CreateLabelledToggle())
+partPenetrationTestToggle.SetAlignment( align_LeftEdge, 14, 245 )
+partPenetrationTestToggle.SetAlignment( align_TopEdge, 366, 28 )
+setText(partPenetrationTestToggle, "Prevent interpenetration")
+partPenetrationTestToggle.Value = PartPenetrationTestEnabled.Value
+
+local attachmentBridgingToggle = track("builder", win.CreateLabelledToggle())
+attachmentBridgingToggle.SetAlignment( align_LeftEdge, 275, 225 )
+attachmentBridgingToggle.SetAlignment( align_TopEdge, 366, 28 )
+setText(attachmentBridgingToggle, "Attachment bridging")
+attachmentBridgingToggle.Value = AttachmentBridgingEnabled.Value
+
+local showAllAttachmentsToggle = track("builder", win.CreateLabelledToggle())
+showAllAttachmentsToggle.SetAlignment( align_LeftEdge, 14, 320 )
+showAllAttachmentsToggle.SetAlignment( align_TopEdge, 404, 28 )
+setText(showAllAttachmentsToggle, "Show all attachments in targeted construction")
+showAllAttachmentsToggle.Value = ShowAllAttachments.Value
+
+local weldHeadingLabel = track("weld", win.CreateLabel())
+weldHeadingLabel.SetAlignment( align_HorizEdges, 14, 14 )
+weldHeadingLabel.SetAlignment( align_TopEdge, 58, 26 )
+weldHeadingLabel.Alignment = textAnc_MiddleLeft
+weldHeadingLabel.FontStyle = fontStyle_Bold
+setText(weldHeadingLabel, "Weld Tool")
+
+local attachTypeDropdown = track("weld", win.CreateLabelledDropdown())
+attachTypeDropdown.SetAlignment( align_HorizEdges, 14, 14 )
+attachTypeDropdown.SetAlignment( align_TopEdge, 96, 30 )
+for _, attachType in ipairs(attachTypes) do
+    attachTypeDropdown.AddOption(attachType[2])
+end
+setText(attachTypeDropdown, "Type")
+
+local ownerPartLabel = track("weld", win.CreateLabel())
+ownerPartLabel.SetAlignment( align_HorizEdges, 14, 14 )
+ownerPartLabel.SetAlignment( align_TopEdge, 144, 24 )
+ownerPartLabel.Alignment = textAnc_MiddleLeft
+setText(ownerPartLabel, "From: N/A")
+
+local connectedPartLabel = track("weld", win.CreateLabel())
+connectedPartLabel.SetAlignment( align_HorizEdges, 14, 14 )
+connectedPartLabel.SetAlignment( align_TopEdge, 174, 24 )
+connectedPartLabel.Alignment = textAnc_MiddleLeft
+setText(connectedPartLabel, "To: N/A")
+
+local pickPartButton = track("weld", win.CreateTextButton())
+pickPartButton.SetAlignment( align_LeftEdge, 14, 230 )
+pickPartButton.SetAlignment( align_TopEdge, 214, 34 )
+setText(pickPartButton, "Start Weld (Tab)")
+
+local deletePartAttachmentsButton = track("weld", win.CreateTextButton())
+deletePartAttachmentsButton.SetAlignment( align_LeftEdge, 258, 230 )
+deletePartAttachmentsButton.SetAlignment( align_TopEdge, 214, 34 )
+setText(deletePartAttachmentsButton, "Detach Part (Del)")
+
+local weldHelpLabel = track("weld", win.CreateLabel())
+weldHelpLabel.SetAlignment( align_HorizEdges, 14, 14 )
+weldHelpLabel.SetAlignment( align_TopEdge, 266, 94 )
+weldHelpLabel.Alignment = textAnc_UpperLeft
+weldHelpLabel.LineSpacing = 1.05
+setText(weldHelpLabel, "Target a part, click Start Weld, target another part, then click Complete Weld. Target nothing before completing to cancel the weld.")
+
+local statusHeadingLabel = track("status", win.CreateLabel())
+statusHeadingLabel.SetAlignment( align_HorizEdges, 14, 14 )
+statusHeadingLabel.SetAlignment( align_TopEdge, 58, 26 )
+statusHeadingLabel.Alignment = textAnc_MiddleLeft
+statusHeadingLabel.FontStyle = fontStyle_Bold
+setText(statusHeadingLabel, "Status")
+
+local statusLabel = track("status", win.CreateLabel())
+statusLabel.SetAlignment( align_HorizEdges, 14, 14 )
+statusLabel.SetAlignment( align_TopEdge, 96, 90 )
+statusLabel.Alignment = textAnc_UpperLeft
+statusLabel.LineSpacing = 1.05
+setText(statusLabel, "Overlay Forge ready.")
+
+local statusHelpLabel = track("status", win.CreateLabel())
+statusHelpLabel.SetAlignment( align_HorizEdges, 14, 14 )
+statusHelpLabel.SetAlignment( align_TopEdge, 198, 170 )
+statusHelpLabel.Alignment = textAnc_UpperLeft
+statusHelpLabel.LineSpacing = 1.05
+setText(statusHelpLabel, "Window: drag the title bar to reposition. Resize from the window edge if needed.\nScene: export all live scene parts for chat context.\nBuilder: manipulator, pivot, size, and attachment visibility helpers.\nWeld: create or delete attachments without loading a separate GearBlocks script.")
 
 local function setStatus(text)
     setText(statusLabel, text)
     print("[OverlayForge] " .. text)
+end
+
+local function setSceneExportStatus(text)
+    setText(sceneResultLabel, text)
+    setStatus(text)
+end
+
+local function showSection(section)
+    activeSection = section
+    win.Title = sectionTitles[section] or "Overlay Forge"
+    applyWindowMinimumSize(win, section)
+    setVisible(backButton, section ~= "home")
+    for sectionName, elements in pairs(sectionElements) do
+        local isVisible = sectionName == activeSection
+        for _, element in ipairs(elements) do
+            setVisible(element, isVisible)
+        end
+    end
+    setStatus("Section: " .. tostring(section))
 end
 
 local function escapeJsonString(value)
@@ -1030,10 +1405,10 @@ local function exportPayload(payload, label)
         ok, destination = emitLogExport(path, content)
     end
     if not ok then
-        setStatus("Export failed: " .. tostring(destination))
+        setSceneExportStatus("Export failed: " .. tostring(destination))
         return false
     end
-    setStatus("Exported " .. tostring(payload.numParts or 0) .. " parts to " .. tostring(destination))
+    setSceneExportStatus("Export successful: " .. tostring(payload.numParts or 0) .. " parts to " .. tostring(destination))
     return true
 end
 
@@ -1058,7 +1433,7 @@ local function exportAllSceneParts()
     end
 
     if #parts == 0 then
-        setStatus("No scene parts found.")
+        setSceneExportStatus("Export complete: no scene parts found.")
         return true
     end
 
@@ -1094,7 +1469,9 @@ local function exportAllConstructions()
 end
 
 local function onExportAll()
+    setSceneExportStatus("Exporting scene...")
     if not exportAllSceneParts() then
+        setSceneExportStatus("Scene export API unavailable; trying loaded constructions...")
         exportAllConstructions()
     end
 end
@@ -1112,20 +1489,301 @@ local function isControlDown()
         or Input.GetKey("control")
 end
 
+local function onDropdownChanged()
+    ManipulatorOrientationMode.Value = manipulatorOrientationDropdown.Value
+end
+
+local function onTranslationStepNumberFieldEndEdit()
+    SelectionStepDistance.Value = translationStepNumberField.Value
+end
+
+local function onRotationStepNumberFieldEndEdit()
+    SelectionStepAngle.Value = rotationStepNumberField.Value
+end
+
+local function onPivotPositionNumberFieldEndEdit()
+    if partSelection then
+        partSelection.PivotPosition = Vector3.__new(
+            pivotPositionXNumberField.Value,
+            pivotPositionYNumberField.Value,
+            pivotPositionZNumberField.Value
+        )
+    end
+end
+
+local function onSnapPivotPositionButtonClicked()
+    if partSelection then
+        partSelection.PivotPosition = Vector3.round(partSelection.PivotPosition, SelectionStepDistance.Value)
+        setStatus("Snapped pivot position.")
+    end
+end
+
+local function onPivotOrientationNumberFieldEndEdit()
+    if partSelection then
+        partSelection.PivotOrientation = Quaternion.euler(
+            pivotOrientationXNumberField.Value,
+            pivotOrientationYNumberField.Value,
+            pivotOrientationZNumberField.Value
+        )
+    end
+end
+
+local function onSnapPivotOrientationButtonClicked()
+    if partSelection then
+        partSelection.PivotOrientation = Quaternion.snapAngles(partSelection.PivotOrientation, SelectionStepAngle.Value)
+        setStatus("Snapped pivot rotation.")
+    end
+end
+
+local function onMoveToGround()
+    if partSelection then
+        partSelection.moveToGround()
+        setStatus("Moved selection to ground.")
+    end
+end
+
+local function onResizeStepOverrideNumberFieldEndEdit()
+    resizeStepOverrideNumberField.Value = round2(resizeStepOverrideNumberField.Value, minResizeUnitStep)
+    SelectionResizeUnitStepOverride.Value = resizeStepOverrideNumberField.Value
+end
+
+local function onSizeClampEnabledToggled()
+    SelectionResizeClampEnabled.Value = sizeClampEnabledToggle.Value
+end
+
+local function onPivotPartSizeNumberFieldEndEdit()
+    if partSelection and partSelection.IsPivotPartResizable then
+        local pivotPart = partSelection.PivotPart
+        if pivotPart then
+            pivotPart.SetSize(
+                Vector3.__new(
+                    pivotPartSizeXNumberField.Value,
+                    pivotPartSizeYNumberField.Value,
+                    pivotPartSizeZNumberField.Value
+                ),
+                SelectionResizeClampEnabled.Value
+            )
+        end
+    end
+end
+
+local function onSnapPivotPartSizeButtonClicked()
+    if partSelection and partSelection.IsPivotPartResizable then
+        local pivotPart = partSelection.PivotPart
+        if pivotPart then
+            local resizeUnitStep = SelectionResizeUnitStepOverride.Value
+            if resizeUnitStep < minResizeUnitStep then
+                resizeUnitStep = pivotPart.ResizeUnitStep
+            end
+            pivotPart.SetSize(Vector3.round(pivotPart.CurrentUnitSize, resizeUnitStep), SelectionResizeClampEnabled.Value)
+            setStatus("Snapped pivot part size.")
+        end
+    end
+end
+
+local function onPartPenetrationTestToggled()
+    PartPenetrationTestEnabled.Value = partPenetrationTestToggle.Value
+end
+
+local function onAttachmentBridgingToggled()
+    AttachmentBridgingEnabled.Value = attachmentBridgingToggle.Value
+end
+
+local function onShowAllAttachmentsToggled()
+    ShowAllAttachments.Value = showAllAttachmentsToggle.Value
+end
+
+local function pickPart(part)
+    if weldOwnerPart == nil then
+        weldOwnerPart = part
+
+        if weldOwnerPart then
+            setText(pickPartButton, "Complete Weld (Tab)")
+            setStatus("Weld start: " .. tostring(weldOwnerPart.FullDisplayName))
+        end
+    else
+        if part then
+            local connectedPart = part
+
+            if weldOwnerPart.Attachments.IsAttached(connectedPart) then
+                setStatus("Parts already attached!")
+            elseif weldOwnerPart.ParentConstruction.IsFrozen ~= connectedPart.ParentConstruction.IsFrozen then
+                setStatus("Parts must be either both frozen or both unfrozen!")
+            else
+                local attachType = attachTypes[attachTypeDropdown.Value + 1][1]
+                local searchPosition = (weldOwnerPart.Position + connectedPart.Position) * 0.5
+                local searchNormal = Vector3.Normalize(connectedPart.Position - weldOwnerPart.Position)
+                AttachmentOps.CreateAttachment(attachType, weldOwnerPart, connectedPart, searchPosition, searchNormal, false, true)
+                setStatus("Created " .. tostring(attachTypes[attachTypeDropdown.Value + 1][2]) .. " weld.")
+            end
+        else
+            setStatus("Weld cancelled.")
+        end
+
+        weldOwnerPart = nil
+        setText(pickPartButton, "Start Weld (Tab)")
+    end
+    currentTargetedPart = nil
+end
+
+local function deletePartAttachments(part)
+    if part then
+        AttachmentOps.DeleteAllAttachments(part, true)
+        setStatus("Detached targeted part.")
+    end
+end
+
+local function onPickPartButton()
+    pickPart(currentTargetedPart)
+end
+
+local function onDeletePartAttachmentsButton()
+    deletePartAttachments(currentTargetedPart)
+end
+
+local function isInGameGuiShowing()
+    return NumInGameGUIShowing.Value > 0
+end
+
 local function onWindowClose()
     UnloadScript.Raise( ScriptName )
 end
 
+addClickHandler(backButton, function() showSection("home") end)
+addClickHandler(homeSceneButton, function() showSection("scene") end)
+addClickHandler(homeBuilderButton, function() showSection("builder") end)
+addClickHandler(homeWeldButton, function() showSection("weld") end)
+addClickHandler(homeStatusButton, function() showSection("status") end)
+
 if not addClickHandler(exportAllButton, onExportAll) then
     setStatus("Export Scene button could not bind click handler.")
 end
+
+addEventHandler(manipulatorOrientationDropdown.OnChanged, onDropdownChanged)
+addEventHandler(translationStepNumberField.OnEndEdit, onTranslationStepNumberFieldEndEdit)
+addEventHandler(rotationStepNumberField.OnEndEdit, onRotationStepNumberFieldEndEdit)
+addEventHandler(pivotPositionXNumberField.OnEndEdit, onPivotPositionNumberFieldEndEdit)
+addEventHandler(pivotPositionYNumberField.OnEndEdit, onPivotPositionNumberFieldEndEdit)
+addEventHandler(pivotPositionZNumberField.OnEndEdit, onPivotPositionNumberFieldEndEdit)
+addClickHandler(snapPivotPositionButton, onSnapPivotPositionButtonClicked)
+addEventHandler(pivotOrientationXNumberField.OnEndEdit, onPivotOrientationNumberFieldEndEdit)
+addEventHandler(pivotOrientationYNumberField.OnEndEdit, onPivotOrientationNumberFieldEndEdit)
+addEventHandler(pivotOrientationZNumberField.OnEndEdit, onPivotOrientationNumberFieldEndEdit)
+addClickHandler(snapPivotOrientationButton, onSnapPivotOrientationButtonClicked)
+addClickHandler(moveToGroundButton, onMoveToGround)
+addEventHandler(resizeStepOverrideNumberField.OnEndEdit, onResizeStepOverrideNumberFieldEndEdit)
+addEventHandler(sizeClampEnabledToggle.OnChanged, onSizeClampEnabledToggled)
+addEventHandler(pivotPartSizeXNumberField.OnEndEdit, onPivotPartSizeNumberFieldEndEdit)
+addEventHandler(pivotPartSizeYNumberField.OnEndEdit, onPivotPartSizeNumberFieldEndEdit)
+addEventHandler(pivotPartSizeZNumberField.OnEndEdit, onPivotPartSizeNumberFieldEndEdit)
+addClickHandler(snapPivotPartSizeButton, onSnapPivotPartSizeButtonClicked)
+addEventHandler(partPenetrationTestToggle.OnChanged, onPartPenetrationTestToggled)
+addEventHandler(attachmentBridgingToggle.OnChanged, onAttachmentBridgingToggled)
+addEventHandler(showAllAttachmentsToggle.OnChanged, onShowAllAttachmentsToggled)
+addClickHandler(pickPartButton, onPickPartButton)
+addClickHandler(deletePartAttachmentsButton, onDeletePartAttachmentsButton)
+
 addEventHandler(win.OnClose, onWindowClose)
 addEventHandler(win.onClose, onWindowClose)
 showWindow(win, true)
+showSection("home")
 
-setStatus("Scene exporter loaded. Output: " .. EXPORT_DIR)
+setStatus("Overlay Forge loaded. Output: " .. EXPORT_DIR)
 
 function Update()
+    local localPlayer = LocalPlayer.Value
+    if localPlayer then
+        partSelection = localPlayer.Toolbox.PartSelection
+    else
+        partSelection = nil
+    end
+
+    local selectionStepDistance = SelectionStepDistance.Value
+    if selectionStepDistance ~= prevSelectionStepDistance then
+        translationStepNumberField.Value = selectionStepDistance
+        prevSelectionStepDistance = selectionStepDistance
+    end
+
+    local selectionStepAngle = SelectionStepAngle.Value
+    if selectionStepAngle ~= prevSelectionStepAngle then
+        rotationStepNumberField.Value = selectionStepAngle
+        prevSelectionStepAngle = selectionStepAngle
+    end
+
+    local selectionResizeStepOverride = SelectionResizeUnitStepOverride.Value
+    if selectionResizeStepOverride ~= prevSelectionResizeStepOverride then
+        resizeStepOverrideNumberField.Value = selectionResizeStepOverride
+        prevSelectionResizeStepOverride = selectionResizeStepOverride
+    end
+
+    if partSelection then
+        local pivotPosition = partSelection.PivotPosition
+        if not prevPivotPosition.equals(pivotPosition) then
+            pivotPositionXNumberField.Value = pivotPosition.X
+            pivotPositionYNumberField.Value = pivotPosition.Y
+            pivotPositionZNumberField.Value = pivotPosition.Z
+            prevPivotPosition = pivotPosition
+        end
+
+        local pivotOrientation = partSelection.PivotOrientation
+        if not prevPivotOrientation.equals(pivotOrientation) then
+            pivotOrientationXNumberField.Value = pivotOrientation.EulerAngles.X
+            pivotOrientationYNumberField.Value = pivotOrientation.EulerAngles.Y
+            pivotOrientationZNumberField.Value = pivotOrientation.EulerAngles.Z
+            prevPivotOrientation = pivotOrientation
+        end
+
+        local pivotPartSize = Vector3.Zero
+        if partSelection.IsPivotPartResizable then
+            local pivotPart = partSelection.PivotPart
+            if pivotPart then
+                pivotPartSize = pivotPart.CurrentUnitSize
+            end
+        end
+
+        if not prevPivotPartSize.equals(pivotPartSize) then
+            pivotPartSizeXNumberField.Value = pivotPartSize.X
+            pivotPartSizeYNumberField.Value = pivotPartSize.Y
+            pivotPartSizeZNumberField.Value = pivotPartSize.Z
+            prevPivotPartSize = pivotPartSize
+        end
+    end
+
+    local showWeldContext = not isInGameGuiShowing()
+    if showWeldContext then
+        local targetedPart = nil
+        if localPlayer and localPlayer.Targeter then
+            targetedPart = localPlayer.Targeter.TargetedPart
+        end
+
+        if targetedPart ~= currentTargetedPart then
+            if weldOwnerPart then
+                setText(ownerPartLabel, string.format("From: %s", weldOwnerPart.FullDisplayName))
+                if targetedPart then
+                    setText(connectedPartLabel, string.format("To: %s", targetedPart.FullDisplayName))
+                else
+                    setText(connectedPartLabel, "To: N/A")
+                end
+            else
+                if targetedPart then
+                    setText(ownerPartLabel, string.format("From: %s", targetedPart.FullDisplayName))
+                else
+                    setText(ownerPartLabel, "From: N/A")
+                end
+                setText(connectedPartLabel, "To: N/A")
+            end
+            currentTargetedPart = targetedPart
+        end
+
+        if Input.GetKeyDown("tab") then
+            pickPart(currentTargetedPart)
+        elseif Input.GetKeyDown("delete") then
+            deletePartAttachments(currentTargetedPart)
+        end
+    else
+        currentTargetedPart = nil
+    end
+
     if Input.GetKeyDown("e") and isControlDown() and isShiftDown() then
         onExportAll()
     end

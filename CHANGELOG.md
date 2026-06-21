@@ -12,9 +12,44 @@ Development bucket for work starting on 2026-06-21 after the completed `0.5.0` G
 
 ### 2026-06-21
 
+#### Added
+
+- 15:37:18 EDT - Added a local Smoking Cessation module with SQLite cigarette event tracking, a configurable record-cigarette keybind, Nicoderm Step 1 patch marker, and day/week/month/year charts.
+- 19:44:22 EDT - Added a local scheduler framework with `def_scheduler_type`, `obj_scheduler`, and `obj_scheduler_run` tables, safe Rust-handler dispatch, run history, and a seeded Smoking Cessation export refresh job.
+
 #### Changed
 
 - 12:09:22 EDT - Changed project version metadata to start the `0.6.0` development bucket.
+- 12:30:17 EDT - Changed GearBlocks script integration so scene export, BuilderToolExt helpers, and WeldTool controls share one resizable Overlay Forge script window with clickable section navigation.
+- 12:49:09 EDT - Changed the GearBlocks script window navigation to start on a compact vertical home menu, replace content per tool view, and expose a top Back button for returning home.
+- 14:06:17 EDT - Changed GearBlocks scene export UI feedback to show export progress, success, and part count in the Scene view while preserving window position across section changes.
+- 14:22:08 EDT - Changed GearBlocks script window positioning so the initial home window opens centered before section navigation starts remembering moved positions.
+- 14:28:28 EDT - Changed GearBlocks section navigation to avoid reapplying window alignment after initial load so moved script windows no longer jump to the top-left corner.
+- 14:51:50 EDT - Changed GearBlocks runtime context importing so manual script exports are indexed from `Player.log` by a passive monitor and before chat responses, and changed Ctrl+Shift+C to toggle the GearBlocks chat overlay window.
+- 14:53:46 EDT - Changed GearBlocks runtime log importing to reconcile completed full-log exports newer than the database latest when the incremental cursor has already advanced past them.
+- 16:07:40 EDT - Changed game chat overlay placement so each chat persists its last window coordinates in SQLite and restores them across app restarts.
+- 16:42:40 EDT - Changed Ctrl+Shift+C chat overlay cycling so selected chats are focused from game context and hidden only when the chat overlay is already foreground.
+- 17:21:53 EDT - Changed GearBlocks chat context and rules to use the developer-confirmed scale of 1 GearBlocks unit = 10 cm and avoid imperial-distance build advice unless requested.
+- 17:41:21 EDT - Added a GearBlocks Home status skeleton for detecting user-installed BepInEx and GearLib third-party dependencies without bundling or installing them.
+- 18:21:15 EDT - Changed the GearBlocks BepInEx status check to read local BepInEx logs and report installed version, install correctness, and chainloader activation.
+- 18:46:40 EDT - Changed the Smoking Cessation record/delete workflows to maintain a ChatGPT-readable Markdown export of patch status, cigarette counts, and event history.
+- 18:54:36 EDT - Changed the Smoking Cessation module to track current cigarette inventory, decrement it when recording cigarettes, graph recent minutes-between-cigarettes spacing, and estimate run-out time.
+- 19:16:24 EDT - Changed module headers to remove the global shortcut label from Cessation and other module views.
+- 19:44:22 EDT - Changed the Smoking Cessation predicted run-out display to refresh on a one-minute UI clock while the scheduler keeps the ChatGPT export fresh in the background.
+
+#### Fixed
+
+- 15:44:33 EDT - Fixed the Ctrl+Shift+C chat overlay shortcut so it does not re-show the main Overlay Forge window when an active game chat context is already selected.
+- 16:14:26 EDT - Fixed Ctrl+Shift+C so it toggles the active chat overlay directly from the backend even when the main Overlay Forge window is hidden.
+- 18:56:56 EDT - Fixed the Smoking Cessation minutes-between-cigarettes graph so it stays clipped within its card and no longer overlaps the history panel.
+- 19:01:52 EDT - Fixed the Smoking Cessation dashboard layout so the rate graph keeps its full height and pushes content into vertical scrolling instead of shrinking at the bottom.
+
+#### Documentation
+
+- Added project reasoning model selection rules that default work to Medium Reasoning and define High / Very High escalation criteria.
+- Added a reasoning escalation gate requiring Codex to stop and ask the user to switch VS Code/Codex reasoning settings before High or Very High tasks.
+- Added a reasoning calibration rule requiring Codex to flag after Medium Reasoning tasks when Low Reasoning would likely have been sufficient.
+- Added the forward SQLite table naming convention for new `obj_`, `def_`, `o2o_`, and `n2n_` tables plus scheduler safety rules.
 
 ## 0.5.0 - 2026-06-20
 

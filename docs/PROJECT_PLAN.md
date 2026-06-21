@@ -94,6 +94,18 @@ Status: **Complete / Passed / Successful**
 
 Overlay Forge 0.2.0 marks the documented `SmashHammer.GearBlocks.Construction` namespace reference interfaces as implemented for runtime export support, including availability-only `apiAttributes`, SQLite persistence of expanded runtime export payloads, catalog attribute availability display, and default chat-context exclusion for API metadata.
 
+**Smoking Cessation**
+
+Status: **Implemented / Pending Validation**
+
+The Smoking Cessation module is a post-Milestone 13 core addendum. It records cigarette events locally in SQLite from either the module UI or the configurable `Record Cigarette` keybind, tracks the current cigarette inventory, displays the `Nicoderm Step 1` patch marker started at `2026-06-21 15:00:00 EDT`, charts smoking counts by day, week, month, or year, graphs recent minutes-between-cigarettes spacing, predicts when the current inventory will run out, and keeps a Markdown export current for ChatGPT app context.
+
+**Scheduler Framework**
+
+Status: **Implemented / Pending Validation**
+
+The Scheduler framework is a local-first backend addendum for bounded recurring jobs. It introduces convention-based SQLite tables for scheduler type definitions, scheduler objects, and scheduler run history. The initial registered scheduler refreshes the Smoking Cessation ChatGPT export on startup and every 60 seconds. Future modules, including GearBlocks, can add scheduler definitions only through explicit Rust handlers rather than arbitrary database-stored commands.
+
 ## Product Direction
 
 Overlay Forge is a personal desktop command hub that floats above the user's workflow and eventually helps turn ideas, notes, tasks, and project plans into Codex-ready markdown bridge files.
@@ -130,6 +142,10 @@ Milestone 13 is the current passed stable baseline for later work. Do not implem
 Gaming Screenshot Capture is a completed, passed, and successful feature addendum on top of Milestone 13. Future Gaming work should preserve the validated screenshot folder layout, SQLite screenshot metadata path, thumbnail rendering through the Tauri asset protocol, overlay-hidden capture behavior, and right-click delete cleanup semantics.
 
 Overlay Forge 0.2.0 GearBlocks runtime API interface support is a completed, passed, and successful feature addendum on top of Milestone 13. Future GearBlocks API work should preserve the runtime exporter/importer boundary, keep catalog views value-free, keep API metadata out of default prompt context, avoid executing getter commands unless a user explicitly requests a future snapshot/include action, and use `docs/GEARBLOCKS_RUNTIME_INTERFACES.md` as the first troubleshooting index for interface-specific issues.
+
+Smoking Cessation is a local-first core module addendum. Future cessation work should preserve SQLite-owned event records, keep the record-cigarette keybind configurable through Settings, and avoid cloud sync or health-provider integrations unless explicitly requested.
+
+Scheduler is a local-first backend framework addendum. Future scheduler jobs should use explicit `def_scheduler_type` definitions and Rust handler dispatch, keep jobs bounded and non-blocking, and record run status in `obj_scheduler_run`. Do not store arbitrary executable commands, scripts, or Lua payloads in scheduler rows.
 
 Milestone 4 remains intentionally small. It does not include automatic Codex handoff, GitHub write operations, pull request creation, branch creation, issue management, full repository browsing, GitHub Actions integration, OAuth, multi-account support, advanced sync, vector store/repo indexing, YouTube integration, external calendar integration, cloud sync, or multi-user auth.
 

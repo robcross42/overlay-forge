@@ -77,7 +77,13 @@ On exporter install, Overlay Forge injects the known API index from SQLite into 
 
 After the user exports the scene, GearBlocks chat uses the latest reconstructed runtime export indexed in SQLite. Overlay Forge stores the complete export payload in SQLite and derives a semantic construction understanding model from that indexed export.
 
-The intended iterative workflow is to load the current build in GearBlocks once, make changes in-game, then click `Refresh Scene Context` in Overlay Forge. Refresh sends the export hotkey to GearBlocks, waits briefly for the exporter to append a complete scene export to `Player.log`, and imports it before chat uses the context. Runtime part reference rows, API availability rows, value fields, properties, and attachments are upserted by stable keys, so repeated scene exports update the current SQLite reference data instead of requiring a full catalog rebuild. Overlay Forge also stores a compact diff between the latest and previous runtime scene export for chat prompt context. Because the default export covers the whole scene, removed parts disappear from the latest chat context after the next scene export and import.
+## GearBlocks Scale And Units
+
+GearBlocks developer guidance on Steam confirms that `1 unit = 10 cm`. Source: `https://steamcommunity.com/app/1305080/discussions/6/4696784170963236905/`. GearBlocks chat context should use this ratio when discussing part movement, spacing, dimensions, alignment, and vehicle scale. Preferred response units are centimeters and/or GearBlocks units such as `1 unit`, `0.5 units`, or `16 units`; chat should not suggest imperial distances unless the user explicitly asks for an imperial conversion.
+
+Scale exceptions: the developer noted that the player character, wheels, and other parts are slightly oversized so gears and other parts have room to fit inside vehicles. Treat those parts as gameplay-clearance exceptions rather than strict real-world scale references.
+
+The intended iterative workflow is to load the current build in GearBlocks once, make changes in-game, then export scene context from either the GearBlocks script window or `Refresh Scene Context` in Overlay Forge. Refresh sends the export hotkey to GearBlocks, waits briefly for the exporter to append a complete scene export to `Player.log`, and imports it before chat uses the context. Manual script-window exports are picked up by Overlay Forge's passive GearBlocks runtime import monitor, which reads only new completed `Player.log` export chunks by cursor. GearBlocks chat send also imports new log additions before creating the prompt context so chat uses the latest indexed scene available at submit time. Runtime part reference rows, API availability rows, value fields, properties, and attachments are upserted by stable keys, so repeated scene exports update the current SQLite reference data instead of requiring a full catalog rebuild. Overlay Forge also stores a compact diff between the latest and previous runtime scene export for chat prompt context. Because the default export covers the whole scene, removed parts disappear from the latest chat context after the next scene export and import.
 
 When GearBlocks saves a construction, Overlay Forge can also use the saved `construction.bytes` file as a current-build signal. GearBlocks chat decodes the most recently modified saved construction file before building its prompt context, so saved part additions and removals can be reflected even before a new runtime scene export. This saved-file context complements the runtime log context while runtime exports continue to provide live metadata unavailable in the save file.
 
@@ -90,13 +96,26 @@ The derived semantic model includes:
 
 Overlay Forge can install and type-check the script mod from outside the game, but the GearBlocks runtime API can only be exercised after the script is loaded inside GearBlocks.
 
-## Overlay Tools
+## Unified Script Window
 
-Overlay Forge includes an installable `OverlayForgeTools` GearBlocks script mod for the Gaming -> GearBlocks -> Tools view. Unlike the stock `BuilderToolExt` and `WeldTool` samples, this script does not create its own GearBlocks window. It listens for whitelisted tool hotkeys sent by Overlay Forge after the game window is focused.
+Overlay Forge installs one GearBlocks script mod named `Overlay Forge` under `ScriptMods\OverlayForgeConstructionExporter`. The script creates one movable, resizable, collapsible GearBlocks window with a compact home menu for Scene, Builder, Weld, and Status. Selecting a menu item replaces the window content with that tool view, changes the window title, and shows a Back button at the top without intentionally recentering the window. This keeps scene export, BuilderToolExt helpers, and WeldTool controls in one script window instead of loading multiple GearBlocks sample scripts with separate windows.
 
-The first pass covers common `BuilderToolExt` actions such as manipulator orientation, step cycling, move-to-ground, pivot snapping, resize clamp, interpenetration, attachment bridging, and show-all-attachments toggles. It also covers common `WeldTool` actions including attachment type selection, start/complete weld, and detach targeted part.
+The Scene section exports the full live scene for Overlay Forge chat context and displays export progress, success/failure, and exported part count in the same view. The Builder section covers common `BuilderToolExt` actions such as manipulator orientation, step intervals, move-to-ground, pivot snapping, resize clamp, unit sizing, interpenetration, attachment bridging, and show-all-attachments toggles. The Weld section covers common `WeldTool` actions including attachment type selection, start/complete weld, detach targeted part, and targeted part feedback.
 
-This bridge intentionally uses a fixed command surface instead of exposing arbitrary keyboard input or arbitrary Lua execution from Overlay Forge.
+Installing the unified script also removes the older `OverlayForgeTools` user script folder when present. Overlay Forge still uses the fixed scene-export hotkey for explicit scene refresh requests, but Builder and Weld controls now run from the in-game script window rather than from arbitrary keyboard input or arbitrary Lua execution sent by Overlay Forge.
+
+## Third-party Mod Dependencies
+
+Overlay Forge may integrate with workflows that require BepInEx and GearLib, but both are third-party dependencies that users must install separately. Overlay Forge must not bundle, redistribute, install, or modify BepInEx or GearLib unless a future explicit license/permission review allows that.
+
+BepInEx is a Unity modding framework. For GearBlocks/GearLib usage, users should follow BepInEx Unity IL2CPP installation guidance and install it into the GearBlocks game root. Overlay Forge detects BepInEx by looking for the `BepInEx` folder and related loader/runtime files under the detected GearBlocks install root. The status check also reads `BepInEx\LogOutput.log` and `BepInEx\ErrorLog.log` when present. `LogOutput.log` is used to report the installed BepInEx version and confirm chainloader activation through `Chainloader initialized` / `Chainloader startup complete` log lines.
+
+GearLib is a third-party GearBlocks modding library by KaBooMa. Its README says GearLib is a requirement for mods made with it and asks modders to tell users about that requirement before distribution. Overlay Forge detects GearLib by looking for `GearLib.dll` under `BepInEx/plugins`.
+
+Current upstream references:
+
+- BepInEx Unity IL2CPP install docs: `https://docs.bepinex.dev/master/articles/user_guide/installation/unity_il2cpp.html`
+- GearLib repository: `https://github.com/KaBooMa/GearLib`
 
 ## Current UI
 

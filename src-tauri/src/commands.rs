@@ -6,7 +6,8 @@ use crate::db::{
     GearBlocksApiCatalogRecord, NoteRecord, PlanningConversationContextRecord,
     PlanningConversationRecord, PlanningMessageRecord, PlanningPromptPreviewRecord,
     ProjectGitHubRepositoryRecord, ProjectMarkdownContextPayload, ProjectMarkdownContextRecord,
-    ProjectRecord, TaskRecord, YouTubeReferenceRecord,
+    ProjectRecord, SchedulerRecord, SmokingCessationSettingsRecord, SmokingEventRecord, TaskRecord,
+    YouTubeReferenceRecord,
 };
 use crate::github;
 use crate::hotkeys;
@@ -29,6 +30,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, State, WebviewWindow};
 
 static MANUAL_OVERLAY_DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);
+static GEARBLOCKS_RUNTIME_IMPORT_MONITOR_ACTIVE: AtomicBool = AtomicBool::new(false);
+static SCHEDULER_WORKER_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 #[derive(Serialize)]
 pub struct MilestoneStatus {
@@ -36,6 +39,12 @@ pub struct MilestoneStatus {
     hotkey: String,
     #[serde(rename = "databaseReady")]
     database_ready: bool,
+}
+
+#[derive(Serialize)]
+pub struct SmokingCessationExportRecord {
+    #[serde(rename = "exportPath")]
+    pub export_path: String,
 }
 
 #[derive(Serialize)]
@@ -99,11 +108,32 @@ pub struct GearBlocksLuaExporterInstallRecord {
 }
 
 #[derive(Serialize)]
-pub struct GearBlocksLuaScriptInstallRecord {
-    #[serde(rename = "scriptModPath")]
-    pub script_mod_path: String,
-    #[serde(rename = "mainLuaPath")]
-    pub main_lua_path: String,
+pub struct GearBlocksThirdPartyDependencyStatusRecord {
+    pub name: String,
+    #[serde(rename = "isDetected")]
+    pub is_detected: bool,
+    #[serde(rename = "isInstalledCorrectly")]
+    pub is_installed_correctly: Option<bool>,
+    #[serde(rename = "isActivated")]
+    pub is_activated: Option<bool>,
+    #[serde(rename = "installedVersion")]
+    pub installed_version: Option<String>,
+    #[serde(rename = "expectedPath")]
+    pub expected_path: String,
+    pub detail: String,
+    #[serde(rename = "statusDetails")]
+    pub status_details: Vec<String>,
+    #[serde(rename = "logPaths")]
+    pub log_paths: Vec<String>,
+    #[serde(rename = "projectUrl")]
+    pub project_url: String,
+}
+
+#[derive(Serialize)]
+pub struct GearBlocksThirdPartyDependencyStatusPayload {
+    #[serde(rename = "gameRoot")]
+    pub game_root: String,
+    pub dependencies: Vec<GearBlocksThirdPartyDependencyStatusRecord>,
 }
 
 #[derive(Serialize)]
@@ -282,6 +312,14 @@ pub fn get_milestone_status(state: State<'_, AppState>) -> Result<MilestoneStatu
 }
 
 #[tauri::command]
+pub fn list_schedulers(state: State<'_, AppState>) -> Result<Vec<SchedulerRecord>, String> {
+    state
+        .database
+        .list_schedulers()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 pub fn shutdown_app(app: AppHandle) {
     app.exit(0);
 }
@@ -299,6 +337,88 @@ pub fn set_overlay_window_opacity(window: WebviewWindow, opacity: f64) -> Result
 #[tauri::command]
 pub fn focus_last_game_window(state: State<'_, AppState>) -> Result<bool, String> {
     focus_last_game_window_impl(state)
+}
+
+pub fn start_gearblocks_runtime_import_monitor(app: AppHandle) {
+    if GEARBLOCKS_RUNTIME_IMPORT_MONITOR_ACTIVE.swap(true, Ordering::SeqCst) {
+        return;
+    }
+
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_millis(2500));
+        let state = app.state::<AppState>();
+        let games = state.database.list_games().unwrap_or_default();
+        for game in games.iter().filter(|game| game.slug == "gearblocks") {
+            if let Err(error) = import_latest_gearblocks_runtime_exports(&state, game.id) {
+                eprintln!("GearBlocks runtime import monitor failed: {error}");
+            }
+        }
+    });
+}
+
+pub fn start_scheduler_worker(app: AppHandle) {
+    if SCHEDULER_WORKER_ACTIVE.swap(true, Ordering::SeqCst) {
+        return;
+    }
+
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_secs(15));
+        let state = app.state::<AppState>();
+        let schedulers = state.database.list_due_schedulers(5).unwrap_or_default();
+        for scheduler in schedulers {
+            if let Err(error) = run_scheduler(&app, state.inner(), scheduler) {
+                eprintln!("Overlay Forge scheduler failed: {error}");
+            }
+        }
+    });
+}
+
+fn run_scheduler(
+    app: &AppHandle,
+    state: &AppState,
+    scheduler: SchedulerRecord,
+) -> Result<(), String> {
+    if !state
+        .database
+        .try_acquire_scheduler(scheduler.id, 120)
+        .map_err(|error| error.to_string())?
+    {
+        return Ok(());
+    }
+
+    let run_id = state
+        .database
+        .start_scheduler_run(&scheduler)
+        .map_err(|error| error.to_string())?;
+    let result = dispatch_scheduler(app, state, &scheduler);
+    let (status, message) = match result {
+        Ok(message) => ("success", message),
+        Err(error) => ("failed", error),
+    };
+    state
+        .database
+        .complete_scheduler_run(&scheduler, run_id, status, &message)
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+fn dispatch_scheduler(
+    app: &AppHandle,
+    state: &AppState,
+    scheduler: &SchedulerRecord,
+) -> Result<String, String> {
+    match scheduler.type_key.as_str() {
+        "smoking_cessation_export" => {
+            let export_path = update_smoking_cessation_chatgpt_export(app, state)?;
+            Ok(format!(
+                "Updated Smoking Cessation ChatGPT export: {}",
+                export_path.to_string_lossy()
+            ))
+        }
+        other => Err(format!(
+            "No registered scheduler handler for type '{other}'."
+        )),
+    }
 }
 
 #[tauri::command]
@@ -354,6 +474,16 @@ fn show_game_chat_overlay_window(
         .set_always_on_top(true)
         .map_err(|error| error.to_string())?;
     ensure_window_accepts_mouse_input(&window)?;
+    let state = app.state::<AppState>();
+    if let Ok(conversation) = state
+        .database
+        .get_game_chat_conversation(selection.conversation_id)
+    {
+        if let (Some(overlay_x), Some(overlay_y)) = (conversation.overlay_x, conversation.overlay_y)
+        {
+            let _ = window.set_position(PhysicalPosition::new(overlay_x, overlay_y));
+        }
+    }
     window.show().map_err(|error| error.to_string())?;
     let _ = set_overlay_opacity(&window, 0.78);
     window.set_focus().map_err(|error| error.to_string())?;
@@ -381,6 +511,52 @@ pub fn focus_game_chat_overlay_window(app: AppHandle) -> Result<bool, String> {
         }
     })
     .map_err(|error| error.to_string())?;
+    Ok(true)
+}
+
+#[tauri::command]
+pub fn toggle_game_chat_overlay_window(
+    app: AppHandle,
+    _state: State<'_, AppState>,
+) -> Result<bool, String> {
+    toggle_active_game_chat_overlay_window(&app)
+}
+
+pub fn toggle_active_game_chat_overlay_window(app: &AppHandle) -> Result<bool, String> {
+    let state = app.state::<AppState>();
+    let selection = state
+        .active_game_chat_overlay
+        .lock()
+        .map_err(|_| "Game chat overlay state is unavailable.".to_string())?
+        .clone();
+    let Some(selection) = selection else {
+        return Ok(false);
+    };
+
+    let window = app
+        .get_webview_window("game-chat")
+        .ok_or_else(|| "Game chat overlay window was not created at startup.".to_string())?;
+    if window.is_visible().map_err(|error| error.to_string())? {
+        window.hide().map_err(|error| error.to_string())?;
+        return Ok(false);
+    }
+
+    show_game_chat_overlay_window(&app, &selection)?;
+    Ok(true)
+}
+
+pub fn show_active_game_chat_overlay_window(app: &AppHandle) -> Result<bool, String> {
+    let state = app.state::<AppState>();
+    let selection = state
+        .active_game_chat_overlay
+        .lock()
+        .map_err(|_| "Game chat overlay state is unavailable.".to_string())?
+        .clone();
+    let Some(selection) = selection else {
+        return Ok(false);
+    };
+
+    show_game_chat_overlay_window(app, &selection)?;
     Ok(true)
 }
 
@@ -559,6 +735,218 @@ pub fn delete_calendar_event(id: i64, state: State<'_, AppState>) -> Result<(), 
         .database
         .delete_calendar_event(id)
         .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn list_smoking_events(state: State<'_, AppState>) -> Result<Vec<SmokingEventRecord>, String> {
+    state
+        .database
+        .list_smoking_events()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn record_smoking_event(
+    smoked_at: Option<String>,
+    notes: Option<String>,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<SmokingEventRecord, String> {
+    let record = state
+        .database
+        .create_smoking_event(
+            smoked_at.as_deref(),
+            "manual",
+            notes.as_deref().unwrap_or_default(),
+        )
+        .map_err(|error| error.to_string())?;
+    if let Err(error) = update_smoking_cessation_chatgpt_export(&app, state.inner()) {
+        eprintln!("Could not update smoking cessation ChatGPT export: {error}");
+    }
+    Ok(record)
+}
+
+#[tauri::command]
+pub fn delete_smoking_event(
+    id: i64,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    state
+        .database
+        .delete_smoking_event(id)
+        .map_err(|error| error.to_string())?;
+    if let Err(error) = update_smoking_cessation_chatgpt_export(&app, state.inner()) {
+        eprintln!("Could not update smoking cessation ChatGPT export: {error}");
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_smoking_cessation_settings(
+    state: State<'_, AppState>,
+) -> Result<SmokingCessationSettingsRecord, String> {
+    state
+        .database
+        .get_smoking_cessation_settings()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn update_smoking_cigarette_count(
+    current_cigarette_count: i64,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<SmokingCessationSettingsRecord, String> {
+    let settings = state
+        .database
+        .update_smoking_cigarette_count(current_cigarette_count)
+        .map_err(|error| error.to_string())?;
+    if let Err(error) = update_smoking_cessation_chatgpt_export(&app, state.inner()) {
+        eprintln!("Could not update smoking cessation ChatGPT export: {error}");
+    }
+    Ok(settings)
+}
+
+#[tauri::command]
+pub fn export_smoking_cessation_chatgpt_context(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<SmokingCessationExportRecord, String> {
+    let export_path = update_smoking_cessation_chatgpt_export(&app, state.inner())?;
+    Ok(SmokingCessationExportRecord {
+        export_path: export_path.to_string_lossy().to_string(),
+    })
+}
+
+pub fn update_smoking_cessation_chatgpt_export(
+    app: &AppHandle,
+    state: &AppState,
+) -> Result<PathBuf, String> {
+    let export_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?
+        .join("chatgpt-exports");
+    fs::create_dir_all(&export_dir).map_err(|error| error.to_string())?;
+    let export_path = export_dir.join("smoking-cessation.md");
+    let events = state
+        .database
+        .list_smoking_events()
+        .map_err(|error| error.to_string())?;
+    let settings = state
+        .database
+        .get_smoking_cessation_settings()
+        .map_err(|error| error.to_string())?;
+    let content = render_smoking_cessation_chatgpt_export(&settings, &events);
+    fs::write(&export_path, content).map_err(|error| error.to_string())?;
+    Ok(export_path)
+}
+
+fn render_smoking_cessation_chatgpt_export(
+    settings: &SmokingCessationSettingsRecord,
+    events: &[SmokingEventRecord],
+) -> String {
+    let exported_at_unix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or_default();
+    let today_key = events
+        .first()
+        .and_then(|event| event.smoked_at.get(0..10))
+        .unwrap_or_default();
+    let today_count = if today_key.is_empty() {
+        0
+    } else {
+        events
+            .iter()
+            .filter(|event| event.smoked_at.starts_with(today_key))
+            .count()
+    };
+    let last_recorded = events
+        .first()
+        .map(|event| event.smoked_at.as_str())
+        .unwrap_or("None");
+
+    let mut content = String::new();
+    content.push_str("# Overlay Forge Smoking Cessation Context\n\n");
+    content.push_str("This file is automatically generated by Overlay Forge for ChatGPT context. Do not edit it directly.\n\n");
+    content.push_str("## Current Status\n\n");
+    content.push_str(&format!("- Exported at Unix time: {exported_at_unix}\n"));
+    content.push_str(&format!("- Patch: {}\n", settings.patch_label));
+    content.push_str(&format!(
+        "- Patch started: {} {}\n",
+        settings.patch_started_at, settings.patch_timezone
+    ));
+    content.push_str(&format!(
+        "- Current cigarettes remaining: {}\n",
+        settings.current_cigarette_count
+    ));
+    content.push_str(&format!("- Total cigarettes recorded: {}\n", events.len()));
+    content.push_str(&format!("- Latest recorded event: {last_recorded}\n"));
+    content.push_str(&format!(
+        "- Count on latest recorded day ({today_key}): {today_count}\n\n"
+    ));
+
+    content.push_str("## Daily Counts\n\n");
+    append_smoking_count_table(&mut content, "Day", smoking_counts_by_prefix(events, 10));
+    content.push_str("\n## Monthly Counts\n\n");
+    append_smoking_count_table(&mut content, "Month", smoking_counts_by_prefix(events, 7));
+    content.push_str("\n## Yearly Counts\n\n");
+    append_smoking_count_table(&mut content, "Year", smoking_counts_by_prefix(events, 4));
+
+    content.push_str("\n## Event Log\n\n");
+    if events.is_empty() {
+        content.push_str("No cigarette events are currently recorded.\n");
+    } else {
+        content.push_str("| Smoked At | Source | Notes |\n");
+        content.push_str("| --- | --- | --- |\n");
+        for event in events {
+            content.push_str(&format!(
+                "| {} | {} | {} |\n",
+                markdown_table_cell(&event.smoked_at),
+                markdown_table_cell(&event.source),
+                markdown_table_cell(&event.notes)
+            ));
+        }
+    }
+
+    content
+}
+
+fn smoking_counts_by_prefix(
+    events: &[SmokingEventRecord],
+    prefix_len: usize,
+) -> Vec<(String, usize)> {
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    for event in events {
+        if let Some(key) = event.smoked_at.get(0..prefix_len) {
+            *counts.entry(key.to_string()).or_default() += 1;
+        }
+    }
+    let mut ordered = counts.into_iter().collect::<Vec<_>>();
+    ordered.sort_by(|left, right| right.0.cmp(&left.0));
+    ordered
+}
+
+fn append_smoking_count_table(content: &mut String, label: &str, counts: Vec<(String, usize)>) {
+    if counts.is_empty() {
+        content.push_str("No records.\n");
+        return;
+    }
+
+    content.push_str(&format!("| {label} | Count |\n"));
+    content.push_str("| --- | ---: |\n");
+    for (key, count) in counts {
+        content.push_str(&format!("| {} | {} |\n", markdown_table_cell(&key), count));
+    }
+}
+
+fn markdown_table_cell(value: &str) -> String {
+    value
+        .replace('|', "\\|")
+        .replace('\r', " ")
+        .replace('\n', " ")
 }
 
 #[tauri::command]
@@ -1166,6 +1554,39 @@ pub fn sync_gearblocks_runtime_context(
     })
 }
 
+#[tauri::command]
+pub fn import_gearblocks_runtime_context(
+    game_id: i64,
+    state: State<'_, AppState>,
+) -> Result<GearBlocksRuntimeContextSyncRecord, String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    require_gearblocks_game(&game)?;
+
+    let imported_count = import_latest_gearblocks_runtime_exports(&state, game.id)?;
+    let construction_count = state
+        .database
+        .count_game_constructions(game.id)
+        .map_err(|error| error.to_string())?;
+    let runtime_export_count = state
+        .database
+        .count_game_runtime_construction_exports(game.id)
+        .map_err(|error| error.to_string())?;
+    let runtime_part_count = state
+        .database
+        .count_game_runtime_parts(game.id)
+        .map_err(|error| error.to_string())?;
+
+    Ok(GearBlocksRuntimeContextSyncRecord {
+        changed: imported_count > 0,
+        runtime_export_count,
+        runtime_part_count,
+        construction_count,
+    })
+}
+
 fn sync_gearblocks_saved_constructions_for_game(
     state: &AppState,
     game_id: i64,
@@ -1325,6 +1746,11 @@ pub fn install_gearblocks_lua_exporter(
     )
     .map_err(|error| error.to_string())?;
 
+    let old_tools_path = gearblocks_root.join("ScriptMods").join("OverlayForgeTools");
+    if old_tools_path.is_dir() {
+        let _ = fs::remove_dir_all(old_tools_path);
+    }
+
     Ok(GearBlocksLuaExporterInstallRecord {
         script_mod_path: script_mod_path.to_string_lossy().to_string(),
         main_lua_path: main_lua_path.to_string_lossy().to_string(),
@@ -1333,53 +1759,27 @@ pub fn install_gearblocks_lua_exporter(
 }
 
 #[tauri::command]
-pub fn install_gearblocks_overlay_tools(
+pub fn get_gearblocks_third_party_dependency_status(
     game_id: i64,
     state: State<'_, AppState>,
-) -> Result<GearBlocksLuaScriptInstallRecord, String> {
+) -> Result<GearBlocksThirdPartyDependencyStatusPayload, String> {
     let game = state
         .database
         .get_game(game_id)
         .map_err(|error| error.to_string())?;
     require_gearblocks_game(&game)?;
 
-    let gearblocks_root = gearblocks_default_user_data_root()?;
-    let script_mod_path = gearblocks_root.join("ScriptMods").join("OverlayForgeTools");
-    fs::create_dir_all(&script_mod_path).map_err(|error| error.to_string())?;
+    let game_root = gearblocks_game_install_root(state.inner(), game_id);
+    let bepinex_status = gearblocks_bepinex_status(game_root.as_deref());
+    let gearlib_status = gearblocks_gearlib_status(game_root.as_deref());
 
-    let main_lua_path = script_mod_path.join("main.lua");
-    fs::write(
-        &main_lua_path,
-        include_str!("../../gearblocks-script-mods/OverlayForgeTools/main.lua.template"),
-    )
-    .map_err(|error| error.to_string())?;
-    fs::write(
-        script_mod_path.join("meta.json"),
-        include_str!("../../gearblocks-script-mods/OverlayForgeTools/meta.json"),
-    )
-    .map_err(|error| error.to_string())?;
-
-    Ok(GearBlocksLuaScriptInstallRecord {
-        script_mod_path: script_mod_path.to_string_lossy().to_string(),
-        main_lua_path: main_lua_path.to_string_lossy().to_string(),
+    Ok(GearBlocksThirdPartyDependencyStatusPayload {
+        game_root: game_root
+            .as_ref()
+            .map(|path| path.to_string_lossy().to_string())
+            .unwrap_or_default(),
+        dependencies: vec![bepinex_status, gearlib_status],
     })
-}
-
-#[tauri::command]
-pub fn send_gearblocks_overlay_tool_action(
-    action: String,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    let tool_key = gearblocks_overlay_tool_key(&action)
-        .ok_or_else(|| format!("Unsupported GearBlocks overlay tool action: {action}"))?;
-
-    if !focus_last_game_window_from_state(state.inner())? {
-        return Err(
-            "No remembered GearBlocks window is available to receive tool input.".to_string(),
-        );
-    }
-    thread::sleep(Duration::from_millis(40));
-    send_virtual_key(tool_key)
 }
 
 fn request_gearblocks_scene_export_from_game(state: &AppState) -> Result<(), String> {
@@ -1454,71 +1854,6 @@ struct OverlayToolKey {
     virtual_key: u16,
     shift: bool,
     control: bool,
-}
-
-fn overlay_tool_key(virtual_key: u16) -> OverlayToolKey {
-    OverlayToolKey {
-        virtual_key,
-        shift: false,
-        control: false,
-    }
-}
-
-fn overlay_tool_shift_key(virtual_key: u16) -> OverlayToolKey {
-    OverlayToolKey {
-        virtual_key,
-        shift: true,
-        control: false,
-    }
-}
-
-fn overlay_tool_control_key(virtual_key: u16) -> OverlayToolKey {
-    OverlayToolKey {
-        virtual_key,
-        shift: false,
-        control: true,
-    }
-}
-
-fn gearblocks_overlay_tool_key(action: &str) -> Option<OverlayToolKey> {
-    #[cfg(target_os = "windows")]
-    {
-        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-            VK_DELETE, VK_F1, VK_F10, VK_F11, VK_F12, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7,
-            VK_F8, VK_F9, VK_TAB,
-        };
-
-        return match action {
-            "weldToggle" => Some(overlay_tool_key(VK_TAB)),
-            "weldDetach" => Some(overlay_tool_key(VK_DELETE)),
-            "weldFixed" => Some(overlay_tool_key(VK_F1)),
-            "weldRotaryBearing" => Some(overlay_tool_key(VK_F2)),
-            "weldLinearBearing" => Some(overlay_tool_key(VK_F3)),
-            "weldLinearRotaryBearing" => Some(overlay_tool_key(VK_F4)),
-            "weldSphericalBearing" => Some(overlay_tool_key(VK_F5)),
-            "weldCvJoint" => Some(overlay_tool_key(VK_F6)),
-            "weldKnuckleJoint" => Some(overlay_tool_key(VK_F7)),
-            "weldNull" => Some(overlay_tool_key(VK_F8)),
-            "builderToggleOrientation" => Some(overlay_tool_key(VK_F9)),
-            "builderCyclePositionStep" => Some(overlay_tool_key(VK_F10)),
-            "builderCycleRotationStep" => Some(overlay_tool_key(VK_F11)),
-            "builderMoveToGround" => Some(overlay_tool_key(VK_F12)),
-            "builderToggleResizeClamp" => Some(overlay_tool_control_key(VK_F9)),
-            "builderToggleInterpenetration" => Some(overlay_tool_control_key(VK_F10)),
-            "builderToggleAttachmentBridging" => Some(overlay_tool_control_key(VK_F11)),
-            "builderToggleShowAllAttachments" => Some(overlay_tool_control_key(VK_F12)),
-            "builderCycleResizeStep" => Some(overlay_tool_shift_key(VK_F10)),
-            "builderSnapPivotPosition" => Some(overlay_tool_shift_key(VK_F11)),
-            "builderSnapPivotRotation" => Some(overlay_tool_shift_key(VK_F12)),
-            _ => None,
-        };
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = action;
-        None
-    }
 }
 
 #[cfg(target_os = "windows")]
@@ -2437,6 +2772,10 @@ pub async fn send_game_chat_message(
         .get_game(conversation.game_id)
         .map_err(|error| error.to_string())?;
 
+    if game.slug == "gearblocks" {
+        import_latest_gearblocks_runtime_exports(&state, game.id)?;
+    }
+
     state
         .database
         .create_game_chat_message(conversation_id, "user", &content)
@@ -2484,7 +2823,10 @@ fn game_custom_prompt_context(
 }
 
 fn gearblocks_prompt_context(state: &State<'_, AppState>, game_id: i64) -> Result<String, String> {
-    let mut sections = vec![gearblocks_parts_catalog_prompt_context()?];
+    let mut sections = vec![
+        gearblocks_units_prompt_context(),
+        gearblocks_parts_catalog_prompt_context()?,
+    ];
     if let Some(saved_context) = gearblocks_latest_saved_construction_context(state, game_id)? {
         sections.push(saved_context);
     }
@@ -2494,6 +2836,16 @@ fn gearblocks_prompt_context(state: &State<'_, AppState>, game_id: i64) -> Resul
         sections.push(runtime_context);
     }
     Ok(sections.join("\n\n---\n\n"))
+}
+
+fn gearblocks_units_prompt_context() -> String {
+    [
+        "# GearBlocks Scale And Units",
+        "Use GearBlocks metric scale for build advice: 1 GearBlocks unit = 10 cm in real life. A 0.5 unit plate is 5 cm thick, and 16 units is 160 cm.",
+        "When suggesting part movement, spacing, dimensions, or alignment, answer in centimeters and/or GearBlocks units such as 1 unit, 0.5 units, 16 units. Do not give imperial-distance suggestions such as inches or feet unless the user explicitly asks for imperial conversion.",
+        "Scale caveat: the developer noted that the player character, wheels, and other parts are slightly oversized to allow room for gears and other parts inside vehicles. Treat those parts as gameplay-clearance exceptions rather than strict real-world scale references.",
+    ]
+    .join("\n")
 }
 
 fn gearblocks_latest_saved_construction_context(
@@ -3197,6 +3549,242 @@ fn gearblocks_default_user_data_root() -> Result<PathBuf, String> {
         .join("LocalLow")
         .join("SmashHammer Games")
         .join("GearBlocks"))
+}
+
+fn gearblocks_game_install_root(state: &AppState, game_id: i64) -> Option<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Ok(locations) = state.database.list_game_data_locations(game_id) {
+        for location in locations {
+            let configured = PathBuf::from(location.directory_path.trim());
+            if configured.join("GearBlocks.exe").is_file() {
+                candidates.push(configured.clone());
+            }
+            if configured
+                .file_name()
+                .is_some_and(|name| name.to_string_lossy() == "SavedConstructions")
+            {
+                if let Some(root) = configured.parent() {
+                    if root.join("GearBlocks.exe").is_file() {
+                        candidates.push(root.to_path_buf());
+                    }
+                }
+            }
+        }
+    }
+
+    if let Ok(program_files_x86) = std::env::var("ProgramFiles(x86)") {
+        candidates.push(
+            PathBuf::from(program_files_x86)
+                .join("Steam")
+                .join("steamapps")
+                .join("common")
+                .join("GearBlocks"),
+        );
+    }
+    if let Ok(program_files) = std::env::var("ProgramFiles") {
+        candidates.push(
+            PathBuf::from(program_files)
+                .join("Steam")
+                .join("steamapps")
+                .join("common")
+                .join("GearBlocks"),
+        );
+    }
+
+    candidates
+        .into_iter()
+        .find(|candidate| candidate.join("GearBlocks.exe").is_file())
+}
+
+fn gearblocks_bepinex_status(
+    game_root: Option<&Path>,
+) -> GearBlocksThirdPartyDependencyStatusRecord {
+    let expected_path = game_root
+        .map(|root| root.join("BepInEx"))
+        .unwrap_or_else(|| PathBuf::from("GearBlocks game root\\BepInEx"));
+    let mut status_details = Vec::new();
+    let mut log_paths = Vec::new();
+    let mut installed_version = None;
+    let mut is_activated = false;
+    let mut is_installed_correctly = false;
+
+    let detected = game_root.is_some_and(|root| {
+        let bepinex_root = root.join("BepInEx");
+        bepinex_root.is_dir()
+            && (root.join("winhttp.dll").is_file()
+                || root.join("doorstop_config.ini").is_file()
+                || bepinex_root.join("config").is_dir()
+                || bepinex_root.join("LogOutput.log").is_file()
+                || bepinex_root.join("LogOutput.txt").is_file()
+                || bepinex_root.join("plugins").is_dir())
+    });
+
+    if let Some(root) = game_root {
+        let bepinex_root = root.join("BepInEx");
+        let has_bepinex_dir = bepinex_root.is_dir();
+        let has_winhttp = root.join("winhttp.dll").is_file();
+        let has_doorstop_config = root.join("doorstop_config.ini").is_file();
+        let has_core = bepinex_root.join("core").is_dir();
+        let has_config = bepinex_root.join("config").is_dir();
+        let log_records = read_bepinex_log_records(&bepinex_root);
+
+        log_paths = log_records
+            .iter()
+            .map(|record| record.path.to_string_lossy().to_string())
+            .collect();
+        installed_version = log_records
+            .iter()
+            .find_map(|record| find_bepinex_version(&record.content));
+        is_activated = log_records.iter().any(|record| {
+            record.content.contains("Chainloader startup complete")
+                || record.content.contains("Chainloader initialized")
+        });
+        let has_log_output = log_records.iter().any(|record| {
+            record
+                .path
+                .file_name()
+                .is_some_and(|name| name.to_string_lossy() == "LogOutput.log")
+        });
+
+        if has_bepinex_dir {
+            status_details.push("BepInEx folder found.".to_string());
+        }
+        if has_winhttp {
+            status_details.push("Doorstop loader winhttp.dll found.".to_string());
+        }
+        if has_doorstop_config {
+            status_details.push("doorstop_config.ini found.".to_string());
+        }
+        if has_core {
+            status_details.push("BepInEx/core folder found.".to_string());
+        }
+        if has_config {
+            status_details.push("BepInEx/config folder found.".to_string());
+        }
+        if let Some(version) = &installed_version {
+            status_details.push(format!("Log reports BepInEx version {version}."));
+        }
+        if is_activated {
+            status_details.push("Log reports BepInEx chainloader startup complete.".to_string());
+        }
+        if !log_paths.is_empty() {
+            status_details.push(format!("Read {} BepInEx log file(s).", log_paths.len()));
+        }
+
+        is_installed_correctly = has_bepinex_dir
+            && has_winhttp
+            && has_doorstop_config
+            && has_core
+            && has_config
+            && has_log_output
+            && installed_version.is_some();
+    }
+
+    let detail = if is_installed_correctly && is_activated {
+        "Installed correctly and successfully activated.".to_string()
+    } else if detected && is_installed_correctly {
+        "Installed correctly, but activation was not confirmed in the BepInEx logs.".to_string()
+    } else if detected {
+        "Detected BepInEx files, but installation looks incomplete or has not generated a usable log yet.".to_string()
+    } else if game_root.is_some() {
+        "Not detected. Install BepInEx 6 for Unity IL2CPP into the GearBlocks game root and run the game once.".to_string()
+    } else {
+        "GearBlocks install root was not detected. Configure a GearBlocks game root or install location before status can be confirmed.".to_string()
+    };
+
+    GearBlocksThirdPartyDependencyStatusRecord {
+        name: "BepInEx".to_string(),
+        is_detected: detected,
+        is_installed_correctly: Some(is_installed_correctly),
+        is_activated: Some(is_activated),
+        installed_version,
+        expected_path: expected_path.to_string_lossy().to_string(),
+        detail,
+        status_details,
+        log_paths,
+        project_url:
+            "https://docs.bepinex.dev/master/articles/user_guide/installation/unity_il2cpp.html"
+                .to_string(),
+    }
+}
+
+fn gearblocks_gearlib_status(
+    game_root: Option<&Path>,
+) -> GearBlocksThirdPartyDependencyStatusRecord {
+    let expected_path = game_root
+        .map(|root| root.join("BepInEx").join("plugins"))
+        .unwrap_or_else(|| PathBuf::from("GearBlocks game root\\BepInEx\\plugins"));
+    let detected = game_root
+        .map(|root| gearblocks_gearlib_plugin_exists(&root.join("BepInEx").join("plugins")))
+        .unwrap_or(false);
+    let detail = if detected {
+        "Detected GearLib under BepInEx/plugins.".to_string()
+    } else if game_root.is_some() {
+        "Not detected. GearLib is a third-party library and must be installed separately by the user into BepInEx/plugins.".to_string()
+    } else {
+        "GearBlocks install root was not detected. GearLib status cannot be confirmed.".to_string()
+    };
+
+    GearBlocksThirdPartyDependencyStatusRecord {
+        name: "GearLib".to_string(),
+        is_detected: detected,
+        is_installed_correctly: Some(detected),
+        is_activated: None,
+        installed_version: None,
+        expected_path: expected_path.to_string_lossy().to_string(),
+        detail,
+        status_details: Vec::new(),
+        log_paths: Vec::new(),
+        project_url: "https://github.com/KaBooMa/GearLib".to_string(),
+    }
+}
+
+struct BepInExLogRecord {
+    path: PathBuf,
+    content: String,
+}
+
+fn read_bepinex_log_records(bepinex_root: &Path) -> Vec<BepInExLogRecord> {
+    ["LogOutput.log", "ErrorLog.log", "LogOutput.txt"]
+        .into_iter()
+        .filter_map(|file_name| {
+            let path = bepinex_root.join(file_name);
+            fs::read_to_string(&path)
+                .ok()
+                .map(|content| BepInExLogRecord { path, content })
+        })
+        .collect()
+}
+
+fn find_bepinex_version(content: &str) -> Option<String> {
+    content.lines().find_map(|line| {
+        line.find("BepInEx ").and_then(|index| {
+            line[index + "BepInEx ".len()..]
+                .split_whitespace()
+                .next()
+                .map(|version| version.trim_matches('-').to_string())
+                .filter(|version| !version.is_empty())
+        })
+    })
+}
+
+fn gearblocks_gearlib_plugin_exists(plugins_root: &Path) -> bool {
+    if !plugins_root.is_dir() {
+        return false;
+    }
+
+    if plugins_root.join("GearLib.dll").is_file() {
+        return true;
+    }
+
+    fs::read_dir(plugins_root)
+        .ok()
+        .into_iter()
+        .flat_map(|entries| entries.filter_map(|entry| entry.ok()))
+        .any(|entry| {
+            let path = entry.path();
+            path.is_dir() && path.join("GearLib.dll").is_file()
+        })
 }
 
 fn gearblocks_runtime_export_dir(
@@ -4082,19 +4670,66 @@ fn import_new_gearblocks_runtime_exports_from_log(
     })?;
 
     let parse_result = parse_gearblocks_runtime_exports_from_text(log_path, &text);
+    let imported_count =
+        persist_newer_gearblocks_runtime_exports(state, game_id, &parse_result.exports, false)?;
+
+    if parse_result.consumed_bytes > 0 {
+        offset += parse_result.consumed_bytes as u64;
+        save_gearblocks_runtime_log_cursor(state, game_id, log_path, offset, &metadata)?;
+    }
+
+    if imported_count == 0 {
+        return reconcile_gearblocks_runtime_exports_from_log(state, game_id, log_path);
+    }
+
+    Ok(imported_count)
+}
+
+fn reconcile_gearblocks_runtime_exports_from_log(
+    state: &AppState,
+    game_id: i64,
+    log_path: &Path,
+) -> Result<usize, String> {
+    let exports = parse_gearblocks_runtime_exports_from_log(log_path)?;
+    persist_newer_gearblocks_runtime_exports(state, game_id, &exports, true)
+}
+
+fn persist_newer_gearblocks_runtime_exports(
+    state: &AppState,
+    game_id: i64,
+    exports: &[GearBlocksRuntimeExportRecord],
+    only_newer_than_latest: bool,
+) -> Result<usize, String> {
     let indexed_at = unix_timestamp_label();
     let mut previous_export = state
         .database
         .latest_game_runtime_construction_export(game_id)
         .map_err(|error| error.to_string())?;
+    let latest_exported_at = previous_export
+        .as_ref()
+        .map(|export| export.exported_at.clone())
+        .unwrap_or_default();
+    let mut imported_count = 0usize;
 
-    for export in &parse_result.exports {
+    for export in exports {
         if previous_export
             .as_ref()
             .is_some_and(|previous| previous.export_id == export.id)
         {
             continue;
         }
+        let exported_at = export
+            .document
+            .get("exportedAt")
+            .and_then(|value| value.as_str())
+            .unwrap_or_default();
+        if only_newer_than_latest
+            && !latest_exported_at.is_empty()
+            && exported_at <= latest_exported_at.as_str()
+        {
+            continue;
+        }
+
         let diff_summary = gearblocks_runtime_scene_diff_summary(previous_export.as_ref(), export)?;
         let persisted = persist_runtime_export(state, game_id, export, &indexed_at)?;
         import_runtime_export_parts(state, game_id, export)?;
@@ -4103,14 +4738,10 @@ fn import_new_gearblocks_runtime_exports_from_log(
             .save_app_setting(&gearblocks_runtime_scene_diff_key(game_id), &diff_summary)
             .map_err(|error| error.to_string())?;
         previous_export = Some(persisted);
+        imported_count += 1;
     }
 
-    if parse_result.consumed_bytes > 0 {
-        offset += parse_result.consumed_bytes as u64;
-        save_gearblocks_runtime_log_cursor(state, game_id, log_path, offset, &metadata)?;
-    }
-
-    Ok(parse_result.exports.len())
+    Ok(imported_count)
 }
 
 fn gearblocks_runtime_log_cursor_key(game_id: i64, log_path: &Path) -> String {

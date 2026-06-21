@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ComponentHost } from "../components/ComponentHost";
 import { WindowResizeHandles, WindowTitlebar } from "../components/WindowControls";
 import { Calendar } from "../features/calendar/Calendar";
+import { Cessation } from "../features/cessation/Cessation";
 import { Gaming } from "../features/gaming/Gaming";
 import { Notes } from "../features/notes/Notes";
 import { Projects } from "../features/projects/Projects";
@@ -15,11 +16,11 @@ import { getMilestoneStatus } from "../services/appStatus";
 import type { MilestoneStatus } from "../services/appStatus";
 import {
   deleteGame,
-  focusGameChatOverlayWindow,
   getActiveGameChatOverlay,
   listGameChatConversations,
   listGames,
-  openGameChatOverlayWindow
+  openGameChatOverlayWindow,
+  toggleGameChatOverlayWindow
 } from "../services/gaming";
 import type { Game, GameChatConversation } from "../services/gaming";
 import { deletePlanningConversation, listPlanningConversations } from "../services/planningChat";
@@ -27,7 +28,6 @@ import type { PlanningConversation } from "../services/planningChat";
 import { deleteProject, listProjects } from "../services/projects";
 import type { Project } from "../services/projects";
 import {
-  focusLastGameWindow,
   hideOverlayWindow,
   setOverlayMinimumSize,
   setOverlayWindowOpacity,
@@ -39,6 +39,7 @@ type ComponentId =
   | "tasks"
   | "notes"
   | "calendar"
+  | "cessation"
   | "gaming"
   | "projects"
   | "youtube"
@@ -49,6 +50,7 @@ const navItems = [
   { id: "tasks", label: "Tasks" },
   { id: "notes", label: "Notes" },
   { id: "calendar", label: "Calendar" },
+  { id: "cessation", label: "Cessation" },
   { id: "gaming", label: "Gaming" },
   { id: "projects", label: "Projects" },
   { id: "youtube", label: "YouTube" },
@@ -167,11 +169,11 @@ export default function App() {
           } else if (action === "game_chat_overlay") {
             void handleGameChatOverlayShortcut();
           } else if (action === "game_chat_overlay_was_hidden") {
-            void handleGameChatOverlayShortcut(false);
+            void handleGameChatOverlayShortcut();
           } else if (action === "game_chat_overlay_focus_chat") {
-            void focusGameChatPrompt();
+            void handleGameChatOverlayShortcut();
           } else if (action === "game_chat_overlay_focus_game") {
-            void focusGameContext();
+            void handleGameChatOverlayShortcut();
           }
         })
         .catch(() => {});
@@ -227,8 +229,7 @@ export default function App() {
   const activeMeta = useMemo(
     () => ({
       title: navItems.find((item) => item.id === activeComponent)?.label ?? "Scratchpad",
-      eyebrow: status?.milestone ?? "Milestone 13",
-      hotkey: status?.hotkey ?? "Ctrl+Shift+Space"
+      eyebrow: status?.milestone ?? "Milestone 13"
     }),
     [activeComponent, status]
   );
@@ -344,23 +345,10 @@ export default function App() {
     setGameNavAction({ type, gameId: game.id, nonce: Date.now() });
   }
 
-  async function focusGameChatPrompt() {
-    const didFocus = await focusGameChatOverlayWindow().catch(() => false);
-    if (!didFocus) {
-      await handleGameChatOverlayShortcut(false);
-    }
-  }
-
-  async function focusGameContext() {
-    await focusLastGameWindow().catch(() => false);
-  }
-
-  async function handleGameChatOverlayShortcut(preShortcutWasVisible?: boolean) {
+  async function handleGameChatOverlayShortcut() {
     const activeOverlay = await getActiveGameChatOverlay().catch(() => null);
     if (activeOverlay) {
-      await openGameChatOverlayWindow(activeOverlay.gameId, activeOverlay.conversationId).catch(
-        () => {}
-      );
+      await toggleGameChatOverlayWindow().catch(() => {});
       return;
     }
 
@@ -898,7 +886,6 @@ export default function App() {
                 <p>{activeMeta.eyebrow}</p>
                 <h2>{activeMeta.title}</h2>
               </div>
-              <kbd>{activeMeta.hotkey}</kbd>
             </header>
           )}
 
@@ -907,6 +894,7 @@ export default function App() {
             {activeComponent === "tasks" && <Tasks />}
             {activeComponent === "notes" && <Notes />}
             {activeComponent === "calendar" && <Calendar />}
+            {activeComponent === "cessation" && <Cessation />}
             {activeComponent === "gaming" && (
               <Gaming
                 chatOverlayMode={isChatOverlayMode}

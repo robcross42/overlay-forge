@@ -106,33 +106,23 @@ export type GearBlocksLuaExporterInstall = {
   exportDirectory: string;
 };
 
-export type GearBlocksLuaScriptInstall = {
-  scriptModPath: string;
-  mainLuaPath: string;
+export type GearBlocksThirdPartyDependencyStatus = {
+  name: string;
+  isDetected: boolean;
+  isInstalledCorrectly: boolean | null;
+  isActivated: boolean | null;
+  installedVersion: string | null;
+  expectedPath: string;
+  detail: string;
+  statusDetails: string[];
+  logPaths: string[];
+  projectUrl: string;
 };
 
-export type GearBlocksOverlayToolAction =
-  | "weldToggle"
-  | "weldDetach"
-  | "weldFixed"
-  | "weldRotaryBearing"
-  | "weldLinearBearing"
-  | "weldLinearRotaryBearing"
-  | "weldSphericalBearing"
-  | "weldCvJoint"
-  | "weldKnuckleJoint"
-  | "weldNull"
-  | "builderToggleOrientation"
-  | "builderCyclePositionStep"
-  | "builderCycleRotationStep"
-  | "builderMoveToGround"
-  | "builderToggleResizeClamp"
-  | "builderToggleInterpenetration"
-  | "builderToggleAttachmentBridging"
-  | "builderToggleShowAllAttachments"
-  | "builderCycleResizeStep"
-  | "builderSnapPivotPosition"
-  | "builderSnapPivotRotation";
+export type GearBlocksThirdPartyDependencyStatusPayload = {
+  gameRoot: string;
+  dependencies: GearBlocksThirdPartyDependencyStatus[];
+};
 
 export type GearBlocksRuntimeExport = {
   id: string;
@@ -316,6 +306,8 @@ export type GameChatConversation = {
   id: number;
   gameId: number;
   title: string;
+  overlayX: number | null;
+  overlayY: number | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -386,6 +378,10 @@ export function syncGearBlocksRuntimeContext(gameId: number) {
   return invoke<GearBlocksRuntimeContextSync>("sync_gearblocks_runtime_context", { gameId });
 }
 
+export function importGearBlocksRuntimeContext(gameId: number) {
+  return invoke<GearBlocksRuntimeContextSync>("import_gearblocks_runtime_context", { gameId });
+}
+
 export function decodeGearBlocksConstructionFile(constructionPath: string) {
   return invoke<GearBlocksConstructionDecode>("decode_gearblocks_construction_file", {
     constructionPath
@@ -402,12 +398,11 @@ export function installGearBlocksLuaExporter(gameId: number) {
   return invoke<GearBlocksLuaExporterInstall>("install_gearblocks_lua_exporter", { gameId });
 }
 
-export function installGearBlocksOverlayTools(gameId: number) {
-  return invoke<GearBlocksLuaScriptInstall>("install_gearblocks_overlay_tools", { gameId });
-}
-
-export function sendGearBlocksOverlayToolAction(action: GearBlocksOverlayToolAction) {
-  return invoke<void>("send_gearblocks_overlay_tool_action", { action });
+export function getGearBlocksThirdPartyDependencyStatus(gameId: number) {
+  return invoke<GearBlocksThirdPartyDependencyStatusPayload>(
+    "get_gearblocks_third_party_dependency_status",
+    { gameId }
+  );
 }
 
 export function listGearBlocksRuntimeExports(gameId: number) {
@@ -515,6 +510,10 @@ export function openGameChatOverlayWindow(gameId: number, conversationId: number
 
 export function focusGameChatOverlayWindow() {
   return invoke<boolean>("focus_game_chat_overlay_window");
+}
+
+export function toggleGameChatOverlayWindow() {
+  return invoke<boolean>("toggle_game_chat_overlay_window");
 }
 
 export function getActiveGameChatOverlay() {

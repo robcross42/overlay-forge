@@ -3,7 +3,7 @@ use std::error::Error;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use crate::AppState;
+use crate::{commands, AppState};
 use serde::{Deserialize, Serialize};
 use tauri::{App, Emitter, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
@@ -16,9 +16,8 @@ const MAIN_WINDOW_LABEL: &str = "main";
 const GAME_CHAT_WINDOW_LABEL: &str = "game-chat";
 const GAME_CHAT_OVERLAY_ACTION: &str = "game_chat_overlay";
 const GAME_CHAT_OVERLAY_WAS_HIDDEN_ACTION: &str = "game_chat_overlay_was_hidden";
-const GAME_CHAT_OVERLAY_FOCUS_CHAT_ACTION: &str = "game_chat_overlay_focus_chat";
-const GAME_CHAT_OVERLAY_FOCUS_GAME_ACTION: &str = "game_chat_overlay_focus_game";
 const GAME_CHAT_SCREENSHOT_CAPTURE_ACTION: &str = "game_chat_region_capture";
+const RECORD_SMOKING_EVENT_ACTION: &str = "record_smoking_event";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct KeybindConfig {
@@ -62,6 +61,7 @@ pub fn register_toggle_hotkey(app: &mut App) -> Result<(), Box<dyn Error>> {
                                 );
                                 let _ = app.emit("game-chat-screenshot-capture-requested", ());
                             }
+                            RECORD_SMOKING_EVENT_ACTION => record_smoking_event_from_shortcut(app),
                             _ => {}
                         }
                     }
@@ -91,6 +91,11 @@ pub fn default_keybinds() -> Vec<KeybindConfig> {
         KeybindConfig {
             action: GAME_CHAT_SCREENSHOT_CAPTURE_ACTION.to_string(),
             label: "Capture Screenshot For Gaming Chat".to_string(),
+            keys: Vec::new(),
+        },
+        KeybindConfig {
+            action: RECORD_SMOKING_EVENT_ACTION.to_string(),
+            label: "Record Cigarette".to_string(),
             keys: Vec::new(),
         },
     ]
@@ -262,7 +267,28 @@ fn trigger_shortcut_action(app: &tauri::AppHandle, action: &str) {
             set_pending_shortcut_action(app, GAME_CHAT_SCREENSHOT_CAPTURE_ACTION);
             let _ = app.emit("game-chat-screenshot-capture-requested", ());
         }
+        RECORD_SMOKING_EVENT_ACTION => record_smoking_event_from_shortcut(app),
         _ => {}
+    }
+}
+
+fn record_smoking_event_from_shortcut(app: &tauri::AppHandle) {
+    let state = app.state::<AppState>();
+    match state
+        .database
+        .create_smoking_event(None, "keybind", "Recorded from keybind")
+    {
+        Ok(record) => {
+            if let Err(error) =
+                commands::update_smoking_cessation_chatgpt_export(app, state.inner())
+            {
+                eprintln!("Could not update smoking cessation ChatGPT export: {error}");
+            }
+            let _ = app.emit("smoking-event-recorded", record);
+        }
+        Err(error) => {
+            eprintln!("Could not record smoking event: {error}");
+        }
     }
 }
 
@@ -271,23 +297,37 @@ fn trigger_game_chat_overlay_shortcut(app: &tauri::AppHandle) {
         .get_webview_window(GAME_CHAT_WINDOW_LABEL)
         .and_then(|window| window.is_visible().ok())
         .unwrap_or(false);
-    let foreground_is_chat = is_window_foreground(app, GAME_CHAT_WINDOW_LABEL);
-    if !foreground_is_chat {
+    let has_active_chat_context = app
+        .state::<AppState>()
+        .active_game_chat_overlay
+        .lock()
+        .map(|selection| selection.is_some())
+        .unwrap_or(false);
+    let chat_is_foreground = is_window_foreground(app, GAME_CHAT_WINDOW_LABEL);
+    if !chat_is_foreground {
         remember_foreground_window_as_game(app);
     }
 
-    let action = if chat_was_visible && foreground_is_chat {
-        GAME_CHAT_OVERLAY_FOCUS_GAME_ACTION
-    } else if chat_was_visible {
-        GAME_CHAT_OVERLAY_FOCUS_CHAT_ACTION
+    if has_active_chat_context {
+        let result = if chat_was_visible && chat_is_foreground {
+            commands::toggle_active_game_chat_overlay_window(app)
+        } else {
+            commands::show_active_game_chat_overlay_window(app)
+        };
+        if let Err(error) = result {
+            eprintln!("Could not cycle game chat overlay from shortcut: {error}");
+        }
+        return;
+    }
+
+    let action = if chat_was_visible {
+        GAME_CHAT_OVERLAY_ACTION
     } else {
         GAME_CHAT_OVERLAY_WAS_HIDDEN_ACTION
     };
 
     set_pending_shortcut_action(app, action);
-    if chat_was_visible && !foreground_is_chat {
-        wake_game_chat_window(app);
-    } else if !chat_was_visible {
+    if !chat_was_visible {
         wake_overlay_window(app);
     }
     let _ = app.emit("game-chat-overlay-requested", ());
@@ -350,14 +390,6 @@ fn wake_overlay_window(app: &tauri::AppHandle) {
     }
 }
 
-fn wake_game_chat_window(app: &tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window(GAME_CHAT_WINDOW_LABEL) {
-        let _ = window.show();
-        let _ = window.set_always_on_top(true);
-        let _ = window.set_focus();
-    }
-}
-
 fn merge_with_defaults(keybinds: Vec<KeybindConfig>) -> Vec<KeybindConfig> {
     default_keybinds()
         .into_iter()
@@ -396,6 +428,7 @@ fn validate_keybinds(keybinds: &[KeybindConfig]) -> Result<(), String> {
             TOGGLE_OVERLAY_ACTION,
             GAME_CHAT_OVERLAY_ACTION,
             GAME_CHAT_SCREENSHOT_CAPTURE_ACTION,
+            RECORD_SMOKING_EVENT_ACTION,
         ]
         .contains(&keybind.action.as_str())
         {

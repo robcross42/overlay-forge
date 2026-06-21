@@ -47,10 +47,159 @@ Keep `CHANGELOG.md` organized so changes can be reviewed by the day they were ma
 - Keep older historical entries as-is unless a separate cleanup task explicitly asks to reorganize them.
 - When a milestone validation changes documentation, include the validation/documentation update under that day's heading so the daily work summary stays complete.
 
+## Reasoning Model Selection Rules
+
+Optimize cost, latency, and token usage by defaulting all tasks to Medium Reasoning unless the requested work meets the criteria for High Reasoning or Very High Reasoning.
+
+Codex should automatically evaluate each request before execution and select the lowest reasoning level capable of completing the task correctly.
+
+### Default Rule
+
+Use Medium Reasoning for all tasks unless one or more escalation conditions are met.
+
+Do not escalate reasoning simply because a request is large, contains many files, or involves multiple steps. Escalation should be based on complexity, uncertainty, architectural impact, or risk.
+
+### Medium Reasoning
+
+Use for:
+
+- Bug fixes with a clearly identified cause.
+- Small feature additions within an existing architecture.
+- UI adjustments.
+- Refactoring isolated code.
+- Documentation updates.
+- Unit test additions.
+- Data model additions that follow existing patterns.
+- Configuration changes.
+- Log analysis with obvious findings.
+- Simple database updates.
+- Export/import enhancements following existing implementation patterns.
+- Iterative tuning and refinement of existing functionality.
+- Game module feature development where requirements are already understood.
+
+Examples:
+
+- Add a button.
+- Fix a null pointer exception.
+- Add a database field.
+- Update export behavior.
+- Adjust overlay positioning.
+- Improve error handling.
+- Add a new API endpoint following existing conventions.
+
+### High Reasoning
+
+Use when the request requires substantial analysis, design decisions, or understanding of multiple interconnected systems.
+
+Escalate to High Reasoning when any of the following apply:
+
+- Architectural changes affecting multiple modules.
+- Database schema redesign.
+- Significant refactoring across multiple files.
+- New subsystem creation.
+- Complex debugging where root cause is unknown.
+- Performance optimization requiring investigation.
+- State synchronization issues.
+- Multi-step workflows spanning several components.
+- Security-sensitive changes.
+- Concurrency or threading concerns.
+- Data migration planning.
+- New integration with external services.
+- Ambiguous requirements requiring design decisions.
+
+Examples:
+
+- Design a new overlay subsystem.
+- Implement a Graph API integration.
+- Investigate data inconsistencies across modules.
+- Rework export and database synchronization logic.
+- Design a plugin architecture.
+- Create a screenshot ingestion pipeline.
+- Diagnose intermittent synchronization failures.
+
+### Very High Reasoning
+
+Use only when failure would be costly or when extensive planning and deep analysis are required before implementation.
+
+Escalate to Very High Reasoning when any of the following apply:
+
+- Designing entirely new platform architecture.
+- Major framework-level changes.
+- Complex cross-module redesigns.
+- Large-scale data model redesigns.
+- Multi-phase migration strategies.
+- High-risk security architecture.
+- Complex AI-agent workflows.
+- Large project planning requiring extensive decomposition.
+- Requests where multiple valid architectural approaches exist and tradeoff analysis is required.
+- Situations where implementation without significant planning would likely create technical debt.
+
+Examples:
+
+- Designing Overlay Forge core architecture.
+- Defining a new module framework.
+- Planning a major persistence redesign.
+- Designing agent-to-agent coordination systems.
+- Reworking application lifecycle management.
+- Establishing project-wide standards affecting all modules.
+
+### Escalation Process
+
+Before beginning work:
+
+1. Classify the task.
+2. Select the lowest reasoning level capable of completing it.
+3. Briefly state the selected reasoning level.
+4. If the selected level is Medium, proceed with execution.
+5. If the selected level is High or Very High, stop before execution and ask the user to switch the VS Code/Codex reasoning setting to that level. Do not continue until the user confirms the setting has been changed or explicitly tells Codex to proceed anyway.
+
+After completing a Medium Reasoning task, briefly flag the user in the final response if Low Reasoning would likely have been sufficient. Do not stop or delay Medium Reasoning work for this; use it only as post-implementation calibration so the project can tune reasoning defaults over time.
+
+Reasoning levels should be selected conservatively.
+
+If uncertain between two levels:
+
+- Prefer Medium over High.
+- Prefer High over Very High.
+
+Escalate only when the complexity genuinely requires it.
+
+### Overlay Forge Specific Guidance
+
+Medium:
+
+- Routine feature additions.
+- UI changes.
+- Database field additions.
+- Export/import fixes.
+- Module-specific enhancements.
+- Iterative improvements discovered through gameplay.
+
+High:
+
+- New modules.
+- Cross-module integrations.
+- Database architecture changes.
+- State synchronization redesign.
+- External service integrations.
+- Complex troubleshooting with unknown root causes.
+
+Very High:
+
+- Core framework redesign.
+- Agent architecture changes.
+- Major persistence redesign.
+- Module framework redesign.
+- Changes affecting all modules and future development patterns.
+
+Goal: maintain maximum development velocity by using Medium Reasoning whenever practical while automatically escalating to High or Very High Reasoning only when complexity, risk, uncertainty, or architectural impact justify the additional cost.
+
 ## Implementation Rules
 
 - Prefer existing repo patterns and feature boundaries over new abstractions.
 - Keep SQLite migrations non-destructive and idempotent.
+- For new convention-based SQLite tables, use `obj_` for dynamic object tables, `def_` for static definition tables, `o2o_` for one-to-one mapping tables, and `n2n_` for many-to-many mapping tables. Include `created_at` and `modified_at` on new convention-based tables. Do not rename existing historical tables unless a dedicated migration is explicitly requested.
+- Scheduler rows must map to explicit Rust handlers through `def_scheduler_type`; do not store or execute arbitrary commands, script bodies, Lua payloads, shell commands, or frontend-controlled executable strings from SQLite.
 - React must call local Tauri commands for backend-owned behavior.
 - Backend-only secrets stay in Rust/Tauri. Do not expose `OPENAI_API_KEY` or `GITHUB_TOKEN` to frontend source or SQLite.
 - Preserve local-first behavior. Do not introduce cloud sync, broad filesystem indexing, GitHub file browsing, vector stores, semantic search, or direct Codex handoff unless explicitly requested.
@@ -65,6 +214,9 @@ Keep `CHANGELOG.md` organized so changes can be reviewed by the day they were ma
 - Do not trigger GearBlocks runtime log parsing from normal chat navigation; use explicit refresh or backend chat-send context assembly until a true background/latest-export importer is added.
 - Runtime API metadata is availability-only by default. Do not execute getter commands or include API getter values in default chat prompt context unless a future explicit user-controlled include/snapshot action is added.
 - Prefer normalized GearBlocks runtime/API tables and command-layer payloads over reparsing only the full runtime export JSON blob.
+- BepInEx and GearLib are third-party, user-installed dependencies. Overlay Forge may detect and document their presence, but must not bundle, redistribute, install, or modify them unless a future explicit license / permission review allows it.
+- GearBlocks scale guidance must use metric units: 1 GearBlocks unit equals 10 cm. Chat should answer GearBlocks build-distance advice in centimeters and/or GearBlocks units such as 1 unit, 0.5 units, or 16 units, and should not suggest imperial distances unless the user explicitly asks for imperial conversion.
+- GearBlocks scale caveat: the developer noted that the player character, wheels, and other parts are slightly oversized to allow room for gears and other parts inside vehicles. Treat those as gameplay-clearance exceptions, not strict real-world scale references.
 - Preserve the validated `game-screenshots/` folder layout, Tauri asset preview scope, overlay-hidden capture behavior, and screenshot delete cleanup semantics.
 
 ## Validation

@@ -50,6 +50,10 @@ Gaming Screenshot Capture is complete, passed, and successful. It adds a Gaming 
 
 Overlay Forge 0.2.0 GearBlocks runtime API interface support is complete, passed, and successful. It adds documented construction namespace interface descriptors, Lua exporter availability metadata, runtime-log import normalization, SQLite persistence of indexed interface data, and catalog display of attribute availability. API metadata is excluded from default prompt context unless a future explicit include control is added.
 
+Smoking Cessation is implemented as a local-first core feature module inside the shell-owned component host. The React feature reads and writes through Tauri commands, records cigarette events in SQLite, tracks the current cigarette inventory count, shows the seeded `Nicoderm Step 1` patch marker, and uses the existing Settings keybind system for the optional `Record Cigarette` shortcut. Cigarette record actions decrement the inventory count in SQLite, while the frontend derives recent spacing and run-out prediction from event timestamps. Cigarette record, delete, refresh, and keybind paths update a local ChatGPT-readable Markdown export under the app data `chatgpt-exports` folder so external chat context can use a narrow file instead of the live SQLite database.
+
+The Scheduler framework is a backend-owned worker loop backed by convention-based SQLite tables. Schedule rows are dynamic `obj_scheduler` records that point to static `def_scheduler_type` definitions. The dispatcher is closed over known Rust handlers, so scheduler records cannot execute arbitrary commands or Lua/script payloads from SQLite. The first registered scheduler type refreshes the Smoking Cessation ChatGPT Markdown export on startup and then every 60 seconds.
+
 ## UI Consistency
 
 Organizer components should follow the same interaction pattern unless a milestone explicitly documents a reason to diverge:
@@ -93,6 +97,8 @@ The Tauri backend owns:
 - Bridge file draft commands
 - Project Markdown context configuration and loading commands
 - Gaming and screenshot capture commands
+- Smoking Cessation event and settings commands
+- Scheduler commands and backend worker dispatch
 - Global hotkey registration
 - Window show/hide behavior
 
@@ -126,9 +132,15 @@ Milestone 12 adds idempotent table initialization for `project_markdown_context`
 
 Gaming adds idempotent table initialization for `games`, `game_data_locations`, `game_catalog_objects`, `game_catalog_references`, and `game_catalog_screenshots`. `game_data_locations` stores game-scoped local save or alternate data directories for games that expose the feature, with GearBlocks currently exposing the controls from its selected-game Home screen. Screenshot image bytes are stored as PNG files under `game-screenshots/`, while SQLite stores metadata and local paths only. The screenshot preview path uses Tauri asset loading scoped to `game-screenshots/`.
 
-GearBlocks construction decoding is local-first and file-based. GearBlocks' default user data location is `%USERPROFILE%\AppData\LocalLow\SmashHammer Games\GearBlocks\`. Overlay Forge discovers `construction.bytes` files from the configured GearBlocks Save Location or that default root's `SavedConstructions` folder, inflates the raw DEFLATE payload, parses the BSON document, and renders a JSON-friendly summary on the GearBlocks Home screen. Runtime-only metadata such as display names, categories, mass, active stage, and documented construction namespace interface availability is handled through an installable GearBlocks Lua script mod under the default root's `ScriptMods` folder that exports the full live scene through marked `Player.log` JSON chunks when direct Lua file writes are unavailable. Overlay Forge indexes those runtime chunks through explicit refresh/import and backend chat-send context assembly; normal chat navigation must not synchronously parse full-scene runtime logs. GearBlocks chat converts the latest whole-scene runtime export into a semantic vehicle-build summary that aggregates welded structural pieces and lists functional systems with inferred purposes.
+Game chat overlay position is persisted on each `game_chat_conversations` row through nullable `overlay_x` and `overlay_y` coordinates. The backend saves the active chat overlay's outer window position when the overlay moves and reapplies those coordinates when that same chat opens, so placement survives app restarts while the chat exists.
 
-GearBlocks Tools adds a separate installable `OverlayForgeTools` script mod. It creates no GearBlocks UI window and listens for a fixed set of tool hotkeys. Overlay Forge exposes BuilderToolExt and WeldTool controls in the Gaming workspace and sends only whitelisted key actions to the remembered GearBlocks window.
+GearBlocks construction decoding is local-first and file-based. GearBlocks' default user data location is `%USERPROFILE%\AppData\LocalLow\SmashHammer Games\GearBlocks\`. Overlay Forge discovers `construction.bytes` files from the configured GearBlocks Save Location or that default root's `SavedConstructions` folder, inflates the raw DEFLATE payload, parses the BSON document, and renders a JSON-friendly summary on the GearBlocks Home screen. Runtime-only metadata such as display names, categories, mass, active stage, and documented construction namespace interface availability is handled through an installable GearBlocks Lua script mod under the default root's `ScriptMods` folder that exports the full live scene through marked `Player.log` JSON chunks when direct Lua file writes are unavailable. Overlay Forge indexes those runtime chunks through explicit refresh/import, a passive cursor-based GearBlocks runtime import monitor, and backend chat-send context assembly; normal chat navigation must not synchronously parse full-scene runtime logs. GearBlocks chat converts the latest whole-scene runtime export into a semantic vehicle-build summary that aggregates welded structural pieces and lists functional systems with inferred purposes.
+
+GearBlocks Tools uses the same installable Overlay Forge GearBlocks script as scene context export. The script creates one movable, resizable GearBlocks window with a compact home menu for Scene, Builder, Weld, and Status. Each menu item replaces the content with a single tool view, updates the window title, and exposes a Back button. Scene export remains the explicit whole-scene runtime context path, while BuilderToolExt and WeldTool helpers run inside that single in-game script window instead of through a separate no-window hotkey bridge.
+
+Smoking Cessation adds idempotent table initialization for `smoking_events` and `smoking_cessation_settings`. Cigarette events are stored as local timestamped rows with a source marker for module or keybind entry. The singleton cessation settings row stores the current patch label, start time, and timezone. The frontend charts are derived from SQLite rows at render time rather than storing aggregate data.
+
+Scheduler persistence adds `def_scheduler_type`, `obj_scheduler`, and `obj_scheduler_run`. These tables establish the forward naming convention for new persistence: `obj_` for dynamic objects, `def_` for static definitions, `o2o_` for one-to-one mappings, and `n2n_` for many-to-many mappings. Scheduler jobs use leases and run history so future modules, including GearBlocks, can add bounded background work without each module inventing its own polling table.
 
 ## OpenAI Boundary
 

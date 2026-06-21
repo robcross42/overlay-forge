@@ -1,9 +1,10 @@
 {
-  "name": "Overlay Forge Construction Exporter",
-  "desc": "Exports loaded GearBlocks construction runtime metadata to JSON for Overlay Forge.",
+  "name": "Overlay Forge",
+  "desc": "Single Overlay Forge script window for scene export, builder helpers, and weld tools.",
   "tags": [
     "Overlay Forge",
     "Construction",
-    "Export"
+    "Export",
+    "Tools"
   ]
 }

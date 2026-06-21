@@ -10,10 +10,11 @@ import {
   createGameChatScreenshotCapture,
   createGameScreenshotCaptureRequest,
   decodeGearBlocksConstructionFile,
+  getGearBlocksThirdPartyDependencyStatus,
   installGearBlocksLuaExporter,
   importGearBlocksCatalogScreenshotImages,
+  importGearBlocksRuntimeContext,
   importGearBlocksRuntimePartIndex,
-  installGearBlocksOverlayTools,
   deleteGameChatConversation,
   deleteGameDataLocation,
   deleteGameScreenshot,
@@ -30,7 +31,6 @@ import {
   listGameRuntimeParts,
   listGameScreenshots,
   saveGameDataLocation,
-  sendGearBlocksOverlayToolAction,
   setGameRuntimePartDisplayImage,
   sendGameChatMessage,
   syncGearBlocksRuntimeContext,
@@ -47,11 +47,11 @@ import type {
   GameDataLocationType,
   GameRuntimePart,
   GameRuntimePartApiMember,
-  GearBlocksOverlayToolAction,
   GearBlocksApiCatalog,
   GearBlocksApiMember,
   GearBlocksConstructionDecode,
   GearBlocksConstructionFile,
+  GearBlocksThirdPartyDependencyStatusPayload,
   GearBlocksRuntimeExport,
   GamePartCategory,
   GameScreenshotCaptureRequest
@@ -94,35 +94,6 @@ const GEARBLOCKS_PARTS_CATALOG_METADATA = {
   validation: "Validated"
 };
 const SHOW_GEARBLOCKS_CATALOG_MAINTENANCE_CONTROLS = false;
-const GEARBLOCKS_WELD_TOOL_ACTIONS: Array<{
-  label: string;
-  action: GearBlocksOverlayToolAction;
-}> = [
-  { label: "Fixed", action: "weldFixed" },
-  { label: "Rotary", action: "weldRotaryBearing" },
-  { label: "Linear", action: "weldLinearBearing" },
-  { label: "Linear Rotary", action: "weldLinearRotaryBearing" },
-  { label: "Spherical", action: "weldSphericalBearing" },
-  { label: "CV", action: "weldCvJoint" },
-  { label: "Knuckle", action: "weldKnuckleJoint" },
-  { label: "Null", action: "weldNull" }
-];
-const GEARBLOCKS_BUILDER_TOOL_ACTIONS: Array<{
-  label: string;
-  action: GearBlocksOverlayToolAction;
-}> = [
-  { label: "Orientation", action: "builderToggleOrientation" },
-  { label: "Position Step", action: "builderCyclePositionStep" },
-  { label: "Rotation Step", action: "builderCycleRotationStep" },
-  { label: "Resize Step", action: "builderCycleResizeStep" },
-  { label: "Move Ground", action: "builderMoveToGround" },
-  { label: "Snap Position", action: "builderSnapPivotPosition" },
-  { label: "Snap Rotation", action: "builderSnapPivotRotation" },
-  { label: "Clamp Resize", action: "builderToggleResizeClamp" },
-  { label: "Interpenetration", action: "builderToggleInterpenetration" },
-  { label: "Attachment Bridging", action: "builderToggleAttachmentBridging" },
-  { label: "All Attachments", action: "builderToggleShowAllAttachments" }
-];
 const GAME_DATA_LOCATION_OPTIONS: Array<{
   type: GameDataLocationType;
   title: string;
@@ -173,9 +144,10 @@ export function Gaming({
   const [decodingConstructionPath, setDecodingConstructionPath] = useState("");
   const [isInstallingLuaExporter, setIsInstallingLuaExporter] = useState(false);
   const [luaExporterPath, setLuaExporterPath] = useState("");
-  const [isInstallingGearBlocksTools, setIsInstallingGearBlocksTools] = useState(false);
-  const [gearBlocksToolsPath, setGearBlocksToolsPath] = useState("");
-  const [isSendingGearBlocksToolAction, setIsSendingGearBlocksToolAction] = useState(false);
+  const [gearBlocksDependencyStatus, setGearBlocksDependencyStatus] =
+    useState<GearBlocksThirdPartyDependencyStatusPayload | null>(null);
+  const [isLoadingGearBlocksDependencyStatus, setIsLoadingGearBlocksDependencyStatus] =
+    useState(false);
   const [runtimeExports, setRuntimeExports] = useState<GearBlocksRuntimeExport[]>([]);
   const [selectedRuntimeExportId, setSelectedRuntimeExportId] = useState("");
   const [gearBlocksApiCatalog, setGearBlocksApiCatalog] = useState<GearBlocksApiCatalog | null>(
@@ -325,13 +297,12 @@ export function Gaming({
       setDecodingConstructionPath("");
       setIsInstallingLuaExporter(false);
       setLuaExporterPath("");
-      setIsInstallingGearBlocksTools(false);
-      setGearBlocksToolsPath("");
-      setIsSendingGearBlocksToolAction(false);
       setRuntimeExports([]);
       setSelectedRuntimeExportId("");
       setGearBlocksApiCatalog(null);
       setSelectedGearBlocksApiTypeId(null);
+      setGearBlocksDependencyStatus(null);
+      setIsLoadingGearBlocksDependencyStatus(false);
       setIsLoadingGearBlocksApiCatalog(false);
       setIsImportingRuntimeExports(false);
       setIsImportingCatalogScreenshot(false);
@@ -372,12 +343,14 @@ export function Gaming({
           void refreshGearBlocksConstructionFiles(selectedGame.id);
           void syncGearBlocksConstructions(selectedGame.id);
           void refreshGearBlocksApiCatalog();
+          void refreshGearBlocksDependencyStatus(selectedGame.id);
         } else {
           setConstructionFiles([]);
           setGameConstructions([]);
           setDecodedConstruction(null);
           setGearBlocksApiCatalog(null);
           setSelectedGearBlocksApiTypeId(null);
+          setGearBlocksDependencyStatus(null);
         }
       })
       .catch((error) => setStatus(formatError(error)));
@@ -459,6 +432,50 @@ export function Gaming({
       onExitChatOverlayMode?.();
     }
   }, [chatOverlayMode, selectedGame?.id, gameView, selectedChatConversationId, onExitChatOverlayMode]);
+
+  useEffect(() => {
+    if (!selectedGame || selectedGame.slug !== "gearblocks" || gameView !== "chat") {
+      return;
+    }
+
+    let isCancelled = false;
+    let isImporting = false;
+
+    async function importManualRuntimeExports() {
+      if (!selectedGame || isImporting) {
+        return;
+      }
+      isImporting = true;
+      try {
+        const sync = await importGearBlocksRuntimeContext(selectedGame.id);
+        if (!isCancelled && sync.changed) {
+          const [categories, orderedParts] = await Promise.all([
+            listGamePartCategories(selectedGame.id),
+            listGameRuntimeParts(selectedGame.id)
+          ]);
+          if (!isCancelled) {
+            setPartCategories(categories);
+            setRuntimeParts(orderedParts);
+            setStatus(
+              `Indexed latest GearBlocks scene export: ${sync.runtimePartCount} runtime part reference(s), ${sync.runtimeExportCount} scene export(s)`
+            );
+          }
+        }
+      } catch {
+        // Passive import should not interrupt chat typing.
+      } finally {
+        isImporting = false;
+      }
+    }
+
+    void importManualRuntimeExports();
+    const intervalId = window.setInterval(importManualRuntimeExports, 2500);
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [gameView, selectedGame?.id, selectedGame?.slug]);
 
   useEffect(() => {
     setChatScreenshotPage((current) => Math.min(current, chatScreenshotPageCount - 1));
@@ -867,6 +884,19 @@ export function Gaming({
     }
   }
 
+  async function refreshGearBlocksDependencyStatus(gameId: number) {
+    setIsLoadingGearBlocksDependencyStatus(true);
+    try {
+      const dependencyStatus = await getGearBlocksThirdPartyDependencyStatus(gameId);
+      setGearBlocksDependencyStatus(dependencyStatus);
+    } catch (error) {
+      setStatus(formatError(error));
+      setGearBlocksDependencyStatus(null);
+    } finally {
+      setIsLoadingGearBlocksDependencyStatus(false);
+    }
+  }
+
   async function syncGearBlocksConstructions(gameId: number) {
     setIsSyncingGameConstructions(true);
     try {
@@ -908,34 +938,6 @@ export function Gaming({
       window.alert(formatError(error));
     } finally {
       setIsInstallingLuaExporter(false);
-    }
-  }
-
-  async function installGearBlocksTools(game: Game) {
-    setIsInstallingGearBlocksTools(true);
-    try {
-      const install = await installGearBlocksOverlayTools(game.id);
-      setGearBlocksToolsPath(install.scriptModPath);
-      setStatus(`Overlay Forge Tools installed: ${install.scriptModPath}`);
-      showToast("Successful");
-    } catch (error) {
-      setStatus(formatError(error));
-      window.alert(formatError(error));
-    } finally {
-      setIsInstallingGearBlocksTools(false);
-    }
-  }
-
-  async function sendGearBlocksToolAction(action: GearBlocksOverlayToolAction) {
-    setIsSendingGearBlocksToolAction(true);
-    try {
-      await sendGearBlocksOverlayToolAction(action);
-      setStatus("Sent GearBlocks tool action");
-    } catch (error) {
-      setStatus(formatError(error));
-      window.alert(formatError(error));
-    } finally {
-      setIsSendingGearBlocksToolAction(false);
     }
   }
 
@@ -1238,6 +1240,76 @@ export function Gaming({
               <span>{parts.length} cataloged parts</span>
               <span>{runtimeParts.length} runtime API parts</span>
               <span>{chatConversations.length} chats</span>
+              {selectedGame.slug === "gearblocks" && (
+                <section
+                  className="game-third-party-panel"
+                  aria-label="GearBlocks third-party dependencies"
+                >
+                  <div className="game-data-locations-head">
+                    <div>
+                      <p>Third-party Mods</p>
+                      <h4>BepInEx and GearLib</h4>
+                    </div>
+                    <button
+                      className="ghost-button"
+                      disabled={isLoadingGearBlocksDependencyStatus}
+                      onClick={() => void refreshGearBlocksDependencyStatus(selectedGame.id)}
+                      type="button"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                  <p>
+                    Overlay Forge does not bundle or install these third-party dependencies. Install
+                    them separately from their official sources before using GearLib-based features.
+                  </p>
+                  <code>{gearBlocksDependencyStatus?.gameRoot || "GearBlocks install root not detected"}</code>
+                  <div className="game-third-party-list">
+                    {gearBlocksDependencyStatus?.dependencies.map((dependency) => (
+                      <article
+                        className={
+                          dependency.isDetected
+                            ? "game-third-party-row detected"
+                            : "game-third-party-row"
+                        }
+                        key={dependency.name}
+                      >
+                        <div>
+                          <strong>{dependency.name}</strong>
+                          <span>{dependency.detail}</span>
+                          {dependency.installedVersion && (
+                            <span>Version: {dependency.installedVersion}</span>
+                          )}
+                          {dependency.isInstalledCorrectly !== null && (
+                            <span>
+                              Install check:{" "}
+                              {dependency.isInstalledCorrectly ? "Correct" : "Needs attention"}
+                            </span>
+                          )}
+                          {dependency.isActivated !== null && (
+                            <span>
+                              Activation:{" "}
+                              {dependency.isActivated ? "Successful" : "Not confirmed"}
+                            </span>
+                          )}
+                          <code>{dependency.expectedPath}</code>
+                          {dependency.logPaths.map((logPath) => (
+                            <code key={logPath}>{logPath}</code>
+                          ))}
+                        </div>
+                        <span>{dependency.isDetected ? "Detected" : "Not detected"}</span>
+                      </article>
+                    ))}
+                    {!gearBlocksDependencyStatus && (
+                      <p>
+                        {isLoadingGearBlocksDependencyStatus
+                          ? "Checking third-party dependency status."
+                          : "Dependency status has not been checked."}
+                      </p>
+                    )}
+                  </div>
+                </section>
+              )}
               {selectedGame.slug === "gearblocks" && (
                 <section className="game-data-locations-panel" aria-label="Game data locations">
                   <div className="game-data-locations-head">
@@ -1577,40 +1649,36 @@ export function Gaming({
                 </div>
                 <button
                   className="ghost-button"
-                  disabled={isInstallingGearBlocksTools}
-                  onClick={() => void installGearBlocksTools(selectedGame)}
+                  disabled={isInstallingLuaExporter}
+                  onClick={() => void installGearBlocksExporter(selectedGame)}
                   type="button"
                 >
-                  Install Tools
+                  Install Overlay Forge Script
                 </button>
               </div>
 
-              {gearBlocksToolsPath && (
+              {luaExporterPath && (
                 <div className="game-script-tools-status">
-                  <span>OverlayForgeTools</span>
-                  <code>{gearBlocksToolsPath}</code>
+                  <span>Overlay Forge Script</span>
+                  <code>{luaExporterPath}</code>
                 </div>
               )}
 
               <div className="game-script-tools-grid">
                 <article className="game-script-tool-card">
                   <div>
+                    <p>Scene</p>
+                    <h4>Scene Context</h4>
+                  </div>
+                  <p>Full live-scene export for chat context.</p>
+                </article>
+
+                <article className="game-script-tool-card">
+                  <div>
                     <p>BuilderToolExt</p>
                     <h4>Builder Tool</h4>
                   </div>
-                  <div className="game-script-tool-actions">
-                    {GEARBLOCKS_BUILDER_TOOL_ACTIONS.map((toolAction) => (
-                      <button
-                        className="ghost-button"
-                        disabled={isSendingGearBlocksToolAction}
-                        key={toolAction.action}
-                        onClick={() => void sendGearBlocksToolAction(toolAction.action)}
-                        type="button"
-                      >
-                        {toolAction.label}
-                      </button>
-                    ))}
-                  </div>
+                  <p>Orientation, step intervals, pivot transforms, sizing, and attachment visibility.</p>
                 </article>
 
                 <article className="game-script-tool-card">
@@ -1618,37 +1686,7 @@ export function Gaming({
                     <p>WeldTool</p>
                     <h4>Weld Tool</h4>
                   </div>
-                  <div className="game-script-tool-actions compact">
-                    {GEARBLOCKS_WELD_TOOL_ACTIONS.map((toolAction) => (
-                      <button
-                        className="ghost-button"
-                        disabled={isSendingGearBlocksToolAction}
-                        key={toolAction.action}
-                        onClick={() => void sendGearBlocksToolAction(toolAction.action)}
-                        type="button"
-                      >
-                        {toolAction.label}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="game-script-tool-actions">
-                    <button
-                      className="primary-button"
-                      disabled={isSendingGearBlocksToolAction}
-                      onClick={() => void sendGearBlocksToolAction("weldToggle")}
-                      type="button"
-                    >
-                      Start / Complete
-                    </button>
-                    <button
-                      className="ghost-button"
-                      disabled={isSendingGearBlocksToolAction}
-                      onClick={() => void sendGearBlocksToolAction("weldDetach")}
-                      type="button"
-                    >
-                      Detach
-                    </button>
-                  </div>
+                  <p>Attachment type, start/complete weld, detach, and targeting feedback.</p>
                 </article>
               </div>
             </section>

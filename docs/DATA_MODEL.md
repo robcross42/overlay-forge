@@ -34,6 +34,10 @@ The GearBlocks Gaming workspace includes an API tab that reads this payload and 
 
 GearBlocks runtime part detail views can query `game_runtime_part_api_members` through the command layer to display canonical API member availability for the selected part, falling back to raw exported `apiAttributes` only when bridge rows are not available.
 
+The Smoking Cessation module stores cigarette event timestamps locally in SQLite and keeps a singleton cessation settings row for the current patch marker and current cigarette inventory count. The initial marker records `Nicoderm Step 1` started at `2026-06-21 15:00:00 EDT`. The module also renders a derived Markdown export for ChatGPT context at `%APPDATA%\com.overlayforge.desktop\chatgpt-exports\smoking-cessation.md`; SQLite remains the source of truth.
+
+The Scheduler framework adds new convention-based tables for reusable background work. New persistence added after this point should prefer `obj_` for dynamic object rows, `def_` for static definition rows, `o2o_` for one-to-one mappings, and `n2n_` for many-to-many mappings. New convention-based tables should include `created_at` and `modified_at`. Existing historical tables are not renamed as part of the scheduler migration.
+
 ## Tables
 
 ### scratchpad
@@ -88,6 +92,90 @@ updated_at
 ```
 
 Simple local event list for Milestone 1. Recurrence, invites, and external calendar sync are deferred.
+
+### smoking_events
+
+```text
+id
+smoked_at
+source
+notes
+created_at
+```
+
+Local cigarette event records for the Smoking Cessation module. `smoked_at` stores the recorded event time, `source` distinguishes manual module entries from keybind entries, and `notes` is available for short local context. Events can be deleted from the module history without affecting other app data.
+
+### smoking_cessation_settings
+
+```text
+id
+patch_label
+patch_started_at
+patch_timezone
+current_cigarette_count
+created_at
+updated_at
+```
+
+Singleton Smoking Cessation settings row. `id` is constrained to `1`. Existing databases are initialized non-destructively with `Nicoderm Step 1`, `2026-06-21 15:00:00`, and `EDT` as the initial patch marker. `current_cigarette_count` stores the user-entered cigarette inventory and is decremented by each new smoking event without deleting historical events.
+
+### def_scheduler_type
+
+```text
+id
+scheduler_key
+label
+description
+created_at
+modified_at
+```
+
+Static scheduler type definitions. `scheduler_key` maps each schedule row to a known Rust handler; SQLite scheduler rows do not execute arbitrary commands or scripts.
+
+Seeded values:
+
+```text
+1 = smoking_cessation_export
+```
+
+### obj_scheduler
+
+```text
+id
+id_type
+owner_module
+name
+is_enabled
+interval_seconds
+run_on_startup
+coalesce_missed_runs
+payload_json
+next_run_at
+last_run_at
+last_status
+last_error
+lease_until
+created_at
+modified_at
+```
+
+Dynamic scheduler records. Each row defines one scheduled event owned by a module. `id_type` points to `def_scheduler_type`. `lease_until` is used by the backend worker to avoid duplicate execution. The initial seeded schedule refreshes the Smoking Cessation ChatGPT export every 60 seconds and on first startup run.
+
+### obj_scheduler_run
+
+```text
+id
+id_scheduler
+id_type
+started_at
+finished_at
+status
+message
+created_at
+modified_at
+```
+
+Run history for scheduled events. Each execution records status and message so future UI can inspect scheduler health without parsing logs.
 
 ### projects
 
@@ -655,6 +743,32 @@ The preferred GearBlocks-compatible path remains internal game-engine export for
 The selected-game UI lists captured screenshot rows in a collapsible Screenshots section. The toolbar remains fixed at the top of the game pane, while screenshot previews and future catalog content scroll below it. Tauri asset loading is enabled for `game-screenshots/` so saved PNGs render as thumbnails inside the webview.
 
 Right-clicking a screenshot opens the screenshot context menu. The validated delete action removes the saved PNG, the capture manifest JSON, the screenshot metadata row, and any `game_catalog_references` rows for the same game whose `local_path` points at the deleted screenshot or manifest.
+
+### game_chat_conversations
+
+```text
+id
+game_id
+title
+overlay_x
+overlay_y
+created_at
+updated_at
+```
+
+Game-scoped chat conversation records for the Gaming workspace. `overlay_x` and `overlay_y` store the latest outer window coordinates for the simple game chat overlay when that conversation is active. The coordinates are nullable, are restored when the conversation's overlay opens, and are deleted naturally with the conversation row.
+
+### game_chat_messages
+
+```text
+id
+conversation_id
+role
+content
+created_at
+```
+
+Game chat messages scoped to `game_chat_conversations`. Deleting a game chat conversation removes its messages and its persisted overlay coordinates.
 
 ## Migration Notes
 

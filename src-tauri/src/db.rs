@@ -53,6 +53,72 @@ pub struct CalendarEventRecord {
     pub updated_at: String,
 }
 
+#[derive(Clone, Serialize)]
+pub struct SmokingEventRecord {
+    pub id: i64,
+    #[serde(rename = "smokedAt")]
+    pub smoked_at: String,
+    pub source: String,
+    pub notes: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct SmokingCessationSettingsRecord {
+    pub id: i64,
+    #[serde(rename = "patchLabel")]
+    pub patch_label: String,
+    #[serde(rename = "patchStartedAt")]
+    pub patch_started_at: String,
+    #[serde(rename = "patchTimezone")]
+    pub patch_timezone: String,
+    #[serde(rename = "currentCigaretteCount")]
+    pub current_cigarette_count: i64,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct SchedulerRecord {
+    pub id: i64,
+    #[serde(rename = "typeId")]
+    pub type_id: i64,
+    #[serde(rename = "typeKey")]
+    pub type_key: String,
+    #[serde(rename = "typeLabel")]
+    pub type_label: String,
+    #[serde(rename = "ownerModule")]
+    pub owner_module: String,
+    pub name: String,
+    #[serde(rename = "isEnabled")]
+    pub is_enabled: bool,
+    #[serde(rename = "intervalSeconds")]
+    pub interval_seconds: i64,
+    #[serde(rename = "runOnStartup")]
+    pub run_on_startup: bool,
+    #[serde(rename = "coalesceMissedRuns")]
+    pub coalesce_missed_runs: bool,
+    #[serde(rename = "payloadJson")]
+    pub payload_json: String,
+    #[serde(rename = "nextRunAt")]
+    pub next_run_at: String,
+    #[serde(rename = "lastRunAt")]
+    pub last_run_at: String,
+    #[serde(rename = "lastStatus")]
+    pub last_status: String,
+    #[serde(rename = "lastError")]
+    pub last_error: String,
+    #[serde(rename = "leaseUntil")]
+    pub lease_until: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "modifiedAt")]
+    pub modified_at: String,
+}
+
 #[derive(Serialize)]
 pub struct ProjectRecord {
     pub id: i64,
@@ -527,6 +593,10 @@ pub struct GameChatConversationRecord {
     #[serde(rename = "gameId")]
     pub game_id: i64,
     pub title: String,
+    #[serde(rename = "overlayX")]
+    pub overlay_x: Option<i32>,
+    #[serde(rename = "overlayY")]
+    pub overlay_y: Option<i32>,
     #[serde(rename = "createdAt")]
     pub created_at: String,
     #[serde(rename = "updatedAt")]
@@ -656,6 +726,109 @@ impl AppDatabase {
                 notes TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS smoking_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                smoked_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                source TEXT NOT NULL DEFAULT 'manual',
+                notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS smoking_cessation_settings (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                patch_label TEXT NOT NULL DEFAULT '',
+                patch_started_at TEXT NOT NULL DEFAULT '',
+                patch_timezone TEXT NOT NULL DEFAULT '',
+                current_cigarette_count INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            INSERT OR IGNORE INTO smoking_cessation_settings (
+                id,
+                patch_label,
+                patch_started_at,
+                patch_timezone
+            )
+            VALUES (1, 'Nicoderm Step 1', '2026-06-21 15:00:00', 'EDT');
+
+            CREATE TABLE IF NOT EXISTS def_scheduler_type (
+                id INTEGER PRIMARY KEY,
+                scheduler_key TEXT NOT NULL UNIQUE,
+                label TEXT NOT NULL,
+                description TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_scheduler (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id_type INTEGER NOT NULL,
+                owner_module TEXT NOT NULL,
+                name TEXT NOT NULL,
+                is_enabled INTEGER NOT NULL DEFAULT 1,
+                interval_seconds INTEGER NOT NULL DEFAULT 60,
+                run_on_startup INTEGER NOT NULL DEFAULT 1,
+                coalesce_missed_runs INTEGER NOT NULL DEFAULT 1,
+                payload_json TEXT NOT NULL DEFAULT '{}',
+                next_run_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                last_run_at TEXT NOT NULL DEFAULT '',
+                last_status TEXT NOT NULL DEFAULT '',
+                last_error TEXT NOT NULL DEFAULT '',
+                lease_until TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (id_type) REFERENCES def_scheduler_type(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_scheduler_run (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id_scheduler INTEGER NOT NULL,
+                id_type INTEGER NOT NULL,
+                started_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                finished_at TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'running',
+                message TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (id_scheduler) REFERENCES obj_scheduler(id),
+                FOREIGN KEY (id_type) REFERENCES def_scheduler_type(id)
+            );
+
+            INSERT OR IGNORE INTO def_scheduler_type (
+                id,
+                scheduler_key,
+                label,
+                description
+            )
+            VALUES (
+                1,
+                'smoking_cessation_export',
+                'Smoking Cessation Export',
+                'Refreshes the Smoking Cessation ChatGPT Markdown export and derived time-sensitive context.'
+            );
+
+            INSERT OR IGNORE INTO obj_scheduler (
+                id_type,
+                owner_module,
+                name,
+                interval_seconds,
+                run_on_startup,
+                coalesce_missed_runs,
+                payload_json,
+                next_run_at
+            )
+            VALUES (
+                1,
+                'smoking_cessation',
+                'Refresh Smoking Cessation ChatGPT export',
+                60,
+                1,
+                1,
+                '{}',
+                datetime('now', 'localtime')
             );
 
             CREATE TABLE IF NOT EXISTS projects (
@@ -1023,6 +1196,8 @@ impl AppDatabase {
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
                 title TEXT NOT NULL DEFAULT 'Game chat',
+                overlay_x INTEGER,
+                overlay_y INTEGER,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
@@ -1091,6 +1266,14 @@ impl AppDatabase {
                 ON game_runtime_construction_exports (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_construction_exports_exported_at
                 ON game_runtime_construction_exports (game_id, exported_at);
+            CREATE INDEX IF NOT EXISTS idx_obj_scheduler_due
+                ON obj_scheduler (is_enabled, next_run_at);
+            CREATE INDEX IF NOT EXISTS idx_obj_scheduler_type
+                ON obj_scheduler (id_type);
+            CREATE INDEX IF NOT EXISTS idx_obj_scheduler_run_scheduler
+                ON obj_scheduler_run (id_scheduler);
+            CREATE INDEX IF NOT EXISTS idx_obj_scheduler_run_started
+                ON obj_scheduler_run (started_at);
 
             INSERT OR IGNORE INTO games (name, slug, summary)
             VALUES (
@@ -1102,6 +1285,12 @@ impl AppDatabase {
         )?;
         Self::ensure_column(&connection, "tasks", "body", "TEXT NOT NULL DEFAULT ''")?;
         Self::ensure_column(&connection, "tasks", "deadline", "TEXT NOT NULL DEFAULT ''")?;
+        Self::ensure_column(
+            &connection,
+            "smoking_cessation_settings",
+            "current_cigarette_count",
+            "INTEGER NOT NULL DEFAULT 0",
+        )?;
         Self::ensure_column(
             &connection,
             "game_catalog_screenshots",
@@ -1161,6 +1350,18 @@ impl AppDatabase {
             "game_runtime_parts",
             "notes",
             "TEXT NOT NULL DEFAULT ''",
+        )?;
+        Self::ensure_column(
+            &connection,
+            "game_chat_conversations",
+            "overlay_x",
+            "INTEGER",
+        )?;
+        Self::ensure_column(
+            &connection,
+            "game_chat_conversations",
+            "overlay_y",
+            "INTEGER",
         )?;
         connection.execute(
             "
@@ -1276,6 +1477,13 @@ impl AppDatabase {
             "
             CREATE UNIQUE INDEX IF NOT EXISTS idx_game_runtime_construction_exports_game_export_unique
                 ON game_runtime_construction_exports (game_id, export_id)
+            ",
+            [],
+        )?;
+        connection.execute(
+            "
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_obj_scheduler_owner_name_unique
+                ON obj_scheduler (owner_module, name)
             ",
             [],
         )?;
@@ -1833,6 +2041,237 @@ impl AppDatabase {
     pub fn delete_calendar_event(&self, id: i64) -> Result<()> {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute("DELETE FROM calendar_events WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    pub fn list_smoking_events(&self) -> Result<Vec<SmokingEventRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        let mut statement = connection.prepare(
+            "
+            SELECT id, smoked_at, source, notes, created_at
+            FROM smoking_events
+            ORDER BY smoked_at DESC, id DESC
+            ",
+        )?;
+
+        let records = statement
+            .query_map([], smoking_event_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(records)
+    }
+
+    pub fn create_smoking_event(
+        &self,
+        smoked_at: Option<&str>,
+        source: &str,
+        notes: &str,
+    ) -> Result<SmokingEventRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute(
+            "
+            INSERT INTO smoking_events (smoked_at, source, notes)
+            VALUES (COALESCE(NULLIF(?1, ''), datetime('now', 'localtime')), ?2, ?3)
+            ",
+            params![
+                smoked_at.map(str::trim).unwrap_or_default(),
+                source.trim(),
+                notes
+            ],
+        )?;
+        let id = connection.last_insert_rowid();
+        connection.execute(
+            "
+            UPDATE smoking_cessation_settings
+            SET current_cigarette_count = MAX(current_cigarette_count - 1, 0),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = 1
+            ",
+            [],
+        )?;
+        Self::get_smoking_event_by_id(&connection, id)
+    }
+
+    pub fn delete_smoking_event(&self, id: i64) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute("DELETE FROM smoking_events WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    pub fn get_smoking_cessation_settings(&self) -> Result<SmokingCessationSettingsRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_smoking_cessation_settings_for_connection(&connection)
+    }
+
+    pub fn update_smoking_cigarette_count(
+        &self,
+        current_cigarette_count: i64,
+    ) -> Result<SmokingCessationSettingsRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute(
+            "
+            UPDATE smoking_cessation_settings
+            SET current_cigarette_count = MAX(?1, 0),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = 1
+            ",
+            params![current_cigarette_count],
+        )?;
+        Self::get_smoking_cessation_settings_for_connection(&connection)
+    }
+
+    pub fn list_schedulers(&self) -> Result<Vec<SchedulerRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                scheduler.id,
+                scheduler.id_type,
+                scheduler_type.scheduler_key,
+                scheduler_type.label,
+                scheduler.owner_module,
+                scheduler.name,
+                scheduler.is_enabled,
+                scheduler.interval_seconds,
+                scheduler.run_on_startup,
+                scheduler.coalesce_missed_runs,
+                scheduler.payload_json,
+                scheduler.next_run_at,
+                scheduler.last_run_at,
+                scheduler.last_status,
+                scheduler.last_error,
+                scheduler.lease_until,
+                scheduler.created_at,
+                scheduler.modified_at
+            FROM obj_scheduler scheduler
+            JOIN def_scheduler_type scheduler_type ON scheduler_type.id = scheduler.id_type
+            ORDER BY scheduler.owner_module, scheduler.name
+            ",
+        )?;
+        let records = statement
+            .query_map([], scheduler_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(records)
+    }
+
+    pub fn list_due_schedulers(&self, limit: i64) -> Result<Vec<SchedulerRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                scheduler.id,
+                scheduler.id_type,
+                scheduler_type.scheduler_key,
+                scheduler_type.label,
+                scheduler.owner_module,
+                scheduler.name,
+                scheduler.is_enabled,
+                scheduler.interval_seconds,
+                scheduler.run_on_startup,
+                scheduler.coalesce_missed_runs,
+                scheduler.payload_json,
+                scheduler.next_run_at,
+                scheduler.last_run_at,
+                scheduler.last_status,
+                scheduler.last_error,
+                scheduler.lease_until,
+                scheduler.created_at,
+                scheduler.modified_at
+            FROM obj_scheduler scheduler
+            JOIN def_scheduler_type scheduler_type ON scheduler_type.id = scheduler.id_type
+            WHERE scheduler.is_enabled = 1
+              AND (
+                (scheduler.run_on_startup = 1 AND scheduler.last_run_at = '')
+                OR datetime(scheduler.next_run_at) <= datetime('now', 'localtime')
+              )
+              AND (
+                scheduler.lease_until = ''
+                OR datetime(scheduler.lease_until) <= datetime('now', 'localtime')
+              )
+            ORDER BY scheduler.next_run_at, scheduler.id
+            LIMIT ?1
+            ",
+        )?;
+        let records = statement
+            .query_map(params![limit.max(1)], scheduler_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(records)
+    }
+
+    pub fn try_acquire_scheduler(&self, scheduler_id: i64, lease_seconds: i64) -> Result<bool> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        let changed = connection.execute(
+            "
+            UPDATE obj_scheduler
+            SET lease_until = datetime('now', 'localtime', ?1),
+                modified_at = CURRENT_TIMESTAMP
+            WHERE id = ?2
+              AND is_enabled = 1
+              AND (
+                lease_until = ''
+                OR datetime(lease_until) <= datetime('now', 'localtime')
+              )
+            ",
+            params![format!("+{} seconds", lease_seconds.max(1)), scheduler_id],
+        )?;
+        Ok(changed == 1)
+    }
+
+    pub fn start_scheduler_run(&self, scheduler: &SchedulerRecord) -> Result<i64> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        connection.execute(
+            "
+            INSERT INTO obj_scheduler_run (
+                id_scheduler,
+                id_type,
+                started_at,
+                status,
+                message
+            )
+            VALUES (?1, ?2, datetime('now', 'localtime'), 'running', '')
+            ",
+            params![scheduler.id, scheduler.type_id],
+        )?;
+        Ok(connection.last_insert_rowid())
+    }
+
+    pub fn complete_scheduler_run(
+        &self,
+        scheduler: &SchedulerRecord,
+        run_id: i64,
+        status: &str,
+        message: &str,
+    ) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        let next_run_modifier = format!("+{} seconds", scheduler.interval_seconds.max(1));
+        connection.execute(
+            "
+            UPDATE obj_scheduler_run
+            SET finished_at = datetime('now', 'localtime'),
+                status = ?1,
+                message = ?2,
+                modified_at = CURRENT_TIMESTAMP
+            WHERE id = ?3
+            ",
+            params![status, message, run_id],
+        )?;
+        connection.execute(
+            "
+            UPDATE obj_scheduler
+            SET next_run_at = datetime('now', 'localtime', ?1),
+                last_run_at = datetime('now', 'localtime'),
+                last_status = ?2,
+                last_error = ?3,
+                lease_until = '',
+                modified_at = CURRENT_TIMESTAMP
+            WHERE id = ?4
+            ",
+            params![
+                next_run_modifier,
+                status,
+                if status == "success" { "" } else { message },
+                scheduler.id
+            ],
+        )?;
         Ok(())
     }
 
@@ -4030,7 +4469,7 @@ impl AppDatabase {
         Self::get_game_by_id(&connection, game_id)?;
         let mut statement = connection.prepare(
             "
-            SELECT id, game_id, title, created_at, updated_at
+            SELECT id, game_id, title, overlay_x, overlay_y, created_at, updated_at
             FROM game_chat_conversations
             WHERE game_id = ?1
             ORDER BY updated_at DESC, id DESC
@@ -4072,6 +4511,25 @@ impl AppDatabase {
     pub fn get_game_chat_conversation(&self, id: i64) -> Result<GameChatConversationRecord> {
         let connection = self.connection.lock().expect("database mutex poisoned");
         Self::get_game_chat_conversation_by_id(&connection, id)
+    }
+
+    pub fn update_game_chat_overlay_position(
+        &self,
+        conversation_id: i64,
+        overlay_x: i32,
+        overlay_y: i32,
+    ) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_chat_conversation_by_id(&connection, conversation_id)?;
+        connection.execute(
+            "
+            UPDATE game_chat_conversations
+            SET overlay_x = ?2, overlay_y = ?3
+            WHERE id = ?1
+            ",
+            params![conversation_id, overlay_x, overlay_y],
+        )?;
+        Ok(())
     }
 
     pub fn list_game_chat_messages(
@@ -4240,6 +4698,32 @@ impl AppDatabase {
                     updated_at: row.get(6)?,
                 })
             },
+        )
+    }
+
+    fn get_smoking_event_by_id(connection: &Connection, id: i64) -> Result<SmokingEventRecord> {
+        connection.query_row(
+            "
+            SELECT id, smoked_at, source, notes, created_at
+            FROM smoking_events
+            WHERE id = ?1
+            ",
+            params![id],
+            smoking_event_from_row,
+        )
+    }
+
+    fn get_smoking_cessation_settings_for_connection(
+        connection: &Connection,
+    ) -> Result<SmokingCessationSettingsRecord> {
+        connection.query_row(
+            "
+            SELECT id, patch_label, patch_started_at, patch_timezone, current_cigarette_count, created_at, updated_at
+            FROM smoking_cessation_settings
+            WHERE id = 1
+            ",
+            [],
+            smoking_cessation_settings_from_row,
         )
     }
 
@@ -4757,7 +5241,7 @@ impl AppDatabase {
     ) -> Result<GameChatConversationRecord> {
         connection.query_row(
             "
-            SELECT id, game_id, title, created_at, updated_at
+            SELECT id, game_id, title, overlay_x, overlay_y, created_at, updated_at
             FROM game_chat_conversations
             WHERE id = ?1
             ",
@@ -5804,6 +6288,53 @@ fn gearblocks_api_docs_url(page: &str) -> String {
     }
 }
 
+fn smoking_event_from_row(row: &rusqlite::Row<'_>) -> Result<SmokingEventRecord> {
+    Ok(SmokingEventRecord {
+        id: row.get(0)?,
+        smoked_at: row.get(1)?,
+        source: row.get(2)?,
+        notes: row.get(3)?,
+        created_at: row.get(4)?,
+    })
+}
+
+fn smoking_cessation_settings_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<SmokingCessationSettingsRecord> {
+    Ok(SmokingCessationSettingsRecord {
+        id: row.get(0)?,
+        patch_label: row.get(1)?,
+        patch_started_at: row.get(2)?,
+        patch_timezone: row.get(3)?,
+        current_cigarette_count: row.get(4)?,
+        created_at: row.get(5)?,
+        updated_at: row.get(6)?,
+    })
+}
+
+fn scheduler_from_row(row: &rusqlite::Row<'_>) -> Result<SchedulerRecord> {
+    Ok(SchedulerRecord {
+        id: row.get(0)?,
+        type_id: row.get(1)?,
+        type_key: row.get(2)?,
+        type_label: row.get(3)?,
+        owner_module: row.get(4)?,
+        name: row.get(5)?,
+        is_enabled: row.get::<_, i64>(6)? == 1,
+        interval_seconds: row.get(7)?,
+        run_on_startup: row.get::<_, i64>(8)? == 1,
+        coalesce_missed_runs: row.get::<_, i64>(9)? == 1,
+        payload_json: row.get(10)?,
+        next_run_at: row.get(11)?,
+        last_run_at: row.get(12)?,
+        last_status: row.get(13)?,
+        last_error: row.get(14)?,
+        lease_until: row.get(15)?,
+        created_at: row.get(16)?,
+        modified_at: row.get(17)?,
+    })
+}
+
 fn youtube_reference_from_row(row: &rusqlite::Row<'_>) -> Result<YouTubeReferenceRecord> {
     Ok(YouTubeReferenceRecord {
         id: row.get(0)?,
@@ -6074,8 +6605,10 @@ fn game_chat_conversation_from_row(row: &rusqlite::Row<'_>) -> Result<GameChatCo
         id: row.get(0)?,
         game_id: row.get(1)?,
         title: row.get(2)?,
-        created_at: row.get(3)?,
-        updated_at: row.get(4)?,
+        overlay_x: row.get(3)?,
+        overlay_y: row.get(4)?,
+        created_at: row.get(5)?,
+        updated_at: row.get(6)?,
     })
 }
 
