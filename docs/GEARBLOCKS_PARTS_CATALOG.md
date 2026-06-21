@@ -17,7 +17,7 @@ Overlay Forge's current source of truth for GearBlocks parts is the runtime API 
 When GearBlocks releases a new version and the catalog needs to be refreshed, re-enable the maintenance controls and use this workflow:
 
 1. In GearBlocks, place one of each part in the empty test map.
-2. Load `Overlay Forge Construction Exporter` and click `Export All`.
+2. Load `Overlay Forge Construction Exporter` and click `Export Scene`.
 3. Capture the in-game catalog screenshot for the same category.
 4. In Overlay Forge, go to Gaming -> GearBlocks -> Parts and select one category filter, such as `Aero`.
 5. Click `Import Catalog Screenshot` and choose the in-game catalog screenshot for that category. Overlay Forge refreshes the runtime part index from the current `Player.log`, crops the visible catalog tiles left-to-right/top-to-bottom, and assigns them to that category's runtime API parts in catalog order.

@@ -1,7 +1,7 @@
 -- Overlay Forge Construction Exporter
 -- Installed by Overlay Forge. Load from GearBlocks SCRIPT MODS, then use the
--- exporter window to export either the targeted construction or all live
--- scene parts to JSON files.
+-- exporter window to export all live scene parts for Overlay Forge chat
+-- context.
 
 local EXPORT_DIR = [[{{EXPORT_DIR}}]]
 local KNOWN_API_INDEX = {{KNOWN_API_INDEX}}
@@ -17,12 +17,8 @@ statusLabel.SetAlignment( align_HorizEdges, 12, 12 )
 statusLabel.SetAlignment( align_TopEdge, 12, 44 )
 statusLabel.Alignment = textAnc_MiddleLeft
 
-local exportTargetButton = win.CreateTextButton()
-exportTargetButton.SetAlignment( align_LeftEdge, 12, 190 )
-exportTargetButton.SetAlignment( align_TopEdge, 64, 36 )
-
 local exportAllButton = win.CreateTextButton()
-exportAllButton.SetAlignment( align_RightEdge, 12, 190 )
+exportAllButton.SetAlignment( align_HorizCentre, 0, 240 )
 exportAllButton.SetAlignment( align_TopEdge, 64, 36 )
 
 local function setText(element, text)
@@ -59,9 +55,8 @@ local function showWindow(window, isVisible)
     end
 end
 
-setText(statusLabel, "Overlay Forge exporter ready.")
-setText(exportTargetButton, "Export Target")
-setText(exportAllButton, "Export All")
+setText(statusLabel, "Overlay Forge scene exporter ready.")
+setText(exportAllButton, "Export Scene")
 
 local function setStatus(text)
     setText(statusLabel, text)
@@ -363,43 +358,6 @@ local function safeUtcDate(format)
         end
     end
     return "runtime"
-end
-
-local function getLocalPlayer()
-    if LocalPlayer ~= nil then
-        local localPlayer = safeRead(function() return LocalPlayer.Value end, nil)
-        if localPlayer ~= nil then
-            return localPlayer
-        end
-    end
-
-    if Players == nil then
-        return nil
-    end
-
-    local players = safeRead(function() return Players.Instances end, nil)
-    if players ~= nil then
-        for player in players do
-            if safeRead(function() return player.IsLocallyControlled end, false) then
-                return player
-            end
-        end
-    end
-
-    return safeRead(function() return Players.GetInstance(0) end, nil)
-end
-
-local function getTargetedConstruction()
-    local player = getLocalPlayer()
-    local targeter = safeRead(function() return player.Targeter end, nil)
-    if player == nil or targeter == nil or not safeRead(function() return targeter.IsTargetingPart end, false) then
-        return nil
-    end
-    local part = safeRead(function() return targeter.TargetedPart end, nil)
-    if part == nil then
-        return nil
-    end
-    return safeRead(function() return part.ParentConstruction end, nil)
 end
 
 local function describeBehaviour(behaviour)
@@ -1084,15 +1042,6 @@ local function exportConstruction(construction, label)
     return exportPayload(payload, label or ("construction_" .. tostring(payload.id)))
 end
 
-local function exportTargetedConstruction()
-    local construction = getTargetedConstruction()
-    if construction == nil then
-        setStatus("Point at a part before exporting target.")
-        return
-    end
-    exportConstruction(construction, "target_" .. tostring(safeRead(function() return construction.ID end, "construction")))
-end
-
 local function exportAllSceneParts()
     if Parts == nil then
         return false
@@ -1144,31 +1093,43 @@ local function exportAllConstructions()
     end
 end
 
-local function onExportTarget()
-    exportTargetedConstruction()
-end
-
 local function onExportAll()
     if not exportAllSceneParts() then
         exportAllConstructions()
     end
 end
 
+local function isShiftDown()
+    return Input.GetKey("left shift") or Input.GetKey("right shift") or Input.GetKey("shift")
+end
+
+local function isControlDown()
+    return Input.GetKey("left ctrl")
+        or Input.GetKey("right ctrl")
+        or Input.GetKey("left control")
+        or Input.GetKey("right control")
+        or Input.GetKey("ctrl")
+        or Input.GetKey("control")
+end
+
 local function onWindowClose()
     UnloadScript.Raise( ScriptName )
 end
 
-if not addClickHandler(exportTargetButton, onExportTarget) then
-    setStatus("Export Target button could not bind click handler.")
-end
 if not addClickHandler(exportAllButton, onExportAll) then
-    setStatus("Export All button could not bind click handler.")
+    setStatus("Export Scene button could not bind click handler.")
 end
 addEventHandler(win.OnClose, onWindowClose)
 addEventHandler(win.onClose, onWindowClose)
 showWindow(win, true)
 
-setStatus("Exporter loaded. Output: " .. EXPORT_DIR)
+setStatus("Scene exporter loaded. Output: " .. EXPORT_DIR)
+
+function Update()
+    if Input.GetKeyDown("e") and isControlDown() and isShiftDown() then
+        onExportAll()
+    end
+end
 
 function Cleanup()
     pcall(function() Windows.DestroyWindow( win ) end)

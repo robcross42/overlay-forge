@@ -2892,6 +2892,17 @@ impl AppDatabase {
         Ok(parts)
     }
 
+    pub fn count_game_runtime_parts(&self, game_id: i64) -> Result<usize> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        let count = connection.query_row(
+            "SELECT COUNT(*) FROM game_runtime_parts WHERE game_id = ?1",
+            params![game_id],
+            |row| row.get::<_, i64>(0),
+        )?;
+        Ok(count.max(0) as usize)
+    }
+
     pub fn list_gearblocks_api_catalog(&self) -> Result<GearBlocksApiCatalogRecord> {
         let connection = self.connection.lock().expect("database mutex poisoned");
         let mut type_statement = connection.prepare(
@@ -3698,6 +3709,17 @@ impl AppDatabase {
         Ok(exports)
     }
 
+    pub fn count_game_runtime_construction_exports(&self, game_id: i64) -> Result<usize> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        let count = connection.query_row(
+            "SELECT COUNT(*) FROM game_runtime_construction_exports WHERE game_id = ?1",
+            params![game_id],
+            |row| row.get::<_, i64>(0),
+        )?;
+        Ok(count.max(0) as usize)
+    }
+
     pub fn latest_game_runtime_construction_export(
         &self,
         game_id: i64,
@@ -3858,6 +3880,17 @@ impl AppDatabase {
             .collect::<Result<Vec<_>>>()?;
 
         Ok(constructions)
+    }
+
+    pub fn count_game_constructions(&self, game_id: i64) -> Result<usize> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        let count = connection.query_row(
+            "SELECT COUNT(*) FROM game_constructions WHERE game_id = ?1",
+            params![game_id],
+            |row| row.get::<_, i64>(0),
+        )?;
+        Ok(count.max(0) as usize)
     }
 
     #[allow(clippy::too_many_arguments)]

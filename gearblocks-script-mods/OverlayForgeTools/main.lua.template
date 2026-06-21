@@ -1,0 +1,249 @@
+local attachTypes =
+{
+	{ attachType_Fixed, 'Fixed' },
+	{ attachType_RotaryBearing, 'Rotary Bearing' },
+	{ attachType_LinearBearing, 'Linear Bearing' },
+	{ attachType_LinearRotaryBearing, 'Linear Rotary Bearing' },
+	{ attachType_SphericalBearing, 'Spherical Bearing' },
+	{ attachType_ConstantVelocityJoint, 'CV Joint' },
+	{ attachType_KnuckleJoint, 'Knuckle Joint' },
+	{ attachType_Null, 'Null' }
+}
+
+local positionSteps = { 0.05, 0.1, 0.25, 0.5, 1, 2 }
+local rotationSteps = { 1, 5, 15, 45, 90 }
+local resizeSteps = { 0, 0.05, 0.1, 0.25, 0.5, 1 }
+
+local currentTargetedPart
+local weldOwnerPart
+local attachTypeIndex = 1
+local positionStepIndex = 3
+local rotationStepIndex = 3
+local resizeStepIndex = 1
+
+local function showStatus( message )
+	if MessagePopupShow then
+		MessagePopupShow.Raise( message )
+	end
+end
+
+local function cycleValue( values, currentIndex )
+	local nextIndex = currentIndex + 1
+	if nextIndex > #values then
+		nextIndex = 1
+	end
+	return nextIndex, values[nextIndex]
+end
+
+local function partSelection()
+	local localPlayer = LocalPlayer.Value
+	if localPlayer and localPlayer.Toolbox then
+		return localPlayer.Toolbox.PartSelection
+	end
+	return nil
+end
+
+local function targetedPart()
+	local localPlayer = LocalPlayer.Value
+	if localPlayer and localPlayer.Targeter then
+		return localPlayer.Targeter.TargetedPart
+	end
+	return nil
+end
+
+local function toggleManipulatorOrientation()
+	if ManipulatorOrientationMode.Value == 0 then
+		ManipulatorOrientationMode.Value = 1
+		showStatus( 'Overlay Forge Tools: Manipulator orientation global' )
+	else
+		ManipulatorOrientationMode.Value = 0
+		showStatus( 'Overlay Forge Tools: Manipulator orientation local' )
+	end
+end
+
+local function cyclePositionStep()
+	positionStepIndex, SelectionStepDistance.Value = cycleValue( positionSteps, positionStepIndex )
+	showStatus( string.format( 'Overlay Forge Tools: Position step %.2f', SelectionStepDistance.Value ) )
+end
+
+local function cycleRotationStep()
+	rotationStepIndex, SelectionStepAngle.Value = cycleValue( rotationSteps, rotationStepIndex )
+	showStatus( string.format( 'Overlay Forge Tools: Rotation step %.0f', SelectionStepAngle.Value ) )
+end
+
+local function cycleResizeStep()
+	resizeStepIndex, SelectionResizeUnitStepOverride.Value = cycleValue( resizeSteps, resizeStepIndex )
+	showStatus( string.format( 'Overlay Forge Tools: Resize step %.2f', SelectionResizeUnitStepOverride.Value ) )
+end
+
+local function moveSelectionToGround()
+	local selection = partSelection()
+	if selection then
+		selection.moveToGround()
+		showStatus( 'Overlay Forge Tools: Moved selection to ground' )
+	end
+end
+
+local function snapPivotPosition()
+	local selection = partSelection()
+	if selection then
+		selection.PivotPosition = Vector3.round( selection.PivotPosition, SelectionStepDistance.Value )
+		showStatus( 'Overlay Forge Tools: Snapped pivot position' )
+	end
+end
+
+local function snapPivotOrientation()
+	local selection = partSelection()
+	if selection then
+		selection.PivotOrientation = Quaternion.snapAngles( selection.PivotOrientation, SelectionStepAngle.Value )
+		showStatus( 'Overlay Forge Tools: Snapped pivot rotation' )
+	end
+end
+
+local function snapPivotPartSize()
+	local selection = partSelection()
+	if selection and selection.IsPivotPartResizable then
+		local pivotPart = selection.PivotPart
+		if pivotPart then
+			local resizeUnitStep = SelectionResizeUnitStepOverride.Value
+			if resizeUnitStep < 0.05 then
+				resizeUnitStep = pivotPart.ResizeUnitStep
+			end
+			pivotPart.SetSize( Vector3.round( pivotPart.CurrentUnitSize, resizeUnitStep ), SelectionResizeClampEnabled.Value )
+			showStatus( 'Overlay Forge Tools: Snapped pivot part size' )
+		end
+	end
+end
+
+local function toggleResizeClamp()
+	SelectionResizeClampEnabled.Value = not SelectionResizeClampEnabled.Value
+	showStatus( string.format( 'Overlay Forge Tools: Clamp resize %s', tostring( SelectionResizeClampEnabled.Value ) ) )
+end
+
+local function togglePartPenetrationTest()
+	PartPenetrationTestEnabled.Value = not PartPenetrationTestEnabled.Value
+	showStatus( string.format( 'Overlay Forge Tools: Prevent interpenetration %s', tostring( PartPenetrationTestEnabled.Value ) ) )
+end
+
+local function toggleAttachmentBridging()
+	AttachmentBridgingEnabled.Value = not AttachmentBridgingEnabled.Value
+	showStatus( string.format( 'Overlay Forge Tools: Attachment bridging %s', tostring( AttachmentBridgingEnabled.Value ) ) )
+end
+
+local function toggleShowAllAttachments()
+	ShowAllAttachments.Value = not ShowAllAttachments.Value
+	showStatus( string.format( 'Overlay Forge Tools: Show all attachments %s', tostring( ShowAllAttachments.Value ) ) )
+end
+
+local function setWeldAttachType( nextIndex )
+	attachTypeIndex = nextIndex
+	showStatus( string.format( 'Overlay Forge Tools: Weld type %s', attachTypes[attachTypeIndex][2] ) )
+end
+
+local function pickWeldPart( part )
+	if weldOwnerPart == nil then
+		weldOwnerPart = part
+		if weldOwnerPart then
+			showStatus( string.format( 'Overlay Forge Tools: Weld from %s', weldOwnerPart.FullDisplayName ) )
+		end
+	else
+		if part then
+			local connectedPart = part
+
+			if weldOwnerPart.Attachments.IsAttached( connectedPart ) then
+				showStatus( 'Parts already attached!' )
+			elseif weldOwnerPart.ParentConstruction.IsFrozen ~= connectedPart.ParentConstruction.IsFrozen then
+				showStatus( 'Parts must be either both frozen or both unfrozen!' )
+			else
+				local attachType = attachTypes[attachTypeIndex][1]
+				local searchPosition = ( weldOwnerPart.Position + connectedPart.Position ) * 0.5
+				local searchNormal = Vector3.Normalize( connectedPart.Position - weldOwnerPart.Position )
+				AttachmentOps.CreateAttachment( attachType, weldOwnerPart, connectedPart, searchPosition, searchNormal, false, true )
+				showStatus( string.format( 'Overlay Forge Tools: Welded %s', attachTypes[attachTypeIndex][2] ) )
+			end
+		end
+
+		weldOwnerPart = nil
+	end
+	currentTargetedPart = nil
+end
+
+local function deletePartAttachments( part )
+	if part then
+		AttachmentOps.DeleteAllAttachments( part, true )
+		showStatus( 'Overlay Forge Tools: Detached targeted part' )
+	end
+end
+
+local function isShiftDown()
+	return Input.GetKey( 'left shift' ) or Input.GetKey( 'right shift' ) or Input.GetKey( 'shift' )
+end
+
+local function isControlDown()
+	return Input.GetKey( 'left ctrl' )
+		or Input.GetKey( 'right ctrl' )
+		or Input.GetKey( 'left control' )
+		or Input.GetKey( 'right control' )
+		or Input.GetKey( 'ctrl' )
+		or Input.GetKey( 'control' )
+end
+
+function Update()
+	currentTargetedPart = targetedPart()
+
+	if Input.GetKeyDown( 'f1' ) then
+		setWeldAttachType( 1 )
+	elseif Input.GetKeyDown( 'f2' ) then
+		setWeldAttachType( 2 )
+	elseif Input.GetKeyDown( 'f3' ) then
+		setWeldAttachType( 3 )
+	elseif Input.GetKeyDown( 'f4' ) then
+		setWeldAttachType( 4 )
+	elseif Input.GetKeyDown( 'f5' ) then
+		setWeldAttachType( 5 )
+	elseif Input.GetKeyDown( 'f6' ) then
+		setWeldAttachType( 6 )
+	elseif Input.GetKeyDown( 'f7' ) then
+		setWeldAttachType( 7 )
+	elseif Input.GetKeyDown( 'f8' ) then
+		setWeldAttachType( 8 )
+	end
+
+	if Input.GetKeyDown( 'tab' ) then
+		pickWeldPart( currentTargetedPart )
+	elseif Input.GetKeyDown( 'delete' ) then
+		deletePartAttachments( currentTargetedPart )
+	end
+
+	if Input.GetKeyDown( 'f9' ) then
+		if isControlDown() then
+			toggleResizeClamp()
+		else
+			toggleManipulatorOrientation()
+		end
+	elseif Input.GetKeyDown( 'f10' ) then
+		if isControlDown() then
+			togglePartPenetrationTest()
+		elseif isShiftDown() then
+			cycleResizeStep()
+		else
+			cyclePositionStep()
+		end
+	elseif Input.GetKeyDown( 'f11' ) then
+		if isControlDown() then
+			toggleAttachmentBridging()
+		elseif isShiftDown() then
+			snapPivotPosition()
+		else
+			cycleRotationStep()
+		end
+	elseif Input.GetKeyDown( 'f12' ) then
+		if isControlDown() then
+			toggleShowAllAttachments()
+		elseif isShiftDown() then
+			snapPivotOrientation()
+		else
+			moveSelectionToGround()
+		end
+	end
+end

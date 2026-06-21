@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::{BufReader, BufWriter, Read};
+use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
@@ -99,6 +99,14 @@ pub struct GearBlocksLuaExporterInstallRecord {
 }
 
 #[derive(Serialize)]
+pub struct GearBlocksLuaScriptInstallRecord {
+    #[serde(rename = "scriptModPath")]
+    pub script_mod_path: String,
+    #[serde(rename = "mainLuaPath")]
+    pub main_lua_path: String,
+}
+
+#[derive(Serialize)]
 pub struct GearBlocksRuntimeExportRecord {
     pub id: String,
     pub name: String,
@@ -120,11 +128,6 @@ pub struct GearBlocksRuntimeContextSyncRecord {
     pub runtime_part_count: usize,
     #[serde(rename = "constructionCount")]
     pub construction_count: usize,
-    #[serde(rename = "runtimeExports")]
-    pub runtime_exports: Vec<GameRuntimeConstructionExportRecord>,
-    #[serde(rename = "runtimeParts")]
-    pub runtime_parts: Vec<GameRuntimePartRecord>,
-    pub constructions: Vec<GameConstructionRecord>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -1126,6 +1129,10 @@ pub fn sync_gearblocks_runtime_context(
         .map_err(|error| error.to_string())?;
     require_gearblocks_game(&game)?;
 
+    request_gearblocks_scene_export_from_game(state.inner())?;
+    let imported_count = import_latest_gearblocks_runtime_exports(&state, game.id)?;
+    sync_gearblocks_saved_constructions_for_game(&state, game.id)?;
+
     let fingerprint = gearblocks_runtime_context_fingerprint(&state, game.id)?;
     let fingerprint_key = format!("gearblocks.runtime_context_fingerprint.{}", game.id);
     let previous_fingerprint = state
@@ -1133,37 +1140,29 @@ pub fn sync_gearblocks_runtime_context(
         .get_app_setting(&fingerprint_key)
         .map_err(|error| error.to_string())?;
     let changed = previous_fingerprint.as_deref() != Some(fingerprint.as_str());
-    if changed {
-        import_latest_gearblocks_runtime_exports(&state, game.id)?;
-        sync_gearblocks_saved_constructions_for_game(&state, game.id)?;
-        state
-            .database
-            .save_app_setting(&fingerprint_key, &fingerprint)
-            .map_err(|error| error.to_string())?;
-    }
+    state
+        .database
+        .save_app_setting(&fingerprint_key, &fingerprint)
+        .map_err(|error| error.to_string())?;
 
-    let constructions = state
+    let construction_count = state
         .database
-        .list_game_constructions(game.id)
+        .count_game_constructions(game.id)
         .map_err(|error| error.to_string())?;
-    let runtime_exports = state
+    let runtime_export_count = state
         .database
-        .list_game_runtime_construction_exports(game.id)
+        .count_game_runtime_construction_exports(game.id)
         .map_err(|error| error.to_string())?;
-    let runtime_parts = state
+    let runtime_part_count = state
         .database
-        .list_game_runtime_parts(game.id)
+        .count_game_runtime_parts(game.id)
         .map_err(|error| error.to_string())?;
-    let runtime_parts = gearblocks_runtime_parts_all_in_catalog_order(runtime_parts);
 
     Ok(GearBlocksRuntimeContextSyncRecord {
-        changed,
-        runtime_export_count: runtime_exports.len(),
-        runtime_part_count: runtime_parts.len(),
-        construction_count: constructions.len(),
-        runtime_exports,
-        runtime_parts,
-        constructions,
+        changed: changed || imported_count > 0,
+        runtime_export_count,
+        runtime_part_count,
+        construction_count,
     })
 }
 
@@ -1331,6 +1330,252 @@ pub fn install_gearblocks_lua_exporter(
         main_lua_path: main_lua_path.to_string_lossy().to_string(),
         export_directory: export_directory.to_string_lossy().to_string(),
     })
+}
+
+#[tauri::command]
+pub fn install_gearblocks_overlay_tools(
+    game_id: i64,
+    state: State<'_, AppState>,
+) -> Result<GearBlocksLuaScriptInstallRecord, String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    require_gearblocks_game(&game)?;
+
+    let gearblocks_root = gearblocks_default_user_data_root()?;
+    let script_mod_path = gearblocks_root.join("ScriptMods").join("OverlayForgeTools");
+    fs::create_dir_all(&script_mod_path).map_err(|error| error.to_string())?;
+
+    let main_lua_path = script_mod_path.join("main.lua");
+    fs::write(
+        &main_lua_path,
+        include_str!("../../gearblocks-script-mods/OverlayForgeTools/main.lua.template"),
+    )
+    .map_err(|error| error.to_string())?;
+    fs::write(
+        script_mod_path.join("meta.json"),
+        include_str!("../../gearblocks-script-mods/OverlayForgeTools/meta.json"),
+    )
+    .map_err(|error| error.to_string())?;
+
+    Ok(GearBlocksLuaScriptInstallRecord {
+        script_mod_path: script_mod_path.to_string_lossy().to_string(),
+        main_lua_path: main_lua_path.to_string_lossy().to_string(),
+    })
+}
+
+#[tauri::command]
+pub fn send_gearblocks_overlay_tool_action(
+    action: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let tool_key = gearblocks_overlay_tool_key(&action)
+        .ok_or_else(|| format!("Unsupported GearBlocks overlay tool action: {action}"))?;
+
+    if !focus_last_game_window_from_state(state.inner())? {
+        return Err(
+            "No remembered GearBlocks window is available to receive tool input.".to_string(),
+        );
+    }
+    thread::sleep(Duration::from_millis(40));
+    send_virtual_key(tool_key)
+}
+
+fn request_gearblocks_scene_export_from_game(state: &AppState) -> Result<(), String> {
+    if !focus_last_game_window_from_state(state)? {
+        return Err(
+            "No remembered GearBlocks window is available for scene export. Focus GearBlocks from Overlay Forge once, then refresh scene context again."
+                .to_string(),
+        );
+    }
+
+    let log_path = gearblocks_default_user_data_root()?.join("Player.log");
+    let initial_length = fs::metadata(&log_path)
+        .map(|metadata| metadata.len())
+        .unwrap_or(0);
+
+    thread::sleep(Duration::from_millis(40));
+    send_virtual_key(OverlayToolKey {
+        virtual_key: overlay_forge_scene_export_virtual_key(),
+        shift: true,
+        control: true,
+    })?;
+    wait_for_gearblocks_export_log_append(&log_path, initial_length);
+    Ok(())
+}
+
+fn overlay_forge_scene_export_virtual_key() -> u16 {
+    b'E' as u16
+}
+
+fn wait_for_gearblocks_export_log_append(log_path: &Path, initial_length: u64) {
+    let started_at = SystemTime::now();
+    loop {
+        if gearblocks_log_has_completed_export_after(log_path, initial_length) {
+            return;
+        }
+
+        if started_at
+            .elapsed()
+            .map(|elapsed| elapsed >= Duration::from_secs(8))
+            .unwrap_or(true)
+        {
+            return;
+        }
+
+        thread::sleep(Duration::from_millis(160));
+    }
+}
+
+fn gearblocks_log_has_completed_export_after(log_path: &Path, initial_length: u64) -> bool {
+    let Ok(metadata) = fs::metadata(log_path) else {
+        return false;
+    };
+    if metadata.len() <= initial_length {
+        return false;
+    }
+
+    let Ok(mut file) = File::open(log_path) else {
+        return false;
+    };
+    if file.seek(SeekFrom::Start(initial_length)).is_err() {
+        return false;
+    }
+    let mut additions = String::new();
+    if file.read_to_string(&mut additions).is_err() {
+        return false;
+    }
+    additions.contains("[OverlayForgeExportEnd]")
+}
+
+#[derive(Clone, Copy)]
+struct OverlayToolKey {
+    virtual_key: u16,
+    shift: bool,
+    control: bool,
+}
+
+fn overlay_tool_key(virtual_key: u16) -> OverlayToolKey {
+    OverlayToolKey {
+        virtual_key,
+        shift: false,
+        control: false,
+    }
+}
+
+fn overlay_tool_shift_key(virtual_key: u16) -> OverlayToolKey {
+    OverlayToolKey {
+        virtual_key,
+        shift: true,
+        control: false,
+    }
+}
+
+fn overlay_tool_control_key(virtual_key: u16) -> OverlayToolKey {
+    OverlayToolKey {
+        virtual_key,
+        shift: false,
+        control: true,
+    }
+}
+
+fn gearblocks_overlay_tool_key(action: &str) -> Option<OverlayToolKey> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+            VK_DELETE, VK_F1, VK_F10, VK_F11, VK_F12, VK_F2, VK_F3, VK_F4, VK_F5, VK_F6, VK_F7,
+            VK_F8, VK_F9, VK_TAB,
+        };
+
+        return match action {
+            "weldToggle" => Some(overlay_tool_key(VK_TAB)),
+            "weldDetach" => Some(overlay_tool_key(VK_DELETE)),
+            "weldFixed" => Some(overlay_tool_key(VK_F1)),
+            "weldRotaryBearing" => Some(overlay_tool_key(VK_F2)),
+            "weldLinearBearing" => Some(overlay_tool_key(VK_F3)),
+            "weldLinearRotaryBearing" => Some(overlay_tool_key(VK_F4)),
+            "weldSphericalBearing" => Some(overlay_tool_key(VK_F5)),
+            "weldCvJoint" => Some(overlay_tool_key(VK_F6)),
+            "weldKnuckleJoint" => Some(overlay_tool_key(VK_F7)),
+            "weldNull" => Some(overlay_tool_key(VK_F8)),
+            "builderToggleOrientation" => Some(overlay_tool_key(VK_F9)),
+            "builderCyclePositionStep" => Some(overlay_tool_key(VK_F10)),
+            "builderCycleRotationStep" => Some(overlay_tool_key(VK_F11)),
+            "builderMoveToGround" => Some(overlay_tool_key(VK_F12)),
+            "builderToggleResizeClamp" => Some(overlay_tool_control_key(VK_F9)),
+            "builderToggleInterpenetration" => Some(overlay_tool_control_key(VK_F10)),
+            "builderToggleAttachmentBridging" => Some(overlay_tool_control_key(VK_F11)),
+            "builderToggleShowAllAttachments" => Some(overlay_tool_control_key(VK_F12)),
+            "builderCycleResizeStep" => Some(overlay_tool_shift_key(VK_F10)),
+            "builderSnapPivotPosition" => Some(overlay_tool_shift_key(VK_F11)),
+            "builderSnapPivotRotation" => Some(overlay_tool_shift_key(VK_F12)),
+            _ => None,
+        };
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = action;
+        None
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn send_virtual_key(tool_key: OverlayToolKey) -> Result<(), String> {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+        SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VK_CONTROL,
+        VK_SHIFT,
+    };
+
+    fn keyboard_input(virtual_key: u16, flags: u32) -> INPUT {
+        INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: virtual_key,
+                    wScan: 0,
+                    dwFlags: flags,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        }
+    }
+
+    let mut inputs = Vec::new();
+    if tool_key.control {
+        inputs.push(keyboard_input(VK_CONTROL, 0));
+    }
+    if tool_key.shift {
+        inputs.push(keyboard_input(VK_SHIFT, 0));
+    }
+    inputs.push(keyboard_input(tool_key.virtual_key, 0));
+    inputs.push(keyboard_input(tool_key.virtual_key, KEYEVENTF_KEYUP));
+    if tool_key.shift {
+        inputs.push(keyboard_input(VK_SHIFT, KEYEVENTF_KEYUP));
+    }
+    if tool_key.control {
+        inputs.push(keyboard_input(VK_CONTROL, KEYEVENTF_KEYUP));
+    }
+
+    let sent = unsafe {
+        SendInput(
+            inputs.len() as u32,
+            inputs.as_mut_ptr(),
+            std::mem::size_of::<INPUT>() as i32,
+        )
+    };
+    if sent == inputs.len() as u32 {
+        Ok(())
+    } else {
+        Err("Could not send GearBlocks overlay tool input.".to_string())
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn send_virtual_key(_tool_key: OverlayToolKey) -> Result<(), String> {
+    Err("GearBlocks overlay tool input is only available on Windows.".to_string())
 }
 
 fn gearblocks_known_api_index_lua(
@@ -2243,6 +2488,7 @@ fn gearblocks_prompt_context(state: &State<'_, AppState>, game_id: i64) -> Resul
     if let Some(saved_context) = gearblocks_latest_saved_construction_context(state, game_id)? {
         sections.push(saved_context);
     }
+    import_latest_gearblocks_runtime_exports(state.inner(), game_id)?;
     if let Some(runtime_context) = gearblocks_latest_runtime_understanding_context(state, game_id)?
     {
         sections.push(runtime_context);
@@ -2982,22 +3228,46 @@ fn lua_long_bracket_path(path: &std::path::Path) -> String {
 struct PendingGearBlocksRuntimeExport {
     intended_path: String,
     chunks: Vec<String>,
+    start_byte: usize,
+}
+
+#[derive(Deserialize, Serialize)]
+struct GearBlocksRuntimeLogCursor {
+    path: String,
+    offset: u64,
+    modified: String,
+}
+
+struct GearBlocksRuntimeExportParseResult {
+    exports: Vec<GearBlocksRuntimeExportRecord>,
+    consumed_bytes: usize,
 }
 
 fn parse_gearblocks_runtime_exports_from_log(
     log_path: &Path,
 ) -> Result<Vec<GearBlocksRuntimeExportRecord>, String> {
+    let text = fs::read_to_string(log_path)
+        .map_err(|error| format!("Could not read GearBlocks runtime export log: {error}"))?;
+    Ok(parse_gearblocks_runtime_exports_from_text(log_path, &text).exports)
+}
+
+fn parse_gearblocks_runtime_exports_from_text(
+    log_path: &Path,
+    text: &str,
+) -> GearBlocksRuntimeExportParseResult {
     const BEGIN_MARKER: &str = "[OverlayForgeExportBegin]";
     const DATA_MARKER: &str = "[OverlayForgeExportData]";
     const END_MARKER: &str = "[OverlayForgeExportEnd]";
 
-    let text = fs::read_to_string(log_path)
-        .map_err(|error| format!("Could not read GearBlocks runtime export log: {error}"))?;
     let mut pending: HashMap<String, PendingGearBlocksRuntimeExport> = HashMap::new();
     let mut exports = Vec::new();
     let source_log_path = log_path.to_string_lossy().to_string();
+    let mut line_start = 0usize;
+    let mut consumed_bytes = 0usize;
 
-    for line in text.lines() {
+    for raw_line in text.split_inclusive('\n') {
+        let line_end = line_start + raw_line.len();
+        let line = raw_line.trim_end_matches(['\r', '\n']);
         if let Some(index) = line.find(BEGIN_MARKER) {
             let payload = &line[index + BEGIN_MARKER.len()..];
             if let Ok(document) = serde_json::from_str::<serde_json::Value>(payload) {
@@ -3012,10 +3282,12 @@ fn parse_gearblocks_runtime_exports_from_log(
                         PendingGearBlocksRuntimeExport {
                             intended_path,
                             chunks: Vec::new(),
+                            start_byte: line_start,
                         },
                     );
                 }
             }
+            line_start = line_end;
             continue;
         }
 
@@ -3026,6 +3298,7 @@ fn parse_gearblocks_runtime_exports_from_log(
                     export.chunks.push(chunk.to_string());
                 }
             }
+            line_start = line_end;
             continue;
         }
 
@@ -3051,10 +3324,28 @@ fn parse_gearblocks_runtime_exports_from_log(
                     });
                 }
             }
+            if pending.is_empty() {
+                consumed_bytes = line_end;
+            }
         }
+
+        line_start = line_end;
     }
 
-    Ok(exports)
+    if pending.is_empty() {
+        consumed_bytes = text.len();
+    } else if let Some(first_pending) = pending.values().map(|pending| pending.start_byte).min() {
+        consumed_bytes = if consumed_bytes == 0 {
+            first_pending
+        } else {
+            consumed_bytes.min(first_pending)
+        };
+    }
+
+    GearBlocksRuntimeExportParseResult {
+        exports,
+        consumed_bytes,
+    }
 }
 
 fn hydrate_gearblocks_api_attribute_refs(document: &mut serde_json::Value) {
@@ -3117,7 +3408,6 @@ fn gearblocks_latest_runtime_understanding_context(
     state: &AppState,
     game_id: i64,
 ) -> Result<Option<String>, String> {
-    import_latest_gearblocks_runtime_exports(state, game_id)?;
     let Some(latest) = state
         .database
         .latest_game_runtime_construction_export(game_id)
@@ -3136,7 +3426,17 @@ fn gearblocks_latest_runtime_understanding_context(
         document,
     };
 
-    Ok(Some(gearblocks_runtime_understanding_context(&export)))
+    let mut context = gearblocks_runtime_understanding_context(&export);
+    if let Some(diff_summary) = state
+        .database
+        .get_app_setting(&gearblocks_runtime_scene_diff_key(game_id))
+        .map_err(|error| error.to_string())?
+    {
+        context.push_str("\n\n");
+        context.push_str(&diff_summary);
+    }
+
+    Ok(Some(context))
 }
 
 fn gearblocks_runtime_understanding_context(export: &GearBlocksRuntimeExportRecord) -> String {
@@ -3230,6 +3530,140 @@ fn gearblocks_runtime_understanding_context(export: &GearBlocksRuntimeExportReco
     sections.push(gearblocks_functional_parts_section(&parts));
 
     sections.join("\n\n")
+}
+
+fn gearblocks_runtime_scene_diff_summary(
+    previous: Option<&GameRuntimeConstructionExportRecord>,
+    current: &GearBlocksRuntimeExportRecord,
+) -> Result<String, String> {
+    let current_parts = gearblocks_runtime_part_count_map(&current.document);
+    let Some(previous) = previous else {
+        return Ok(format!(
+            "## Runtime Scene Change Since Previous Export\nNo previous runtime scene export was indexed. Current scene snapshot contains {} part key(s) across {} runtime part(s).",
+            current_parts.len(),
+            gearblocks_runtime_document_part_count(&current.document)
+        ));
+    };
+
+    let previous_document = serde_json::from_str::<serde_json::Value>(&previous.document_json)
+        .map_err(|error| format!("Previous GearBlocks runtime export JSON is invalid: {error}"))?;
+    let previous_parts = gearblocks_runtime_part_count_map(&previous_document);
+    let mut added = Vec::new();
+    let mut removed = Vec::new();
+
+    for (key, current_part) in &current_parts {
+        let previous_count = previous_parts
+            .get(key)
+            .map(|part| part.count)
+            .unwrap_or_default();
+        if current_part.count > previous_count {
+            added.push(format!(
+                "{} x{}",
+                current_part.label,
+                current_part.count - previous_count
+            ));
+        }
+    }
+
+    for (key, previous_part) in &previous_parts {
+        let current_count = current_parts
+            .get(key)
+            .map(|part| part.count)
+            .unwrap_or_default();
+        if previous_part.count > current_count {
+            removed.push(format!(
+                "{} x{}",
+                previous_part.label,
+                previous_part.count - current_count
+            ));
+        }
+    }
+
+    added.sort();
+    removed.sort();
+    let previous_total = gearblocks_runtime_document_part_count(&previous_document);
+    let current_total = gearblocks_runtime_document_part_count(&current.document);
+    let mut lines = vec![format!(
+        "Runtime scene part count changed by {:+} ({} -> {}).",
+        current_total as i64 - previous_total as i64,
+        previous_total,
+        current_total
+    )];
+
+    if added.is_empty() && removed.is_empty() {
+        lines.push(
+            "No added or removed part keys detected since the previous runtime scene export."
+                .to_string(),
+        );
+    } else {
+        if !added.is_empty() {
+            lines.push(format!(
+                "Added part keys: {}.",
+                summarize_change_items(&added, 40)
+            ));
+        }
+        if !removed.is_empty() {
+            lines.push(format!(
+                "Removed part keys: {}.",
+                summarize_change_items(&removed, 40)
+            ));
+        }
+    }
+
+    Ok(format!(
+        "## Runtime Scene Change Since Previous Export\n{}",
+        lines.join("\n")
+    ))
+}
+
+struct GearBlocksRuntimePartCount {
+    label: String,
+    count: usize,
+}
+
+fn gearblocks_runtime_part_count_map(
+    document: &serde_json::Value,
+) -> HashMap<String, GearBlocksRuntimePartCount> {
+    let mut counts: HashMap<String, GearBlocksRuntimePartCount> = HashMap::new();
+    let Some(parts) = document.get("parts").and_then(serde_json::Value::as_array) else {
+        return counts;
+    };
+
+    for part in parts {
+        let key = runtime_part_key(part);
+        if key.is_empty() {
+            continue;
+        }
+        let name = preferred_part_name(part);
+        let category = json_string(part.get("category"));
+        let label = if category.trim().is_empty() {
+            name
+        } else {
+            format!("{category}: {name}")
+        };
+        counts
+            .entry(key)
+            .and_modify(|entry| entry.count += 1)
+            .or_insert(GearBlocksRuntimePartCount { label, count: 1 });
+    }
+
+    counts
+}
+
+fn gearblocks_runtime_document_part_count(document: &serde_json::Value) -> usize {
+    document
+        .get("parts")
+        .and_then(serde_json::Value::as_array)
+        .map(Vec::len)
+        .unwrap_or_default()
+}
+
+fn summarize_change_items(items: &[String], limit: usize) -> String {
+    let mut visible = items.iter().take(limit).cloned().collect::<Vec<_>>();
+    if items.len() > limit {
+        visible.push(format!("{} more", items.len() - limit));
+    }
+    visible.join(", ")
 }
 
 fn persist_runtime_export(
@@ -3601,20 +4035,125 @@ fn import_latest_gearblocks_runtime_exports(
     game_id: i64,
 ) -> Result<usize, String> {
     let root = gearblocks_default_user_data_root()?;
-    let mut exports = Vec::new();
+    let mut imported_count = 0usize;
     for log_path in [root.join("Player-prev.log"), root.join("Player.log")] {
         if log_path.is_file() {
-            exports.extend(parse_gearblocks_runtime_exports_from_log(&log_path)?);
+            imported_count +=
+                import_new_gearblocks_runtime_exports_from_log(state, game_id, &log_path)?;
         }
     }
 
-    let indexed_at = unix_timestamp_label();
-    for export in &exports {
-        persist_runtime_export(state, game_id, export, &indexed_at)?;
-        import_runtime_export_parts(state, game_id, export)?;
+    Ok(imported_count)
+}
+
+fn import_new_gearblocks_runtime_exports_from_log(
+    state: &AppState,
+    game_id: i64,
+    log_path: &Path,
+) -> Result<usize, String> {
+    let metadata = fs::metadata(log_path)
+        .map_err(|error| format!("Could not read GearBlocks runtime log metadata: {error}"))?;
+    let cursor_key = gearblocks_runtime_log_cursor_key(game_id, log_path);
+    let cursor = state
+        .database
+        .get_app_setting(&cursor_key)
+        .map_err(|error| error.to_string())?
+        .and_then(|value| serde_json::from_str::<GearBlocksRuntimeLogCursor>(&value).ok());
+    let mut offset = cursor
+        .as_ref()
+        .filter(|cursor| {
+            cursor.path == log_path.to_string_lossy() && metadata.len() >= cursor.offset
+        })
+        .map(|cursor| cursor.offset)
+        .unwrap_or(0);
+
+    if offset >= metadata.len() {
+        save_gearblocks_runtime_log_cursor(state, game_id, log_path, offset, &metadata)?;
+        return Ok(0);
     }
 
-    Ok(exports.len())
+    let mut file = File::open(log_path)
+        .map_err(|error| format!("Could not open GearBlocks runtime export log: {error}"))?;
+    file.seek(SeekFrom::Start(offset))
+        .map_err(|error| format!("Could not seek GearBlocks runtime export log: {error}"))?;
+    let mut text = String::new();
+    file.read_to_string(&mut text).map_err(|error| {
+        format!("Could not read GearBlocks runtime export log additions: {error}")
+    })?;
+
+    let parse_result = parse_gearblocks_runtime_exports_from_text(log_path, &text);
+    let indexed_at = unix_timestamp_label();
+    let mut previous_export = state
+        .database
+        .latest_game_runtime_construction_export(game_id)
+        .map_err(|error| error.to_string())?;
+
+    for export in &parse_result.exports {
+        if previous_export
+            .as_ref()
+            .is_some_and(|previous| previous.export_id == export.id)
+        {
+            continue;
+        }
+        let diff_summary = gearblocks_runtime_scene_diff_summary(previous_export.as_ref(), export)?;
+        let persisted = persist_runtime_export(state, game_id, export, &indexed_at)?;
+        import_runtime_export_parts(state, game_id, export)?;
+        state
+            .database
+            .save_app_setting(&gearblocks_runtime_scene_diff_key(game_id), &diff_summary)
+            .map_err(|error| error.to_string())?;
+        previous_export = Some(persisted);
+    }
+
+    if parse_result.consumed_bytes > 0 {
+        offset += parse_result.consumed_bytes as u64;
+        save_gearblocks_runtime_log_cursor(state, game_id, log_path, offset, &metadata)?;
+    }
+
+    Ok(parse_result.exports.len())
+}
+
+fn gearblocks_runtime_log_cursor_key(game_id: i64, log_path: &Path) -> String {
+    let file_name = log_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("Player.log");
+    format!("gearblocks.runtime_log_cursor.{game_id}.{file_name}")
+}
+
+fn save_gearblocks_runtime_log_cursor(
+    state: &AppState,
+    game_id: i64,
+    log_path: &Path,
+    offset: u64,
+    metadata: &fs::Metadata,
+) -> Result<(), String> {
+    let cursor = GearBlocksRuntimeLogCursor {
+        path: log_path.to_string_lossy().to_string(),
+        offset,
+        modified: file_modified_timestamp(metadata),
+    };
+    let cursor_json = serde_json::to_string(&cursor).map_err(|error| error.to_string())?;
+    state
+        .database
+        .save_app_setting(
+            &gearblocks_runtime_log_cursor_key(game_id, log_path),
+            &cursor_json,
+        )
+        .map_err(|error| error.to_string())
+}
+
+fn file_modified_timestamp(metadata: &fs::Metadata) -> String {
+    metadata
+        .modified()
+        .ok()
+        .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
+        .map(|value| format!("{}.{}", value.as_secs(), value.subsec_nanos()))
+        .unwrap_or_else(|| "unknown".to_string())
+}
+
+fn gearblocks_runtime_scene_diff_key(game_id: i64) -> String {
+    format!("gearblocks.runtime_scene_diff.{game_id}")
 }
 
 fn runtime_part_key(part: &serde_json::Value) -> String {

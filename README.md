@@ -78,7 +78,9 @@ The simple Gaming chat overlay also includes a capture button for quick full gam
 
 GearBlocks also exposes selected-game Home controls for setting its Save Location and Alternate Data Location through a native directory picker. These paths are stored locally in SQLite as game-scoped data-location records.
 
-The GearBlocks Home screen includes a Construction Decoder for local `construction.bytes` saves. Overlay Forge inflates the raw DEFLATE payload, parses the BSON document, and presents a compact construction summary plus decoded JSON. The same panel can install an Overlay Forge GearBlocks script mod that exports richer runtime metadata from loaded constructions to JSON. See `docs/GEARBLOCKS_CONSTRUCTION_DECODER.md`.
+The GearBlocks Home screen includes a Construction Decoder for local `construction.bytes` saves. Overlay Forge inflates the raw DEFLATE payload, parses the BSON document, and presents a compact construction summary plus decoded JSON. The same panel can install an Overlay Forge GearBlocks script mod that exports richer whole-scene runtime metadata from the loaded scene. Use `Refresh Scene Context` in Overlay Forge to request a fresh in-game scene export and index the newest scene before asking scene-specific chat questions. See `docs/GEARBLOCKS_CONSTRUCTION_DECODER.md`.
+
+The GearBlocks Tools view can install `OverlayForgeTools`, a no-window GearBlocks script mod that lets Overlay Forge send whitelisted BuilderToolExt and WeldTool actions to the remembered GearBlocks window.
 
 **Overlay Forge 0.2.0 - GearBlocks Runtime API Interfaces**
 

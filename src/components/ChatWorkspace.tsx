@@ -103,12 +103,19 @@ export function ChatWorkspace<TConversation extends ChatConversation, TMessage e
   }, [focusInputRequestNonce, selectedConversation?.id]);
 
   function handleDraftKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    const cursorPosition = event.currentTarget.selectionStart;
+    const hasSelection = event.currentTarget.selectionStart !== event.currentTarget.selectionEnd;
+    const textBeforeCursor = draft.slice(0, cursorPosition);
+    const currentLine = textBeforeCursor.slice(textBeforeCursor.lastIndexOf("\n") + 1);
+    const isBlankLineSubmit =
+      draft.trim().length > 0 && !hasSelection && currentLine.trim().length === 0;
+
     if (
       event.key !== "Enter" ||
       event.shiftKey ||
       !selectedConversation ||
       isSending ||
-      !draft.endsWith("  ")
+      !isBlankLineSubmit
     ) {
       return;
     }

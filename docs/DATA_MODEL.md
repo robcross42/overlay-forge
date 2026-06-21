@@ -407,9 +407,9 @@ created_at
 updated_at
 ```
 
-GearBlocks runtime construction export index populated from Overlay Forge Lua exporter records reconstructed from `Player.log` / `Player-prev.log` after the user explicitly refreshes runtime logs. `document_json` stores the complete runtime export payload, including availability-only `apiAttributes` entries. Chat context uses the latest indexed construction summary from SQLite but excludes API metadata by default. Normal game selection and Parts navigation read the existing SQLite index and do not auto-import changed log files.
+GearBlocks runtime construction export index populated from Overlay Forge Lua exporter records reconstructed from `Player.log` / `Player-prev.log`. `document_json` stores the complete runtime export payload, including availability-only `apiAttributes` entries. Chat context uses the latest indexed construction summary from SQLite but excludes API metadata by default. Overlay Forge stores per-log import cursors in `app_settings` so explicit refresh/import and GearBlocks chat send paths can read new log additions instead of reparsing unchanged file prefixes. Normal chat navigation must not synchronously parse full-scene runtime logs.
 
-The intended iterative GearBlocks workflow is to load the current build in-game, run `Export Target` or `Export All`, then use `Refresh Runtime Log` in Overlay Forge after subsequent build changes. Runtime part reference data and normalized detail indexes are upserted by stable keys, so unchanged catalog references are retained while refreshed exports update the latest observed build context. Use a full `Export All` refresh when removed parts need to disappear from the latest chat context.
+The intended iterative GearBlocks workflow is to load the current build in-game, run `Export Scene`, then use chat or click `Refresh Scene Context` in Overlay Forge. Runtime part reference data and normalized detail indexes are upserted by stable keys, so unchanged catalog references are retained while refreshed scene exports update the latest observed build context. A compact latest-vs-previous runtime scene diff summary is stored in `app_settings` for chat prompt context. Because the default export covers the whole scene, removed parts disappear from the latest chat context after the next scene export and import.
 
 ### game_runtime_parts
 

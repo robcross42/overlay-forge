@@ -106,6 +106,34 @@ export type GearBlocksLuaExporterInstall = {
   exportDirectory: string;
 };
 
+export type GearBlocksLuaScriptInstall = {
+  scriptModPath: string;
+  mainLuaPath: string;
+};
+
+export type GearBlocksOverlayToolAction =
+  | "weldToggle"
+  | "weldDetach"
+  | "weldFixed"
+  | "weldRotaryBearing"
+  | "weldLinearBearing"
+  | "weldLinearRotaryBearing"
+  | "weldSphericalBearing"
+  | "weldCvJoint"
+  | "weldKnuckleJoint"
+  | "weldNull"
+  | "builderToggleOrientation"
+  | "builderCyclePositionStep"
+  | "builderCycleRotationStep"
+  | "builderMoveToGround"
+  | "builderToggleResizeClamp"
+  | "builderToggleInterpenetration"
+  | "builderToggleAttachmentBridging"
+  | "builderToggleShowAllAttachments"
+  | "builderCycleResizeStep"
+  | "builderSnapPivotPosition"
+  | "builderSnapPivotRotation";
+
 export type GearBlocksRuntimeExport = {
   id: string;
   name: string;
@@ -237,9 +265,6 @@ export type GearBlocksRuntimeContextSync = {
   runtimeExportCount: number;
   runtimePartCount: number;
   constructionCount: number;
-  runtimeExports: GameRuntimeConstructionExport[];
-  runtimeParts: GameRuntimePart[];
-  constructions: GameConstruction[];
 };
 
 export type GameRuntimePart = {
@@ -375,6 +400,14 @@ export function decodeGearBlocksConstructionFolder(folderPath: string) {
 
 export function installGearBlocksLuaExporter(gameId: number) {
   return invoke<GearBlocksLuaExporterInstall>("install_gearblocks_lua_exporter", { gameId });
+}
+
+export function installGearBlocksOverlayTools(gameId: number) {
+  return invoke<GearBlocksLuaScriptInstall>("install_gearblocks_overlay_tools", { gameId });
+}
+
+export function sendGearBlocksOverlayToolAction(action: GearBlocksOverlayToolAction) {
+  return invoke<void>("send_gearblocks_overlay_tool_action", { action });
 }
 
 export function listGearBlocksRuntimeExports(gameId: number) {

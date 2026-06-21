@@ -5,7 +5,7 @@ Agent instructions for Overlay Forge. This file applies to the entire repository
 ## Project Baseline
 
 - Current stable app baseline: Milestone 13, complete / passed / successful.
-- Current active development bucket: `0.4.0`.
+- Current active development bucket: `0.5.0`.
 - Overlay Forge is a local-first Tauri v2 desktop overlay app with a React + TypeScript frontend, Rust backend, and SQLite persistence.
 - Future work must preserve the completed overlay shell, Projects workspace, project chat, bridge draft, local Markdown context, Gaming, GearBlocks, screenshot, and runtime API indexing workflows unless a user request explicitly changes them.
 
@@ -42,6 +42,7 @@ Keep `CHANGELOG.md` organized so changes can be reviewed by the day they were ma
 
 - Under the active version bucket, add a daily heading before new change entries using ISO format: `### YYYY-MM-DD`.
 - Put that day's changes under standard changelog subheadings such as `#### Added`, `#### Changed`, `#### Fixed`, `#### Validation`, or `#### Documentation`.
+- For new `#### Changed` and `#### Fixed` bullet entries, prefix each bullet with the current local system timestamp using `HH:MM:SS EDT -`, for example `- 18:34:15 EDT - Changed ...`.
 - Add all entries for the same calendar day under the same date heading instead of scattering them through older sections.
 - Keep older historical entries as-is unless a separate cleanup task explicitly asks to reorganize them.
 - When a milestone validation changes documentation, include the validation/documentation update under that day's heading so the daily work summary stays complete.
@@ -60,8 +61,8 @@ Keep `CHANGELOG.md` organized so changes can be reviewed by the day they were ma
 
 - GearBlocks save decoding, runtime log import, catalog metadata, screenshots, and chat context are local-first.
 - `construction.bytes` decoding reads local raw DEFLATE-compressed BSON and does not require GearBlocks to be running.
-- Runtime metadata comes from the installable GearBlocks Lua script mod and explicit `Refresh Runtime Log` imports.
-- Normal game selection and Parts navigation must not automatically scan `Player.log` or `Player-prev.log`.
+- Runtime metadata comes from the installable GearBlocks Lua script mod, which now exports the whole live scene by default.
+- Do not trigger GearBlocks runtime log parsing from normal chat navigation; use explicit refresh or backend chat-send context assembly until a true background/latest-export importer is added.
 - Runtime API metadata is availability-only by default. Do not execute getter commands or include API getter values in default chat prompt context unless a future explicit user-controlled include/snapshot action is added.
 - Prefer normalized GearBlocks runtime/API tables and command-layer payloads over reparsing only the full runtime export JSON blob.
 - Preserve the validated `game-screenshots/` folder layout, Tauri asset preview scope, overlay-hidden capture behavior, and screenshot delete cleanup semantics.

@@ -6,6 +6,29 @@ Unreleased changes are grouped by day using `YYYY-MM-DD` headings so a single da
 
 ## Unreleased
 
+## 0.5.0 - 2026-06-20
+
+Development bucket for GearBlocks scene-context workflow work starting on 2026-06-20 after the completed `0.4.0` documentation rules session.
+
+### 2026-06-20
+
+#### Changed
+
+- Changed the GearBlocks Lua exporter workflow so the default export path is the full live scene instead of a targeted construction.
+- Removed the GearBlocks targeted export button binding from the installed exporter UI.
+- Added the backend/runtime plumbing needed to fingerprint GearBlocks scene context changes after new `Player.log` exporter chunks appear.
+- Added explicit `Refresh Scene Context` controls to GearBlocks Chat and Parts so scene-specific chat context can be updated after running `Export Scene`.
+- Changed GearBlocks runtime export import to use per-log SQLite cursors so explicit refresh reads only new `Player.log` / `Player-prev.log` additions when possible.
+- Added a compact runtime scene diff summary between the latest and previous scene exports and included it in GearBlocks chat prompt context.
+- 18:45:48 EDT - Changed chat prompt keyboard submission so pressing Enter on a blank line submits the prompt.
+- 18:55:37 EDT - Changed GearBlocks tool access by adding an Overlay Forge Tools view, installer, no-window script bridge, and whitelisted BuilderToolExt / WeldTool actions.
+- 20:37:52 EDT - Changed GearBlocks scene context refresh so it requests a fresh in-game scene export before importing new `Player.log` context.
+
+#### Fixed
+
+- Disabled GearBlocks runtime context polling from the React chat entry path so opening GearBlocks Chats does not synchronously parse and index full-scene `Player.log` exports.
+- Changed GearBlocks chat send context to import new `Player.log` additions through the runtime cursor before using the latest indexed runtime scene snapshot.
+
 ## 0.4.0 - 2026-06-17
 
 Development bucket for work starting on 2026-06-17 after the completed `0.3.0` session.

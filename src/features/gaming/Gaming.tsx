@@ -13,6 +13,7 @@ import {
   installGearBlocksLuaExporter,
   importGearBlocksCatalogScreenshotImages,
   importGearBlocksRuntimePartIndex,
+  installGearBlocksOverlayTools,
   deleteGameChatConversation,
   deleteGameDataLocation,
   deleteGameScreenshot,
@@ -29,8 +30,10 @@ import {
   listGameRuntimeParts,
   listGameScreenshots,
   saveGameDataLocation,
+  sendGearBlocksOverlayToolAction,
   setGameRuntimePartDisplayImage,
   sendGameChatMessage,
+  syncGearBlocksRuntimeContext,
   syncGearBlocksSavedConstructions,
   updateGameRuntimePartNotes
 } from "../../services/gaming";
@@ -44,6 +47,7 @@ import type {
   GameDataLocationType,
   GameRuntimePart,
   GameRuntimePartApiMember,
+  GearBlocksOverlayToolAction,
   GearBlocksApiCatalog,
   GearBlocksApiMember,
   GearBlocksConstructionDecode,
@@ -82,7 +86,7 @@ type ScreenshotContextMenu = {
   y: number;
 };
 
-type GameView = "home" | "chat" | "screenshots" | "parts" | "constructions" | "api";
+type GameView = "home" | "chat" | "screenshots" | "parts" | "constructions" | "api" | "tools";
 const CHAT_SCREENSHOTS_PER_PAGE = 8;
 const GEARBLOCKS_PARTS_CATALOG_METADATA = {
   gameVersion: "0.8.96622",
@@ -90,6 +94,35 @@ const GEARBLOCKS_PARTS_CATALOG_METADATA = {
   validation: "Validated"
 };
 const SHOW_GEARBLOCKS_CATALOG_MAINTENANCE_CONTROLS = false;
+const GEARBLOCKS_WELD_TOOL_ACTIONS: Array<{
+  label: string;
+  action: GearBlocksOverlayToolAction;
+}> = [
+  { label: "Fixed", action: "weldFixed" },
+  { label: "Rotary", action: "weldRotaryBearing" },
+  { label: "Linear", action: "weldLinearBearing" },
+  { label: "Linear Rotary", action: "weldLinearRotaryBearing" },
+  { label: "Spherical", action: "weldSphericalBearing" },
+  { label: "CV", action: "weldCvJoint" },
+  { label: "Knuckle", action: "weldKnuckleJoint" },
+  { label: "Null", action: "weldNull" }
+];
+const GEARBLOCKS_BUILDER_TOOL_ACTIONS: Array<{
+  label: string;
+  action: GearBlocksOverlayToolAction;
+}> = [
+  { label: "Orientation", action: "builderToggleOrientation" },
+  { label: "Position Step", action: "builderCyclePositionStep" },
+  { label: "Rotation Step", action: "builderCycleRotationStep" },
+  { label: "Resize Step", action: "builderCycleResizeStep" },
+  { label: "Move Ground", action: "builderMoveToGround" },
+  { label: "Snap Position", action: "builderSnapPivotPosition" },
+  { label: "Snap Rotation", action: "builderSnapPivotRotation" },
+  { label: "Clamp Resize", action: "builderToggleResizeClamp" },
+  { label: "Interpenetration", action: "builderToggleInterpenetration" },
+  { label: "Attachment Bridging", action: "builderToggleAttachmentBridging" },
+  { label: "All Attachments", action: "builderToggleShowAllAttachments" }
+];
 const GAME_DATA_LOCATION_OPTIONS: Array<{
   type: GameDataLocationType;
   title: string;
@@ -140,6 +173,9 @@ export function Gaming({
   const [decodingConstructionPath, setDecodingConstructionPath] = useState("");
   const [isInstallingLuaExporter, setIsInstallingLuaExporter] = useState(false);
   const [luaExporterPath, setLuaExporterPath] = useState("");
+  const [isInstallingGearBlocksTools, setIsInstallingGearBlocksTools] = useState(false);
+  const [gearBlocksToolsPath, setGearBlocksToolsPath] = useState("");
+  const [isSendingGearBlocksToolAction, setIsSendingGearBlocksToolAction] = useState(false);
   const [runtimeExports, setRuntimeExports] = useState<GearBlocksRuntimeExport[]>([]);
   const [selectedRuntimeExportId, setSelectedRuntimeExportId] = useState("");
   const [gearBlocksApiCatalog, setGearBlocksApiCatalog] = useState<GearBlocksApiCatalog | null>(
@@ -289,6 +325,9 @@ export function Gaming({
       setDecodingConstructionPath("");
       setIsInstallingLuaExporter(false);
       setLuaExporterPath("");
+      setIsInstallingGearBlocksTools(false);
+      setGearBlocksToolsPath("");
+      setIsSendingGearBlocksToolAction(false);
       setRuntimeExports([]);
       setSelectedRuntimeExportId("");
       setGearBlocksApiCatalog(null);
@@ -872,6 +911,34 @@ export function Gaming({
     }
   }
 
+  async function installGearBlocksTools(game: Game) {
+    setIsInstallingGearBlocksTools(true);
+    try {
+      const install = await installGearBlocksOverlayTools(game.id);
+      setGearBlocksToolsPath(install.scriptModPath);
+      setStatus(`Overlay Forge Tools installed: ${install.scriptModPath}`);
+      showToast("Successful");
+    } catch (error) {
+      setStatus(formatError(error));
+      window.alert(formatError(error));
+    } finally {
+      setIsInstallingGearBlocksTools(false);
+    }
+  }
+
+  async function sendGearBlocksToolAction(action: GearBlocksOverlayToolAction) {
+    setIsSendingGearBlocksToolAction(true);
+    try {
+      await sendGearBlocksOverlayToolAction(action);
+      setStatus("Sent GearBlocks tool action");
+    } catch (error) {
+      setStatus(formatError(error));
+      window.alert(formatError(error));
+    } finally {
+      setIsSendingGearBlocksToolAction(false);
+    }
+  }
+
   async function importGearBlocksRuntimeExports(game: Game) {
     setIsImportingRuntimeExports(true);
     try {
@@ -882,7 +949,25 @@ export function Gaming({
       setRuntimeExports([]);
       setSelectedRuntimeExportId("");
       setStatus(
-        `Refreshed GearBlocks runtime log and indexed ${indexedParts.length} unique part reference(s)`
+        `Refreshed GearBlocks scene context and indexed ${indexedParts.length} unique part reference(s)`
+      );
+      showToast("Successful");
+    } catch (error) {
+      setStatus(formatError(error));
+      window.alert(formatError(error));
+    } finally {
+      setIsImportingRuntimeExports(false);
+    }
+  }
+
+  async function refreshGearBlocksSceneContext(game: Game) {
+    setIsImportingRuntimeExports(true);
+    try {
+      const sync = await syncGearBlocksRuntimeContext(game.id);
+      const categories = await listGamePartCategories(game.id);
+      setPartCategories(categories);
+      setStatus(
+        `Refreshed GearBlocks scene context: ${sync.runtimePartCount} runtime part reference(s), ${sync.runtimeExportCount} scene export(s)`
       );
       showToast("Successful");
     } catch (error) {
@@ -1075,6 +1160,15 @@ export function Gaming({
             >
               API
               <span className="button-count">{gearBlocksApiCatalog?.types.length ?? 0}</span>
+            </button>
+          )}
+          {selectedGame.slug === "gearblocks" && (
+            <button
+              className={gameView === "tools" ? "primary-button" : "ghost-button"}
+              onClick={() => setGameView("tools")}
+              type="button"
+            >
+              Tools
             </button>
           )}
           <button
@@ -1474,101 +1568,213 @@ export function Gaming({
             </section>
           )}
 
+          {gameView === "tools" && selectedGame.slug === "gearblocks" && (
+            <section className="game-script-tools-panel" aria-label="GearBlocks overlay tools">
+              <div className="game-view-head">
+                <div>
+                  <p>GearBlocks</p>
+                  <h3>Tools</h3>
+                </div>
+                <button
+                  className="ghost-button"
+                  disabled={isInstallingGearBlocksTools}
+                  onClick={() => void installGearBlocksTools(selectedGame)}
+                  type="button"
+                >
+                  Install Tools
+                </button>
+              </div>
+
+              {gearBlocksToolsPath && (
+                <div className="game-script-tools-status">
+                  <span>OverlayForgeTools</span>
+                  <code>{gearBlocksToolsPath}</code>
+                </div>
+              )}
+
+              <div className="game-script-tools-grid">
+                <article className="game-script-tool-card">
+                  <div>
+                    <p>BuilderToolExt</p>
+                    <h4>Builder Tool</h4>
+                  </div>
+                  <div className="game-script-tool-actions">
+                    {GEARBLOCKS_BUILDER_TOOL_ACTIONS.map((toolAction) => (
+                      <button
+                        className="ghost-button"
+                        disabled={isSendingGearBlocksToolAction}
+                        key={toolAction.action}
+                        onClick={() => void sendGearBlocksToolAction(toolAction.action)}
+                        type="button"
+                      >
+                        {toolAction.label}
+                      </button>
+                    ))}
+                  </div>
+                </article>
+
+                <article className="game-script-tool-card">
+                  <div>
+                    <p>WeldTool</p>
+                    <h4>Weld Tool</h4>
+                  </div>
+                  <div className="game-script-tool-actions compact">
+                    {GEARBLOCKS_WELD_TOOL_ACTIONS.map((toolAction) => (
+                      <button
+                        className="ghost-button"
+                        disabled={isSendingGearBlocksToolAction}
+                        key={toolAction.action}
+                        onClick={() => void sendGearBlocksToolAction(toolAction.action)}
+                        type="button"
+                      >
+                        {toolAction.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="game-script-tool-actions">
+                    <button
+                      className="primary-button"
+                      disabled={isSendingGearBlocksToolAction}
+                      onClick={() => void sendGearBlocksToolAction("weldToggle")}
+                      type="button"
+                    >
+                      Start / Complete
+                    </button>
+                    <button
+                      className="ghost-button"
+                      disabled={isSendingGearBlocksToolAction}
+                      onClick={() => void sendGearBlocksToolAction("weldDetach")}
+                      type="button"
+                    >
+                      Detach
+                    </button>
+                  </div>
+                </article>
+              </div>
+            </section>
+          )}
+
           {gameView === "chat" && (
             <ChatWorkspace
               conversations={chatConversations}
               chatOverlayMode={chatOverlayMode}
               contextSlot={
-                <section className="chat-screenshot-context" aria-label="Screenshot context">
-                  <div className="chat-screenshot-summary">
-                    <div>
-                      <p>Prompt context</p>
-                      <strong>{selectedPromptScreenshotIds.length} screenshot(s) selected</strong>
-                    </div>
-                    <button
-                      className="ghost-button"
-                      onClick={() => setIsChatScreenshotPickerOpen((current) => !current)}
-                      type="button"
-                    >
-                      {isChatScreenshotPickerOpen ? "Hide Screenshots" : "Add Screenshots"}
-                    </button>
-                  </div>
-
-                  {isChatScreenshotPickerOpen && (
-                    <>
-                      <div className="chat-screenshot-actions">
+                <>
+                  {selectedGame.slug === "gearblocks" && (
+                    <section className="chat-screenshot-context" aria-label="Scene context">
+                      <div className="chat-screenshot-summary">
+                        <div>
+                          <p>Scene context</p>
+                          <strong>Latest indexed GearBlocks export</strong>
+                        </div>
                         <button
                           className="ghost-button"
-                          disabled={chatScreenshotPage === 0 || screenshots.length === 0}
-                          onClick={() =>
-                            setChatScreenshotPage((current) => Math.max(0, current - 1))
-                          }
+                          disabled={isImportingRuntimeExports}
+                          onClick={() => void refreshGearBlocksSceneContext(selectedGame)}
                           type="button"
                         >
-                          Prev
-                        </button>
-                        <span>
-                          {screenshots.length === 0
-                            ? "0 / 0"
-                            : `${chatScreenshotPage + 1} / ${chatScreenshotPageCount}`}
-                        </span>
-                        <button
-                          className="ghost-button"
-                          disabled={
-                            chatScreenshotPage >= chatScreenshotPageCount - 1 ||
-                            screenshots.length === 0
-                          }
-                          onClick={() =>
-                            setChatScreenshotPage((current) =>
-                              Math.min(chatScreenshotPageCount - 1, current + 1)
-                            )
-                          }
-                          type="button"
-                        >
-                          Next
-                        </button>
-                        <button
-                          className="primary-button"
-                          disabled={isRequestingScreenshot}
-                          onClick={() => void requestScreenshotCapture(selectedGame)}
-                          type="button"
-                        >
-                          Capture
+                          Refresh Scene Context
                         </button>
                       </div>
-                      {screenshots.length === 0 ? (
-                        <p>No screenshots captured yet.</p>
-                      ) : (
-                        <div className="chat-screenshot-context-grid">
-                          {visibleChatScreenshots.map((screenshot) => (
-                            <label
-                              className={
-                                selectedPromptScreenshotIds.includes(screenshot.id)
-                                  ? "chat-screenshot-option selected"
-                                  : "chat-screenshot-option"
-                              }
-                              key={screenshot.id}
-                            >
-                              <input
-                                checked={selectedPromptScreenshotIds.includes(screenshot.id)}
-                                onChange={() => togglePromptScreenshot(screenshot.id)}
-                                type="checkbox"
-                              />
-                              <img
-                                alt={`Screenshot captured ${formatCapturedAt(screenshot)}`}
-                                src={convertFileSrc(screenshot.filePath)}
-                              />
-                              <span>{formatCapturedAt(screenshot)}</span>
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                    </>
+                    </section>
                   )}
-                </section>
+                  <section className="chat-screenshot-context" aria-label="Screenshot context">
+                    <div className="chat-screenshot-summary">
+                      <div>
+                        <p>Prompt context</p>
+                        <strong>{selectedPromptScreenshotIds.length} screenshot(s) selected</strong>
+                      </div>
+                      <button
+                        className="ghost-button"
+                        onClick={() => setIsChatScreenshotPickerOpen((current) => !current)}
+                        type="button"
+                      >
+                        {isChatScreenshotPickerOpen ? "Hide Screenshots" : "Add Screenshots"}
+                      </button>
+                    </div>
+
+                    {isChatScreenshotPickerOpen && (
+                      <>
+                        <div className="chat-screenshot-actions">
+                          <button
+                            className="ghost-button"
+                            disabled={chatScreenshotPage === 0 || screenshots.length === 0}
+                            onClick={() =>
+                              setChatScreenshotPage((current) => Math.max(0, current - 1))
+                            }
+                            type="button"
+                          >
+                            Prev
+                          </button>
+                          <span>
+                            {screenshots.length === 0
+                              ? "0 / 0"
+                              : `${chatScreenshotPage + 1} / ${chatScreenshotPageCount}`}
+                          </span>
+                          <button
+                            className="ghost-button"
+                            disabled={
+                              chatScreenshotPage >= chatScreenshotPageCount - 1 ||
+                              screenshots.length === 0
+                            }
+                            onClick={() =>
+                              setChatScreenshotPage((current) =>
+                                Math.min(chatScreenshotPageCount - 1, current + 1)
+                              )
+                            }
+                            type="button"
+                          >
+                            Next
+                          </button>
+                          <button
+                            className="primary-button"
+                            disabled={isRequestingScreenshot}
+                            onClick={() => void requestScreenshotCapture(selectedGame)}
+                            type="button"
+                          >
+                            Capture
+                          </button>
+                        </div>
+                        {screenshots.length === 0 ? (
+                          <p>No screenshots captured yet.</p>
+                        ) : (
+                          <div className="chat-screenshot-context-grid">
+                            {visibleChatScreenshots.map((screenshot) => (
+                              <label
+                                className={
+                                  selectedPromptScreenshotIds.includes(screenshot.id)
+                                    ? "chat-screenshot-option selected"
+                                    : "chat-screenshot-option"
+                                }
+                                key={screenshot.id}
+                              >
+                                <input
+                                  checked={selectedPromptScreenshotIds.includes(screenshot.id)}
+                                  onChange={() => togglePromptScreenshot(screenshot.id)}
+                                  type="checkbox"
+                                />
+                                <img
+                                  alt={`Screenshot captured ${formatCapturedAt(screenshot)}`}
+                                  src={convertFileSrc(screenshot.filePath)}
+                                />
+                                <span>{formatCapturedAt(screenshot)}</span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </section>
+                </>
               }
               draft={chatDraft}
-              emptyMainSlot={<GameChatDefaultsPane game={selectedGame} />}
+              emptyMainSlot={
+                <GameChatDefaultsPane
+                  game={selectedGame}
+                  isRefreshingSceneContext={isImportingRuntimeExports}
+                  onRefreshSceneContext={() => void refreshGearBlocksSceneContext(selectedGame)}
+                />
+              }
               emptyConversationLabel="No game chats yet."
               hideSidebarWhenSelected
               inputPlaceholder={`Ask about ${selectedGame.name}...`}
@@ -1643,7 +1849,7 @@ export function Gaming({
                         onClick={() => void importGearBlocksRuntimeExports(selectedGame)}
                         type="button"
                       >
-                        Refresh Runtime Log
+                        Refresh Scene Context
                       </button>
                       {SHOW_GEARBLOCKS_CATALOG_MAINTENANCE_CONTROLS && (
                         <>
@@ -1681,8 +1887,8 @@ export function Gaming({
                   </div>
                   {runtimeParts.length === 0 ? (
                     <p>
-                      Export scene parts from the GearBlocks Lua script, then run the maintenance
-                      Player.log import.
+                      Export the scene from the GearBlocks Lua script, then refresh the runtime log
+                      to index the latest Player.log scene context.
                     </p>
                   ) : (
                     <div className="game-runtime-catalog-layout">
@@ -2288,7 +2494,15 @@ function RuntimePartApiMemberFlags({ member }: { member: GameRuntimePartApiMembe
   );
 }
 
-function GameChatDefaultsPane({ game }: { game: Game }) {
+function GameChatDefaultsPane({
+  game,
+  isRefreshingSceneContext,
+  onRefreshSceneContext
+}: {
+  game: Game;
+  isRefreshingSceneContext: boolean;
+  onRefreshSceneContext: () => void;
+}) {
   const isGearBlocks = game.slug === "gearblocks";
 
   return (
@@ -2317,9 +2531,16 @@ function GameChatDefaultsPane({ game }: { game: Game }) {
           <article className="game-chat-default-item enabled">
             <div>
               <strong>Runtime construction context</strong>
-              <span>Latest Overlay Forge exporter data from Player.log is summarized for chat</span>
+              <span>Refresh after running Export Scene to update chat context</span>
             </div>
-            <span>Auto</span>
+            <button
+              className="ghost-button"
+              disabled={isRefreshingSceneContext}
+              onClick={onRefreshSceneContext}
+              type="button"
+            >
+              Refresh Scene Context
+            </button>
           </article>
         )}
 

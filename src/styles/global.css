@@ -1774,6 +1774,98 @@ select.text-input option:hover {
   font-size: 0.84rem;
 }
 
+.game-script-tools-panel {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.game-script-tools-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.game-script-tools-status span {
+  flex: 0 0 auto;
+  color: var(--accent-strong);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.game-script-tools-status code {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-script-tools-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+
+.game-script-tool-card {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.game-script-tool-card p,
+.game-script-tool-card h4 {
+  margin: 0;
+}
+
+.game-script-tool-card p {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.game-script-tool-card h4 {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-script-tool-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.game-script-tool-actions.compact {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.game-script-tool-actions button {
+  justify-content: center;
+  min-width: 0;
+  min-height: 36px;
+  padding-right: 9px;
+  padding-left: 9px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 .game-api-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
