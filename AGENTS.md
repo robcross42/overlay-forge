@@ -5,7 +5,7 @@ Agent instructions for Overlay Forge. This file applies to the entire repository
 ## Project Baseline
 
 - Current stable app baseline: Milestone 13, complete / passed / successful.
-- Current active development bucket: `0.5.0`.
+- Current active development bucket: `0.6.0`.
 - Overlay Forge is a local-first Tauri v2 desktop overlay app with a React + TypeScript frontend, Rust backend, and SQLite persistence.
 - Future work must preserve the completed overlay shell, Projects workspace, project chat, bridge draft, local Markdown context, Gaming, GearBlocks, screenshot, and runtime API indexing workflows unless a user request explicitly changes them.
 

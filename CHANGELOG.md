@@ -6,6 +6,16 @@ Unreleased changes are grouped by day using `YYYY-MM-DD` headings so a single da
 
 ## Unreleased
 
+## 0.6.0 - 2026-06-21
+
+Development bucket for work starting on 2026-06-21 after the completed `0.5.0` GearBlocks scene-context workflow session.
+
+### 2026-06-21
+
+#### Changed
+
+- 12:09:22 EDT - Changed project version metadata to start the `0.6.0` development bucket.
+
 ## 0.5.0 - 2026-06-20
 
 Development bucket for GearBlocks scene-context workflow work starting on 2026-06-20 after the completed `0.4.0` documentation rules session.
