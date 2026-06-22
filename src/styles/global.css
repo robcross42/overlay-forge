@@ -4465,6 +4465,13 @@ select.text-input option:hover {
   white-space: pre-wrap;
 }
 
+.chat-message-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+}
+
 .chat-input-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

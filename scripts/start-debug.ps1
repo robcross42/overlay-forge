@@ -21,7 +21,6 @@ if (-not (Test-Path $exePath)) {
 $process = Start-Process `
     -FilePath $exePath `
     -WorkingDirectory $tauriRoot `
-    -WindowStyle Hidden `
     -PassThru
 
 Write-Host "Started overlay-forge PID $($process.Id)."

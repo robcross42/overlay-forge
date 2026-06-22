@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "pretauri:dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stop-overlay-forge.ps1",
-    "tauri:dev": "tauri dev",
+    "tauri:dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tauri-dev-with-log.ps1",
     "tauri:build": "tauri build",
     "app:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-debug.ps1",
     "app:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stop-overlay-forge.ps1"

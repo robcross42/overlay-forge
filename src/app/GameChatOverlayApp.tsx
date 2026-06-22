@@ -7,7 +7,6 @@ import {
   createGameChatScreenshotCapture,
   focusGameChatOverlayWindow,
   getActiveGameChatOverlay,
-  importGearBlocksRuntimeContext,
   listGameChatConversations,
   listGameChatMessages,
   listGames,
@@ -97,42 +96,6 @@ export default function GameChatOverlayApp() {
       cleanup?.();
     };
   }, [game?.id, isCapturingPromptScreenshot]);
-
-  useEffect(() => {
-    if (!game || game.slug !== "gearblocks") {
-      return;
-    }
-
-    let isCancelled = false;
-    let isImporting = false;
-
-    async function importManualRuntimeExports() {
-      if (!game || isImporting) {
-        return;
-      }
-      isImporting = true;
-      try {
-        const sync = await importGearBlocksRuntimeContext(game.id);
-        if (!isCancelled && sync.changed) {
-          setStatus(
-            `Indexed latest GearBlocks scene export: ${sync.runtimePartCount} runtime part reference(s), ${sync.runtimeExportCount} scene export(s)`
-          );
-        }
-      } catch {
-        // Passive import should not interrupt overlay chat.
-      } finally {
-        isImporting = false;
-      }
-    }
-
-    void importManualRuntimeExports();
-    const intervalId = window.setInterval(importManualRuntimeExports, 2500);
-
-    return () => {
-      isCancelled = true;
-      window.clearInterval(intervalId);
-    };
-  }, [game?.id, game?.slug]);
 
   async function loadActiveChat() {
     try {

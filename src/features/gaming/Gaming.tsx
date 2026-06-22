@@ -5,6 +5,7 @@ import { ChatWorkspace } from "../../components/ChatWorkspace";
 import {
   catalogGamePartsFromScreenshots,
   clearGameRuntimePartImagesForCategory,
+  clearGearBlocksMarkers,
   createGame,
   createGameChatConversation,
   createGameChatScreenshotCapture,
@@ -13,7 +14,6 @@ import {
   getGearBlocksThirdPartyDependencyStatus,
   installGearBlocksLuaExporter,
   importGearBlocksCatalogScreenshotImages,
-  importGearBlocksRuntimeContext,
   importGearBlocksRuntimePartIndex,
   deleteGameChatConversation,
   deleteGameDataLocation,
@@ -33,6 +33,7 @@ import {
   saveGameDataLocation,
   setGameRuntimePartDisplayImage,
   sendGameChatMessage,
+  sendGearBlocksMarkerCommands,
   syncGearBlocksRuntimeContext,
   syncGearBlocksSavedConstructions,
   updateGameRuntimePartNotes
@@ -53,6 +54,7 @@ import type {
   GearBlocksConstructionFile,
   GearBlocksThirdPartyDependencyStatusPayload,
   GearBlocksRuntimeExport,
+  GearBlocksMarkerInput,
   GamePartCategory,
   GameScreenshotCaptureRequest
 } from "../../services/gaming";
@@ -174,6 +176,7 @@ export function Gaming({
   const [newChatTitle, setNewChatTitle] = useState("");
   const [chatDraft, setChatDraft] = useState("");
   const [isSendingChat, setIsSendingChat] = useState(false);
+  const [isSendingGearBlocksMarkers, setIsSendingGearBlocksMarkers] = useState(false);
   const [isCapturingPromptScreenshot, setIsCapturingPromptScreenshot] = useState(false);
   const [selectedPromptScreenshotIds, setSelectedPromptScreenshotIds] = useState<number[]>([]);
   const [chatScreenshotPage, setChatScreenshotPage] = useState(0);
@@ -432,50 +435,6 @@ export function Gaming({
       onExitChatOverlayMode?.();
     }
   }, [chatOverlayMode, selectedGame?.id, gameView, selectedChatConversationId, onExitChatOverlayMode]);
-
-  useEffect(() => {
-    if (!selectedGame || selectedGame.slug !== "gearblocks" || gameView !== "chat") {
-      return;
-    }
-
-    let isCancelled = false;
-    let isImporting = false;
-
-    async function importManualRuntimeExports() {
-      if (!selectedGame || isImporting) {
-        return;
-      }
-      isImporting = true;
-      try {
-        const sync = await importGearBlocksRuntimeContext(selectedGame.id);
-        if (!isCancelled && sync.changed) {
-          const [categories, orderedParts] = await Promise.all([
-            listGamePartCategories(selectedGame.id),
-            listGameRuntimeParts(selectedGame.id)
-          ]);
-          if (!isCancelled) {
-            setPartCategories(categories);
-            setRuntimeParts(orderedParts);
-            setStatus(
-              `Indexed latest GearBlocks scene export: ${sync.runtimePartCount} runtime part reference(s), ${sync.runtimeExportCount} scene export(s)`
-            );
-          }
-        }
-      } catch {
-        // Passive import should not interrupt chat typing.
-      } finally {
-        isImporting = false;
-      }
-    }
-
-    void importManualRuntimeExports();
-    const intervalId = window.setInterval(importManualRuntimeExports, 2500);
-
-    return () => {
-      isCancelled = true;
-      window.clearInterval(intervalId);
-    };
-  }, [gameView, selectedGame?.id, selectedGame?.slug]);
 
   useEffect(() => {
     setChatScreenshotPage((current) => Math.min(current, chatScreenshotPageCount - 1));
@@ -765,6 +724,46 @@ export function Gaming({
       setStatus(formatError(error));
     } finally {
       setIsSendingChat(false);
+    }
+  }
+
+  async function sendGearBlocksMarkersFromMessage(message: GameChatMessage) {
+    if (!selectedGame || selectedGame.slug !== "gearblocks") {
+      setStatus("GearBlocks markers require the GearBlocks game section");
+      return;
+    }
+
+    const markers = extractGearBlocksMarkers(message.content);
+    if (markers.length === 0) {
+      setStatus("No marker plan found in that response");
+      return;
+    }
+
+    setIsSendingGearBlocksMarkers(true);
+    try {
+      const result = await sendGearBlocksMarkerCommands(selectedGame.id, markers);
+      setStatus(`Sent ${result.commandCount} marker command(s) to GearBlocks`);
+    } catch (error) {
+      setStatus(formatError(error));
+    } finally {
+      setIsSendingGearBlocksMarkers(false);
+    }
+  }
+
+  async function clearGearBlocksChatMarkers() {
+    if (!selectedGame || selectedGame.slug !== "gearblocks") {
+      setStatus("GearBlocks markers require the GearBlocks game section");
+      return;
+    }
+
+    setIsSendingGearBlocksMarkers(true);
+    try {
+      await clearGearBlocksMarkers(selectedGame.id);
+      setStatus("Sent clear markers command to GearBlocks");
+    } catch (error) {
+      setStatus(formatError(error));
+    } finally {
+      setIsSendingGearBlocksMarkers(false);
     }
   }
 
@@ -1713,6 +1712,14 @@ export function Gaming({
                         >
                           Refresh Scene Context
                         </button>
+                        <button
+                          className="ghost-button"
+                          disabled={isSendingGearBlocksMarkers}
+                          onClick={() => void clearGearBlocksChatMarkers()}
+                          type="button"
+                        >
+                          Clear Markers
+                        </button>
                       </div>
                     </section>
                   )}
@@ -1836,6 +1843,36 @@ export function Gaming({
                 setIsChatScreenshotPickerOpen(false);
               }}
               onSendMessage={() => void sendGameChat()}
+              renderMessageContent={(message) => {
+                const content =
+                  selectedGame.slug === "gearblocks" && message.role === "assistant"
+                    ? stripGearBlocksMarkerBlocks(message.content)
+                    : message.content;
+                return <p>{content}</p>;
+              }}
+              renderMessageActions={(message) => {
+                if (selectedGame.slug !== "gearblocks" || message.role !== "assistant") {
+                  return null;
+                }
+
+                const markers = extractGearBlocksMarkers(message.content);
+                if (markers.length === 0) {
+                  return null;
+                }
+
+                return (
+                  <div className="chat-message-actions">
+                    <button
+                      className="ghost-button"
+                      disabled={isSendingGearBlocksMarkers}
+                      onClick={() => void sendGearBlocksMarkersFromMessage(message)}
+                      type="button"
+                    >
+                      Send {markers.length} Marker{markers.length === 1 ? "" : "s"}
+                    </button>
+                  </div>
+                );
+              }}
               promptContextSummary={
                 isCapturingPromptScreenshot
                   ? "Capturing screenshot..."
@@ -2350,6 +2387,67 @@ export function Gaming({
 
 function formatError(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function stripGearBlocksMarkerBlocks(content: string) {
+  return content
+    .replace(/```overlay-forge-markers\s*[\s\S]*?```/gi, "")
+    .trim();
+}
+
+function extractGearBlocksMarkers(content: string): GearBlocksMarkerInput[] {
+  const markers: GearBlocksMarkerInput[] = [];
+  const blockPattern = /```overlay-forge-markers\s*([\s\S]*?)```/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = blockPattern.exec(content)) !== null) {
+    try {
+      const parsed = JSON.parse(match[1]) as unknown;
+      const markerList = Array.isArray(parsed)
+        ? parsed
+        : isRecord(parsed) && Array.isArray(parsed.markers)
+          ? parsed.markers
+          : [];
+
+      for (const marker of markerList) {
+        if (!isRecord(marker)) {
+          continue;
+        }
+
+        const x = Number(marker.x);
+        const y = Number(marker.y);
+        const z = Number(marker.z);
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+          continue;
+        }
+
+        markers.push({
+          label: typeof marker.label === "string" ? marker.label : undefined,
+          reason: typeof marker.reason === "string" ? marker.reason : undefined,
+          x,
+          y,
+          z,
+          color: typeof marker.color === "string" ? marker.color : undefined,
+          durationSeconds:
+            Number.isFinite(Number(marker.durationSeconds)) && marker.durationSeconds !== undefined
+              ? Number(marker.durationSeconds)
+              : undefined,
+          size:
+            Number.isFinite(Number(marker.size)) && marker.size !== undefined
+              ? Number(marker.size)
+              : undefined
+        });
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return markers;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function parseJsonOrFallback(value: string, fallback: unknown) {

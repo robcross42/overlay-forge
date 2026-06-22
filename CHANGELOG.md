@@ -10,29 +10,97 @@ Unreleased changes are grouped by day using `YYYY-MM-DD` headings so a single da
 
 Development bucket for the SQLite naming normalization and scheduler-backed persistence migration.
 
+### 2026-06-22
+
+#### Changed
+
+- 00:06:33 EDT - Changed GearBlocks chat-send runtime importing to reconcile the full `Player.log` and `Player-prev.log` after cursor-based diff imports so missed completed exports are persisted before prompt context is assembled.
+- 00:06:33 EDT - Changed GearBlocks runtime prompt context to include the exact latest export ID and exported timestamp used by chat.
+- 00:18:24 EDT - Changed GearBlocks chat submission to avoid triggering a full in-game scene export and instead only import/reconcile completed `Player.log` additions before prompt context is assembled.
+- 00:35:49 EDT - Changed the GearBlocks Lua script to emit compact scene-delta log records for added, changed, and removed parts after a full scene export baseline.
+- 01:18:15 EDT - Changed the `npm run tauri:dev` workflow to write a PowerShell transcript log for each dev session under `logs\tauri-dev`.
+- 01:24:28 EDT - Changed the Tauri dev logging wrapper to redirect the full `tauri dev` output to a session log and mirror new log lines back to the visible terminal.
+- 01:36:26 EDT - Changed the GearBlocks BepInEx marker plugin template to include the Unity IMGUI reference used for screen-space marker crosshairs and labels.
+
+#### Fixed
+
+- 00:35:49 EDT - Fixed GearBlocks chat context missing copied parts after the last full export by importing scene deltas from `Player.log` and applying them as synthetic `sceneDeltaPatch` runtime snapshots before prompt context is assembled.
+- 00:48:08 EDT - Fixed GearBlocks Chats shortcut freezes by keeping the passive runtime import monitor cursor-only, seeding missing monitor cursors at the log tail, and reserving full-log reconciliation for explicit refresh/import actions.
+- 00:59:31 EDT - Fixed the remaining first-open GearBlocks Chats freeze by removing the chat-view runtime import polling loop, capping stale runtime log catch-up reads, filtering player-character scene deltas, and quieting the Lua delta monitor so player animation and world-position drift are not logged as scene edits.
+- 01:09:43 EDT - Fixed intermittent chat input lag by removing the dedicated chat overlay's GearBlocks runtime import polling loop and the main app's 500ms pending-shortcut polling fallback.
+- 01:13:20 EDT - Fixed the debug restart helper so automated Overlay Forge restarts launch the visible app window instead of starting the process hidden.
+- 01:36:26 EDT - Fixed GearBlocks marker visibility by adding a screen-space Unity crosshair and label over spawned marker world positions in addition to the runtime scene marker objects.
+
+#### Known Issues
+
+- 01:48:22 EDT - GearBlocks marker commands are reaching the BepInEx plugin, but visual markers are still not appearing in-game; marker rendering work is paused while in-game chat usage is prioritized.
+
+#### Documentation
+
+- 00:35:49 EDT - Documented GearBlocks baseline export plus scene-delta prompt context behavior in the runtime exporter and data model docs.
+- 01:12:02 EDT - Documented that Overlay Forge restarts should be automated with the repo stop/start scripts when safe, while GearBlocks and other stateful user apps still require explicit user action or warning.
+- 01:16:34 EDT - Documented that automated Overlay Forge restarts during development should prefer the visible `npm run tauri:dev` workflow so both Vite and Tauri are running.
+- 01:18:15 EDT - Documented the Tauri dev-session terminal log location and latest-log pointer file.
+- 01:36:26 EDT - Documented the GearBlocks marker plugin's Unity IMGUI reference requirement and screen-space marker behavior.
+
+#### Validation
+
+- 00:06:33 EDT - Validated GearBlocks chat-send runtime reconciliation with `cargo check`, `cargo test`, `npm run build`, and `git diff --check`.
+- 00:18:24 EDT - Validated diff-only GearBlocks chat submission importing with `cargo check`, `npm run build`, and `git diff --check`.
+- 00:35:49 EDT - Validated GearBlocks scene-delta importing with `cargo check`, `cargo test`, `npm run build`, and `git diff --check`; regenerated the installed GearBlocks script with the new delta monitor.
+- 00:48:08 EDT - Validated the GearBlocks passive import freeze fix with `cargo check`, `cargo test`, `npm run build`, and `git diff --check`.
+- 00:59:31 EDT - Validated the GearBlocks chat-view polling and scene-delta spam fix with `cargo check`, `cargo test`, `npm run build`, and `git diff --check`; regenerated the installed GearBlocks script with the quieter delta monitor.
+- 01:09:43 EDT - Validated the chat input lag fix with `npm run build`, `cargo check`, and `git diff --check`.
+- 01:13:20 EDT - Validated the visible Overlay Forge restart by stopping the hidden debug process, rebuilding, starting a visible debug process, and confirming PID `8072`.
+- 01:16:34 EDT - Validated the corrected dev restart by stopping the raw debug executable, launching `npm run tauri:dev` in a visible PowerShell session, and confirming Node/Vite plus `overlay-forge.exe` child processes.
+- 01:18:15 EDT - Validated the dev terminal logging wrapper with PowerShell parser syntax validation, package script inspection, and `git diff --check`.
+- 01:24:28 EDT - Validated the corrected dev terminal logging wrapper by launching `npm run tauri:dev`, confirming Vite/Tauri output in `logs\tauri-dev\latest.txt`, and confirming the `overlay-forge.exe` dev process.
+- 01:36:26 EDT - Validated the screen-space GearBlocks marker plugin update with `dotnet build` and installed the rebuilt BepInEx plugin DLL into the local GearBlocks install.
+
 ### 2026-06-21
 
 #### Added
 
 - 20:07:26 EDT - Added normalized `def_game`, `obj_game`, and `obj_game_setting` persistence so static game definitions, local game rows, and deep per-game settings do not require table-per-game schemas.
+- 21:06:34 EDT - Added a source-only GearBlocks BepInEx/GearLib plugin template folder with local reference guidance and ignored workspace conventions.
+- 22:11:56 EDT - Added a direct Overlay Forge GearBlocks BepInEx plugin template with a file-backed command bridge and temporary center-raycast marker command.
+- 22:47:46 EDT - Added a general GearBlocks chat marker capability where assistant responses can include user-approved `overlay-forge-markers` JSON plans that Overlay Forge sends to the BepInEx plugin as temporary world-coordinate marker commands.
 
 #### Changed
 
 - 19:56:38 EDT - Changed project version metadata to start the `0.6.1` database migration bucket.
 - 20:07:26 EDT - Changed SQLite initialization to non-destructively rename legacy tables into the `obj_`, `def_`, and `n2n_` naming convention and add `schema_json` plus `modified_at` metadata columns.
+- 22:47:46 EDT - Changed GearBlocks runtime prompt context to include marker guidance and functional-part world coordinates so chat can point at connection points without using custom parts.
+- 23:38:51 EDT - Changed GearBlocks runtime part indexing to store first-class world and local coordinates for every exported part and backfill existing rows from stored runtime JSON.
+- 23:47:57 EDT - Changed GearBlocks marker commands and the BepInEx plugin template to use larger default markers with runtime Unity sphere objects plus thicker crosshair lines.
 
 #### Fixed
 
 - 20:15:11 EDT - Fixed partially migrated SQLite databases by copying legacy rows into normalized tables and dropping copied legacy duplicates so normalized unique indexes can be recreated for `ON CONFLICT` upserts.
+- 22:23:52 EDT - Fixed the direct GearBlocks BepInEx plugin command parser to avoid Newtonsoft's IL2CPP generic deserialize path and remove the unsupported custom command parameter warning.
+- 23:47:57 EDT - Fixed chat-authored GearBlocks markers being too small and line-only to reliably see in the Unity scene.
 
 #### Documentation
 
 - 20:07:26 EDT - Documented the 0.6.1 SQLite naming normalization, game definition model, and normalized-table project rules.
+- 21:06:34 EDT - Documented GearLib as a third-party user-installed dependency and linked the new BepInEx template guidance from project docs.
+- 22:11:56 EDT - Documented the direct GearBlocks BepInEx plugin path, runtime marker command folder, supported commands, and install location.
+- 22:47:46 EDT - Documented chat-authored marker blocks, world-coordinate marker commands, and the user-approved marker dispatch workflow.
+- 23:15:00 EDT - Documented that one `npm run tauri:dev` run hit a Rust `STATUS_ACCESS_VIOLATION` and required exiting GearBlocks before continuing BepInEx plugin development.
+- 23:38:51 EDT - Documented GearBlocks runtime part world/local coordinate columns and marker coordinate context for structural-only parts.
+- 23:47:57 EDT - Documented the larger GearBlocks marker size and runtime Unity object marker behavior.
+- 23:55:22 EDT - Documented that restart, relaunch, and reload requirements must be shown as bold red user-facing warnings.
 
 #### Validation
 
 - 20:09:58 EDT - Validated the 0.6.1 database migration with `cargo test`, `cargo check`, `npm run build`, and `git diff --check`.
 - 20:15:30 EDT - Validated the partial SQLite migration repair with `cargo test`, `cargo check`, `npm run build`, `git diff --check`, and a live startup check against the app-data database.
+- 21:08:49 EDT - Validated the GearBlocks BepInEx/GearLib template scaffold with .NET SDK and BepInEx template checks plus `git diff --check`.
+- 22:11:56 EDT - Validated the direct GearBlocks BepInEx plugin template by building the ignored working copy with `dotnet build` and installing the compiled DLL into the local GearBlocks BepInEx plugins folder.
+- 22:47:46 EDT - Validated the chat marker capability with `npm run build`, `cargo check`, and `dotnet build`; live DLL replacement is pending until GearBlocks releases the loaded plugin file.
+- 23:38:51 EDT - Validated runtime coordinate indexing with `cargo test`, `cargo check`, `npm run build`, and `git diff --check`.
+- 23:47:57 EDT - Validated visible GearBlocks marker updates with `dotnet build`, `cargo check`, `npm run build`, and `git diff --check`; installing the rebuilt DLL is pending because GearBlocks has the current plugin DLL locked.
+- 23:54:33 EDT - Installed the rebuilt visible-marker GearBlocks BepInEx plugin DLL after GearBlocks released the loaded file lock.
 
 ## 0.6.0 - 2026-06-21
 

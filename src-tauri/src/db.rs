@@ -308,6 +308,22 @@ pub struct GameRuntimePartRecord {
     pub full_display_name: String,
     pub category: String,
     pub mass: f64,
+    #[serde(rename = "worldX")]
+    pub world_x: Option<f64>,
+    #[serde(rename = "worldY")]
+    pub world_y: Option<f64>,
+    #[serde(rename = "worldZ")]
+    pub world_z: Option<f64>,
+    #[serde(rename = "localX")]
+    pub local_x: Option<f64>,
+    #[serde(rename = "localY")]
+    pub local_y: Option<f64>,
+    #[serde(rename = "localZ")]
+    pub local_z: Option<f64>,
+    #[serde(rename = "worldPositionJson")]
+    pub world_position_json: String,
+    #[serde(rename = "localPositionJson")]
+    pub local_position_json: String,
     #[serde(rename = "propertiesJson")]
     pub properties_json: String,
     #[serde(rename = "sourceExportId")]
@@ -1008,6 +1024,14 @@ impl AppDatabase {
                 full_display_name TEXT NOT NULL DEFAULT '',
                 category TEXT NOT NULL DEFAULT '',
                 mass REAL NOT NULL DEFAULT 0,
+                world_x REAL,
+                world_y REAL,
+                world_z REAL,
+                local_x REAL,
+                local_y REAL,
+                local_z REAL,
+                world_position_json TEXT NOT NULL DEFAULT '{}',
+                local_position_json TEXT NOT NULL DEFAULT '{}',
                 properties_json TEXT NOT NULL DEFAULT '{}',
                 source_export_id TEXT NOT NULL DEFAULT '',
                 source_construction_id TEXT NOT NULL DEFAULT '',
@@ -1379,6 +1403,24 @@ impl AppDatabase {
             "source_screenshot_path",
             "TEXT NOT NULL DEFAULT ''",
         )?;
+        Self::ensure_column(&connection, "obj_game_runtime_part", "world_x", "REAL")?;
+        Self::ensure_column(&connection, "obj_game_runtime_part", "world_y", "REAL")?;
+        Self::ensure_column(&connection, "obj_game_runtime_part", "world_z", "REAL")?;
+        Self::ensure_column(&connection, "obj_game_runtime_part", "local_x", "REAL")?;
+        Self::ensure_column(&connection, "obj_game_runtime_part", "local_y", "REAL")?;
+        Self::ensure_column(&connection, "obj_game_runtime_part", "local_z", "REAL")?;
+        Self::ensure_column(
+            &connection,
+            "obj_game_runtime_part",
+            "world_position_json",
+            "TEXT NOT NULL DEFAULT '{}'",
+        )?;
+        Self::ensure_column(
+            &connection,
+            "obj_game_runtime_part",
+            "local_position_json",
+            "TEXT NOT NULL DEFAULT '{}'",
+        )?;
         Self::ensure_column(
             &connection,
             "obj_game_runtime_part",
@@ -1397,6 +1439,7 @@ impl AppDatabase {
             "notes",
             "TEXT NOT NULL DEFAULT ''",
         )?;
+        Self::backfill_game_runtime_part_positions(&connection)?;
         Self::ensure_column(
             &connection,
             "obj_game_chat_conversation",
@@ -3709,6 +3752,14 @@ impl AppDatabase {
                 full_display_name,
                 category,
                 mass,
+                world_x,
+                world_y,
+                world_z,
+                local_x,
+                local_y,
+                local_z,
+                world_position_json,
+                local_position_json,
                 properties_json,
                 source_export_id,
                 source_construction_id,
@@ -3954,6 +4005,14 @@ impl AppDatabase {
                     full_display_name,
                     category,
                     mass,
+                    world_x,
+                    world_y,
+                    world_z,
+                    local_x,
+                    local_y,
+                    local_z,
+                    world_position_json,
+                    local_position_json,
                     properties_json,
                     source_export_id,
                     source_construction_id,
@@ -4034,6 +4093,14 @@ impl AppDatabase {
                 full_display_name,
                 category,
                 mass,
+                world_x,
+                world_y,
+                world_z,
+                local_x,
+                local_y,
+                local_z,
+                world_position_json,
+                local_position_json,
                 properties_json,
                 source_export_id,
                 source_construction_id,
@@ -4093,6 +4160,10 @@ impl AppDatabase {
         full_display_name: &str,
         category: &str,
         mass: f64,
+        world_position: Option<(f64, f64, f64)>,
+        local_position: Option<(f64, f64, f64)>,
+        world_position_json: &str,
+        local_position_json: &str,
         properties_json: &str,
         source_export_id: &str,
         source_construction_id: &str,
@@ -4100,6 +4171,14 @@ impl AppDatabase {
     ) -> Result<GameRuntimePartRecord> {
         let connection = self.connection.lock().expect("database mutex poisoned");
         Self::get_game_by_id(&connection, game_id)?;
+        let (world_x, world_y, world_z) = match world_position {
+            Some((x, y, z)) => (Some(x), Some(y), Some(z)),
+            None => (None, None, None),
+        };
+        let (local_x, local_y, local_z) = match local_position {
+            Some((x, y, z)) => (Some(x), Some(y), Some(z)),
+            None => (None, None, None),
+        };
         connection.execute(
             "
             INSERT INTO obj_game_runtime_part (
@@ -4111,12 +4190,20 @@ impl AppDatabase {
                 full_display_name,
                 category,
                 mass,
+                world_x,
+                world_y,
+                world_z,
+                local_x,
+                local_y,
+                local_z,
+                world_position_json,
+                local_position_json,
                 properties_json,
                 source_export_id,
                 source_construction_id,
                 last_seen_at
             )
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
             ON CONFLICT(game_id, part_key) DO UPDATE SET
                 asset_guid = excluded.asset_guid,
                 asset_name = excluded.asset_name,
@@ -4124,6 +4211,14 @@ impl AppDatabase {
                 full_display_name = excluded.full_display_name,
                 category = excluded.category,
                 mass = excluded.mass,
+                world_x = excluded.world_x,
+                world_y = excluded.world_y,
+                world_z = excluded.world_z,
+                local_x = excluded.local_x,
+                local_y = excluded.local_y,
+                local_z = excluded.local_z,
+                world_position_json = excluded.world_position_json,
+                local_position_json = excluded.local_position_json,
                 properties_json = excluded.properties_json,
                 source_export_id = excluded.source_export_id,
                 source_construction_id = excluded.source_construction_id,
@@ -4139,6 +4234,14 @@ impl AppDatabase {
                 full_display_name.trim(),
                 category.trim(),
                 mass,
+                world_x,
+                world_y,
+                world_z,
+                local_x,
+                local_y,
+                local_z,
+                world_position_json.trim(),
+                local_position_json.trim(),
                 properties_json,
                 source_export_id.trim(),
                 source_construction_id.trim(),
@@ -5150,6 +5253,92 @@ impl AppDatabase {
         Ok(())
     }
 
+    fn backfill_game_runtime_part_positions(connection: &Connection) -> Result<()> {
+        let rows = {
+            let mut statement = connection.prepare(
+                "
+                SELECT id, properties_json
+                FROM obj_game_runtime_part
+                WHERE
+                    world_x IS NULL
+                    OR world_y IS NULL
+                    OR world_z IS NULL
+                    OR local_x IS NULL
+                    OR local_y IS NULL
+                    OR local_z IS NULL
+                    OR world_position_json = ''
+                    OR world_position_json = '{}'
+                    OR local_position_json = ''
+                    OR local_position_json = '{}'
+                ",
+            )?;
+            let rows = statement
+                .query_map([], |row| {
+                    Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+                })?
+                .collect::<Result<Vec<_>>>()?;
+            rows
+        };
+
+        for (id, properties_json) in rows {
+            let Ok(value) = serde_json::from_str::<serde_json::Value>(&properties_json) else {
+                continue;
+            };
+            let world_position = value.get("position").and_then(db_json_vector3);
+            let local_position = value.get("localPosition").and_then(db_json_vector3);
+            if world_position.is_none() && local_position.is_none() {
+                continue;
+            }
+
+            let (world_x, world_y, world_z) = match world_position {
+                Some((x, y, z)) => (Some(x), Some(y), Some(z)),
+                None => (None, None, None),
+            };
+            let (local_x, local_y, local_z) = match local_position {
+                Some((x, y, z)) => (Some(x), Some(y), Some(z)),
+                None => (None, None, None),
+            };
+            let world_position_json = value
+                .get("position")
+                .and_then(|position| serde_json::to_string(position).ok())
+                .unwrap_or_else(|| "{}".to_string());
+            let local_position_json = value
+                .get("localPosition")
+                .and_then(|position| serde_json::to_string(position).ok())
+                .unwrap_or_else(|| "{}".to_string());
+
+            connection.execute(
+                "
+                UPDATE obj_game_runtime_part
+                SET
+                    world_x = ?1,
+                    world_y = ?2,
+                    world_z = ?3,
+                    local_x = ?4,
+                    local_y = ?5,
+                    local_z = ?6,
+                    world_position_json = ?7,
+                    local_position_json = ?8,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?9
+                ",
+                params![
+                    world_x,
+                    world_y,
+                    world_z,
+                    local_x,
+                    local_y,
+                    local_z,
+                    world_position_json,
+                    local_position_json,
+                    id
+                ],
+            )?;
+        }
+
+        Ok(())
+    }
+
     fn get_note_by_id(connection: &Connection, id: i64) -> Result<NoteRecord> {
         connection.query_row(
             "
@@ -5484,6 +5673,14 @@ impl AppDatabase {
                 full_display_name,
                 category,
                 mass,
+                world_x,
+                world_y,
+                world_z,
+                local_x,
+                local_y,
+                local_z,
+                world_position_json,
+                local_position_json,
                 properties_json,
                 source_export_id,
                 source_construction_id,
@@ -5519,6 +5716,14 @@ impl AppDatabase {
                 full_display_name,
                 category,
                 mass,
+                world_x,
+                world_y,
+                world_z,
+                local_x,
+                local_y,
+                local_z,
+                world_position_json,
+                local_position_json,
                 properties_json,
                 source_export_id,
                 source_construction_id,
@@ -6915,16 +7120,32 @@ fn game_runtime_part_from_row(row: &rusqlite::Row<'_>) -> Result<GameRuntimePart
         full_display_name: row.get(6)?,
         category: row.get(7)?,
         mass: row.get(8)?,
-        properties_json: row.get(9)?,
-        source_export_id: row.get(10)?,
-        source_construction_id: row.get(11)?,
-        last_seen_at: row.get(12)?,
-        display_image_path: row.get(13)?,
-        source_image_path: row.get(14)?,
-        notes: row.get(15)?,
-        created_at: row.get(16)?,
-        updated_at: row.get(17)?,
+        world_x: row.get(9)?,
+        world_y: row.get(10)?,
+        world_z: row.get(11)?,
+        local_x: row.get(12)?,
+        local_y: row.get(13)?,
+        local_z: row.get(14)?,
+        world_position_json: row.get(15)?,
+        local_position_json: row.get(16)?,
+        properties_json: row.get(17)?,
+        source_export_id: row.get(18)?,
+        source_construction_id: row.get(19)?,
+        last_seen_at: row.get(20)?,
+        display_image_path: row.get(21)?,
+        source_image_path: row.get(22)?,
+        notes: row.get(23)?,
+        created_at: row.get(24)?,
+        updated_at: row.get(25)?,
     })
+}
+
+fn db_json_vector3(value: &serde_json::Value) -> Option<(f64, f64, f64)> {
+    Some((
+        value.get("x")?.as_f64()?,
+        value.get("y")?.as_f64()?,
+        value.get("z")?.as_f64()?,
+    ))
 }
 
 fn game_runtime_construction_export_from_row(

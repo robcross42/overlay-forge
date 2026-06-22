@@ -257,6 +257,23 @@ export type GearBlocksRuntimeContextSync = {
   constructionCount: number;
 };
 
+export type GearBlocksMarkerInput = {
+  label?: string;
+  reason?: string;
+  x: number;
+  y: number;
+  z: number;
+  color?: string;
+  durationSeconds?: number;
+  size?: number;
+};
+
+export type GearBlocksMarkerCommandResult = {
+  commandCount: number;
+  commandDirectory: string;
+  statusDirectory: string;
+};
+
 export type GameRuntimePart = {
   id: number;
   gameId: number;
@@ -267,6 +284,14 @@ export type GameRuntimePart = {
   fullDisplayName: string;
   category: string;
   mass: number;
+  worldX: number | null;
+  worldY: number | null;
+  worldZ: number | null;
+  localX: number | null;
+  localY: number | null;
+  localZ: number | null;
+  worldPositionJson: string;
+  localPositionJson: string;
   propertiesJson: string;
   sourceExportId: string;
   sourceConstructionId: string;
@@ -380,6 +405,17 @@ export function syncGearBlocksRuntimeContext(gameId: number) {
 
 export function importGearBlocksRuntimeContext(gameId: number) {
   return invoke<GearBlocksRuntimeContextSync>("import_gearblocks_runtime_context", { gameId });
+}
+
+export function sendGearBlocksMarkerCommands(gameId: number, markers: GearBlocksMarkerInput[]) {
+  return invoke<GearBlocksMarkerCommandResult>("send_gearblocks_marker_commands", {
+    gameId,
+    markers
+  });
+}
+
+export function clearGearBlocksMarkers(gameId: number) {
+  return invoke<GearBlocksMarkerCommandResult>("clear_gearblocks_markers", { gameId });
 }
 
 export function decodeGearBlocksConstructionFile(constructionPath: string) {

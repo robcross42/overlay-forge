@@ -151,7 +151,6 @@ export default function App() {
     let isMounted = true;
     let unlisten: (() => void) | null = null;
     let unlistenOverlayToggle: (() => void) | null = null;
-    let pollId: number | null = null;
 
     function consumePendingShortcut() {
       invoke<string | null>("consume_pending_shortcut_action")
@@ -212,7 +211,6 @@ export default function App() {
       .catch(() => {});
 
     window.addEventListener("focus", consumePendingShortcut);
-    pollId = window.setInterval(consumePendingShortcut, 500);
     consumePendingShortcut();
 
     return () => {
@@ -220,9 +218,6 @@ export default function App() {
       unlisten?.();
       unlistenOverlayToggle?.();
       window.removeEventListener("focus", consumePendingShortcut);
-      if (pollId !== null) {
-        window.clearInterval(pollId);
-      }
     };
   }, [activeComponent, gameNavAction, gameSections, isChatOverlayMode, selectedGameId]);
 

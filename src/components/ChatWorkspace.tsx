@@ -43,6 +43,8 @@ type ChatWorkspaceProps<TConversation extends ChatConversation, TMessage extends
   onNewConversationTitleChange: (value: string) => void;
   onSelectConversation: (conversationId: number) => void;
   onSendMessage: () => void;
+  renderMessageContent?: (message: TMessage) => ReactNode;
+  renderMessageActions?: (message: TMessage) => ReactNode;
 };
 
 export function ChatWorkspace<TConversation extends ChatConversation, TMessage extends ChatMessage>({
@@ -71,7 +73,9 @@ export function ChatWorkspace<TConversation extends ChatConversation, TMessage e
   onDraftChange,
   onNewConversationTitleChange,
   onSelectConversation,
-  onSendMessage
+  onSendMessage,
+  renderMessageContent,
+  renderMessageActions
 }: ChatWorkspaceProps<TConversation, TMessage>) {
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -282,7 +286,8 @@ export function ChatWorkspace<TConversation extends ChatConversation, TMessage e
                 messages.map((message) => (
                   <article className={`chat-message chat-message-${message.role}`} key={message.id}>
                     <span>{message.role === "assistant" ? "Assistant" : "You"}</span>
-                    <p>{message.content}</p>
+                    {renderMessageContent ? renderMessageContent(message) : <p>{message.content}</p>}
+                    {renderMessageActions?.(message)}
                   </article>
                 ))
               )}

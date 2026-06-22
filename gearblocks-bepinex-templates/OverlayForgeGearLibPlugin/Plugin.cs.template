@@ -1,0 +1,21 @@
+using BepInEx;
+using BepInEx.Logging;
+using BepInEx.Unity.IL2CPP;
+
+namespace OverlayForgeGearLibPlugin;
+
+[BepInPlugin(MyPluginInfo.PLUGIN_GUID, MyPluginInfo.PLUGIN_NAME, MyPluginInfo.PLUGIN_VERSION)]
+[BepInDependency("GearLib")]
+public class Plugin : BasePlugin
+{
+    internal static new ManualLogSource Log = null!;
+
+    public override void Load()
+    {
+        Log = base.Log;
+        Log.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} loaded.");
+
+        // GearLib-dependent part or behavior registration will go here.
+        // Keep the template minimal until Overlay Forge owns a concrete GearBlocks BepInEx feature.
+    }
+}

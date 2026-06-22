@@ -19,7 +19,7 @@ use bson::{Bson, Document};
 use flate2::read::DeflateDecoder;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
@@ -32,6 +32,8 @@ use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, State, WebviewWindow}
 static MANUAL_OVERLAY_DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);
 static GEARBLOCKS_RUNTIME_IMPORT_MONITOR_ACTIVE: AtomicBool = AtomicBool::new(false);
 static SCHEDULER_WORKER_ACTIVE: AtomicBool = AtomicBool::new(false);
+const GEARBLOCKS_RUNTIME_INITIAL_TAIL_BYTES: u64 = 2 * 1024 * 1024;
+const GEARBLOCKS_RUNTIME_INCREMENTAL_READ_LIMIT_BYTES: u64 = 2 * 1024 * 1024;
 
 #[derive(Serialize)]
 pub struct MilestoneStatus {
@@ -149,6 +151,14 @@ pub struct GearBlocksRuntimeExportRecord {
     pub document: serde_json::Value,
 }
 
+#[derive(Clone)]
+struct GearBlocksSceneDeltaRecord {
+    id: String,
+    emitted_at: String,
+    source_log_path: String,
+    document: serde_json::Value,
+}
+
 #[derive(Serialize)]
 pub struct GearBlocksRuntimeContextSyncRecord {
     pub changed: bool,
@@ -158,6 +168,29 @@ pub struct GearBlocksRuntimeContextSyncRecord {
     pub runtime_part_count: usize,
     #[serde(rename = "constructionCount")]
     pub construction_count: usize,
+}
+
+#[derive(Deserialize)]
+pub struct GearBlocksMarkerInput {
+    pub label: Option<String>,
+    pub reason: Option<String>,
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+    pub color: Option<String>,
+    #[serde(rename = "durationSeconds")]
+    pub duration_seconds: Option<f64>,
+    pub size: Option<f64>,
+}
+
+#[derive(Serialize)]
+pub struct GearBlocksMarkerCommandResult {
+    #[serde(rename = "commandCount")]
+    pub command_count: usize,
+    #[serde(rename = "commandDirectory")]
+    pub command_directory: String,
+    #[serde(rename = "statusDirectory")]
+    pub status_directory: String,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -349,7 +382,9 @@ pub fn start_gearblocks_runtime_import_monitor(app: AppHandle) {
         let state = app.state::<AppState>();
         let games = state.database.list_games().unwrap_or_default();
         for game in games.iter().filter(|game| game.slug == "gearblocks") {
-            if let Err(error) = import_latest_gearblocks_runtime_exports(&state, game.id) {
+            if let Err(error) =
+                import_latest_gearblocks_runtime_exports_for_monitor(&state, game.id)
+            {
                 eprintln!("GearBlocks runtime import monitor failed: {error}");
             }
         }
@@ -1518,7 +1553,8 @@ pub fn sync_gearblocks_runtime_context(
     require_gearblocks_game(&game)?;
 
     request_gearblocks_scene_export_from_game(state.inner())?;
-    let imported_count = import_latest_gearblocks_runtime_exports(&state, game.id)?;
+    let imported_count = import_latest_gearblocks_runtime_exports(&state, game.id)?
+        + reconcile_latest_gearblocks_runtime_exports(&state, game.id)?;
     sync_gearblocks_saved_constructions_for_game(&state, game.id)?;
 
     let fingerprint = gearblocks_runtime_context_fingerprint(&state, game.id)?;
@@ -1565,7 +1601,8 @@ pub fn import_gearblocks_runtime_context(
         .map_err(|error| error.to_string())?;
     require_gearblocks_game(&game)?;
 
-    let imported_count = import_latest_gearblocks_runtime_exports(&state, game.id)?;
+    let imported_count = import_latest_gearblocks_runtime_exports(&state, game.id)?
+        + reconcile_latest_gearblocks_runtime_exports(&state, game.id)?;
     let construction_count = state
         .database
         .count_game_constructions(game.id)
@@ -1584,6 +1621,112 @@ pub fn import_gearblocks_runtime_context(
         runtime_export_count,
         runtime_part_count,
         construction_count,
+    })
+}
+
+#[tauri::command]
+pub fn send_gearblocks_marker_commands(
+    game_id: i64,
+    markers: Vec<GearBlocksMarkerInput>,
+    state: State<'_, AppState>,
+) -> Result<GearBlocksMarkerCommandResult, String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    require_gearblocks_game(&game)?;
+    if markers.is_empty() {
+        return Err("At least one marker is required.".to_string());
+    }
+
+    let command_directory = gearblocks_plugin_command_directory()?;
+    let status_directory = gearblocks_plugin_status_directory()?;
+    fs::create_dir_all(&command_directory).map_err(|error| {
+        format!("Could not create GearBlocks marker command directory: {error}")
+    })?;
+    fs::create_dir_all(&status_directory)
+        .map_err(|error| format!("Could not create GearBlocks marker status directory: {error}"))?;
+
+    let batch_id = unix_timestamp_label();
+    for (index, marker) in markers.iter().enumerate() {
+        if !marker.x.is_finite() || !marker.y.is_finite() || !marker.z.is_finite() {
+            return Err("Marker coordinates must be finite numbers.".to_string());
+        }
+
+        let label = marker
+            .label
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("chat-marker");
+        let id = format!(
+            "chat_marker_{}_{}_{}",
+            batch_id,
+            index + 1,
+            safe_filename_part(label)
+        );
+        let command = json!({
+            "action": "spawn_world_marker",
+            "id": id,
+            "label": label,
+            "reason": marker.reason.as_deref().unwrap_or_default(),
+            "x": marker.x,
+            "y": marker.y,
+            "z": marker.z,
+            "color": marker.color.as_deref().unwrap_or("#55f0c8"),
+            "durationSeconds": marker.duration_seconds.unwrap_or(45.0),
+            "size": marker.size.unwrap_or(4.0),
+        });
+        fs::write(
+            command_directory.join(format!("{id}.json")),
+            serde_json::to_string_pretty(&command)
+                .map_err(|error| format!("Could not serialize marker command: {error}"))?,
+        )
+        .map_err(|error| format!("Could not write marker command file: {error}"))?;
+    }
+
+    Ok(GearBlocksMarkerCommandResult {
+        command_count: markers.len(),
+        command_directory: command_directory.to_string_lossy().to_string(),
+        status_directory: status_directory.to_string_lossy().to_string(),
+    })
+}
+
+#[tauri::command]
+pub fn clear_gearblocks_markers(
+    game_id: i64,
+    state: State<'_, AppState>,
+) -> Result<GearBlocksMarkerCommandResult, String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    require_gearblocks_game(&game)?;
+
+    let command_directory = gearblocks_plugin_command_directory()?;
+    let status_directory = gearblocks_plugin_status_directory()?;
+    fs::create_dir_all(&command_directory).map_err(|error| {
+        format!("Could not create GearBlocks marker command directory: {error}")
+    })?;
+    fs::create_dir_all(&status_directory)
+        .map_err(|error| format!("Could not create GearBlocks marker status directory: {error}"))?;
+
+    let id = format!("clear_markers_{}", unix_timestamp_label());
+    let command = json!({
+        "action": "clear_markers",
+        "id": id,
+    });
+    fs::write(
+        command_directory.join(format!("{id}.json")),
+        serde_json::to_string_pretty(&command)
+            .map_err(|error| format!("Could not serialize clear marker command: {error}"))?,
+    )
+    .map_err(|error| format!("Could not write clear marker command file: {error}"))?;
+
+    Ok(GearBlocksMarkerCommandResult {
+        command_count: 1,
+        command_directory: command_directory.to_string_lossy().to_string(),
+        status_directory: status_directory.to_string_lossy().to_string(),
     })
 }
 
@@ -1801,7 +1944,12 @@ fn request_gearblocks_scene_export_from_game(state: &AppState) -> Result<(), Str
         shift: true,
         control: true,
     })?;
-    wait_for_gearblocks_export_log_append(&log_path, initial_length);
+    if !wait_for_gearblocks_export_log_append(&log_path, initial_length) {
+        return Err(
+            "GearBlocks did not write a completed Overlay Forge scene export after the chat prompt requested one. Make sure the Overlay Forge GearBlocks script is loaded, then try again."
+                .to_string(),
+        );
+    }
     Ok(())
 }
 
@@ -1809,11 +1957,11 @@ fn overlay_forge_scene_export_virtual_key() -> u16 {
     b'E' as u16
 }
 
-fn wait_for_gearblocks_export_log_append(log_path: &Path, initial_length: u64) {
+fn wait_for_gearblocks_export_log_append(log_path: &Path, initial_length: u64) -> bool {
     let started_at = SystemTime::now();
     loop {
         if gearblocks_log_has_completed_export_after(log_path, initial_length) {
-            return;
+            return true;
         }
 
         if started_at
@@ -1821,7 +1969,7 @@ fn wait_for_gearblocks_export_log_append(log_path: &Path, initial_length: u64) {
             .map(|elapsed| elapsed >= Duration::from_secs(8))
             .unwrap_or(true)
         {
-            return;
+            return false;
         }
 
         thread::sleep(Duration::from_millis(160));
@@ -2825,6 +2973,7 @@ fn game_custom_prompt_context(
 fn gearblocks_prompt_context(state: &State<'_, AppState>, game_id: i64) -> Result<String, String> {
     let mut sections = vec![
         gearblocks_units_prompt_context(),
+        gearblocks_marker_prompt_context(),
         gearblocks_parts_catalog_prompt_context()?,
     ];
     if let Some(saved_context) = gearblocks_latest_saved_construction_context(state, game_id)? {
@@ -2844,6 +2993,17 @@ fn gearblocks_units_prompt_context() -> String {
         "Use GearBlocks metric scale for build advice: 1 GearBlocks unit = 10 cm in real life. A 0.5 unit plate is 5 cm thick, and 16 units is 160 cm.",
         "When suggesting part movement, spacing, dimensions, or alignment, answer in centimeters and/or GearBlocks units such as 1 unit, 0.5 units, 16 units. Do not give imperial-distance suggestions such as inches or feet unless the user explicitly asks for imperial conversion.",
         "Scale caveat: the developer noted that the player character, wheels, and other parts are slightly oversized to allow room for gears and other parts inside vehicles. Treat those parts as gameplay-clearance exceptions rather than strict real-world scale references.",
+    ]
+    .join("\n")
+}
+
+fn gearblocks_marker_prompt_context() -> String {
+    [
+        "# Overlay Forge In-Game Markers",
+        "When a response would be clearer with in-game visual references, include a final fenced code block labelled `overlay-forge-markers`.",
+        "The marker block must be valid JSON shaped as `{ \"markers\": [{ \"label\": string, \"reason\": string, \"x\": number, \"y\": number, \"z\": number, \"color\": \"#55f0c8\", \"durationSeconds\": 45, \"size\": 4.0 }] }`.",
+        "Use GearBlocks world coordinates from the latest runtime scene context when available. Prefer markers for connection points, part endpoints, missing drivetrain links, steering pivots, suspension hardpoints, alignment corrections, and places where a part should move or attach.",
+        "Keep marker counts small, normally 1-5. Explain the marker purpose in normal prose before the block. Do not include markers when coordinates are uncertain; ask for a fresh scene export or screenshot instead.",
     ]
     .join("\n")
 }
@@ -3551,6 +3711,18 @@ fn gearblocks_default_user_data_root() -> Result<PathBuf, String> {
         .join("GearBlocks"))
 }
 
+fn gearblocks_plugin_root() -> Result<PathBuf, String> {
+    Ok(gearblocks_default_user_data_root()?.join("OverlayForgePlugin"))
+}
+
+fn gearblocks_plugin_command_directory() -> Result<PathBuf, String> {
+    Ok(gearblocks_plugin_root()?.join("commands"))
+}
+
+fn gearblocks_plugin_status_directory() -> Result<PathBuf, String> {
+    Ok(gearblocks_plugin_root()?.join("status"))
+}
+
 fn gearblocks_game_install_root(state: &AppState, game_id: i64) -> Option<PathBuf> {
     let mut candidates = Vec::new();
     if let Ok(locations) = state.database.list_game_data_locations(game_id) {
@@ -3839,6 +4011,46 @@ fn parse_gearblocks_runtime_exports_from_log(
     Ok(parse_gearblocks_runtime_exports_from_text(log_path, &text).exports)
 }
 
+fn parse_gearblocks_scene_deltas_from_log(
+    log_path: &Path,
+) -> Result<Vec<GearBlocksSceneDeltaRecord>, String> {
+    let text = fs::read_to_string(log_path)
+        .map_err(|error| format!("Could not read GearBlocks runtime export log: {error}"))?;
+    Ok(parse_gearblocks_scene_deltas_from_text(log_path, &text))
+}
+
+fn parse_gearblocks_scene_deltas_from_text(
+    log_path: &Path,
+    text: &str,
+) -> Vec<GearBlocksSceneDeltaRecord> {
+    const DELTA_MARKER: &str = "[OverlayForgeSceneDelta]";
+    let mut deltas = Vec::new();
+    let source_log_path = log_path.to_string_lossy().to_string();
+
+    for line in text.lines() {
+        let Some(index) = line.find(DELTA_MARKER) else {
+            continue;
+        };
+        let payload = &line[index + DELTA_MARKER.len()..];
+        let Ok(document) = serde_json::from_str::<serde_json::Value>(payload) else {
+            continue;
+        };
+        let id = json_string(document.get("id"));
+        let emitted_at = json_string(document.get("emittedAt"));
+        if id.is_empty() || emitted_at.is_empty() {
+            continue;
+        }
+        deltas.push(GearBlocksSceneDeltaRecord {
+            id,
+            emitted_at,
+            source_log_path: source_log_path.clone(),
+            document,
+        });
+    }
+
+    deltas
+}
+
 fn parse_gearblocks_runtime_exports_from_text(
     log_path: &Path,
     text: &str,
@@ -3985,6 +4197,7 @@ struct GearBlocksRuntimePart<'a> {
     purpose: &'static str,
     behaviours: Vec<String>,
     local_position: Option<&'a serde_json::Value>,
+    world_position: Option<&'a serde_json::Value>,
     current_unit_size: Option<&'a serde_json::Value>,
     link_node_count: usize,
     mass: f64,
@@ -4078,6 +4291,7 @@ fn gearblocks_runtime_understanding_context(export: &GearBlocksRuntimeExportReco
             purpose,
             behaviours,
             local_position: part.get("localPosition"),
+            world_position: part.get("position"),
             current_unit_size: part.get("currentUnitSize"),
             link_node_count,
             mass: json_f64(part.get("mass")),
@@ -4089,8 +4303,11 @@ fn gearblocks_runtime_understanding_context(export: &GearBlocksRuntimeExportReco
     let mut sections = Vec::new();
     sections.push("# GearBlocks Runtime Construction Understanding".to_string());
     sections.push(format!(
-        "Source: latest runtime export reconstructed from `{}`. Intended output path: `{}`.",
-        export.source_log_path, export.intended_path
+        "Source: latest runtime export `{}` reconstructed from `{}`. Intended output path: `{}`. Exported at: `{}`.",
+        export.id,
+        export.source_log_path,
+        export.intended_path,
+        json_string(export.document.get("exportedAt"))
     ));
     sections.push(format!(
         "Construction ID: {}. Parts: {}. Runtime-reported parts: {}. Mass: {:.2}. Frozen: {}. Invulnerable: {}. Player character: {}.",
@@ -4114,6 +4331,7 @@ fn gearblocks_runtime_understanding_context(export: &GearBlocksRuntimeExportReco
         &parts,
         true,
     ));
+    sections.push(gearblocks_marker_coordinate_reference_section(&parts));
     sections.push(gearblocks_structural_bounds_section(&parts));
     sections.push(gearblocks_functional_parts_section(&parts));
 
@@ -4326,6 +4544,10 @@ fn import_runtime_export_parts(
         let display_name = json_string(part.get("displayName"));
         let full_display_name = json_string(part.get("fullDisplayName"));
         let category = json_string(part.get("category"));
+        let world_position = part.get("position").and_then(json_vector3);
+        let local_position = part.get("localPosition").and_then(json_vector3);
+        let world_position_json = compact_json_or_empty_object(part.get("position"))?;
+        let local_position_json = compact_json_or_empty_object(part.get("localPosition"))?;
         let properties_json =
             serde_json::to_string_pretty(&part).map_err(|error| error.to_string())?;
         state
@@ -4339,6 +4561,10 @@ fn import_runtime_export_parts(
                 &full_display_name,
                 &category,
                 json_f64(part.get("mass")),
+                world_position,
+                local_position,
+                &world_position_json,
+                &local_position_json,
                 &properties_json,
                 &export.id,
                 &source_construction_id,
@@ -4627,7 +4853,39 @@ fn import_latest_gearblocks_runtime_exports(
     for log_path in [root.join("Player-prev.log"), root.join("Player.log")] {
         if log_path.is_file() {
             imported_count +=
-                import_new_gearblocks_runtime_exports_from_log(state, game_id, &log_path)?;
+                import_new_gearblocks_runtime_exports_from_log(state, game_id, &log_path, false)?;
+        }
+    }
+
+    Ok(imported_count)
+}
+
+fn import_latest_gearblocks_runtime_exports_for_monitor(
+    state: &AppState,
+    game_id: i64,
+) -> Result<usize, String> {
+    let root = gearblocks_default_user_data_root()?;
+    let mut imported_count = 0usize;
+    for log_path in [root.join("Player-prev.log"), root.join("Player.log")] {
+        if log_path.is_file() {
+            imported_count +=
+                import_new_gearblocks_runtime_exports_from_log(state, game_id, &log_path, true)?;
+        }
+    }
+
+    Ok(imported_count)
+}
+
+fn reconcile_latest_gearblocks_runtime_exports(
+    state: &AppState,
+    game_id: i64,
+) -> Result<usize, String> {
+    let root = gearblocks_default_user_data_root()?;
+    let mut imported_count = 0usize;
+    for log_path in [root.join("Player-prev.log"), root.join("Player.log")] {
+        if log_path.is_file() {
+            imported_count +=
+                reconcile_gearblocks_runtime_exports_from_log(state, game_id, &log_path)?;
         }
     }
 
@@ -4638,6 +4896,7 @@ fn import_new_gearblocks_runtime_exports_from_log(
     state: &AppState,
     game_id: i64,
     log_path: &Path,
+    seed_missing_cursor_at_end: bool,
 ) -> Result<usize, String> {
     let metadata = fs::metadata(log_path)
         .map_err(|error| format!("Could not read GearBlocks runtime log metadata: {error}"))?;
@@ -4647,13 +4906,31 @@ fn import_new_gearblocks_runtime_exports_from_log(
         .get_app_setting(&cursor_key)
         .map_err(|error| error.to_string())?
         .and_then(|value| serde_json::from_str::<GearBlocksRuntimeLogCursor>(&value).ok());
+
+    if cursor.is_none() && seed_missing_cursor_at_end {
+        save_gearblocks_runtime_log_cursor(state, game_id, log_path, metadata.len(), &metadata)?;
+        return Ok(0);
+    }
+
+    let initial_offset = if cursor.is_none() {
+        metadata
+            .len()
+            .saturating_sub(GEARBLOCKS_RUNTIME_INITIAL_TAIL_BYTES)
+    } else {
+        0
+    };
     let mut offset = cursor
         .as_ref()
         .filter(|cursor| {
             cursor.path == log_path.to_string_lossy() && metadata.len() >= cursor.offset
         })
         .map(|cursor| cursor.offset)
-        .unwrap_or(0);
+        .unwrap_or(initial_offset);
+    if metadata.len().saturating_sub(offset) > GEARBLOCKS_RUNTIME_INCREMENTAL_READ_LIMIT_BYTES {
+        offset = metadata
+            .len()
+            .saturating_sub(GEARBLOCKS_RUNTIME_INCREMENTAL_READ_LIMIT_BYTES);
+    }
 
     if offset >= metadata.len() {
         save_gearblocks_runtime_log_cursor(state, game_id, log_path, offset, &metadata)?;
@@ -4670,16 +4947,16 @@ fn import_new_gearblocks_runtime_exports_from_log(
     })?;
 
     let parse_result = parse_gearblocks_runtime_exports_from_text(log_path, &text);
-    let imported_count =
+    let scene_deltas = parse_gearblocks_scene_deltas_from_text(log_path, &text);
+    let mut imported_count =
         persist_newer_gearblocks_runtime_exports(state, game_id, &parse_result.exports, false)?;
+    imported_count += persist_gearblocks_scene_deltas(state, game_id, &scene_deltas)?;
 
     if parse_result.consumed_bytes > 0 {
         offset += parse_result.consumed_bytes as u64;
         save_gearblocks_runtime_log_cursor(state, game_id, log_path, offset, &metadata)?;
-    }
-
-    if imported_count == 0 {
-        return reconcile_gearblocks_runtime_exports_from_log(state, game_id, log_path);
+    } else if imported_count > 0 {
+        save_gearblocks_runtime_log_cursor(state, game_id, log_path, metadata.len(), &metadata)?;
     }
 
     Ok(imported_count)
@@ -4691,7 +4968,11 @@ fn reconcile_gearblocks_runtime_exports_from_log(
     log_path: &Path,
 ) -> Result<usize, String> {
     let exports = parse_gearblocks_runtime_exports_from_log(log_path)?;
-    persist_newer_gearblocks_runtime_exports(state, game_id, &exports, true)
+    let mut imported_count =
+        persist_newer_gearblocks_runtime_exports(state, game_id, &exports, true)?;
+    let deltas = parse_gearblocks_scene_deltas_from_log(log_path)?;
+    imported_count += persist_gearblocks_scene_deltas(state, game_id, &deltas)?;
+    Ok(imported_count)
 }
 
 fn persist_newer_gearblocks_runtime_exports(
@@ -4725,7 +5006,7 @@ fn persist_newer_gearblocks_runtime_exports(
             .unwrap_or_default();
         if only_newer_than_latest
             && !latest_exported_at.is_empty()
-            && exported_at <= latest_exported_at.as_str()
+            && exported_at < latest_exported_at.as_str()
         {
             continue;
         }
@@ -4742,6 +5023,227 @@ fn persist_newer_gearblocks_runtime_exports(
     }
 
     Ok(imported_count)
+}
+
+fn persist_gearblocks_scene_deltas(
+    state: &AppState,
+    game_id: i64,
+    deltas: &[GearBlocksSceneDeltaRecord],
+) -> Result<usize, String> {
+    let mut sorted_deltas = deltas.to_vec();
+    sorted_deltas.sort_by(|left, right| {
+        left.emitted_at
+            .cmp(&right.emitted_at)
+            .then(left.id.cmp(&right.id))
+    });
+
+    let mut imported_count = 0usize;
+    let indexed_at = unix_timestamp_label();
+    let mut previous_export = state
+        .database
+        .latest_game_runtime_construction_export(game_id)
+        .map_err(|error| error.to_string())?;
+
+    for delta in sorted_deltas {
+        let Some(previous) = previous_export.as_ref() else {
+            continue;
+        };
+        if !previous.exported_at.is_empty() && delta.emitted_at < previous.exported_at {
+            continue;
+        }
+
+        let mut document = serde_json::from_str::<serde_json::Value>(&previous.document_json)
+            .map_err(|error| {
+                format!("Latest GearBlocks runtime export JSON is invalid: {error}")
+            })?;
+        if gearblocks_delta_already_applied(&document, &delta.id) {
+            continue;
+        }
+        if !apply_gearblocks_scene_delta_to_document(&mut document, &delta)? {
+            continue;
+        }
+
+        let export = GearBlocksRuntimeExportRecord {
+            id: format!("scene_delta_{}", safe_filename_part(&delta.id)),
+            name: format!("scene_delta_{}.json", safe_filename_part(&delta.id)),
+            intended_path: format!("{}#{}", delta.source_log_path, delta.id),
+            source_log_path: delta.source_log_path.clone(),
+            byte_size: document.to_string().len(),
+            document,
+        };
+        let diff_summary =
+            gearblocks_runtime_scene_diff_summary(previous_export.as_ref(), &export)?;
+        let persisted = persist_runtime_export(state, game_id, &export, &indexed_at)?;
+        import_runtime_export_parts(state, game_id, &export)?;
+        state
+            .database
+            .save_app_setting(&gearblocks_runtime_scene_diff_key(game_id), &diff_summary)
+            .map_err(|error| error.to_string())?;
+        previous_export = Some(persisted);
+        imported_count += 1;
+    }
+
+    Ok(imported_count)
+}
+
+fn gearblocks_delta_already_applied(document: &serde_json::Value, delta_id: &str) -> bool {
+    document
+        .get("appliedDeltaIds")
+        .and_then(serde_json::Value::as_array)
+        .is_some_and(|items| {
+            items
+                .iter()
+                .any(|item| item.as_str().is_some_and(|value| value == delta_id))
+        })
+}
+
+fn apply_gearblocks_scene_delta_to_document(
+    document: &mut serde_json::Value,
+    delta: &GearBlocksSceneDeltaRecord,
+) -> Result<bool, String> {
+    let part_count = {
+        let Some(parts) = document
+            .get_mut("parts")
+            .and_then(serde_json::Value::as_array_mut)
+        else {
+            return Ok(false);
+        };
+
+        let mut by_key = parts
+            .iter()
+            .enumerate()
+            .filter_map(|(index, part)| gearblocks_part_instance_key(part).map(|key| (key, index)))
+            .collect::<HashMap<_, _>>();
+        let mut changed = false;
+
+        for removed in delta
+            .document
+            .get("removed")
+            .and_then(serde_json::Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            let key = json_string(removed.get("key"));
+            if key.is_empty() {
+                continue;
+            }
+            if let Some(index) = by_key.remove(&key) {
+                parts.remove(index);
+                by_key = parts
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, part)| {
+                        gearblocks_part_instance_key(part).map(|key| (key, index))
+                    })
+                    .collect::<HashMap<_, _>>();
+                changed = true;
+            }
+        }
+
+        for part in delta
+            .document
+            .get("added")
+            .and_then(serde_json::Value::as_array)
+            .into_iter()
+            .flatten()
+            .chain(
+                delta
+                    .document
+                    .get("updated")
+                    .and_then(serde_json::Value::as_array)
+                    .into_iter()
+                    .flatten(),
+            )
+        {
+            if gearblocks_part_is_player_character(part) {
+                continue;
+            }
+            let Some(key) = gearblocks_part_instance_key(part) else {
+                continue;
+            };
+            if let Some(index) = by_key.get(&key).copied() {
+                parts[index] = part.clone();
+            } else {
+                parts.push(part.clone());
+                by_key.insert(key, parts.len() - 1);
+            }
+            changed = true;
+        }
+
+        if !changed {
+            return Ok(false);
+        }
+
+        parts.sort_by(|left, right| {
+            json_i64(left.get("index"))
+                .cmp(&json_i64(right.get("index")))
+                .then(
+                    gearblocks_part_instance_key(left)
+                        .unwrap_or_default()
+                        .cmp(&gearblocks_part_instance_key(right).unwrap_or_default()),
+                )
+        });
+
+        parts.len()
+    };
+
+    if let Some(object) = document.as_object_mut() {
+        object.insert(
+            "exportedAt".to_string(),
+            serde_json::Value::String(delta.emitted_at.clone()),
+        );
+        object.insert(
+            "exportKind".to_string(),
+            serde_json::Value::String("sceneDeltaPatch".to_string()),
+        );
+        object.insert("numParts".to_string(), json!(part_count));
+        object.insert(
+            "lastDeltaId".to_string(),
+            serde_json::Value::String(delta.id.clone()),
+        );
+        let mut applied = object
+            .get("appliedDeltaIds")
+            .and_then(serde_json::Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        applied.push(serde_json::Value::String(delta.id.clone()));
+        let mut seen = HashSet::new();
+        let deduped = applied
+            .into_iter()
+            .filter(|value| {
+                value
+                    .as_str()
+                    .is_some_and(|text| seen.insert(text.to_string()))
+            })
+            .collect::<Vec<_>>();
+        object.insert(
+            "appliedDeltaIds".to_string(),
+            serde_json::Value::Array(deduped),
+        );
+    }
+
+    Ok(true)
+}
+
+fn gearblocks_part_instance_key(part: &serde_json::Value) -> Option<String> {
+    if let Some(key) = part.get("key").and_then(serde_json::Value::as_str) {
+        if !key.is_empty() {
+            return Some(key.to_string());
+        }
+    }
+    if let Some(id) = part.get("id").and_then(serde_json::Value::as_i64) {
+        return Some(format!("id:{id}"));
+    }
+    if let Some(index) = part.get("index").and_then(serde_json::Value::as_i64) {
+        return Some(format!("idx:{index}"));
+    }
+    None
+}
+
+fn gearblocks_part_is_player_character(part: &serde_json::Value) -> bool {
+    part.get("parentConstructionIsPlayerCharacter")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false)
 }
 
 fn gearblocks_runtime_log_cursor_key(game_id: i64, log_path: &Path) -> String {
@@ -5023,6 +5525,63 @@ fn gearblocks_structural_bounds_section(parts: &[GearBlocksRuntimePart<'_>]) -> 
     )
 }
 
+fn gearblocks_marker_coordinate_reference_section(parts: &[GearBlocksRuntimePart<'_>]) -> String {
+    let mut sorted_parts = parts.iter().collect::<Vec<_>>();
+    sorted_parts.sort_by(|left, right| {
+        left.index
+            .cmp(&right.index)
+            .then(left.name.cmp(&right.name))
+            .then(left.category.cmp(&right.category))
+    });
+
+    let mut lines = Vec::new();
+    for part in sorted_parts.iter().take(320) {
+        let world_position = part
+            .world_position
+            .and_then(json_vector3)
+            .map(|(x, y, z)| format!("world=({x:.2},{y:.2},{z:.2})"))
+            .unwrap_or_else(|| "world=unavailable".to_string());
+        let local_position = part
+            .local_position
+            .and_then(json_vector3)
+            .map(|(x, y, z)| format!("local=({x:.2},{y:.2},{z:.2})"))
+            .unwrap_or_else(|| "local=unavailable".to_string());
+        let size = part
+            .current_unit_size
+            .and_then(json_vector3)
+            .map(|(x, y, z)| format!(" size=({x:.2},{y:.2},{z:.2})"))
+            .unwrap_or_default();
+        lines.push(format!(
+            "- #{} idx {} [{} / {}] {}: {} {}{}",
+            part.id,
+            part.index,
+            part.system,
+            part.category,
+            part.name,
+            world_position,
+            local_position,
+            size
+        ));
+    }
+
+    if parts.len() > lines.len() {
+        lines.push(format!(
+            "- {} additional part coordinate row(s) omitted from prompt context for size.",
+            parts.len() - lines.len()
+        ));
+    }
+
+    if lines.is_empty() {
+        "## Marker Coordinate Reference\nNo runtime parts were available for coordinate reference."
+            .to_string()
+    } else {
+        format!(
+            "## Marker Coordinate Reference\nCoordinates are GearBlocks units; 1 unit equals 10 cm. Use world coordinates for temporary marker placement.\n{}",
+            lines.join("\n")
+        )
+    }
+}
+
 fn gearblocks_functional_parts_section(parts: &[GearBlocksRuntimePart<'_>]) -> String {
     let mut functional_parts = parts
         .iter()
@@ -5051,8 +5610,13 @@ fn gearblocks_functional_parts_section(parts: &[GearBlocksRuntimePart<'_>]) -> S
             .and_then(json_vector3)
             .map(|(x, y, z)| format!(" local=({x:.2},{y:.2},{z:.2})"))
             .unwrap_or_default();
+        let world_position = part
+            .world_position
+            .and_then(json_vector3)
+            .map(|(x, y, z)| format!(" world=({x:.2},{y:.2},{z:.2})"))
+            .unwrap_or_default();
         lines.push(format!(
-            "- #{} idx {} [{} / {}] {}: {}; behaviours={}; links={}{}{}",
+            "- #{} idx {} [{} / {}] {}: {}; behaviours={}; links={}{}{}{}",
             part.id,
             part.index,
             part.system,
@@ -5062,6 +5626,7 @@ fn gearblocks_functional_parts_section(parts: &[GearBlocksRuntimePart<'_>]) -> S
             behaviours,
             part.link_node_count,
             position,
+            world_position,
             size
         ));
     }
@@ -5115,6 +5680,13 @@ fn json_bool_label(value: Option<&serde_json::Value>) -> &'static str {
         Some(true) => "true",
         Some(false) => "false",
         None => "unknown",
+    }
+}
+
+fn compact_json_or_empty_object(value: Option<&serde_json::Value>) -> Result<String, String> {
+    match value {
+        Some(value) => serde_json::to_string(value).map_err(|error| error.to_string()),
+        None => Ok("{}".to_string()),
     }
 }
 

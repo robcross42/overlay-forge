@@ -9,7 +9,7 @@ use std::sync::Mutex;
 
 use commands::{
     attach_planning_conversation_context, catalog_game_parts_from_screenshots,
-    clear_game_runtime_part_images_for_category, clear_openai_api_key,
+    clear_game_runtime_part_images_for_category, clear_gearblocks_markers, clear_openai_api_key,
     consume_pending_shortcut_action, create_bridge_file_draft_from_conversation,
     create_calendar_event, create_game, create_game_chat_conversation,
     create_game_chat_screenshot_capture, create_game_screenshot_capture_request, create_note,
@@ -37,12 +37,12 @@ use commands::{
     preview_planning_chat_prompt, record_smoking_event, remove_planning_conversation_context,
     reset_keybinds, save_game_data_location, save_keybinds, save_openai_api_key,
     save_project_github_repository, save_project_markdown_context, save_scratchpad,
-    send_game_chat_message, send_planning_message, set_game_runtime_part_display_image,
-    set_overlay_window_opacity, shutdown_app, start_manual_overlay_drag, start_scheduler_worker,
-    sync_gearblocks_runtime_context, sync_gearblocks_saved_constructions,
-    toggle_game_chat_overlay_window, update_calendar_event, update_game_runtime_part_notes,
-    update_note, update_project, update_smoking_cigarette_count, update_task,
-    update_youtube_reference,
+    send_game_chat_message, send_gearblocks_marker_commands, send_planning_message,
+    set_game_runtime_part_display_image, set_overlay_window_opacity, shutdown_app,
+    start_manual_overlay_drag, start_scheduler_worker, sync_gearblocks_runtime_context,
+    sync_gearblocks_saved_constructions, toggle_game_chat_overlay_window, update_calendar_event,
+    update_game_runtime_part_notes, update_note, update_project, update_smoking_cigarette_count,
+    update_task, update_youtube_reference,
 };
 use db::AppDatabase;
 use serde::Serialize;
@@ -206,6 +206,8 @@ pub fn run() {
             sync_gearblocks_saved_constructions,
             sync_gearblocks_runtime_context,
             import_gearblocks_runtime_context,
+            send_gearblocks_marker_commands,
+            clear_gearblocks_markers,
             decode_gearblocks_construction_file,
             decode_gearblocks_construction_folder,
             install_gearblocks_lua_exporter,

@@ -19,7 +19,7 @@ Before planning or implementing project work, read the relevant repo docs instea
 - `docs/DATA_MODEL.md`
 - `docs/PROJECT_PLAN.md`
 - `docs/PROJECT_DEFERRED_ITEMS.md`
-- GearBlocks work: also read `docs/GEARBLOCKS_CONSTRUCTION_DECODER.md`, `docs/GEARBLOCKS_PARTS_CATALOG.md`, and `docs/GEARBLOCKS_RUNTIME_INTERFACES.md`.
+- GearBlocks work: also read `docs/GEARBLOCKS_CONSTRUCTION_DECODER.md`, `docs/GEARBLOCKS_PARTS_CATALOG.md`, `docs/GEARBLOCKS_RUNTIME_INTERFACES.md`, and `docs/GEARBLOCKS_GEARLIB.md` when the work involves BepInEx, GearLib, or compiled GearBlocks plugins.
 - Gaming screenshot work: also read `docs/GAMING_SCREENSHOT_VALIDATION.md`.
 - Bridge workflow work: also read `docs/BRIDGE_FILES.md` and `bridge-files/OPENAI_APP_BRIDGE.md`.
 
@@ -206,6 +206,15 @@ Goal: maintain maximum development velocity by using Medium Reasoning whenever p
 - Preserve local-first behavior. Do not introduce cloud sync, broad filesystem indexing, GitHub file browsing, vector stores, semantic search, or direct Codex handoff unless explicitly requested.
 - Use structured APIs/parsers when available instead of ad hoc string parsing.
 - Keep edits scoped. Do not refactor unrelated modules while implementing a requested change.
+
+## User-Facing Restart Warnings
+
+- If a completed change requires only Overlay Forge itself to restart and the local scripts can do it safely, automate the restart instead of only telling the user. During normal development, prefer starting the full dev workflow with `npm run tauri:dev` in a visible terminal so Vite and Tauri both run. Use the raw debug executable only when the user explicitly asks for it or when a dev-server workflow is not needed. Report that the restart was performed.
+- When a completed change requires the user to restart, relaunch, reload, or close and reopen any app, game, service, plugin host, dev server, overlay, or IDE, call this out clearly in the final response.
+- Format restart warnings as bold red text using inline HTML: `<span style="color:red"><strong>Restart required:</strong> ...</span>`.
+- Put the warning near the top of the final response so it is not missed.
+- Be specific about what must be restarted and why, such as GearBlocks needing to reload a BepInEx DLL, Overlay Forge needing to reload backend commands, or a dev server needing to pick up configuration changes.
+- Do not silently restart GearBlocks, Steam, an IDE, or another user-controlled app where state could be lost. For those, either ask first or provide the bold red warning.
 
 ## GearBlocks Rules
 

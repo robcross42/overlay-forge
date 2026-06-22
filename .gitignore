@@ -4,6 +4,11 @@ src-tauri/target/
 src-tauri/gen/
 game-screenshots/
 bridge-files/temp/
+logs/
+gearblocks-bepinex-workspace/
+gearblocks-bepinex-templates/**/bin/
+gearblocks-bepinex-templates/**/obj/
+gearblocks-bepinex-templates/**/libs/*.dll
 
 # Cargo build output, including GitHub's default Rust ignore patterns.
 debug/

@@ -527,9 +527,9 @@ created_at
 updated_at
 ```
 
-GearBlocks runtime construction export index populated from Overlay Forge Lua exporter records reconstructed from `Player.log` / `Player-prev.log`. `document_json` stores the complete runtime export payload, including availability-only `apiAttributes` entries. Chat context uses the latest indexed construction summary from SQLite but excludes API metadata by default. Overlay Forge stores per-log import cursors in `obj_setting` so explicit refresh/import and GearBlocks chat send paths can read new log additions instead of reparsing unchanged file prefixes. Normal chat navigation must not synchronously parse full-scene runtime logs.
+GearBlocks runtime construction export index populated from Overlay Forge Lua exporter records reconstructed from `Player.log` / `Player-prev.log`. `document_json` stores the complete runtime export payload, including availability-only `apiAttributes` entries. Chat context uses the latest indexed construction summary from SQLite but excludes API metadata by default. Overlay Forge stores per-log import cursors in `obj_setting` so explicit refresh/import and GearBlocks chat send paths can read new log additions instead of reparsing unchanged file prefixes. Normal chat navigation must not synchronously parse full-scene runtime logs. After a full scene export baseline exists, imported `[OverlayForgeSceneDelta]` log records are applied to the latest stored export and persisted as synthetic `sceneDeltaPatch` snapshots so copied, moved, resized, or removed parts can update chat context without triggering a full export on every prompt.
 
-The intended iterative GearBlocks workflow is to load the current build in-game, run `Export Scene`, then use chat or click `Refresh Scene Context` in Overlay Forge. Runtime part reference data and normalized detail indexes are upserted by stable keys, so unchanged catalog references are retained while refreshed scene exports update the latest observed build context. A compact latest-vs-previous runtime scene diff summary is stored in `obj_setting` for chat prompt context. Because the default export covers the whole scene, removed parts disappear from the latest chat context after the next scene export and import.
+The intended iterative GearBlocks workflow is to load the current build in-game, run `Export Scene`, then keep the Overlay Forge script loaded while building. Runtime part reference data and normalized detail indexes are upserted by stable keys, so unchanged catalog references are retained while refreshed scene exports or imported scene deltas update the latest observed build context. A compact latest-vs-previous runtime scene diff summary is stored in `obj_setting` for chat prompt context. Because the default export covers the whole scene, removed parts disappear from the latest chat context after the next scene export and import or after an imported scene-delta removal.
 
 ### obj_game_runtime_part
 
@@ -543,6 +543,14 @@ display_name
 full_display_name
 category
 mass
+world_x
+world_y
+world_z
+local_x
+local_y
+local_z
+world_position_json
+local_position_json
 properties_json
 source_export_id
 source_construction_id
@@ -554,7 +562,7 @@ created_at
 updated_at
 ```
 
-GearBlocks runtime API part index populated from Overlay Forge Lua exporter records reconstructed from `Player.log` / `Player-prev.log`. `part_key` prefers `AssetGUID`, falls back to `AssetName`, then to category plus display name. `properties_json` stores the full exported runtime part object, including documented construction namespace `apiAttributes`, so newly exposed GearBlocks API fields remain available without schema changes.
+GearBlocks runtime API part index populated from Overlay Forge Lua exporter records reconstructed from `Player.log` / `Player-prev.log`. `part_key` prefers `AssetGUID`, falls back to `AssetName`, then to category plus display name. `world_x` / `world_y` / `world_z` store runtime world coordinates for marker placement, while `local_x` / `local_y` / `local_z` store construction-local coordinates for design reasoning. `world_position_json` and `local_position_json` retain the original exported vector payloads. `properties_json` stores the full exported runtime part object, including documented construction namespace `apiAttributes`, so newly exposed GearBlocks API fields remain available without schema changes.
 
 `display_image_path` stores Overlay Forge's copied catalog display image under `game-screenshots/<game-slug>/part-images/`. `source_image_path` stores the original image selected by the user. Screenshot bytes are kept outside SQLite.
 

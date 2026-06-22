@@ -1,0 +1,419 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Text.RegularExpressions;
+using BepInEx;
+using BepInEx.Logging;
+using BepInEx.Unity.IL2CPP;
+using Il2CppInterop.Runtime.Injection;
+using UnityEngine;
+
+namespace OverlayForgeGearBlocksPlugin;
+
+[BepInPlugin(MyPluginInfo.PLUGIN_GUID, MyPluginInfo.PLUGIN_NAME, MyPluginInfo.PLUGIN_VERSION)]
+public class Plugin : BasePlugin
+{
+    internal static new ManualLogSource Log = null!;
+
+    public override void Load()
+    {
+        Log = base.Log;
+        ClassInjector.RegisterTypeInIl2Cpp<OverlayForgeMarkerBridge>();
+
+        GameObject bridgeObject = new GameObject("Overlay Forge Marker Bridge");
+        UnityEngine.Object.DontDestroyOnLoad(bridgeObject);
+        bridgeObject.hideFlags = HideFlags.HideAndDontSave;
+        bridgeObject.AddComponent<OverlayForgeMarkerBridge>();
+
+        Log.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} loaded.");
+    }
+}
+
+public class OverlayForgeMarkerBridge : MonoBehaviour
+{
+    private const float PollIntervalSeconds = 0.25f;
+    private const float DefaultMarkerDurationSeconds = 20f;
+    private const float DefaultMarkerSize = 4.0f;
+
+    private readonly List<MarkerHandle> markers = new List<MarkerHandle>();
+    private string commandDirectory = string.Empty;
+    private string processedDirectory = string.Empty;
+    private string statusDirectory = string.Empty;
+    private float pollTimer;
+
+    public OverlayForgeMarkerBridge(IntPtr ptr) : base(ptr)
+    {
+    }
+
+    private void Awake()
+    {
+        string root = Path.Combine(Application.persistentDataPath, "OverlayForgePlugin");
+        commandDirectory = Path.Combine(root, "commands");
+        processedDirectory = Path.Combine(root, "processed");
+        statusDirectory = Path.Combine(root, "status");
+
+        Directory.CreateDirectory(commandDirectory);
+        Directory.CreateDirectory(processedDirectory);
+        Directory.CreateDirectory(statusDirectory);
+
+        Plugin.Log.LogInfo($"Overlay Forge command directory: {commandDirectory}");
+        WriteStatus("startup", true, "Overlay Forge GearBlocks plugin ready.");
+    }
+
+    private void Update()
+    {
+        pollTimer += Time.unscaledDeltaTime;
+        if (pollTimer >= PollIntervalSeconds)
+        {
+            pollTimer = 0f;
+            PollCommands();
+        }
+
+        for (int i = markers.Count - 1; i >= 0; i--)
+        {
+            if (Time.unscaledTime < markers[i].ExpiresAt)
+                continue;
+
+            if (markers[i].Root != null)
+                Destroy(markers[i].Root);
+            markers.RemoveAt(i);
+        }
+    }
+
+    private void PollCommands()
+    {
+        if (string.IsNullOrWhiteSpace(commandDirectory) || !Directory.Exists(commandDirectory))
+            return;
+
+        foreach (string path in Directory.GetFiles(commandDirectory, "*.json").OrderBy(File.GetCreationTimeUtc).Take(5))
+        {
+            ProcessCommandFile(path);
+        }
+    }
+
+    private void ProcessCommandFile(string path)
+    {
+        string commandId = Path.GetFileNameWithoutExtension(path);
+        try
+        {
+            string commandText = File.ReadAllText(path);
+            string action = ExtractString(commandText, "action");
+            string parsedId = ExtractString(commandText, "id");
+            string label = ExtractString(commandText, "label");
+            string color = ExtractString(commandText, "color");
+            float durationSeconds = ExtractFloat(commandText, "durationSeconds", DefaultMarkerDurationSeconds);
+            float size = ExtractFloat(commandText, "size", DefaultMarkerSize);
+            float x = ExtractFloat(commandText, "x", 0f);
+            float y = ExtractFloat(commandText, "y", 0f);
+            float z = ExtractFloat(commandText, "z", 0f);
+
+            commandId = string.IsNullOrWhiteSpace(parsedId) ? commandId : parsedId;
+
+            switch ((action ?? string.Empty).Trim().ToLowerInvariant())
+            {
+                case "spawn_center_marker":
+                    SpawnCenterMarker(commandId, label, color, durationSeconds, size);
+                    WriteStatus(commandId, true, "Marker spawned.");
+                    break;
+                case "spawn_world_marker":
+                    SpawnWorldMarker(commandId, label, new Vector3(x, y, z), color, durationSeconds, size);
+                    WriteStatus(commandId, true, "World marker spawned.");
+                    break;
+                case "clear_markers":
+                    ClearMarkers();
+                    WriteStatus(commandId, true, "Markers cleared.");
+                    break;
+                case "ping":
+                    WriteStatus(commandId, true, "Pong.");
+                    break;
+                default:
+                    throw new InvalidOperationException($"Unsupported command action '{action}'.");
+            }
+
+            MoveProcessed(path, ".done");
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.LogWarning($"Overlay Forge command failed: {ex}");
+            WriteStatus(commandId, false, ex.Message);
+            MoveProcessed(path, ".error");
+        }
+    }
+
+    private void OnGUI()
+    {
+        Camera camera = Camera.main ?? UnityEngine.Object.FindObjectOfType<Camera>();
+        if (camera == null)
+            return;
+
+        foreach (MarkerHandle marker in markers)
+        {
+            Vector3 screen = camera.WorldToScreenPoint(marker.WorldPosition);
+            if (screen.z <= 0f)
+                continue;
+
+            float x = Mathf.Clamp(screen.x, 24f, Screen.width - 24f);
+            float y = Mathf.Clamp(Screen.height - screen.y, 24f, Screen.height - 24f);
+            DrawScreenMarker(new Vector2(x, y), marker.Color, marker.Label);
+        }
+    }
+
+    private void DrawScreenMarker(Vector2 center, Color color, string label)
+    {
+        Color previousColor = GUI.color;
+        GUI.color = color;
+        float arm = 28f;
+        float width = 5f;
+        GUI.DrawTexture(new Rect(center.x - arm, center.y - width * 0.5f, arm * 2f, width), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(center.x - width * 0.5f, center.y - arm, width, arm * 2f), Texture2D.whiteTexture);
+        GUI.DrawTexture(new Rect(center.x - 7f, center.y - 7f, 14f, 14f), Texture2D.whiteTexture);
+
+        if (!string.IsNullOrWhiteSpace(label))
+        {
+            GUI.color = Color.black;
+            GUI.Label(new Rect(center.x + 14f, center.y - 13f, 260f, 24f), label);
+            GUI.color = color;
+            GUI.Label(new Rect(center.x + 12f, center.y - 15f, 260f, 24f), label);
+        }
+
+        GUI.color = previousColor;
+    }
+
+    private void SpawnCenterMarker(string commandId, string label, string colorValue, float durationSeconds, float markerSize)
+    {
+        Camera camera = Camera.main ?? UnityEngine.Object.FindObjectOfType<Camera>();
+        if (camera == null)
+            throw new InvalidOperationException("No active camera was found.");
+
+        Ray ray = camera.ScreenPointToRay(new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 0f));
+        if (!Physics.Raycast(ray, out RaycastHit hit, 1000f))
+            throw new InvalidOperationException("The center raycast did not hit a surface.");
+
+        float duration = Math.Max(0.5f, durationSeconds);
+        float size = Math.Max(0.5f, markerSize);
+        Color color = ParseColor(colorValue, new Color(0.33f, 0.94f, 0.78f, 1f));
+
+        GameObject root = new GameObject($"Overlay Forge Marker {commandId}");
+        root.hideFlags = HideFlags.HideAndDontSave;
+
+        Vector3 normal = hit.normal.sqrMagnitude > 0.001f ? hit.normal.normalized : Vector3.up;
+        Vector3 tangent = Vector3.Cross(normal, Vector3.up);
+        if (tangent.sqrMagnitude < 0.001f)
+            tangent = Vector3.Cross(normal, Vector3.right);
+        tangent.Normalize();
+        Vector3 bitangent = Vector3.Cross(normal, tangent).normalized;
+        Vector3 center = hit.point + normal * 0.015f;
+
+        CreateSphere(root, "center", center, size * 0.18f, color);
+        CreateLine(root, "horizontal", center - tangent * size, center + tangent * size, color);
+        CreateLine(root, "vertical", center - bitangent * size, center + bitangent * size, color);
+        CreateLine(root, "normal", center, center + normal * (size * 0.65f), color);
+
+        markers.Add(new MarkerHandle(root, Time.unscaledTime + duration, center, color, label));
+        Plugin.Log.LogInfo($"Spawned Overlay Forge marker '{commandId}' at {center}.");
+    }
+
+    private void SpawnWorldMarker(string commandId, string label, Vector3 center, string colorValue, float durationSeconds, float markerSize)
+    {
+        float duration = Math.Max(0.5f, durationSeconds);
+        float size = Math.Max(0.5f, markerSize);
+        Color color = ParseColor(colorValue, new Color(0.33f, 0.94f, 0.78f, 1f));
+
+        GameObject root = new GameObject($"Overlay Forge Marker {commandId}");
+        root.hideFlags = HideFlags.HideAndDontSave;
+
+        CreateSphere(root, "center", center, size * 0.18f, color);
+        CreateLine(root, "x", center - Vector3.right * size, center + Vector3.right * size, color);
+        CreateLine(root, "y", center - Vector3.up * size, center + Vector3.up * size, color);
+        CreateLine(root, "z", center - Vector3.forward * size, center + Vector3.forward * size, color);
+
+        markers.Add(new MarkerHandle(root, Time.unscaledTime + duration, center, color, label));
+        Plugin.Log.LogInfo($"Spawned Overlay Forge world marker '{commandId}' at {center}.");
+    }
+
+    private void CreateLine(GameObject parent, string name, Vector3 start, Vector3 end, Color color)
+    {
+        GameObject lineObject = new GameObject($"marker-line-{name}");
+        lineObject.transform.SetParent(parent.transform, false);
+        lineObject.hideFlags = HideFlags.HideAndDontSave;
+
+        LineRenderer line = lineObject.AddComponent<LineRenderer>();
+        line.useWorldSpace = true;
+        line.positionCount = 2;
+        line.SetPosition(0, start);
+        line.SetPosition(1, end);
+        float width = Math.Max(0.08f, Vector3.Distance(start, end) * 0.035f);
+        line.startWidth = width;
+        line.endWidth = width;
+        line.startColor = color;
+        line.endColor = color;
+        line.material = CreateMarkerMaterial(color);
+    }
+
+    private void CreateSphere(GameObject parent, string name, Vector3 center, float radius, Color color)
+    {
+        GameObject sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        sphere.name = $"marker-sphere-{name}";
+        sphere.transform.SetParent(parent.transform, false);
+        sphere.transform.position = center;
+        float diameter = Math.Max(0.18f, radius * 2f);
+        sphere.transform.localScale = new Vector3(diameter, diameter, diameter);
+        sphere.hideFlags = HideFlags.HideAndDontSave;
+
+        Collider collider = sphere.GetComponent<Collider>();
+        if (collider != null)
+            Destroy(collider);
+
+        Renderer renderer = sphere.GetComponent<Renderer>();
+        if (renderer != null)
+            renderer.material = CreateMarkerMaterial(color);
+    }
+
+    private Material CreateMarkerMaterial(Color color)
+    {
+        Shader shader =
+            Shader.Find("Unlit/Color") ??
+            Shader.Find("Sprites/Default") ??
+            Shader.Find("Universal Render Pipeline/Unlit") ??
+            Shader.Find("Standard");
+        Material material = new Material(shader);
+        material.color = color;
+        return material;
+    }
+
+    private void ClearMarkers()
+    {
+        foreach (MarkerHandle marker in markers)
+        {
+            if (marker.Root != null)
+                Destroy(marker.Root);
+        }
+        markers.Clear();
+    }
+
+    private static Color ParseColor(string color, Color fallback)
+    {
+        if (string.IsNullOrWhiteSpace(color))
+            return fallback;
+
+        string value = color.Trim().TrimStart('#');
+        if (value.Length != 6 && value.Length != 8)
+            return fallback;
+
+        try
+        {
+            byte r = byte.Parse(value.Substring(0, 2), NumberStyles.HexNumber);
+            byte g = byte.Parse(value.Substring(2, 2), NumberStyles.HexNumber);
+            byte b = byte.Parse(value.Substring(4, 2), NumberStyles.HexNumber);
+            byte a = value.Length == 8 ? byte.Parse(value.Substring(6, 2), NumberStyles.HexNumber) : (byte)255;
+            return new Color(r / 255f, g / 255f, b / 255f, a / 255f);
+        }
+        catch
+        {
+            return fallback;
+        }
+    }
+
+    private void WriteStatus(string commandId, bool ok, string message)
+    {
+        if (string.IsNullOrWhiteSpace(statusDirectory))
+            return;
+
+        Directory.CreateDirectory(statusDirectory);
+        string statusPath = Path.Combine(statusDirectory, $"{SanitizeFileName(commandId)}.json");
+        File.WriteAllText(statusPath,
+            "{\n" +
+            $"  \"id\": \"{EscapeJson(commandId)}\",\n" +
+            $"  \"ok\": {(ok ? "true" : "false")},\n" +
+            $"  \"message\": \"{EscapeJson(message)}\",\n" +
+            $"  \"writtenAtUtc\": \"{DateTimeOffset.UtcNow:O}\"\n" +
+            "}\n");
+    }
+
+    private void MoveProcessed(string path, string suffix)
+    {
+        Directory.CreateDirectory(processedDirectory);
+        string destination = Path.Combine(
+            processedDirectory,
+            $"{Path.GetFileNameWithoutExtension(path)}{suffix}{Path.GetExtension(path)}"
+        );
+        if (File.Exists(destination))
+            File.Delete(destination);
+        File.Move(path, destination);
+    }
+
+    private static string SanitizeFileName(string value)
+    {
+        foreach (char invalid in Path.GetInvalidFileNameChars())
+            value = value.Replace(invalid, '_');
+        return string.IsNullOrWhiteSpace(value) ? "command" : value;
+    }
+
+    private static string EscapeJson(string value)
+    {
+        if (value == null)
+            return string.Empty;
+
+        return value
+            .Replace("\\", "\\\\")
+            .Replace("\"", "\\\"")
+            .Replace("\r", "\\r")
+            .Replace("\n", "\\n");
+    }
+
+    private static string ExtractString(string json, string propertyName)
+    {
+        Match match = Regex.Match(
+            json,
+            $"\"{Regex.Escape(propertyName)}\"\\s*:\\s*\"((?:\\\\.|[^\"])*)\"",
+            RegexOptions.IgnoreCase
+        );
+        return match.Success ? UnescapeJsonString(match.Groups[1].Value) : string.Empty;
+    }
+
+    private static float ExtractFloat(string json, string propertyName, float fallback)
+    {
+        Match match = Regex.Match(
+            json,
+            $"\"{Regex.Escape(propertyName)}\"\\s*:\\s*(-?[0-9]+(?:\\.[0-9]+)?)",
+            RegexOptions.IgnoreCase
+        );
+
+        if (!match.Success)
+            return fallback;
+
+        return float.TryParse(match.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out float value)
+            ? value
+            : fallback;
+    }
+
+    private static string UnescapeJsonString(string value)
+    {
+        return value
+            .Replace("\\\"", "\"")
+            .Replace("\\\\", "\\")
+            .Replace("\\r", "\r")
+            .Replace("\\n", "\n");
+    }
+
+    private sealed class MarkerHandle
+    {
+        public MarkerHandle(GameObject root, float expiresAt, Vector3 worldPosition, Color color, string label)
+        {
+            Root = root;
+            ExpiresAt = expiresAt;
+            WorldPosition = worldPosition;
+            Color = color;
+            Label = label;
+        }
+
+        public GameObject Root { get; }
+        public float ExpiresAt { get; }
+        public Vector3 WorldPosition { get; }
+        public Color Color { get; }
+        public string Label { get; }
+    }
+
+}
