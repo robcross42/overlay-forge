@@ -678,27 +678,28 @@ pub struct AppDatabase {
 impl AppDatabase {
     pub fn new(path: PathBuf) -> Result<Self> {
         let connection = Connection::open(path)?;
+        Self::migrate_legacy_table_names(&connection)?;
         connection.execute_batch(
             "
             PRAGMA journal_mode = WAL;
 
-            CREATE TABLE IF NOT EXISTS scratchpad (
+            CREATE TABLE IF NOT EXISTS obj_scratchpad (
                 id INTEGER PRIMARY KEY CHECK (id = 1),
                 content TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            INSERT OR IGNORE INTO scratchpad (id, content) VALUES (1, '');
+            INSERT OR IGNORE INTO obj_scratchpad (id, content) VALUES (1, '');
 
-            CREATE TABLE IF NOT EXISTS app_settings (
+            CREATE TABLE IF NOT EXISTS obj_setting (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS tasks (
+            CREATE TABLE IF NOT EXISTS obj_task (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
                 body TEXT NOT NULL DEFAULT '',
@@ -708,7 +709,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS notes (
+            CREATE TABLE IF NOT EXISTS obj_note (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
                 body TEXT NOT NULL DEFAULT '',
@@ -716,7 +717,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS calendar_events (
+            CREATE TABLE IF NOT EXISTS obj_calendar_event (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
                 start_date TEXT NOT NULL,
@@ -728,7 +729,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS smoking_events (
+            CREATE TABLE IF NOT EXISTS obj_smoking_event (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 smoked_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
                 source TEXT NOT NULL DEFAULT 'manual',
@@ -736,7 +737,7 @@ impl AppDatabase {
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS smoking_cessation_settings (
+            CREATE TABLE IF NOT EXISTS obj_smoking_cessation_setting (
                 id INTEGER PRIMARY KEY CHECK (id = 1),
                 patch_label TEXT NOT NULL DEFAULT '',
                 patch_started_at TEXT NOT NULL DEFAULT '',
@@ -746,7 +747,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            INSERT OR IGNORE INTO smoking_cessation_settings (
+            INSERT OR IGNORE INTO obj_smoking_cessation_setting (
                 id,
                 patch_label,
                 patch_started_at,
@@ -831,7 +832,7 @@ impl AppDatabase {
                 datetime('now', 'localtime')
             );
 
-            CREATE TABLE IF NOT EXISTS projects (
+            CREATE TABLE IF NOT EXISTS obj_project (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 description TEXT NOT NULL DEFAULT '',
@@ -840,7 +841,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS planning_conversations (
+            CREATE TABLE IF NOT EXISTS obj_planning_conversation (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id INTEGER NOT NULL,
                 title TEXT NOT NULL DEFAULT 'Planning conversation',
@@ -848,7 +849,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS planning_messages (
+            CREATE TABLE IF NOT EXISTS obj_planning_message (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 conversation_id INTEGER NOT NULL,
                 role TEXT NOT NULL,
@@ -856,7 +857,7 @@ impl AppDatabase {
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS planning_conversation_context (
+            CREATE TABLE IF NOT EXISTS n2n_planning_conversation_context (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 conversation_id INTEGER NOT NULL,
                 context_type TEXT NOT NULL,
@@ -865,7 +866,7 @@ impl AppDatabase {
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS project_github_repositories (
+            CREATE TABLE IF NOT EXISTS obj_project_github_repository (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id INTEGER NOT NULL UNIQUE,
                 repository_full_name TEXT NOT NULL,
@@ -878,7 +879,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS project_markdown_context (
+            CREATE TABLE IF NOT EXISTS obj_project_markdown_context (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id INTEGER NOT NULL UNIQUE,
                 root_path TEXT NOT NULL,
@@ -887,7 +888,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS youtube_references (
+            CREATE TABLE IF NOT EXISTS obj_youtube_reference (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
                 url TEXT NOT NULL,
@@ -899,7 +900,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS bridge_file_drafts (
+            CREATE TABLE IF NOT EXISTS obj_bridge_file_draft (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id INTEGER NOT NULL,
                 conversation_id INTEGER NOT NULL,
@@ -910,16 +911,41 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS games (
+            CREATE TABLE IF NOT EXISTS def_game (
+                id_game INTEGER PRIMARY KEY,
+                game_key TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                ui_name TEXT NOT NULL,
+                summary TEXT NOT NULL DEFAULT '',
+                schema_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_game (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id_game INTEGER NOT NULL DEFAULT 1,
                 name TEXT NOT NULL UNIQUE COLLATE NOCASE,
                 slug TEXT NOT NULL UNIQUE COLLATE NOCASE,
                 summary TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (id_game) REFERENCES def_game(id_game)
             );
 
-            CREATE TABLE IF NOT EXISTS game_catalog_objects (
+            CREATE TABLE IF NOT EXISTS obj_game_setting (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                id_game INTEGER NOT NULL DEFAULT 1,
+                setting_key TEXT NOT NULL,
+                setting_value_json TEXT NOT NULL DEFAULT 'null',
+                schema_json TEXT NOT NULL DEFAULT '{}',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (game_id) REFERENCES obj_game(id),
+                FOREIGN KEY (id_game) REFERENCES def_game(id_game)
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_game_catalog_object (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
                 name TEXT NOT NULL,
@@ -932,7 +958,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS game_catalog_references (
+            CREATE TABLE IF NOT EXISTS obj_game_catalog_reference (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
                 object_id INTEGER,
@@ -946,7 +972,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS game_data_locations (
+            CREATE TABLE IF NOT EXISTS obj_game_data_location (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
                 location_type TEXT NOT NULL,
@@ -956,7 +982,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS game_catalog_screenshots (
+            CREATE TABLE IF NOT EXISTS obj_game_catalog_screenshot (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
                 object_id INTEGER,
@@ -972,7 +998,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS game_runtime_parts (
+            CREATE TABLE IF NOT EXISTS obj_game_runtime_part (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
                 part_key TEXT NOT NULL,
@@ -993,7 +1019,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS game_runtime_part_api_attributes (
+            CREATE TABLE IF NOT EXISTS obj_game_runtime_part_api_attribute (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
                 part_key TEXT NOT NULL,
@@ -1014,7 +1040,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS game_runtime_part_values (
+            CREATE TABLE IF NOT EXISTS obj_game_runtime_part_value (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
                 part_key TEXT NOT NULL,
@@ -1034,7 +1060,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS game_runtime_part_properties (
+            CREATE TABLE IF NOT EXISTS obj_game_runtime_part_property (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
                 part_key TEXT NOT NULL,
@@ -1054,7 +1080,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS game_runtime_part_attachments (
+            CREATE TABLE IF NOT EXISTS obj_game_runtime_part_attachment (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
                 part_key TEXT NOT NULL,
@@ -1074,7 +1100,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS gearblocks_api_types (
+            CREATE TABLE IF NOT EXISTS def_gearblocks_api_type (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 namespace TEXT NOT NULL,
                 type_name TEXT NOT NULL,
@@ -1087,7 +1113,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS gearblocks_api_members (
+            CREATE TABLE IF NOT EXISTS def_gearblocks_api_member (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 type_id INTEGER NOT NULL,
                 member_key TEXT NOT NULL,
@@ -1107,7 +1133,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS gearblocks_api_parameters (
+            CREATE TABLE IF NOT EXISTS def_gearblocks_api_parameter (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 member_id INTEGER NOT NULL,
                 position INTEGER NOT NULL,
@@ -1119,7 +1145,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS gearblocks_api_enum_values (
+            CREATE TABLE IF NOT EXISTS def_gearblocks_api_enum_value (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 type_id INTEGER NOT NULL,
                 position INTEGER NOT NULL,
@@ -1133,7 +1159,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS game_runtime_part_api_members (
+            CREATE TABLE IF NOT EXISTS n2n_game_runtime_part_api_member (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
                 part_key TEXT NOT NULL,
@@ -1147,7 +1173,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS game_constructions (
+            CREATE TABLE IF NOT EXISTS obj_game_construction (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
                 name TEXT NOT NULL,
@@ -1170,7 +1196,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS game_runtime_construction_exports (
+            CREATE TABLE IF NOT EXISTS obj_game_runtime_construction_export (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
                 export_id TEXT NOT NULL,
@@ -1192,7 +1218,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS game_chat_conversations (
+            CREATE TABLE IF NOT EXISTS obj_game_chat_conversation (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
                 title TEXT NOT NULL DEFAULT 'Game chat',
@@ -1202,7 +1228,7 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
-            CREATE TABLE IF NOT EXISTS game_chat_messages (
+            CREATE TABLE IF NOT EXISTS obj_game_chat_message (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 conversation_id INTEGER NOT NULL,
                 role TEXT NOT NULL,
@@ -1211,61 +1237,61 @@ impl AppDatabase {
             );
 
             CREATE INDEX IF NOT EXISTS idx_game_catalog_objects_game_id
-                ON game_catalog_objects (game_id);
+                ON obj_game_catalog_object (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_catalog_objects_game_name
-                ON game_catalog_objects (game_id, name COLLATE NOCASE);
+                ON obj_game_catalog_object (game_id, name COLLATE NOCASE);
             CREATE INDEX IF NOT EXISTS idx_game_catalog_references_game_id
-                ON game_catalog_references (game_id);
+                ON obj_game_catalog_reference (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_catalog_references_object_id
-                ON game_catalog_references (object_id);
+                ON obj_game_catalog_reference (object_id);
             CREATE INDEX IF NOT EXISTS idx_game_data_locations_game_id
-                ON game_data_locations (game_id);
+                ON obj_game_data_location (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_catalog_screenshots_game_id
-                ON game_catalog_screenshots (game_id);
+                ON obj_game_catalog_screenshot (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_catalog_screenshots_object_id
-                ON game_catalog_screenshots (object_id);
+                ON obj_game_catalog_screenshot (object_id);
             CREATE INDEX IF NOT EXISTS idx_game_chat_conversations_game_id
-                ON game_chat_conversations (game_id);
+                ON obj_game_chat_conversation (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_chat_messages_conversation_id
-                ON game_chat_messages (conversation_id);
+                ON obj_game_chat_message (conversation_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_parts_game_id
-                ON game_runtime_parts (game_id);
+                ON obj_game_runtime_part (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_part_api_attributes_game_id
-                ON game_runtime_part_api_attributes (game_id);
+                ON obj_game_runtime_part_api_attribute (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_part_api_attributes_interface
-                ON game_runtime_part_api_attributes (game_id, interface_name, attribute_name);
+                ON obj_game_runtime_part_api_attribute (game_id, interface_name, attribute_name);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_part_values_game_id
-                ON game_runtime_part_values (game_id);
+                ON obj_game_runtime_part_value (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_part_values_field_path
-                ON game_runtime_part_values (game_id, field_path);
+                ON obj_game_runtime_part_value (game_id, field_path);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_part_properties_game_id
-                ON game_runtime_part_properties (game_id);
+                ON obj_game_runtime_part_property (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_part_properties_property_path
-                ON game_runtime_part_properties (game_id, property_path);
+                ON obj_game_runtime_part_property (game_id, property_path);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_part_attachments_game_id
-                ON game_runtime_part_attachments (game_id);
+                ON obj_game_runtime_part_attachment (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_part_attachments_attachment_path
-                ON game_runtime_part_attachments (game_id, attachment_path);
+                ON obj_game_runtime_part_attachment (game_id, attachment_path);
             CREATE INDEX IF NOT EXISTS idx_gearblocks_api_types_namespace
-                ON gearblocks_api_types (namespace, type_name);
+                ON def_gearblocks_api_type (namespace, type_name);
             CREATE INDEX IF NOT EXISTS idx_gearblocks_api_members_type_id
-                ON gearblocks_api_members (type_id);
+                ON def_gearblocks_api_member (type_id);
             CREATE INDEX IF NOT EXISTS idx_gearblocks_api_members_member_name
-                ON gearblocks_api_members (member_name);
+                ON def_gearblocks_api_member (member_name);
             CREATE INDEX IF NOT EXISTS idx_gearblocks_api_parameters_member_id
-                ON gearblocks_api_parameters (member_id);
+                ON def_gearblocks_api_parameter (member_id);
             CREATE INDEX IF NOT EXISTS idx_gearblocks_api_enum_values_type_id
-                ON gearblocks_api_enum_values (type_id);
+                ON def_gearblocks_api_enum_value (type_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_part_api_members_game_id
-                ON game_runtime_part_api_members (game_id);
+                ON n2n_game_runtime_part_api_member (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_part_api_members_api_member_id
-                ON game_runtime_part_api_members (api_member_id);
+                ON n2n_game_runtime_part_api_member (api_member_id);
             CREATE INDEX IF NOT EXISTS idx_game_constructions_game_id
-                ON game_constructions (game_id);
+                ON obj_game_construction (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_construction_exports_game_id
-                ON game_runtime_construction_exports (game_id);
+                ON obj_game_runtime_construction_export (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_construction_exports_exported_at
-                ON game_runtime_construction_exports (game_id, exported_at);
+                ON obj_game_runtime_construction_export (game_id, exported_at);
             CREATE INDEX IF NOT EXISTS idx_obj_scheduler_due
                 ON obj_scheduler (is_enabled, next_run_at);
             CREATE INDEX IF NOT EXISTS idx_obj_scheduler_type
@@ -1275,7 +1301,16 @@ impl AppDatabase {
             CREATE INDEX IF NOT EXISTS idx_obj_scheduler_run_started
                 ON obj_scheduler_run (started_at);
 
-            INSERT OR IGNORE INTO games (name, slug, summary)
+            INSERT OR IGNORE INTO def_game (id_game, game_key, ui_name, summary, schema_json)
+            VALUES (
+                1,
+                'gearblocks',
+                'GearBlocks',
+                'Supported GearBlocks game module definition.',
+                '{\"fields\":{\"id_game\":\"stable integer game definition id\",\"game_key\":\"stable lowercase game key\",\"ui_name\":\"visible game definition name\",\"summary\":\"definition summary\"}}'
+            );
+
+            INSERT OR IGNORE INTO obj_game (name, slug, summary)
             VALUES (
                 'GearBlocks',
                 'gearblocks',
@@ -1283,125 +1318,146 @@ impl AppDatabase {
             );
             ",
         )?;
-        Self::ensure_column(&connection, "tasks", "body", "TEXT NOT NULL DEFAULT ''")?;
-        Self::ensure_column(&connection, "tasks", "deadline", "TEXT NOT NULL DEFAULT ''")?;
+        Self::ensure_column(&connection, "obj_task", "body", "TEXT NOT NULL DEFAULT ''")?;
         Self::ensure_column(
             &connection,
-            "smoking_cessation_settings",
+            "obj_task",
+            "deadline",
+            "TEXT NOT NULL DEFAULT ''",
+        )?;
+        Self::ensure_column(
+            &connection,
+            "obj_game",
+            "id_game",
+            "INTEGER NOT NULL DEFAULT 1",
+        )?;
+        Self::ensure_column(
+            &connection,
+            "obj_smoking_cessation_setting",
             "current_cigarette_count",
             "INTEGER NOT NULL DEFAULT 0",
         )?;
         Self::ensure_column(
             &connection,
-            "game_catalog_screenshots",
+            "obj_game_catalog_screenshot",
             "request_id",
             "TEXT NOT NULL DEFAULT ''",
         )?;
         Self::ensure_column(
             &connection,
-            "game_catalog_screenshots",
+            "obj_game_catalog_screenshot",
             "request_path",
             "TEXT NOT NULL DEFAULT ''",
         )?;
         Self::ensure_column(
             &connection,
-            "game_catalog_screenshots",
+            "obj_game_catalog_screenshot",
             "capture_status",
             "TEXT NOT NULL DEFAULT 'captured'",
         )?;
         Self::ensure_column(
             &connection,
-            "game_catalog_objects",
+            "obj_game_catalog_object",
             "category_icon",
             "TEXT NOT NULL DEFAULT ''",
         )?;
         Self::ensure_column(
             &connection,
-            "game_catalog_objects",
+            "obj_game_catalog_object",
             "category_icon_path",
             "TEXT NOT NULL DEFAULT ''",
         )?;
         Self::ensure_column(
             &connection,
-            "game_catalog_objects",
+            "obj_game_catalog_object",
             "thumbnail_path",
             "TEXT NOT NULL DEFAULT ''",
         )?;
         Self::ensure_column(
             &connection,
-            "game_catalog_objects",
+            "obj_game_catalog_object",
             "source_screenshot_path",
             "TEXT NOT NULL DEFAULT ''",
         )?;
         Self::ensure_column(
             &connection,
-            "game_runtime_parts",
+            "obj_game_runtime_part",
             "display_image_path",
             "TEXT NOT NULL DEFAULT ''",
         )?;
         Self::ensure_column(
             &connection,
-            "game_runtime_parts",
+            "obj_game_runtime_part",
             "source_image_path",
             "TEXT NOT NULL DEFAULT ''",
         )?;
         Self::ensure_column(
             &connection,
-            "game_runtime_parts",
+            "obj_game_runtime_part",
             "notes",
             "TEXT NOT NULL DEFAULT ''",
         )?;
         Self::ensure_column(
             &connection,
-            "game_chat_conversations",
+            "obj_game_chat_conversation",
             "overlay_x",
             "INTEGER",
         )?;
         Self::ensure_column(
             &connection,
-            "game_chat_conversations",
+            "obj_game_chat_conversation",
             "overlay_y",
             "INTEGER",
         )?;
+        Self::ensure_schema_metadata_columns(&connection)?;
+        Self::ensure_modified_at_triggers(&connection)?;
+        Self::refresh_schema_json_metadata(&connection)?;
         connection.execute(
             "
             CREATE INDEX IF NOT EXISTS idx_game_catalog_screenshots_request_id
-                ON game_catalog_screenshots (request_id)
+                ON obj_game_catalog_screenshot (request_id)
             ",
             [],
         )?;
         connection.execute(
             "
             CREATE UNIQUE INDEX IF NOT EXISTS idx_game_catalog_objects_game_name_unique
-                ON game_catalog_objects (game_id, name COLLATE NOCASE)
+                ON obj_game_catalog_object (game_id, name COLLATE NOCASE)
+            ",
+            [],
+        )?;
+        connection.execute(
+            "
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_obj_game_setting_game_key_unique
+                ON obj_game_setting (game_id, setting_key)
             ",
             [],
         )?;
         connection.execute(
             "
             CREATE UNIQUE INDEX IF NOT EXISTS idx_game_catalog_objects_game_name_exact_unique
-                ON game_catalog_objects (game_id, name)
+                ON obj_game_catalog_object (game_id, name)
             ",
             [],
         )?;
         connection.execute(
             "
             CREATE UNIQUE INDEX IF NOT EXISTS idx_game_data_locations_game_type_unique
-                ON game_data_locations (game_id, location_type)
+                ON obj_game_data_location (game_id, location_type)
             ",
             [],
         )?;
         connection.execute(
             "
             CREATE UNIQUE INDEX IF NOT EXISTS idx_game_runtime_parts_game_part_key_unique
-                ON game_runtime_parts (game_id, part_key)
+                ON obj_game_runtime_part (game_id, part_key)
             ",
             [],
         )?;
         connection.execute(
             "
             CREATE UNIQUE INDEX IF NOT EXISTS idx_game_runtime_part_api_attributes_unique
-                ON game_runtime_part_api_attributes (
+                ON obj_game_runtime_part_api_attribute (
                     game_id,
                     part_key,
                     interface_name,
@@ -1413,70 +1469,70 @@ impl AppDatabase {
         connection.execute(
             "
             CREATE UNIQUE INDEX IF NOT EXISTS idx_game_runtime_part_values_unique
-                ON game_runtime_part_values (game_id, part_key, field_path)
+                ON obj_game_runtime_part_value (game_id, part_key, field_path)
             ",
             [],
         )?;
         connection.execute(
             "
             CREATE UNIQUE INDEX IF NOT EXISTS idx_game_runtime_part_properties_unique
-                ON game_runtime_part_properties (game_id, part_key, property_path)
+                ON obj_game_runtime_part_property (game_id, part_key, property_path)
             ",
             [],
         )?;
         connection.execute(
             "
             CREATE UNIQUE INDEX IF NOT EXISTS idx_game_runtime_part_attachments_unique
-                ON game_runtime_part_attachments (game_id, part_key, attachment_path)
+                ON obj_game_runtime_part_attachment (game_id, part_key, attachment_path)
             ",
             [],
         )?;
         connection.execute(
             "
             CREATE UNIQUE INDEX IF NOT EXISTS idx_gearblocks_api_types_unique
-                ON gearblocks_api_types (namespace, type_name)
+                ON def_gearblocks_api_type (namespace, type_name)
             ",
             [],
         )?;
         connection.execute(
             "
             CREATE UNIQUE INDEX IF NOT EXISTS idx_gearblocks_api_members_unique
-                ON gearblocks_api_members (type_id, member_key)
+                ON def_gearblocks_api_member (type_id, member_key)
             ",
             [],
         )?;
         connection.execute(
             "
             CREATE UNIQUE INDEX IF NOT EXISTS idx_gearblocks_api_parameters_unique
-                ON gearblocks_api_parameters (member_id, position)
+                ON def_gearblocks_api_parameter (member_id, position)
             ",
             [],
         )?;
         connection.execute(
             "
             CREATE UNIQUE INDEX IF NOT EXISTS idx_gearblocks_api_enum_values_unique
-                ON gearblocks_api_enum_values (type_id, value_name)
+                ON def_gearblocks_api_enum_value (type_id, value_name)
             ",
             [],
         )?;
         connection.execute(
             "
             CREATE UNIQUE INDEX IF NOT EXISTS idx_game_runtime_part_api_members_unique
-                ON game_runtime_part_api_members (game_id, part_key, api_member_id)
+                ON n2n_game_runtime_part_api_member (game_id, part_key, api_member_id)
             ",
             [],
         )?;
         connection.execute(
             "
             CREATE UNIQUE INDEX IF NOT EXISTS idx_game_constructions_game_path_unique
-                ON game_constructions (game_id, construction_path)
+                ON obj_game_construction (game_id, construction_path)
             ",
             [],
         )?;
         connection.execute(
             "
             CREATE UNIQUE INDEX IF NOT EXISTS idx_game_runtime_construction_exports_game_export_unique
-                ON game_runtime_construction_exports (game_id, export_id)
+                ON obj_game_runtime_construction_export (game_id, export_id)
             ",
             [],
         )?;
@@ -1497,6 +1553,282 @@ impl AppDatabase {
 
     pub fn is_ready(&self) -> bool {
         self.ready
+    }
+
+    fn migrate_legacy_table_names(connection: &Connection) -> Result<()> {
+        let table_migrations = [
+            ("scratchpad", "obj_scratchpad"),
+            ("app_settings", "obj_setting"),
+            ("tasks", "obj_task"),
+            ("notes", "obj_note"),
+            ("calendar_events", "obj_calendar_event"),
+            ("smoking_events", "obj_smoking_event"),
+            (
+                "smoking_cessation_settings",
+                "obj_smoking_cessation_setting",
+            ),
+            ("projects", "obj_project"),
+            ("planning_conversations", "obj_planning_conversation"),
+            ("planning_messages", "obj_planning_message"),
+            (
+                "planning_conversation_context",
+                "n2n_planning_conversation_context",
+            ),
+            (
+                "project_github_repositories",
+                "obj_project_github_repository",
+            ),
+            ("project_markdown_context", "obj_project_markdown_context"),
+            ("youtube_references", "obj_youtube_reference"),
+            ("bridge_file_drafts", "obj_bridge_file_draft"),
+            ("games", "obj_game"),
+            ("game_catalog_objects", "obj_game_catalog_object"),
+            ("game_catalog_references", "obj_game_catalog_reference"),
+            ("game_data_locations", "obj_game_data_location"),
+            ("game_catalog_screenshots", "obj_game_catalog_screenshot"),
+            ("game_runtime_parts", "obj_game_runtime_part"),
+            (
+                "game_runtime_part_api_attributes",
+                "obj_game_runtime_part_api_attribute",
+            ),
+            ("game_runtime_part_values", "obj_game_runtime_part_value"),
+            (
+                "game_runtime_part_properties",
+                "obj_game_runtime_part_property",
+            ),
+            (
+                "game_runtime_part_attachments",
+                "obj_game_runtime_part_attachment",
+            ),
+            ("gearblocks_api_types", "def_gearblocks_api_type"),
+            ("gearblocks_api_members", "def_gearblocks_api_member"),
+            ("gearblocks_api_parameters", "def_gearblocks_api_parameter"),
+            (
+                "gearblocks_api_enum_values",
+                "def_gearblocks_api_enum_value",
+            ),
+            (
+                "game_runtime_part_api_members",
+                "n2n_game_runtime_part_api_member",
+            ),
+            ("game_constructions", "obj_game_construction"),
+            (
+                "game_runtime_construction_exports",
+                "obj_game_runtime_construction_export",
+            ),
+            ("game_chat_conversations", "obj_game_chat_conversation"),
+            ("game_chat_messages", "obj_game_chat_message"),
+        ];
+
+        for (legacy_name, normalized_name) in table_migrations {
+            Self::rename_table_if_needed(connection, legacy_name, normalized_name)?;
+        }
+
+        Ok(())
+    }
+
+    fn rename_table_if_needed(
+        connection: &Connection,
+        legacy_name: &str,
+        normalized_name: &str,
+    ) -> Result<()> {
+        if Self::table_exists(connection, normalized_name)?
+            || !Self::table_exists(connection, legacy_name)?
+        {
+            return Ok(());
+        }
+        connection.execute(
+            &format!("ALTER TABLE {legacy_name} RENAME TO {normalized_name}"),
+            [],
+        )?;
+        Ok(())
+    }
+
+    fn table_exists(connection: &Connection, table_name: &str) -> Result<bool> {
+        connection
+            .query_row(
+                "
+                SELECT 1
+                FROM sqlite_master
+                WHERE type = 'table' AND name = ?1
+                LIMIT 1
+                ",
+                params![table_name],
+                |_| Ok(()),
+            )
+            .optional()
+            .map(|value| value.is_some())
+    }
+
+    fn ensure_schema_metadata_columns(connection: &Connection) -> Result<()> {
+        for table in Self::normalized_schema_tables() {
+            Self::ensure_column(
+                connection,
+                table,
+                "schema_json",
+                "TEXT NOT NULL DEFAULT '{}'",
+            )?;
+            Self::ensure_column(connection, table, "modified_at", "TEXT NOT NULL DEFAULT ''")?;
+            connection.execute(
+                &format!(
+                    "
+                    UPDATE {table}
+                    SET modified_at = CURRENT_TIMESTAMP
+                    WHERE modified_at = ''
+                    "
+                ),
+                [],
+            )?;
+        }
+
+        Ok(())
+    }
+
+    fn ensure_modified_at_triggers(connection: &Connection) -> Result<()> {
+        let table_primary_keys = [
+            ("obj_scratchpad", "id"),
+            ("obj_setting", "key"),
+            ("obj_task", "id"),
+            ("obj_note", "id"),
+            ("obj_calendar_event", "id"),
+            ("obj_smoking_event", "id"),
+            ("obj_smoking_cessation_setting", "id"),
+            ("def_scheduler_type", "id"),
+            ("obj_scheduler", "id"),
+            ("obj_scheduler_run", "id"),
+            ("def_game", "id_game"),
+            ("obj_game", "id"),
+            ("obj_game_setting", "id"),
+            ("obj_project", "id"),
+            ("obj_planning_conversation", "id"),
+            ("obj_planning_message", "id"),
+            ("n2n_planning_conversation_context", "id"),
+            ("obj_project_github_repository", "id"),
+            ("obj_project_markdown_context", "id"),
+            ("obj_youtube_reference", "id"),
+            ("obj_bridge_file_draft", "id"),
+            ("obj_game_catalog_object", "id"),
+            ("obj_game_catalog_reference", "id"),
+            ("obj_game_data_location", "id"),
+            ("obj_game_catalog_screenshot", "id"),
+            ("obj_game_runtime_part", "id"),
+            ("obj_game_runtime_part_api_attribute", "id"),
+            ("obj_game_runtime_part_value", "id"),
+            ("obj_game_runtime_part_property", "id"),
+            ("obj_game_runtime_part_attachment", "id"),
+            ("def_gearblocks_api_type", "id"),
+            ("def_gearblocks_api_member", "id"),
+            ("def_gearblocks_api_parameter", "id"),
+            ("def_gearblocks_api_enum_value", "id"),
+            ("n2n_game_runtime_part_api_member", "id"),
+            ("obj_game_construction", "id"),
+            ("obj_game_runtime_construction_export", "id"),
+            ("obj_game_chat_conversation", "id"),
+            ("obj_game_chat_message", "id"),
+        ];
+
+        for (table, primary_key) in table_primary_keys {
+            connection.execute(
+                &format!(
+                    "
+                    CREATE TRIGGER IF NOT EXISTS trg_{table}_modified_at
+                    AFTER UPDATE ON {table}
+                    WHEN OLD.modified_at IS NEW.modified_at
+                    BEGIN
+                        UPDATE {table}
+                        SET modified_at = CURRENT_TIMESTAMP
+                        WHERE {primary_key} = NEW.{primary_key}
+                            AND modified_at IS OLD.modified_at;
+                    END
+                    "
+                ),
+                [],
+            )?;
+        }
+
+        Ok(())
+    }
+
+    fn refresh_schema_json_metadata(connection: &Connection) -> Result<()> {
+        let tables = Self::normalized_schema_tables();
+        for table in tables {
+            let schema_json = Self::table_schema_json(connection, table)?;
+            connection.execute(
+                &format!(
+                    "
+                    UPDATE {table}
+                    SET schema_json = ?1
+                    WHERE schema_json = '' OR schema_json = '{{}}'
+                    "
+                ),
+                params![schema_json],
+            )?;
+        }
+        Ok(())
+    }
+
+    fn normalized_schema_tables() -> [&'static str; 39] {
+        [
+            "obj_scratchpad",
+            "obj_setting",
+            "obj_task",
+            "obj_note",
+            "obj_calendar_event",
+            "obj_smoking_event",
+            "obj_smoking_cessation_setting",
+            "def_scheduler_type",
+            "obj_scheduler",
+            "obj_scheduler_run",
+            "def_game",
+            "obj_game",
+            "obj_game_setting",
+            "obj_project",
+            "obj_planning_conversation",
+            "obj_planning_message",
+            "n2n_planning_conversation_context",
+            "obj_project_github_repository",
+            "obj_project_markdown_context",
+            "obj_youtube_reference",
+            "obj_bridge_file_draft",
+            "obj_game_catalog_object",
+            "obj_game_catalog_reference",
+            "obj_game_data_location",
+            "obj_game_catalog_screenshot",
+            "obj_game_runtime_part",
+            "obj_game_runtime_part_api_attribute",
+            "obj_game_runtime_part_value",
+            "obj_game_runtime_part_property",
+            "obj_game_runtime_part_attachment",
+            "def_gearblocks_api_type",
+            "def_gearblocks_api_member",
+            "def_gearblocks_api_parameter",
+            "def_gearblocks_api_enum_value",
+            "n2n_game_runtime_part_api_member",
+            "obj_game_construction",
+            "obj_game_runtime_construction_export",
+            "obj_game_chat_conversation",
+            "obj_game_chat_message",
+        ]
+    }
+
+    fn table_schema_json(connection: &Connection, table: &str) -> Result<String> {
+        let mut statement = connection.prepare(&format!("PRAGMA table_info({table})"))?;
+        let columns = statement
+            .query_map([], |row| {
+                Ok(serde_json::json!({
+                    "name": row.get::<_, String>(1)?,
+                    "storageType": row.get::<_, String>(2)?,
+                    "notNull": row.get::<_, i64>(3)? == 1,
+                    "defaultValue": row.get::<_, Option<String>>(4)?,
+                    "isPrimaryKey": row.get::<_, i64>(5)? > 0,
+                }))
+            })?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(serde_json::json!({
+            "table": table,
+            "columns": columns,
+        })
+        .to_string())
     }
 
     fn seed_gearblocks_api_catalog(connection: &Connection) -> Result<()> {
@@ -1531,7 +1863,7 @@ impl AppDatabase {
                 let parsed = parse_gearblocks_api_member(raw_member, definition.name);
                 connection.execute(
                     "
-                    INSERT INTO gearblocks_api_members (
+                    INSERT INTO def_gearblocks_api_member (
                         type_id,
                         member_key,
                         member_name,
@@ -1577,7 +1909,7 @@ impl AppDatabase {
                 let member_id = connection.query_row(
                     "
                     SELECT id
-                    FROM gearblocks_api_members
+                    FROM def_gearblocks_api_member
                     WHERE type_id = ?1
                         AND member_key = ?2
                     ",
@@ -1587,7 +1919,7 @@ impl AppDatabase {
 
                 connection.execute(
                     "
-                    DELETE FROM gearblocks_api_parameters
+                    DELETE FROM def_gearblocks_api_parameter
                     WHERE member_id = ?1
                     ",
                     params![member_id],
@@ -1596,7 +1928,7 @@ impl AppDatabase {
                 for parameter in parsed.parameters {
                     connection.execute(
                         "
-                        INSERT INTO gearblocks_api_parameters (
+                        INSERT INTO def_gearblocks_api_parameter (
                             member_id,
                             position,
                             parameter_name,
@@ -1642,7 +1974,7 @@ impl AppDatabase {
 
             connection.execute(
                 "
-                DELETE FROM gearblocks_api_enum_values
+                DELETE FROM def_gearblocks_api_enum_value
                 WHERE type_id = ?1
                 ",
                 params![type_id],
@@ -1651,7 +1983,7 @@ impl AppDatabase {
             for (index, value) in definition.values.iter().enumerate() {
                 connection.execute(
                     "
-                    INSERT INTO gearblocks_api_enum_values (
+                    INSERT INTO def_gearblocks_api_enum_value (
                         type_id,
                         position,
                         value_name,
@@ -1698,7 +2030,7 @@ impl AppDatabase {
     ) -> Result<i64> {
         connection.execute(
             "
-            INSERT INTO gearblocks_api_types (
+            INSERT INTO def_gearblocks_api_type (
                 namespace,
                 type_name,
                 type_kind,
@@ -1730,7 +2062,7 @@ impl AppDatabase {
         connection.query_row(
             "
             SELECT id
-            FROM gearblocks_api_types
+            FROM def_gearblocks_api_type
             WHERE namespace = ?1
                 AND type_name = ?2
             ",
@@ -1743,7 +2075,7 @@ impl AppDatabase {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection
             .query_row(
-                "SELECT value FROM app_settings WHERE key = ?1",
+                "SELECT value FROM obj_setting WHERE key = ?1",
                 params![key.trim()],
                 |row| row.get(0),
             )
@@ -1754,7 +2086,7 @@ impl AppDatabase {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
             "
-            INSERT INTO app_settings (key, value)
+            INSERT INTO obj_setting (key, value)
             VALUES (?1, ?2)
             ON CONFLICT(key) DO UPDATE SET
                 value = excluded.value,
@@ -1768,7 +2100,7 @@ impl AppDatabase {
     pub fn delete_app_setting(&self, key: &str) -> Result<()> {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
-            "DELETE FROM app_settings WHERE key = ?1",
+            "DELETE FROM obj_setting WHERE key = ?1",
             params![key.trim()],
         )?;
         Ok(())
@@ -1776,16 +2108,18 @@ impl AppDatabase {
 
     pub fn get_scratchpad(&self) -> Result<String> {
         let connection = self.connection.lock().expect("database mutex poisoned");
-        connection.query_row("SELECT content FROM scratchpad WHERE id = 1", [], |row| {
-            row.get(0)
-        })
+        connection.query_row(
+            "SELECT content FROM obj_scratchpad WHERE id = 1",
+            [],
+            |row| row.get(0),
+        )
     }
 
     pub fn save_scratchpad(&self, content: &str) -> Result<()> {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
             "
-            INSERT INTO scratchpad (id, content, updated_at)
+            INSERT INTO obj_scratchpad (id, content, updated_at)
             VALUES (1, ?1, CURRENT_TIMESTAMP)
             ON CONFLICT(id) DO UPDATE SET
                 content = excluded.content,
@@ -1802,7 +2136,7 @@ impl AppDatabase {
         let mut statement = connection.prepare(
             "
             SELECT id, title, body, deadline, is_completed, created_at, updated_at
-            FROM tasks
+            FROM obj_task
             ORDER BY
                 CASE WHEN deadline = '' THEN 1 ELSE 0 END,
                 deadline ASC,
@@ -1831,7 +2165,7 @@ impl AppDatabase {
     pub fn create_task(&self, title: &str, body: &str, deadline: &str) -> Result<TaskRecord> {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
-            "INSERT INTO tasks (title, body, deadline) VALUES (?1, ?2, ?3)",
+            "INSERT INTO obj_task (title, body, deadline) VALUES (?1, ?2, ?3)",
             params![title.trim(), body, deadline.trim()],
         )?;
         let id = connection.last_insert_rowid();
@@ -1851,7 +2185,7 @@ impl AppDatabase {
         if let Some(next_title) = title {
             connection.execute(
                 "
-                UPDATE tasks
+                UPDATE obj_task
                 SET title = ?1,
                     body = COALESCE(?2, body),
                     deadline = COALESCE(?3, deadline),
@@ -1863,7 +2197,7 @@ impl AppDatabase {
         } else if body.is_some() || deadline.is_some() {
             connection.execute(
                 "
-                UPDATE tasks
+                UPDATE obj_task
                 SET body = COALESCE(?1, body),
                     deadline = COALESCE(?2, deadline),
                     updated_at = CURRENT_TIMESTAMP
@@ -1875,7 +2209,7 @@ impl AppDatabase {
 
         if let Some(next_state) = is_completed {
             connection.execute(
-                "UPDATE tasks SET is_completed = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
+                "UPDATE obj_task SET is_completed = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2",
                 params![if next_state { 1 } else { 0 }, id],
             )?;
         }
@@ -1885,7 +2219,7 @@ impl AppDatabase {
 
     pub fn delete_task(&self, id: i64) -> Result<()> {
         let connection = self.connection.lock().expect("database mutex poisoned");
-        connection.execute("DELETE FROM tasks WHERE id = ?1", params![id])?;
+        connection.execute("DELETE FROM obj_task WHERE id = ?1", params![id])?;
         Ok(())
     }
 
@@ -1894,7 +2228,7 @@ impl AppDatabase {
         let mut statement = connection.prepare(
             "
             SELECT id, title, body, created_at, updated_at
-            FROM notes
+            FROM obj_note
             ORDER BY updated_at DESC, id DESC
             ",
         )?;
@@ -1917,7 +2251,7 @@ impl AppDatabase {
     pub fn create_note(&self, title: &str, body: &str) -> Result<NoteRecord> {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
-            "INSERT INTO notes (title, body) VALUES (?1, ?2)",
+            "INSERT INTO obj_note (title, body) VALUES (?1, ?2)",
             params![title.trim(), body],
         )?;
         let id = connection.last_insert_rowid();
@@ -1928,7 +2262,7 @@ impl AppDatabase {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
             "
-            UPDATE notes
+            UPDATE obj_note
             SET title = ?1, body = ?2, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?3
             ",
@@ -1940,7 +2274,7 @@ impl AppDatabase {
 
     pub fn delete_note(&self, id: i64) -> Result<()> {
         let connection = self.connection.lock().expect("database mutex poisoned");
-        connection.execute("DELETE FROM notes WHERE id = ?1", params![id])?;
+        connection.execute("DELETE FROM obj_note WHERE id = ?1", params![id])?;
         Ok(())
     }
 
@@ -1949,7 +2283,7 @@ impl AppDatabase {
         let mut statement = connection.prepare(
             "
             SELECT id, title, start_date, start_time, end_date, end_time, notes, created_at, updated_at
-            FROM calendar_events
+            FROM obj_calendar_event
             ORDER BY start_date ASC, start_time ASC, id ASC
             ",
         )?;
@@ -1985,7 +2319,7 @@ impl AppDatabase {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
             "
-            INSERT INTO calendar_events (title, start_date, start_time, end_date, end_time, notes)
+            INSERT INTO obj_calendar_event (title, start_date, start_time, end_date, end_time, notes)
             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
             ",
             params![
@@ -2014,7 +2348,7 @@ impl AppDatabase {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
             "
-            UPDATE calendar_events
+            UPDATE obj_calendar_event
             SET title = ?1,
                 start_date = ?2,
                 start_time = ?3,
@@ -2040,7 +2374,7 @@ impl AppDatabase {
 
     pub fn delete_calendar_event(&self, id: i64) -> Result<()> {
         let connection = self.connection.lock().expect("database mutex poisoned");
-        connection.execute("DELETE FROM calendar_events WHERE id = ?1", params![id])?;
+        connection.execute("DELETE FROM obj_calendar_event WHERE id = ?1", params![id])?;
         Ok(())
     }
 
@@ -2049,7 +2383,7 @@ impl AppDatabase {
         let mut statement = connection.prepare(
             "
             SELECT id, smoked_at, source, notes, created_at
-            FROM smoking_events
+            FROM obj_smoking_event
             ORDER BY smoked_at DESC, id DESC
             ",
         )?;
@@ -2069,7 +2403,7 @@ impl AppDatabase {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
             "
-            INSERT INTO smoking_events (smoked_at, source, notes)
+            INSERT INTO obj_smoking_event (smoked_at, source, notes)
             VALUES (COALESCE(NULLIF(?1, ''), datetime('now', 'localtime')), ?2, ?3)
             ",
             params![
@@ -2081,7 +2415,7 @@ impl AppDatabase {
         let id = connection.last_insert_rowid();
         connection.execute(
             "
-            UPDATE smoking_cessation_settings
+            UPDATE obj_smoking_cessation_setting
             SET current_cigarette_count = MAX(current_cigarette_count - 1, 0),
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = 1
@@ -2093,7 +2427,7 @@ impl AppDatabase {
 
     pub fn delete_smoking_event(&self, id: i64) -> Result<()> {
         let connection = self.connection.lock().expect("database mutex poisoned");
-        connection.execute("DELETE FROM smoking_events WHERE id = ?1", params![id])?;
+        connection.execute("DELETE FROM obj_smoking_event WHERE id = ?1", params![id])?;
         Ok(())
     }
 
@@ -2109,7 +2443,7 @@ impl AppDatabase {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
             "
-            UPDATE smoking_cessation_settings
+            UPDATE obj_smoking_cessation_setting
             SET current_cigarette_count = MAX(?1, 0),
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = 1
@@ -2280,7 +2614,7 @@ impl AppDatabase {
         let mut statement = connection.prepare(
             "
             SELECT id, name, description, status, created_at, updated_at
-            FROM projects
+            FROM obj_project
             ORDER BY updated_at DESC, id DESC
             ",
         )?;
@@ -2309,7 +2643,7 @@ impl AppDatabase {
     ) -> Result<ProjectRecord> {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
-            "INSERT INTO projects (name, description, status) VALUES (?1, ?2, ?3)",
+            "INSERT INTO obj_project (name, description, status) VALUES (?1, ?2, ?3)",
             params![name.trim(), description, status.trim()],
         )?;
         let id = connection.last_insert_rowid();
@@ -2326,7 +2660,7 @@ impl AppDatabase {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
             "
-            UPDATE projects
+            UPDATE obj_project
             SET name = ?1,
                 description = ?2,
                 status = ?3,
@@ -2342,18 +2676,18 @@ impl AppDatabase {
     pub fn delete_project(&self, id: i64) -> Result<()> {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
-            "DELETE FROM bridge_file_drafts WHERE project_id = ?1",
+            "DELETE FROM obj_bridge_file_draft WHERE project_id = ?1",
             params![id],
         )?;
         connection.execute(
-            "DELETE FROM project_markdown_context WHERE project_id = ?1",
+            "DELETE FROM obj_project_markdown_context WHERE project_id = ?1",
             params![id],
         )?;
         connection.execute(
-            "DELETE FROM project_github_repositories WHERE project_id = ?1",
+            "DELETE FROM obj_project_github_repository WHERE project_id = ?1",
             params![id],
         )?;
-        connection.execute("DELETE FROM projects WHERE id = ?1", params![id])?;
+        connection.execute("DELETE FROM obj_project WHERE id = ?1", params![id])?;
         Ok(())
     }
 
@@ -2380,7 +2714,7 @@ impl AppDatabase {
         Self::get_project_by_id(&connection, project_id)?;
         connection.execute(
             "
-            INSERT INTO project_github_repositories (
+            INSERT INTO obj_project_github_repository (
                 project_id,
                 repository_full_name,
                 repository_url,
@@ -2410,7 +2744,7 @@ impl AppDatabase {
         let connection = self.connection.lock().expect("database mutex poisoned");
         Self::get_project_by_id(&connection, project_id)?;
         connection.execute(
-            "DELETE FROM project_github_repositories WHERE project_id = ?1",
+            "DELETE FROM obj_project_github_repository WHERE project_id = ?1",
             params![project_id],
         )?;
         Ok(())
@@ -2428,7 +2762,7 @@ impl AppDatabase {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
             "
-            UPDATE project_github_repositories
+            UPDATE obj_project_github_repository
             SET repository_full_name = ?1,
                 repository_url = ?2,
                 default_branch = ?3,
@@ -2459,7 +2793,7 @@ impl AppDatabase {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
             "
-            UPDATE project_github_repositories
+            UPDATE obj_project_github_repository
             SET last_fetched_at = CURRENT_TIMESTAMP,
                 last_fetch_status = ?1,
                 updated_at = CURRENT_TIMESTAMP
@@ -2496,7 +2830,7 @@ impl AppDatabase {
 
         connection.execute(
             "
-            INSERT INTO project_markdown_context (
+            INSERT INTO obj_project_markdown_context (
                 project_id,
                 root_path,
                 readme_path,
@@ -2518,7 +2852,7 @@ impl AppDatabase {
         let connection = self.connection.lock().expect("database mutex poisoned");
         Self::get_project_by_id(&connection, project_id)?;
         connection.execute(
-            "DELETE FROM project_markdown_context WHERE project_id = ?1",
+            "DELETE FROM obj_project_markdown_context WHERE project_id = ?1",
             params![project_id],
         )?;
         Ok(())
@@ -2543,7 +2877,7 @@ impl AppDatabase {
             let mut statement = connection.prepare(
                 "
                 SELECT id, project_id, title, created_at, updated_at
-                FROM planning_conversations
+                FROM obj_planning_conversation
                 WHERE project_id = ?1
                 ORDER BY updated_at DESC, id DESC
                 ",
@@ -2557,7 +2891,7 @@ impl AppDatabase {
         let mut statement = connection.prepare(
             "
             SELECT id, project_id, title, created_at, updated_at
-            FROM planning_conversations
+            FROM obj_planning_conversation
             ORDER BY updated_at DESC, id DESC
             ",
         )?;
@@ -2584,7 +2918,7 @@ impl AppDatabase {
 
         connection.execute(
             "
-            INSERT INTO planning_conversations (project_id, title)
+            INSERT INTO obj_planning_conversation (project_id, title)
             VALUES (?1, ?2)
             ",
             params![project_id, clean_title],
@@ -2619,7 +2953,7 @@ impl AppDatabase {
             SELECT id, conversation_id, role, content, created_at
             FROM (
                 SELECT id, conversation_id, role, content, created_at
-                FROM planning_messages
+                FROM obj_planning_message
                 WHERE conversation_id = ?1
                 ORDER BY id DESC
                 LIMIT ?2
@@ -2645,14 +2979,14 @@ impl AppDatabase {
         Self::get_planning_conversation_by_id(&connection, conversation_id)?;
         connection.execute(
             "
-            INSERT INTO planning_messages (conversation_id, role, content)
+            INSERT INTO obj_planning_message (conversation_id, role, content)
             VALUES (?1, ?2, ?3)
             ",
             params![conversation_id, role, content],
         )?;
         connection.execute(
             "
-            UPDATE planning_conversations
+            UPDATE obj_planning_conversation
             SET updated_at = CURRENT_TIMESTAMP
             WHERE id = ?1
             ",
@@ -2666,19 +3000,19 @@ impl AppDatabase {
     pub fn delete_planning_conversation(&self, conversation_id: i64) -> Result<()> {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
-            "DELETE FROM bridge_file_drafts WHERE conversation_id = ?1",
+            "DELETE FROM obj_bridge_file_draft WHERE conversation_id = ?1",
             params![conversation_id],
         )?;
         connection.execute(
-            "DELETE FROM planning_conversation_context WHERE conversation_id = ?1",
+            "DELETE FROM n2n_planning_conversation_context WHERE conversation_id = ?1",
             params![conversation_id],
         )?;
         connection.execute(
-            "DELETE FROM planning_messages WHERE conversation_id = ?1",
+            "DELETE FROM obj_planning_message WHERE conversation_id = ?1",
             params![conversation_id],
         )?;
         connection.execute(
-            "DELETE FROM planning_conversations WHERE id = ?1",
+            "DELETE FROM obj_planning_conversation WHERE id = ?1",
             params![conversation_id],
         )?;
         Ok(())
@@ -2718,7 +3052,7 @@ impl AppDatabase {
 
         connection.execute(
             "
-            INSERT INTO planning_conversation_context (
+            INSERT INTO n2n_planning_conversation_context (
                 conversation_id,
                 context_type,
                 source_id,
@@ -2741,7 +3075,7 @@ impl AppDatabase {
     pub fn remove_planning_conversation_context(&self, id: i64) -> Result<()> {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
-            "DELETE FROM planning_conversation_context WHERE id = ?1",
+            "DELETE FROM n2n_planning_conversation_context WHERE id = ?1",
             params![id],
         )?;
         Ok(())
@@ -2761,7 +3095,7 @@ impl AppDatabase {
         let markdown_context =
             Self::load_project_markdown_context_for_project(&connection, project.id)?;
         let message_count: i64 = connection.query_row(
-            "SELECT COUNT(*) FROM planning_messages WHERE conversation_id = ?1",
+            "SELECT COUNT(*) FROM obj_planning_message WHERE conversation_id = ?1",
             params![conversation_id],
             |row| row.get(0),
         )?;
@@ -2882,7 +3216,7 @@ impl AppDatabase {
         let mut statement = connection.prepare(
             "
             SELECT id, project_id, conversation_id, title, content, status, created_at, updated_at
-            FROM bridge_file_drafts
+            FROM obj_bridge_file_draft
             WHERE project_id = ?1
             ORDER BY updated_at DESC, id DESC
             ",
@@ -2940,7 +3274,7 @@ impl AppDatabase {
 
         connection.execute(
             "
-            INSERT INTO bridge_file_drafts (
+            INSERT INTO obj_bridge_file_draft (
                 project_id,
                 conversation_id,
                 title,
@@ -2958,7 +3292,10 @@ impl AppDatabase {
 
     pub fn delete_bridge_file_draft(&self, id: i64) -> Result<()> {
         let connection = self.connection.lock().expect("database mutex poisoned");
-        connection.execute("DELETE FROM bridge_file_drafts WHERE id = ?1", params![id])?;
+        connection.execute(
+            "DELETE FROM obj_bridge_file_draft WHERE id = ?1",
+            params![id],
+        )?;
         Ok(())
     }
 
@@ -2967,7 +3304,7 @@ impl AppDatabase {
         let mut statement = connection.prepare(
             "
             SELECT id, title, url, video_id, channel_name, notes, tags, created_at, updated_at
-            FROM youtube_references
+            FROM obj_youtube_reference
             ORDER BY updated_at DESC, id DESC
             ",
         )?;
@@ -2996,7 +3333,7 @@ impl AppDatabase {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
             "
-            INSERT INTO youtube_references (title, url, video_id, channel_name, notes, tags)
+            INSERT INTO obj_youtube_reference (title, url, video_id, channel_name, notes, tags)
             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
             ",
             params![
@@ -3025,7 +3362,7 @@ impl AppDatabase {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
             "
-            UPDATE youtube_references
+            UPDATE obj_youtube_reference
             SET title = ?1,
                 url = ?2,
                 video_id = ?3,
@@ -3051,7 +3388,10 @@ impl AppDatabase {
 
     pub fn delete_youtube_reference(&self, id: i64) -> Result<()> {
         let connection = self.connection.lock().expect("database mutex poisoned");
-        connection.execute("DELETE FROM youtube_references WHERE id = ?1", params![id])?;
+        connection.execute(
+            "DELETE FROM obj_youtube_reference WHERE id = ?1",
+            params![id],
+        )?;
         Ok(())
     }
 
@@ -3060,7 +3400,7 @@ impl AppDatabase {
         let mut statement = connection.prepare(
             "
             SELECT id, name, slug, summary, created_at, updated_at
-            FROM games
+            FROM obj_game
             ORDER BY name COLLATE NOCASE ASC, id ASC
             ",
         )?;
@@ -3083,7 +3423,7 @@ impl AppDatabase {
         let slug = game_slug(trimmed_name);
         connection.execute(
             "
-            INSERT INTO games (name, slug, summary)
+            INSERT INTO obj_game (name, slug, summary)
             VALUES (?1, ?2, ?3)
             ",
             params![trimmed_name, slug, summary.trim()],
@@ -3097,34 +3437,34 @@ impl AppDatabase {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
             "
-            DELETE FROM game_chat_messages
+            DELETE FROM obj_game_chat_message
             WHERE conversation_id IN (
-                SELECT id FROM game_chat_conversations WHERE game_id = ?1
+                SELECT id FROM obj_game_chat_conversation WHERE game_id = ?1
             )
             ",
             params![id],
         )?;
         connection.execute(
-            "DELETE FROM game_chat_conversations WHERE game_id = ?1",
+            "DELETE FROM obj_game_chat_conversation WHERE game_id = ?1",
             params![id],
         )?;
         connection.execute(
-            "DELETE FROM game_catalog_screenshots WHERE game_id = ?1",
+            "DELETE FROM obj_game_catalog_screenshot WHERE game_id = ?1",
             params![id],
         )?;
         connection.execute(
-            "DELETE FROM game_catalog_references WHERE game_id = ?1",
+            "DELETE FROM obj_game_catalog_reference WHERE game_id = ?1",
             params![id],
         )?;
         connection.execute(
-            "DELETE FROM game_data_locations WHERE game_id = ?1",
+            "DELETE FROM obj_game_data_location WHERE game_id = ?1",
             params![id],
         )?;
         connection.execute(
-            "DELETE FROM game_catalog_objects WHERE game_id = ?1",
+            "DELETE FROM obj_game_catalog_object WHERE game_id = ?1",
             params![id],
         )?;
-        connection.execute("DELETE FROM games WHERE id = ?1", params![id])?;
+        connection.execute("DELETE FROM obj_game WHERE id = ?1", params![id])?;
         Ok(())
     }
 
@@ -3134,7 +3474,7 @@ impl AppDatabase {
         let mut statement = connection.prepare(
             "
             SELECT id, game_id, location_type, label, directory_path, created_at, updated_at
-            FROM game_data_locations
+            FROM obj_game_data_location
             WHERE game_id = ?1
             ORDER BY
                 CASE location_type
@@ -3165,7 +3505,7 @@ impl AppDatabase {
         let trimmed_type = location_type.trim();
         connection.execute(
             "
-            INSERT INTO game_data_locations (game_id, location_type, label, directory_path)
+            INSERT INTO obj_game_data_location (game_id, location_type, label, directory_path)
             VALUES (?1, ?2, ?3, ?4)
             ON CONFLICT(game_id, location_type) DO UPDATE SET
                 label = excluded.label,
@@ -3182,7 +3522,7 @@ impl AppDatabase {
         let connection = self.connection.lock().expect("database mutex poisoned");
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
-            "DELETE FROM game_data_locations WHERE game_id = ?1 AND location_type = ?2",
+            "DELETE FROM obj_game_data_location WHERE game_id = ?1 AND location_type = ?2",
             params![game_id, location_type.trim()],
         )?;
         Ok(())
@@ -3207,7 +3547,7 @@ impl AppDatabase {
                 source_screenshot_path,
                 created_at,
                 updated_at
-            FROM game_catalog_objects
+            FROM obj_game_catalog_object
             WHERE game_id = ?1
             ORDER BY category COLLATE NOCASE ASC, name COLLATE NOCASE ASC
             ",
@@ -3224,7 +3564,7 @@ impl AppDatabase {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
             "
-            DELETE FROM game_catalog_objects
+            DELETE FROM obj_game_catalog_object
             WHERE game_id = ?1
                 AND tags LIKE '%screenshot-catalog%'
             ",
@@ -3250,7 +3590,7 @@ impl AppDatabase {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
             "
-            INSERT INTO game_catalog_objects (
+            INSERT INTO obj_game_catalog_object (
                 game_id,
                 name,
                 object_type,
@@ -3318,7 +3658,7 @@ impl AppDatabase {
                 notes,
                 created_at,
                 updated_at
-            FROM game_runtime_parts
+            FROM obj_game_runtime_part
             WHERE game_id = ?1
             ORDER BY category COLLATE NOCASE ASC, display_name COLLATE NOCASE ASC, asset_name COLLATE NOCASE ASC
             ",
@@ -3335,7 +3675,7 @@ impl AppDatabase {
         let connection = self.connection.lock().expect("database mutex poisoned");
         Self::get_game_by_id(&connection, game_id)?;
         let count = connection.query_row(
-            "SELECT COUNT(*) FROM game_runtime_parts WHERE game_id = ?1",
+            "SELECT COUNT(*) FROM obj_game_runtime_part WHERE game_id = ?1",
             params![game_id],
             |row| row.get::<_, i64>(0),
         )?;
@@ -3359,10 +3699,10 @@ impl AppDatabase {
                 COUNT(DISTINCT enum_values.id) AS enum_value_count,
                 types.created_at,
                 types.updated_at
-            FROM gearblocks_api_types types
-            LEFT JOIN gearblocks_api_members members
+            FROM def_gearblocks_api_type types
+            LEFT JOIN def_gearblocks_api_member members
                 ON members.type_id = types.id
-            LEFT JOIN gearblocks_api_enum_values enum_values
+            LEFT JOIN def_gearblocks_api_enum_value enum_values
                 ON enum_values.type_id = types.id
             GROUP BY types.id
             ORDER BY
@@ -3401,8 +3741,8 @@ impl AppDatabase {
                 members.notes,
                 members.created_at,
                 members.updated_at
-            FROM gearblocks_api_members members
-            INNER JOIN gearblocks_api_types types
+            FROM def_gearblocks_api_member members
+            INNER JOIN def_gearblocks_api_type types
                 ON types.id = members.type_id
             ORDER BY
                 types.namespace COLLATE NOCASE ASC,
@@ -3428,7 +3768,7 @@ impl AppDatabase {
                 is_optional,
                 created_at,
                 updated_at
-            FROM gearblocks_api_parameters
+            FROM def_gearblocks_api_parameter
             ORDER BY member_id ASC, position ASC
             ",
         )?;
@@ -3450,7 +3790,7 @@ impl AppDatabase {
                 source_version,
                 created_at,
                 updated_at
-            FROM gearblocks_api_enum_values
+            FROM def_gearblocks_api_enum_value
             ORDER BY type_id ASC, position ASC, value_name COLLATE NOCASE ASC
             ",
         )?;
@@ -3476,7 +3816,7 @@ impl AppDatabase {
             .query_row(
                 "
                 SELECT part_key
-                FROM game_runtime_parts
+                FROM obj_game_runtime_part
                 WHERE id = ?1
                     AND game_id = ?2
                 ",
@@ -3515,10 +3855,10 @@ impl AppDatabase {
                 members.docs_url,
                 observed.created_at,
                 observed.updated_at
-            FROM game_runtime_part_api_members observed
-            INNER JOIN gearblocks_api_members members
+            FROM n2n_game_runtime_part_api_member observed
+            INNER JOIN def_gearblocks_api_member members
                 ON members.id = observed.api_member_id
-            INNER JOIN gearblocks_api_types types
+            INNER JOIN def_gearblocks_api_type types
                 ON types.id = members.type_id
             WHERE observed.game_id = ?1
                 AND observed.part_key = ?2
@@ -3563,7 +3903,7 @@ impl AppDatabase {
                     notes,
                     created_at,
                     updated_at
-                FROM game_runtime_parts
+                FROM obj_game_runtime_part
                 WHERE id = ?1
                 ",
                 params![id],
@@ -3583,7 +3923,7 @@ impl AppDatabase {
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "
-            UPDATE game_runtime_parts
+            UPDATE obj_game_runtime_part
             SET
                 display_image_path = ?1,
                 source_image_path = ?2,
@@ -3611,7 +3951,7 @@ impl AppDatabase {
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "
-            UPDATE game_runtime_parts
+            UPDATE obj_game_runtime_part
             SET
                 display_image_path = '',
                 source_image_path = '',
@@ -3643,7 +3983,7 @@ impl AppDatabase {
                 notes,
                 created_at,
                 updated_at
-            FROM game_runtime_parts
+            FROM obj_game_runtime_part
             WHERE game_id = ?1
                 AND category = ?2
             ORDER BY display_name COLLATE NOCASE ASC, asset_name COLLATE NOCASE ASC
@@ -3670,7 +4010,7 @@ impl AppDatabase {
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "
-            UPDATE game_runtime_parts
+            UPDATE obj_game_runtime_part
             SET
                 notes = ?1,
                 updated_at = CURRENT_TIMESTAMP
@@ -3702,7 +4042,7 @@ impl AppDatabase {
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "
-            INSERT INTO game_runtime_parts (
+            INSERT INTO obj_game_runtime_part (
                 game_id,
                 part_key,
                 asset_guid,
@@ -3770,7 +4110,7 @@ impl AppDatabase {
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "
-            INSERT INTO game_runtime_part_api_attributes (
+            INSERT INTO obj_game_runtime_part_api_attribute (
                 game_id,
                 part_key,
                 asset_guid,
@@ -3839,8 +4179,8 @@ impl AppDatabase {
         let mut statement = connection.prepare(
             "
                 SELECT DISTINCT members.id
-                FROM gearblocks_api_members members
-                INNER JOIN gearblocks_api_types types
+                FROM def_gearblocks_api_member members
+                INNER JOIN def_gearblocks_api_type types
                     ON types.id = members.type_id
                 WHERE types.namespace = 'SmashHammer.GearBlocks.Construction'
                     AND types.type_name = ?1
@@ -3864,7 +4204,7 @@ impl AppDatabase {
         for api_member_id in api_member_ids {
             connection.execute(
                 "
-                INSERT INTO game_runtime_part_api_members (
+                INSERT INTO n2n_game_runtime_part_api_member (
                     game_id,
                     part_key,
                     api_member_id,
@@ -3917,7 +4257,7 @@ impl AppDatabase {
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "
-            INSERT INTO game_runtime_part_values (
+            INSERT INTO obj_game_runtime_part_value (
                 game_id,
                 part_key,
                 asset_guid,
@@ -3987,7 +4327,7 @@ impl AppDatabase {
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "
-            INSERT INTO game_runtime_part_properties (
+            INSERT INTO obj_game_runtime_part_property (
                 game_id,
                 part_key,
                 asset_guid,
@@ -4057,7 +4397,7 @@ impl AppDatabase {
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "
-            INSERT INTO game_runtime_part_attachments (
+            INSERT INTO obj_game_runtime_part_attachment (
                 game_id,
                 part_key,
                 asset_guid,
@@ -4135,7 +4475,7 @@ impl AppDatabase {
                 last_indexed_at,
                 created_at,
                 updated_at
-            FROM game_runtime_construction_exports
+            FROM obj_game_runtime_construction_export
             WHERE game_id = ?1
             ORDER BY exported_at DESC, id DESC
             ",
@@ -4152,7 +4492,7 @@ impl AppDatabase {
         let connection = self.connection.lock().expect("database mutex poisoned");
         Self::get_game_by_id(&connection, game_id)?;
         let count = connection.query_row(
-            "SELECT COUNT(*) FROM game_runtime_construction_exports WHERE game_id = ?1",
+            "SELECT COUNT(*) FROM obj_game_runtime_construction_export WHERE game_id = ?1",
             params![game_id],
             |row| row.get::<_, i64>(0),
         )?;
@@ -4188,7 +4528,7 @@ impl AppDatabase {
                     last_indexed_at,
                     created_at,
                     updated_at
-                FROM game_runtime_construction_exports
+                FROM obj_game_runtime_construction_export
                 WHERE game_id = ?1
                 ORDER BY exported_at DESC, id DESC
                 LIMIT 1
@@ -4223,7 +4563,7 @@ impl AppDatabase {
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "
-            INSERT INTO game_runtime_construction_exports (
+            INSERT INTO obj_game_runtime_construction_export (
                 game_id,
                 export_id,
                 name,
@@ -4308,7 +4648,7 @@ impl AppDatabase {
                 last_indexed_at,
                 created_at,
                 updated_at
-            FROM game_constructions
+            FROM obj_game_construction
             WHERE game_id = ?1
             ORDER BY name COLLATE NOCASE ASC
             ",
@@ -4325,7 +4665,7 @@ impl AppDatabase {
         let connection = self.connection.lock().expect("database mutex poisoned");
         Self::get_game_by_id(&connection, game_id)?;
         let count = connection.query_row(
-            "SELECT COUNT(*) FROM game_constructions WHERE game_id = ?1",
+            "SELECT COUNT(*) FROM obj_game_construction WHERE game_id = ?1",
             params![game_id],
             |row| row.get::<_, i64>(0),
         )?;
@@ -4357,7 +4697,7 @@ impl AppDatabase {
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "
-            INSERT INTO game_constructions (
+            INSERT INTO obj_game_construction (
                 game_id,
                 name,
                 folder_path,
@@ -4433,7 +4773,7 @@ impl AppDatabase {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
             "
-            INSERT INTO game_catalog_screenshots (
+            INSERT INTO obj_game_catalog_screenshot (
                 game_id,
                 title,
                 file_path,
@@ -4470,7 +4810,7 @@ impl AppDatabase {
         let mut statement = connection.prepare(
             "
             SELECT id, game_id, title, overlay_x, overlay_y, created_at, updated_at
-            FROM game_chat_conversations
+            FROM obj_game_chat_conversation
             WHERE game_id = ?1
             ORDER BY updated_at DESC, id DESC
             ",
@@ -4498,7 +4838,7 @@ impl AppDatabase {
 
         connection.execute(
             "
-            INSERT INTO game_chat_conversations (game_id, title)
+            INSERT INTO obj_game_chat_conversation (game_id, title)
             VALUES (?1, ?2)
             ",
             params![game_id, clean_title],
@@ -4523,7 +4863,7 @@ impl AppDatabase {
         Self::get_game_chat_conversation_by_id(&connection, conversation_id)?;
         connection.execute(
             "
-            UPDATE game_chat_conversations
+            UPDATE obj_game_chat_conversation
             SET overlay_x = ?2, overlay_y = ?3
             WHERE id = ?1
             ",
@@ -4552,7 +4892,7 @@ impl AppDatabase {
             SELECT id, conversation_id, role, content, created_at
             FROM (
                 SELECT id, conversation_id, role, content, created_at
-                FROM game_chat_messages
+                FROM obj_game_chat_message
                 WHERE conversation_id = ?1
                 ORDER BY id DESC
                 LIMIT ?2
@@ -4578,14 +4918,14 @@ impl AppDatabase {
         Self::get_game_chat_conversation_by_id(&connection, conversation_id)?;
         connection.execute(
             "
-            INSERT INTO game_chat_messages (conversation_id, role, content)
+            INSERT INTO obj_game_chat_message (conversation_id, role, content)
             VALUES (?1, ?2, ?3)
             ",
             params![conversation_id, role.trim(), content.trim()],
         )?;
         connection.execute(
             "
-            UPDATE game_chat_conversations
+            UPDATE obj_game_chat_conversation
             SET updated_at = CURRENT_TIMESTAMP
             WHERE id = ?1
             ",
@@ -4599,11 +4939,11 @@ impl AppDatabase {
     pub fn delete_game_chat_conversation(&self, conversation_id: i64) -> Result<()> {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
-            "DELETE FROM game_chat_messages WHERE conversation_id = ?1",
+            "DELETE FROM obj_game_chat_message WHERE conversation_id = ?1",
             params![conversation_id],
         )?;
         connection.execute(
-            "DELETE FROM game_chat_conversations WHERE id = ?1",
+            "DELETE FROM obj_game_chat_conversation WHERE id = ?1",
             params![conversation_id],
         )?;
         Ok(())
@@ -4627,7 +4967,7 @@ impl AppDatabase {
                 captured_at,
                 created_at,
                 updated_at
-            FROM game_catalog_screenshots
+            FROM obj_game_catalog_screenshot
             WHERE game_id = ?1
                 AND capture_status != 'requested'
             ORDER BY created_at DESC, id DESC
@@ -4658,7 +4998,7 @@ impl AppDatabase {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
             "
-            DELETE FROM game_catalog_references
+            DELETE FROM obj_game_catalog_reference
             WHERE game_id = ?1
                 AND (
                     local_path = ?2
@@ -4673,7 +5013,7 @@ impl AppDatabase {
     pub fn delete_game_screenshot(&self, id: i64) -> Result<()> {
         let connection = self.connection.lock().expect("database mutex poisoned");
         connection.execute(
-            "DELETE FROM game_catalog_screenshots WHERE id = ?1",
+            "DELETE FROM obj_game_catalog_screenshot WHERE id = ?1",
             params![id],
         )?;
         Ok(())
@@ -4683,7 +5023,7 @@ impl AppDatabase {
         connection.query_row(
             "
             SELECT id, title, body, deadline, is_completed, created_at, updated_at
-            FROM tasks
+            FROM obj_task
             WHERE id = ?1
             ",
             params![id],
@@ -4705,7 +5045,7 @@ impl AppDatabase {
         connection.query_row(
             "
             SELECT id, smoked_at, source, notes, created_at
-            FROM smoking_events
+            FROM obj_smoking_event
             WHERE id = ?1
             ",
             params![id],
@@ -4719,7 +5059,7 @@ impl AppDatabase {
         connection.query_row(
             "
             SELECT id, patch_label, patch_started_at, patch_timezone, current_cigarette_count, created_at, updated_at
-            FROM smoking_cessation_settings
+            FROM obj_smoking_cessation_setting
             WHERE id = 1
             ",
             [],
@@ -4754,7 +5094,7 @@ impl AppDatabase {
         connection.query_row(
             "
             SELECT id, title, body, created_at, updated_at
-            FROM notes
+            FROM obj_note
             WHERE id = ?1
             ",
             params![id],
@@ -4774,7 +5114,7 @@ impl AppDatabase {
         connection.query_row(
             "
             SELECT id, title, start_date, start_time, end_date, end_time, notes, created_at, updated_at
-            FROM calendar_events
+            FROM obj_calendar_event
             WHERE id = ?1
             ",
             params![id],
@@ -4798,7 +5138,7 @@ impl AppDatabase {
         connection.query_row(
             "
             SELECT id, name, description, status, created_at, updated_at
-            FROM projects
+            FROM obj_project
             WHERE id = ?1
             ",
             params![id],
@@ -4832,7 +5172,7 @@ impl AppDatabase {
                 last_fetch_status,
                 created_at,
                 updated_at
-            FROM project_github_repositories
+            FROM obj_project_github_repository
             WHERE project_id = ?1
             ",
             params![project_id],
@@ -4860,7 +5200,7 @@ impl AppDatabase {
         connection.query_row(
             "
             SELECT id, project_id, root_path, readme_path, created_at, updated_at
-            FROM project_markdown_context
+            FROM obj_project_markdown_context
             WHERE project_id = ?1
             ",
             params![project_id],
@@ -4875,7 +5215,7 @@ impl AppDatabase {
         connection.query_row(
             "
             SELECT id, project_id, title, created_at, updated_at
-            FROM planning_conversations
+            FROM obj_planning_conversation
             WHERE id = ?1
             ",
             params![id],
@@ -4890,7 +5230,7 @@ impl AppDatabase {
         connection.query_row(
             "
             SELECT id, conversation_id, role, content, created_at
-            FROM planning_messages
+            FROM obj_planning_message
             WHERE id = ?1
             ",
             params![id],
@@ -4905,7 +5245,7 @@ impl AppDatabase {
         let mut statement = connection.prepare(
             "
             SELECT id, conversation_id, role, content, created_at
-            FROM planning_messages
+            FROM obj_planning_message
             WHERE conversation_id = ?1
             ORDER BY id ASC
             ",
@@ -4925,7 +5265,7 @@ impl AppDatabase {
         connection.query_row(
             "
             SELECT id, conversation_id, context_type, source_id, label, created_at
-            FROM planning_conversation_context
+            FROM n2n_planning_conversation_context
             WHERE id = ?1
             ",
             params![id],
@@ -4940,7 +5280,7 @@ impl AppDatabase {
         let mut statement = connection.prepare(
             "
             SELECT id, conversation_id, context_type, source_id, label, created_at
-            FROM planning_conversation_context
+            FROM n2n_planning_conversation_context
             WHERE conversation_id = ?1
             ORDER BY created_at ASC, id ASC
             ",
@@ -4972,7 +5312,7 @@ impl AppDatabase {
         let mut statement = connection.prepare(
             "
             SELECT id, conversation_id, context_type, source_id, label, created_at
-            FROM planning_conversation_context
+            FROM n2n_planning_conversation_context
             WHERE conversation_id = ?1
               AND context_type = ?2
               AND (
@@ -5000,7 +5340,7 @@ impl AppDatabase {
         connection.query_row(
             "
             SELECT id, title, url, video_id, channel_name, notes, tags, created_at, updated_at
-            FROM youtube_references
+            FROM obj_youtube_reference
             WHERE id = ?1
             ",
             params![id],
@@ -5012,7 +5352,7 @@ impl AppDatabase {
         connection.query_row(
             "
             SELECT id, name, slug, summary, created_at, updated_at
-            FROM games
+            FROM obj_game
             WHERE id = ?1
             ",
             params![id],
@@ -5028,7 +5368,7 @@ impl AppDatabase {
         connection.query_row(
             "
             SELECT id, game_id, location_type, label, directory_path, created_at, updated_at
-            FROM game_data_locations
+            FROM obj_game_data_location
             WHERE game_id = ?1 AND location_type = ?2
             ",
             params![game_id, location_type],
@@ -5058,7 +5398,7 @@ impl AppDatabase {
                 source_screenshot_path,
                 created_at,
                 updated_at
-            FROM game_catalog_objects
+            FROM obj_game_catalog_object
             WHERE game_id = ?1
                 AND name = ?2 COLLATE NOCASE
             ",
@@ -5093,7 +5433,7 @@ impl AppDatabase {
                 notes,
                 created_at,
                 updated_at
-            FROM game_runtime_parts
+            FROM obj_game_runtime_part
             WHERE game_id = ?1
                 AND part_key = ?2
             ",
@@ -5128,7 +5468,7 @@ impl AppDatabase {
                 notes,
                 created_at,
                 updated_at
-            FROM game_runtime_parts
+            FROM obj_game_runtime_part
             WHERE id = ?1
                 AND game_id = ?2
             ",
@@ -5164,7 +5504,7 @@ impl AppDatabase {
                 last_indexed_at,
                 created_at,
                 updated_at
-            FROM game_runtime_construction_exports
+            FROM obj_game_runtime_construction_export
             WHERE game_id = ?1
                 AND export_id = ?2
             ",
@@ -5201,7 +5541,7 @@ impl AppDatabase {
                 last_indexed_at,
                 created_at,
                 updated_at
-            FROM game_constructions
+            FROM obj_game_construction
             WHERE game_id = ?1
                 AND construction_path = ?2
             ",
@@ -5227,7 +5567,7 @@ impl AppDatabase {
                 captured_at,
                 created_at,
                 updated_at
-            FROM game_catalog_screenshots
+            FROM obj_game_catalog_screenshot
             WHERE id = ?1
             ",
             params![id],
@@ -5242,7 +5582,7 @@ impl AppDatabase {
         connection.query_row(
             "
             SELECT id, game_id, title, overlay_x, overlay_y, created_at, updated_at
-            FROM game_chat_conversations
+            FROM obj_game_chat_conversation
             WHERE id = ?1
             ",
             params![id],
@@ -5257,7 +5597,7 @@ impl AppDatabase {
         connection.query_row(
             "
             SELECT id, conversation_id, role, content, created_at
-            FROM game_chat_messages
+            FROM obj_game_chat_message
             WHERE id = ?1
             ",
             params![id],
@@ -5272,7 +5612,7 @@ impl AppDatabase {
         let mut statement = connection.prepare(
             "
             SELECT id, conversation_id, role, content, created_at
-            FROM game_chat_messages
+            FROM obj_game_chat_message
             WHERE conversation_id = ?1
             ORDER BY id ASC
             ",
@@ -5292,7 +5632,7 @@ impl AppDatabase {
         connection.query_row(
             "
             SELECT id, project_id, conversation_id, title, content, status, created_at, updated_at
-            FROM bridge_file_drafts
+            FROM obj_bridge_file_draft
             WHERE id = ?1
             ",
             params![id],
@@ -5431,7 +5771,7 @@ impl AppDatabase {
             },
             "scratchpad" => {
                 let content: String = connection.query_row(
-                    "SELECT content FROM scratchpad WHERE id = 1",
+                    "SELECT content FROM obj_scratchpad WHERE id = 1",
                     [],
                     |row| row.get(0),
                 )?;
@@ -5521,7 +5861,7 @@ impl AppDatabase {
                 last_fetch_status,
                 created_at,
                 updated_at
-            FROM project_github_repositories
+            FROM obj_project_github_repository
             WHERE id = ?1
             ",
             params![id],
@@ -6644,5 +6984,118 @@ fn game_slug(name: &str) -> String {
         "game".to_string()
     } else {
         slug
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_db_path(test_name: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after unix epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "overlay-forge-{test_name}-{}-{unique}.sqlite3",
+            std::process::id()
+        ))
+    }
+
+    fn remove_db_files(path: &Path) {
+        let _ = fs::remove_file(path);
+        let _ = fs::remove_file(path.with_extension("sqlite3-shm"));
+        let _ = fs::remove_file(path.with_extension("sqlite3-wal"));
+    }
+
+    #[test]
+    fn initializes_normalized_schema_on_new_database() {
+        let path = temp_db_path("normalized-schema");
+        remove_db_files(&path);
+
+        let database = AppDatabase::new(path.clone()).expect("database should initialize");
+        assert!(database.is_ready());
+
+        let connection = Connection::open(&path).expect("database should reopen");
+        for table in [
+            "def_game",
+            "obj_game",
+            "obj_game_setting",
+            "obj_setting",
+            "obj_scheduler",
+            "n2n_planning_conversation_context",
+        ] {
+            assert!(
+                AppDatabase::table_exists(&connection, table).expect("table lookup should work"),
+                "{table} should exist"
+            );
+        }
+
+        let game_schema: String = connection
+            .query_row(
+                "SELECT schema_json FROM obj_game WHERE slug = 'gearblocks'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("seeded game should have schema metadata");
+        assert!(game_schema.contains("\"table\":\"obj_game\""));
+
+        drop(connection);
+        drop(database);
+        remove_db_files(&path);
+    }
+
+    #[test]
+    fn renames_legacy_game_table_without_dropping_rows() {
+        let path = temp_db_path("legacy-rename");
+        remove_db_files(&path);
+
+        {
+            let connection = Connection::open(&path).expect("legacy database should open");
+            connection
+                .execute_batch(
+                    "
+                    CREATE TABLE games (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                        slug TEXT NOT NULL UNIQUE COLLATE NOCASE,
+                        summary TEXT NOT NULL DEFAULT '',
+                        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    );
+
+                    INSERT INTO games (name, slug, summary)
+                    VALUES ('Legacy Game', 'legacy-game', 'legacy row');
+                    ",
+                )
+                .expect("legacy games table should be created");
+        }
+
+        let database = AppDatabase::new(path.clone()).expect("database should migrate");
+        let connection = Connection::open(&path).expect("database should reopen after migration");
+
+        assert!(
+            !AppDatabase::table_exists(&connection, "games").expect("legacy lookup should work"),
+            "legacy games table should be renamed"
+        );
+        assert!(
+            AppDatabase::table_exists(&connection, "obj_game").expect("new lookup should work"),
+            "obj_game should exist after rename"
+        );
+
+        let (id_game, summary): (i64, String) = connection
+            .query_row(
+                "SELECT id_game, summary FROM obj_game WHERE slug = 'legacy-game'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("legacy game row should survive migration");
+        assert_eq!(id_game, 1);
+        assert_eq!(summary, "legacy row");
+
+        drop(connection);
+        drop(database);
+        remove_db_files(&path);
     }
 }

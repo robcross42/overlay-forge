@@ -32,15 +32,17 @@ The indexed GearBlocks API catalog is available through the backend command laye
 
 The GearBlocks Gaming workspace includes an API tab that reads this payload and displays type coverage, member signatures, parsed method parameters, mutating/readable flags, and enum values.
 
-GearBlocks runtime part detail views can query `game_runtime_part_api_members` through the command layer to display canonical API member availability for the selected part, falling back to raw exported `apiAttributes` only when bridge rows are not available.
+GearBlocks runtime part detail views can query `n2n_game_runtime_part_api_member` through the command layer to display canonical API member availability for the selected part, falling back to raw exported `apiAttributes` only when bridge rows are not available.
 
 The Smoking Cessation module stores cigarette event timestamps locally in SQLite and keeps a singleton cessation settings row for the current patch marker and current cigarette inventory count. The initial marker records `Nicoderm Step 1` started at `2026-06-21 15:00:00 EDT`. The module also renders a derived Markdown export for ChatGPT context at `%APPDATA%\com.overlayforge.desktop\chatgpt-exports\smoking-cessation.md`; SQLite remains the source of truth.
 
-The Scheduler framework adds new convention-based tables for reusable background work. New persistence added after this point should prefer `obj_` for dynamic object rows, `def_` for static definition rows, `o2o_` for one-to-one mappings, and `n2n_` for many-to-many mappings. New convention-based tables should include `created_at` and `modified_at`. Existing historical tables are not renamed as part of the scheduler migration.
+The Scheduler framework adds new convention-based tables for reusable background work. New persistence should use `obj_` for dynamic object rows, `def_` for static definition rows, `o2o_` for one-to-one mappings, and `n2n_` for many-to-many mappings.
+
+Overlay Forge 0.6.1 normalizes the existing SQLite table names into that convention through idempotent `ALTER TABLE ... RENAME TO ...` migrations. Current normalized tables also receive `schema_json` and `modified_at` columns. The generated `schema_json` value stores the table name plus field names, SQLite storage types, nullability, defaults, and primary-key markers so each row carries a compact machine-readable description of the table format. Existing `updated_at` columns remain for API compatibility until a later code-level cleanup can safely remove or rename them.
 
 ## Tables
 
-### scratchpad
+### obj_scratchpad
 
 ```text
 id
@@ -51,7 +53,7 @@ updated_at
 
 Single-row quick capture surface from Milestone 0.
 
-### tasks
+### obj_task
 
 ```text
 id
@@ -65,7 +67,7 @@ updated_at
 
 Local to-do items. Existing Milestone 1 databases are migrated non-destructively by adding `body` and `deadline` columns if they are missing.
 
-### notes
+### obj_note
 
 ```text
 id
@@ -77,7 +79,7 @@ updated_at
 
 Multiple saved note documents, separate from the scratchpad.
 
-### calendar_events
+### obj_calendar_event
 
 ```text
 id
@@ -93,7 +95,7 @@ updated_at
 
 Simple local event list for Milestone 1. Recurrence, invites, and external calendar sync are deferred.
 
-### smoking_events
+### obj_smoking_event
 
 ```text
 id
@@ -105,7 +107,7 @@ created_at
 
 Local cigarette event records for the Smoking Cessation module. `smoked_at` stores the recorded event time, `source` distinguishes manual module entries from keybind entries, and `notes` is available for short local context. Events can be deleted from the module history without affecting other app data.
 
-### smoking_cessation_settings
+### obj_smoking_cessation_setting
 
 ```text
 id
@@ -177,7 +179,7 @@ modified_at
 
 Run history for scheduled events. Each execution records status and message so future UI can inspect scheduler health without parsing logs.
 
-### projects
+### obj_project
 
 ```text
 id
@@ -190,7 +192,7 @@ updated_at
 
 Local project records for Milestone 2. Valid Milestone 2 status values are `ACTIVE` and `ARCHIVED`; complex project lifecycle workflows are deferred.
 
-### planning_conversations
+### obj_planning_conversation
 
 ```text
 id
@@ -202,9 +204,9 @@ updated_at
 
 Local planning chat conversation records for Milestone 3. Each conversation belongs to one local project.
 
-Milestone 6 continues to use this table for Chat inside the selected Projects workspace. The selected project supplies `project_id`; the chat UI no longer asks the user to select the project a second time.
+Milestone 6 continues to use this table for Chat inside the selected project workspace. The selected project supplies `project_id`; the chat UI no longer asks the user to select the project a second time.
 
-### planning_messages
+### obj_planning_message
 
 ```text
 id
@@ -224,7 +226,7 @@ system
 
 Milestone 3 writes `user` and `assistant` messages during normal chat use. `system` is reserved for future workflow needs; the active planning instruction is backend-owned and not stored as a user-visible message.
 
-### planning_conversation_context
+### n2n_planning_conversation_context
 
 ```text
 id
@@ -235,7 +237,7 @@ label
 created_at
 ```
 
-Manual context attachment records for Milestone 9. Each row belongs to one `planning_conversations.id` value through `conversation_id`.
+Manual context attachment records for Milestone 9. Each row belongs to one `obj_planning_conversation.id` value through `conversation_id`.
 
 Supported `context_type` values are:
 
@@ -246,14 +248,14 @@ note
 task
 calendar_event
 youtube_reference
-scratchpad
+obj_scratchpad
 ```
 
-`source_id` stores the source record ID for local records when applicable. It may be null for singleton context such as Scratchpad. `label` stores the display label captured when the context is attached.
+`source_id` stores the source record ID for local records when applicable. It may be null for singleton context such as the scratchpad. `label` stores the display label captured when the context is attached.
 
-Deleting an attachment removes only the `planning_conversation_context` row. It does not delete the source project, GitHub repository link, note, task, calendar event, YouTube reference, or scratchpad content.
+Deleting an attachment removes only the `n2n_planning_conversation_context` row. It does not delete the source project, GitHub repository link, note, task, calendar event, YouTube reference, or scratchpad content.
 
-### bridge_file_drafts
+### obj_bridge_file_draft
 
 ```text
 id
@@ -266,7 +268,7 @@ created_at
 updated_at
 ```
 
-Local bridge-file draft records for Milestone 11. Each row belongs to one `projects.id` value through `project_id` and links to a source `planning_conversations.id` value through `conversation_id`.
+Local bridge-file draft records for Milestone 11. Each row belongs to one `obj_project.id` value through `project_id` and links to a source `obj_planning_conversation.id` value through `conversation_id`.
 
 `title` stores a readable draft title.
 
@@ -280,9 +282,9 @@ draft
 
 Milestone 11 only uses `draft`. Approval, obsolete, sent, implemented, validated, and archived workflows are deferred.
 
-Deleting a bridge draft removes only the `bridge_file_drafts` row. It does not delete the source project, planning conversation, planning messages, or attached context.
+Deleting a bridge draft removes only the `obj_bridge_file_draft` row. It does not delete the source project, planning conversation, planning messages, or attached context.
 
-### project_markdown_context
+### obj_project_markdown_context
 
 ```text
 id
@@ -293,7 +295,7 @@ created_at
 updated_at
 ```
 
-Project Markdown context configuration records for Milestone 12. Each row belongs to one `projects.id` value through `project_id`.
+Project Markdown context configuration records for Milestone 12. Each row belongs to one `obj_project.id` value through `project_id`.
 
 `root_path` stores the configured local project documentation root.
 
@@ -307,7 +309,7 @@ Milestone 12 stores configuration only. It does not cache Markdown file snapshot
 
 Deleting a project deletes that project's Markdown context configuration. It does not delete any local filesystem files.
 
-### project_github_repositories
+### obj_project_github_repository
 
 ```text
 id
@@ -346,7 +348,7 @@ last_fetch_status
 
 GitHub tokens are not stored in SQLite.
 
-### youtube_references
+### obj_youtube_reference
 
 ```text
 id
@@ -372,10 +374,25 @@ updated_at
 
 The backend parses and stores `video_id` from supported URL shapes when a reference is created or updated. `channel_name`, `notes`, and `tags` are optional user-entered metadata. No YouTube API key, account login, scraping, transcript retrieval, recommendations, downloads, or account sync data is stored.
 
-### games
+### def_game
+
+```text
+id_game
+game_key
+ui_name
+summary
+schema_json
+created_at
+modified_at
+```
+
+Static game definitions that apply across all local game rows. `id_game` is the stable definition id used by game-scoped object rows, `game_key` is the stable lowercase identifier, and `ui_name` is the visible name for the definition. `GearBlocks` is seeded with `id_game = 1`.
+
+### obj_game
 
 ```text
 id
+id_game
 name
 slug
 summary
@@ -383,9 +400,24 @@ created_at
 updated_at
 ```
 
-Local game section records for the Gaming workspace. `name` and `slug` are unique case-insensitively. `GearBlocks` is inserted automatically if no existing row uses that name or slug.
+Local game section records for the Gaming workspace. `id_game` links each local section to `def_game.id_game`. `name` and `slug` are unique case-insensitively. `GearBlocks` is inserted automatically if no existing row uses that name or slug.
 
-### game_catalog_objects
+### obj_game_setting
+
+```text
+id
+game_id
+id_game
+setting_key
+setting_value_json
+schema_json
+created_at
+modified_at
+```
+
+Generic per-game settings. This avoids table-per-game schema growth such as `obj_game_gearblocks`; deep GearBlocks-specific settings should live here or in future normalized feature tables keyed by `game_id` and `id_game`.
+
+### obj_game_catalog_object
 
 ```text
 id
@@ -404,11 +436,11 @@ created_at
 updated_at
 ```
 
-Game-scoped catalog objects for item, block, entity, component, or similar object tracking. Rows belong to `games.id` through `game_id`.
+Game-scoped catalog objects for item, block, entity, component, or similar object tracking. Rows belong to `obj_game.id` through `game_id`.
 
 The Parts cataloger uses this table to store recognizable GearBlocks parts from the screenshot set. `category` preserves the selected left-side GearBlocks category context from the source screenshot, `category_icon_path` stores a cropped image of that selected category icon for the filter button row, `thumbnail_path` points to the current source image used for the chart thumbnail, and `source_screenshot_path` records where the catalog entry came from.
 
-### game_catalog_references
+### obj_game_catalog_reference
 
 ```text
 id
@@ -426,7 +458,7 @@ updated_at
 
 Game-scoped reference records for future external URLs, local files, notes, and object-linked reference material. `object_id` is optional so references can belong to a whole game or to a specific catalog object.
 
-### game_data_locations
+### obj_game_data_location
 
 ```text
 id
@@ -442,7 +474,7 @@ Game-scoped local directory records for save folders or alternate game data fold
 
 GearBlocks' default user data location is `%USERPROFILE%\AppData\LocalLow\SmashHammer Games\GearBlocks\`. Overlay Forge derives default GearBlocks subpaths from that root, including `SavedConstructions`, `ScriptMods`, and `OverlayForgeExports`, unless a feature explicitly uses a configured game data location.
 
-### game_constructions
+### obj_game_construction
 
 ```text
 id
@@ -471,7 +503,7 @@ GearBlocks saved construction index populated from each construction folder unde
 
 GearBlocks chat refreshes the most recently modified saved construction file before building prompt context. This saved-file context reflects saved part additions and removals from `construction.bytes`, while runtime-log context remains responsible for live runtime metadata such as display names, runtime transforms, API availability, and other values only exposed after loading the build in-game.
 
-### game_runtime_construction_exports
+### obj_game_runtime_construction_export
 
 ```text
 id
@@ -495,11 +527,11 @@ created_at
 updated_at
 ```
 
-GearBlocks runtime construction export index populated from Overlay Forge Lua exporter records reconstructed from `Player.log` / `Player-prev.log`. `document_json` stores the complete runtime export payload, including availability-only `apiAttributes` entries. Chat context uses the latest indexed construction summary from SQLite but excludes API metadata by default. Overlay Forge stores per-log import cursors in `app_settings` so explicit refresh/import and GearBlocks chat send paths can read new log additions instead of reparsing unchanged file prefixes. Normal chat navigation must not synchronously parse full-scene runtime logs.
+GearBlocks runtime construction export index populated from Overlay Forge Lua exporter records reconstructed from `Player.log` / `Player-prev.log`. `document_json` stores the complete runtime export payload, including availability-only `apiAttributes` entries. Chat context uses the latest indexed construction summary from SQLite but excludes API metadata by default. Overlay Forge stores per-log import cursors in `obj_setting` so explicit refresh/import and GearBlocks chat send paths can read new log additions instead of reparsing unchanged file prefixes. Normal chat navigation must not synchronously parse full-scene runtime logs.
 
-The intended iterative GearBlocks workflow is to load the current build in-game, run `Export Scene`, then use chat or click `Refresh Scene Context` in Overlay Forge. Runtime part reference data and normalized detail indexes are upserted by stable keys, so unchanged catalog references are retained while refreshed scene exports update the latest observed build context. A compact latest-vs-previous runtime scene diff summary is stored in `app_settings` for chat prompt context. Because the default export covers the whole scene, removed parts disappear from the latest chat context after the next scene export and import.
+The intended iterative GearBlocks workflow is to load the current build in-game, run `Export Scene`, then use chat or click `Refresh Scene Context` in Overlay Forge. Runtime part reference data and normalized detail indexes are upserted by stable keys, so unchanged catalog references are retained while refreshed scene exports update the latest observed build context. A compact latest-vs-previous runtime scene diff summary is stored in `obj_setting` for chat prompt context. Because the default export covers the whole scene, removed parts disappear from the latest chat context after the next scene export and import.
 
-### game_runtime_parts
+### obj_game_runtime_part
 
 ```text
 id
@@ -526,7 +558,7 @@ GearBlocks runtime API part index populated from Overlay Forge Lua exporter reco
 
 `display_image_path` stores Overlay Forge's copied catalog display image under `game-screenshots/<game-slug>/part-images/`. `source_image_path` stores the original image selected by the user. Screenshot bytes are kept outside SQLite.
 
-### game_runtime_part_api_attributes
+### obj_game_runtime_part_api_attribute
 
 ```text
 id
@@ -551,7 +583,7 @@ updated_at
 
 GearBlocks runtime API availability index populated from imported runtime export parts after compact `apiAttributeKey` references are hydrated. Rows are unique per `game_id`, `part_key`, `interface_name`, and `attribute_name`, so repeated scene exports update last-seen metadata instead of duplicating known API definitions.
 
-### game_runtime_part_values
+### obj_game_runtime_part_value
 
 ```text
 id
@@ -575,7 +607,7 @@ updated_at
 
 GearBlocks runtime value-field index populated from any imported part JSON field named `value`. Rows are unique per `game_id`, `part_key`, and `field_path`, allowing Overlay Forge to discover newly exposed value fields while keeping the latest observed value payload searchable outside the full part JSON blob.
 
-### game_runtime_part_properties
+### obj_game_runtime_part_property
 
 ```text
 id
@@ -599,7 +631,7 @@ updated_at
 
 GearBlocks runtime property index populated from leaf values under each part's `properties` object. Rows are unique per `game_id`, `part_key`, and `property_path`, so new property fields are indexed as they are encountered and existing fields are refreshed with the latest observed value.
 
-### game_runtime_part_attachments
+### obj_game_runtime_part_attachment
 
 ```text
 id
@@ -623,7 +655,7 @@ updated_at
 
 GearBlocks runtime attachment index populated from direct entries under each part's `attachments` field. Rows are unique per `game_id`, `part_key`, and `attachment_path`, which preserves the latest attachment payload without repeatedly expanding the main runtime part table.
 
-### gearblocks_api_types
+### def_gearblocks_api_type
 
 ```text
 id
@@ -640,7 +672,7 @@ updated_at
 
 Canonical GearBlocks API type catalog seeded from Overlay Forge's documented `SmashHammer.GearBlocks.Construction` registry. Type rows include documented classes, interfaces, and enums. Rows are unique per `namespace` and `type_name`.
 
-### gearblocks_api_members
+### def_gearblocks_api_member
 
 ```text
 id
@@ -664,7 +696,7 @@ updated_at
 
 Canonical GearBlocks API member catalog. `member_key` stores the exact documented member/signature string, while `member_name` stores the base property or method name. Methods are marked invokable and parsed into parameters; properties are marked readable. Mutating operations are flagged by operation interfaces and known mutating method prefixes.
 
-### gearblocks_api_parameters
+### def_gearblocks_api_parameter
 
 ```text
 id
@@ -680,7 +712,7 @@ updated_at
 
 Canonical GearBlocks API method parameter catalog. Rows are parsed from documented member signatures and are unique per `member_id` and `position`.
 
-### gearblocks_api_enum_values
+### def_gearblocks_api_enum_value
 
 ```text
 id
@@ -698,7 +730,7 @@ updated_at
 
 Canonical GearBlocks API enum value catalog. Values are seeded from the documented construction namespace enums, including Lua constant names where the official docs expose them. Rows are unique per enum `type_id` and `value_name`.
 
-### game_runtime_part_api_members
+### n2n_game_runtime_part_api_member
 
 ```text
 id
@@ -716,7 +748,7 @@ updated_at
 
 Runtime bridge from observed part API availability to canonical GearBlocks API members. Rows are unique per `game_id`, `part_key`, and `api_member_id`, so repeated exports refresh last-seen metadata without duplicating known part/member support.
 
-### game_catalog_screenshots
+### obj_game_catalog_screenshot
 
 ```text
 id
@@ -742,9 +774,9 @@ The preferred GearBlocks-compatible path remains internal game-engine export for
 
 The selected-game UI lists captured screenshot rows in a collapsible Screenshots section. The toolbar remains fixed at the top of the game pane, while screenshot previews and future catalog content scroll below it. Tauri asset loading is enabled for `game-screenshots/` so saved PNGs render as thumbnails inside the webview.
 
-Right-clicking a screenshot opens the screenshot context menu. The validated delete action removes the saved PNG, the capture manifest JSON, the screenshot metadata row, and any `game_catalog_references` rows for the same game whose `local_path` points at the deleted screenshot or manifest.
+Right-clicking a screenshot opens the screenshot context menu. The validated delete action removes the saved PNG, the capture manifest JSON, the screenshot metadata row, and any `obj_game_catalog_reference` rows for the same game whose `local_path` points at the deleted screenshot or manifest.
 
-### game_chat_conversations
+### obj_game_chat_conversation
 
 ```text
 id
@@ -758,7 +790,7 @@ updated_at
 
 Game-scoped chat conversation records for the Gaming workspace. `overlay_x` and `overlay_y` store the latest outer window coordinates for the simple game chat overlay when that conversation is active. The coordinates are nullable, are restored when the conversation's overlay opens, and are deleted naturally with the conversation row.
 
-### game_chat_messages
+### obj_game_chat_message
 
 ```text
 id
@@ -768,14 +800,14 @@ content
 created_at
 ```
 
-Game chat messages scoped to `game_chat_conversations`. Deleting a game chat conversation removes its messages and its persisted overlay coordinates.
+Game chat messages scoped to `obj_game_chat_conversation`. Deleting a game chat conversation removes its messages and its persisted overlay coordinates.
 
 ## Migration Notes
 
 Milestone 4 uses non-destructive idempotent table initialization:
 
 ```text
-CREATE TABLE IF NOT EXISTS project_github_repositories
+CREATE TABLE IF NOT EXISTS obj_project_github_repository
 ```
 
 Existing user data remains intact. Deleting a local project deletes that project's GitHub repository linkage record, but does not affect any GitHub remote repository.
@@ -783,17 +815,17 @@ Existing user data remains intact. Deleting a local project deletes that project
 Milestone 5 uses non-destructive idempotent table initialization:
 
 ```text
-CREATE TABLE IF NOT EXISTS youtube_references
+CREATE TABLE IF NOT EXISTS obj_youtube_reference
 ```
 
 Existing user data remains intact. Deleting a YouTube reference removes only that local SQLite row and does not affect YouTube or any external account.
 
-Milestone 6 does not change the SQLite schema. Existing `projects`, `planning_conversations`, and `planning_messages` rows remain intact.
+Milestone 6 does not change the SQLite schema. Existing `obj_project`, `obj_planning_conversation`, and `obj_planning_message` rows remain intact.
 
 Milestone 9 uses non-destructive idempotent table initialization:
 
 ```text
-CREATE TABLE IF NOT EXISTS planning_conversation_context
+CREATE TABLE IF NOT EXISTS n2n_planning_conversation_context
 ```
 
 Existing user data remains intact. Deleting a planning conversation deletes that conversation's attachment links along with its messages.
@@ -801,7 +833,7 @@ Existing user data remains intact. Deleting a planning conversation deletes that
 Milestone 11 uses non-destructive idempotent table initialization:
 
 ```text
-CREATE TABLE IF NOT EXISTS bridge_file_drafts
+CREATE TABLE IF NOT EXISTS obj_bridge_file_draft
 ```
 
 Existing user data remains intact. Bridge drafts are stored locally in SQLite and are not exported to disk by Milestone 11.
@@ -809,7 +841,7 @@ Existing user data remains intact. Bridge drafts are stored locally in SQLite an
 Milestone 12 uses non-destructive idempotent table initialization:
 
 ```text
-CREATE TABLE IF NOT EXISTS project_markdown_context
+CREATE TABLE IF NOT EXISTS obj_project_markdown_context
 ```
 
 Existing user data remains intact. The table stores only the configured local root and README path for each project. It does not store Markdown file contents.
@@ -817,23 +849,25 @@ Existing user data remains intact. The table stores only the configured local ro
 Gaming uses non-destructive idempotent table initialization:
 
 ```text
-CREATE TABLE IF NOT EXISTS games
-CREATE TABLE IF NOT EXISTS game_catalog_objects
-CREATE TABLE IF NOT EXISTS game_catalog_references
-CREATE TABLE IF NOT EXISTS game_data_locations
-CREATE TABLE IF NOT EXISTS game_constructions
-CREATE TABLE IF NOT EXISTS game_runtime_construction_exports
-CREATE TABLE IF NOT EXISTS game_runtime_parts
-CREATE TABLE IF NOT EXISTS game_runtime_part_api_attributes
-CREATE TABLE IF NOT EXISTS game_runtime_part_values
-CREATE TABLE IF NOT EXISTS game_runtime_part_properties
-CREATE TABLE IF NOT EXISTS game_runtime_part_attachments
-CREATE TABLE IF NOT EXISTS gearblocks_api_types
-CREATE TABLE IF NOT EXISTS gearblocks_api_members
-CREATE TABLE IF NOT EXISTS gearblocks_api_parameters
-CREATE TABLE IF NOT EXISTS gearblocks_api_enum_values
-CREATE TABLE IF NOT EXISTS game_runtime_part_api_members
-CREATE TABLE IF NOT EXISTS game_catalog_screenshots
+CREATE TABLE IF NOT EXISTS obj_game
+CREATE TABLE IF NOT EXISTS def_game
+CREATE TABLE IF NOT EXISTS obj_game_setting
+CREATE TABLE IF NOT EXISTS obj_game_catalog_object
+CREATE TABLE IF NOT EXISTS obj_game_catalog_reference
+CREATE TABLE IF NOT EXISTS obj_game_data_location
+CREATE TABLE IF NOT EXISTS obj_game_construction
+CREATE TABLE IF NOT EXISTS obj_game_runtime_construction_export
+CREATE TABLE IF NOT EXISTS obj_game_runtime_part
+CREATE TABLE IF NOT EXISTS obj_game_runtime_part_api_attribute
+CREATE TABLE IF NOT EXISTS obj_game_runtime_part_value
+CREATE TABLE IF NOT EXISTS obj_game_runtime_part_property
+CREATE TABLE IF NOT EXISTS obj_game_runtime_part_attachment
+CREATE TABLE IF NOT EXISTS def_gearblocks_api_type
+CREATE TABLE IF NOT EXISTS def_gearblocks_api_member
+CREATE TABLE IF NOT EXISTS def_gearblocks_api_parameter
+CREATE TABLE IF NOT EXISTS def_gearblocks_api_enum_value
+CREATE TABLE IF NOT EXISTS n2n_game_runtime_part_api_member
+CREATE TABLE IF NOT EXISTS obj_game_catalog_screenshot
 ```
 
 Existing user data remains intact. Deleting a game removes that local game row and its local catalog object/reference/screenshot metadata rows. It does not delete screenshot image files from disk.

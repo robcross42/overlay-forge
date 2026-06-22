@@ -104,49 +104,51 @@ The Tauri backend owns:
 
 ## Persistence
 
-SQLite is the local source of truth. The first schema contains a single-row `scratchpad` table. This Milestone 0 scratchpad persistence path is complete and passed.
+SQLite is the local source of truth. The first schema contains a single-row `obj_scratchpad` table. This Milestone 0 scratchpad persistence path is complete and passed.
 
-Milestone 1 adds idempotent table initialization for `tasks`, `notes`, and `calendar_events`.
+Milestone 1 adds idempotent table initialization for `obj_task`, `obj_note`, and `obj_calendar_event`.
 
-Milestone 2 adds idempotent table initialization for `projects`.
+Milestone 2 adds idempotent table initialization for `obj_project`.
 
-Milestone 3 adds idempotent table initialization for `planning_conversations` and `planning_messages`. Later milestones should add tables for bridge file drafts and exported bridge-file workflow state.
+Milestone 3 adds idempotent table initialization for `obj_planning_conversation` and `obj_planning_message`. Later milestones should add tables for bridge file drafts and exported bridge-file workflow state.
 
-Milestone 4 adds idempotent table initialization for `project_github_repositories`. The table stores project repository linkage and fetched metadata/status only. Migrations are non-destructive and must not remove existing Scratchpad, Tasks, Notes, Calendar, Projects, or Planning Chat data.
+Milestone 4 adds idempotent table initialization for `obj_project_github_repository`. The table stores project repository linkage and fetched metadata/status only. Migrations are non-destructive and must not remove existing Scratchpad, Tasks, Notes, Calendar, Projects, or Planning Chat data.
 
-Milestone 5 adds idempotent table initialization for `youtube_references`. The table stores only user-created YouTube references and user-entered metadata. Migrations are non-destructive and must not remove existing Scratchpad, Tasks, Notes, Calendar, Projects, Planning Chat, or GitHub repository data.
+Milestone 5 adds idempotent table initialization for `obj_youtube_reference`. The table stores only user-created YouTube references and user-entered metadata. Migrations are non-destructive and must not remove existing Scratchpad, Tasks, Notes, Calendar, Projects, Planning Chat, or GitHub repository data.
 
-Milestone 6 adds no new tables. It preserves existing `planning_conversations` and `planning_messages` records and scopes the frontend Chat section through the selected Projects workspace.
+Milestone 6 adds no new tables. It preserves existing `obj_planning_conversation` and `obj_planning_message` records and scopes the frontend Chat section through the selected Projects workspace.
 
-Milestone 7 adds no new tables. Overview continues to use `projects`, GitHub continues to use `project_github_repositories`, Chat continues to use `planning_conversations` and `planning_messages`, and References only summarizes existing local context categories.
+Milestone 7 adds no new tables. Overview continues to use `obj_project`, GitHub continues to use `obj_project_github_repository`, Chat continues to use `obj_planning_conversation` and `obj_planning_message`, and References only summarizes existing local context categories.
 
-Milestone 8 adds no new tables. The shell-owned Projects navigation tree reads existing `projects` rows and continues to use the same project CRUD commands. Chat and GitHub behavior continue to use the existing selected-project data paths.
+Milestone 8 adds no new tables. The shell-owned Projects navigation tree reads existing `obj_project` rows and continues to use the same project CRUD commands. Chat and GitHub behavior continue to use the existing selected-project data paths.
 
-Milestone 9 adds idempotent table initialization for `planning_conversation_context`. Attachments are scoped to a single planning conversation, link to existing local records by `context_type` and `source_id`, and store a readable label. Removing an attachment deletes only the attachment link and does not delete the source record.
+Milestone 9 adds idempotent table initialization for `n2n_planning_conversation_context`. Attachments are scoped to a single planning conversation, link to existing local records by `context_type` and `source_id`, and store a readable label. Removing an attachment deletes only the attachment link and does not delete the source record.
 
 Milestone 10 adds no new tables. Prompt Preview uses existing project, planning conversation, planning message, and context attachment data.
 
-Milestone 11 adds idempotent table initialization for `bridge_file_drafts`. Drafts are project-scoped, may link to a source planning conversation, and store generated Markdown content locally. Migrations are non-destructive and must not remove existing user data.
+Milestone 11 adds idempotent table initialization for `obj_bridge_file_draft`. Drafts are project-scoped, may link to a source planning conversation, and store generated Markdown content locally. Migrations are non-destructive and must not remove existing user data.
 
-Milestone 12 adds idempotent table initialization for `project_markdown_context`. Each row stores one configured local Markdown root per project. Markdown file content is read freshly from disk for chat load, Prompt Preview, project chat sends, and bridge draft generation; file snapshots are not cached in SQLite.
+Milestone 12 adds idempotent table initialization for `obj_project_markdown_context`. Each row stores one configured local Markdown root per project. Markdown file content is read freshly from disk for chat load, Prompt Preview, project chat sends, and bridge draft generation; file snapshots are not cached in SQLite.
 
-Gaming adds idempotent table initialization for `games`, `game_data_locations`, `game_catalog_objects`, `game_catalog_references`, and `game_catalog_screenshots`. `game_data_locations` stores game-scoped local save or alternate data directories for games that expose the feature, with GearBlocks currently exposing the controls from its selected-game Home screen. Screenshot image bytes are stored as PNG files under `game-screenshots/`, while SQLite stores metadata and local paths only. The screenshot preview path uses Tauri asset loading scoped to `game-screenshots/`.
+Gaming adds idempotent table initialization for `def_game`, `obj_game`, `obj_game_setting`, `obj_game_data_location`, `obj_game_catalog_object`, `obj_game_catalog_reference`, and `obj_game_catalog_screenshot`. `def_game` holds static game definitions such as the visible UI definition name, while `obj_game` stores local game sections. `obj_game_setting` is the generic per-game settings table for deep game-specific settings without creating table-per-game schemas. Screenshot image bytes are stored as PNG files under `game-screenshots/`, while SQLite stores metadata and local paths only. The screenshot preview path uses Tauri asset loading scoped to `game-screenshots/`.
 
-Game chat overlay position is persisted on each `game_chat_conversations` row through nullable `overlay_x` and `overlay_y` coordinates. The backend saves the active chat overlay's outer window position when the overlay moves and reapplies those coordinates when that same chat opens, so placement survives app restarts while the chat exists.
+Game chat overlay position is persisted on each `obj_game_chat_conversation` row through nullable `overlay_x` and `overlay_y` coordinates. The backend saves the active chat overlay's outer window position when the overlay moves and reapplies those coordinates when that same chat opens, so placement survives app restarts while the chat exists.
 
 GearBlocks construction decoding is local-first and file-based. GearBlocks' default user data location is `%USERPROFILE%\AppData\LocalLow\SmashHammer Games\GearBlocks\`. Overlay Forge discovers `construction.bytes` files from the configured GearBlocks Save Location or that default root's `SavedConstructions` folder, inflates the raw DEFLATE payload, parses the BSON document, and renders a JSON-friendly summary on the GearBlocks Home screen. Runtime-only metadata such as display names, categories, mass, active stage, and documented construction namespace interface availability is handled through an installable GearBlocks Lua script mod under the default root's `ScriptMods` folder that exports the full live scene through marked `Player.log` JSON chunks when direct Lua file writes are unavailable. Overlay Forge indexes those runtime chunks through explicit refresh/import, a passive cursor-based GearBlocks runtime import monitor, and backend chat-send context assembly; normal chat navigation must not synchronously parse full-scene runtime logs. GearBlocks chat converts the latest whole-scene runtime export into a semantic vehicle-build summary that aggregates welded structural pieces and lists functional systems with inferred purposes.
 
 GearBlocks Tools uses the same installable Overlay Forge GearBlocks script as scene context export. The script creates one movable, resizable GearBlocks window with a compact home menu for Scene, Builder, Weld, and Status. Each menu item replaces the content with a single tool view, updates the window title, and exposes a Back button. Scene export remains the explicit whole-scene runtime context path, while BuilderToolExt and WeldTool helpers run inside that single in-game script window instead of through a separate no-window hotkey bridge.
 
-Smoking Cessation adds idempotent table initialization for `smoking_events` and `smoking_cessation_settings`. Cigarette events are stored as local timestamped rows with a source marker for module or keybind entry. The singleton cessation settings row stores the current patch label, start time, and timezone. The frontend charts are derived from SQLite rows at render time rather than storing aggregate data.
+Smoking Cessation adds idempotent table initialization for `obj_smoking_event` and `obj_smoking_cessation_setting`. Cigarette events are stored as local timestamped rows with a source marker for module or keybind entry. The singleton cessation settings row stores the current patch label, start time, and timezone. The frontend charts are derived from SQLite rows at render time rather than storing aggregate data.
 
 Scheduler persistence adds `def_scheduler_type`, `obj_scheduler`, and `obj_scheduler_run`. These tables establish the forward naming convention for new persistence: `obj_` for dynamic objects, `def_` for static definitions, `o2o_` for one-to-one mappings, and `n2n_` for many-to-many mappings. Scheduler jobs use leases and run history so future modules, including GearBlocks, can add bounded background work without each module inventing its own polling table.
+
+Overlay Forge 0.6.1 applies the same naming convention to existing SQLite tables with non-destructive legacy table renames, adds `schema_json` and `modified_at` metadata columns to normalized tables, and keeps existing `updated_at` columns in place for frontend/API compatibility.
 
 ## OpenAI Boundary
 
 Planning Chat calls the OpenAI Responses API from the Rust/Tauri backend. React invokes local Tauri commands only and never reads `OPENAI_API_KEY`. Model selection, request shape, and the planning assistant instruction are centralized in the backend OpenAI service module so later bridge-file generation, tools, streaming, or model changes do not leak through the frontend.
 
-In Milestone 6, the primary UI path for Planning Chat is Projects -> selected project -> Chat. The selected project is passed directly into the chat surface, while the backend continues to enforce conversation ownership through `planning_conversations.project_id`.
+In Milestone 6, the primary UI path for Planning Chat is Projects -> selected project -> Chat. The selected project is passed directly into the chat surface, while the backend continues to enforce conversation ownership through `obj_planning_conversation.project_id`.
 
 Milestone 7 preserves this boundary. Chat remains a selected-project workspace section and remains backed by the existing planning conversation/message tables.
 
@@ -214,7 +216,7 @@ Milestone 12 does not read GitHub repository file contents through the GitHub AP
 
 ## Project Workspace UI Boundary
 
-Milestone 13 is a frontend workspace consolidation. It does not add tables or change context ownership. Project Markdown context remains project-scoped. Manual context attachments remain conversation-scoped through `planning_conversation_context`.
+Milestone 13 is a frontend workspace consolidation. It does not add tables or change context ownership. Project Markdown context remains project-scoped. Manual context attachments remain conversation-scoped through `n2n_planning_conversation_context`.
 
 GitHub repository linkage and project Markdown context configuration now live in Project Edit instead of occupying the primary chat path. The focused chat surface keeps message history and message input close to the selected conversation while moving manual attachment controls and local Markdown bridge drafts into a collapsible right-hand pane.
 

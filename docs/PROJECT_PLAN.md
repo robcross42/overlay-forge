@@ -106,6 +106,12 @@ Status: **Implemented / Pending Validation**
 
 The Scheduler framework is a local-first backend addendum for bounded recurring jobs. It introduces convention-based SQLite tables for scheduler type definitions, scheduler objects, and scheduler run history. The initial registered scheduler refreshes the Smoking Cessation ChatGPT export on startup and every 60 seconds. Future modules, including GearBlocks, can add scheduler definitions only through explicit Rust handlers rather than arbitrary database-stored commands.
 
+**SQLite Naming Normalization**
+
+Status: **Implemented / Pending Validation**
+
+Overlay Forge 0.6.1 normalizes existing SQLite tables into the `obj_`, `def_`, `o2o_`, and `n2n_` naming convention through non-destructive legacy table renames. Normalized tables receive `schema_json` and `modified_at` metadata columns. Game persistence now separates static game definitions in `def_game`, local game sections in `obj_game`, and deep per-game settings in generic `obj_game_setting` rows instead of creating physical tables per game.
+
 ## Product Direction
 
 Overlay Forge is a personal desktop command hub that floats above the user's workflow and eventually helps turn ideas, notes, tasks, and project plans into Codex-ready markdown bridge files.
@@ -146,6 +152,8 @@ Overlay Forge 0.2.0 GearBlocks runtime API interface support is a completed, pas
 Smoking Cessation is a local-first core module addendum. Future cessation work should preserve SQLite-owned event records, keep the record-cigarette keybind configurable through Settings, and avoid cloud sync or health-provider integrations unless explicitly requested.
 
 Scheduler is a local-first backend framework addendum. Future scheduler jobs should use explicit `def_scheduler_type` definitions and Rust handler dispatch, keep jobs bounded and non-blocking, and record run status in `obj_scheduler_run`. Do not store arbitrary executable commands, scripts, or Lua payloads in scheduler rows.
+
+SQLite naming normalization is the current persistence convention. Future persistence work should use `obj_` for dynamic object tables, `def_` for static definitions, `o2o_` for one-to-one mapping tables, and `n2n_` for many-to-many mapping tables. Avoid table-per-game settings such as `obj_game_gearblocks`; use `obj_game_setting` or a normalized feature table keyed by `game_id` and `id_game`.
 
 Milestone 4 remains intentionally small. It does not include automatic Codex handoff, GitHub write operations, pull request creation, branch creation, issue management, full repository browsing, GitHub Actions integration, OAuth, multi-account support, advanced sync, vector store/repo indexing, YouTube integration, external calendar integration, cloud sync, or multi-user auth.
 

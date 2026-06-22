@@ -198,7 +198,8 @@ Goal: maintain maximum development velocity by using Medium Reasoning whenever p
 
 - Prefer existing repo patterns and feature boundaries over new abstractions.
 - Keep SQLite migrations non-destructive and idempotent.
-- For new convention-based SQLite tables, use `obj_` for dynamic object tables, `def_` for static definition tables, `o2o_` for one-to-one mapping tables, and `n2n_` for many-to-many mapping tables. Include `created_at` and `modified_at` on new convention-based tables. Do not rename existing historical tables unless a dedicated migration is explicitly requested.
+- Use normalized SQLite names: `obj_` for dynamic object tables, `def_` for static definition tables, `o2o_` for one-to-one mapping tables, and `n2n_` for many-to-many mapping tables. Include `created_at`, `modified_at`, and a `schema_json` field on normalized tables unless there is a concrete compatibility reason not to. Keep legacy table renames non-destructive and idempotent.
+- For game-specific persistence, prefer `def_game`, `obj_game`, `obj_game_setting`, or normalized feature tables keyed by `game_id` and `id_game`. Do not create per-game physical tables such as `obj_game_gearblocks` unless a future design explicitly justifies the migration cost.
 - Scheduler rows must map to explicit Rust handlers through `def_scheduler_type`; do not store or execute arbitrary commands, script bodies, Lua payloads, shell commands, or frontend-controlled executable strings from SQLite.
 - React must call local Tauri commands for backend-owned behavior.
 - Backend-only secrets stay in Rust/Tauri. Do not expose `OPENAI_API_KEY` or `GITHUB_TOKEN` to frontend source or SQLite.

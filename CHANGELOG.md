@@ -6,6 +6,29 @@ Unreleased changes are grouped by day using `YYYY-MM-DD` headings so a single da
 
 ## Unreleased
 
+## 0.6.1 - 2026-06-21
+
+Development bucket for the SQLite naming normalization and scheduler-backed persistence migration.
+
+### 2026-06-21
+
+#### Added
+
+- 20:07:26 EDT - Added normalized `def_game`, `obj_game`, and `obj_game_setting` persistence so static game definitions, local game rows, and deep per-game settings do not require table-per-game schemas.
+
+#### Changed
+
+- 19:56:38 EDT - Changed project version metadata to start the `0.6.1` database migration bucket.
+- 20:07:26 EDT - Changed SQLite initialization to non-destructively rename legacy tables into the `obj_`, `def_`, and `n2n_` naming convention and add `schema_json` plus `modified_at` metadata columns.
+
+#### Documentation
+
+- 20:07:26 EDT - Documented the 0.6.1 SQLite naming normalization, game definition model, and normalized-table project rules.
+
+#### Validation
+
+- 20:09:58 EDT - Validated the 0.6.1 database migration with `cargo test`, `cargo check`, `npm run build`, and `git diff --check`.
+
 ## 0.6.0 - 2026-06-21
 
 Development bucket for work starting on 2026-06-21 after the completed `0.5.0` GearBlocks scene-context workflow session.

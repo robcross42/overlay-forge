@@ -24,7 +24,7 @@ Milestone 5 adds a local-first YouTube component for intentionally saved, user-c
 
 Status: **Complete / Passed / Successful**
 
-Milestone 6 moves project-scoped chat into the Projects section. Selecting a project now establishes the active project workspace, with Overview, GitHub, and Chat sections scoped to that selected project. The Chat section reuses existing `planning_conversations` and `planning_messages` data and no longer requires a second project selector.
+Milestone 6 moves project-scoped chat into the Projects section. Selecting a project now establishes the active project workspace, with Overview, GitHub, and Chat sections scoped to that selected project. The Chat section reuses existing `obj_planning_conversation` and `obj_planning_message` data and no longer requires a second project selector.
 
 **Milestone 7 - Project Workspace Layout Refinement**
 
@@ -91,6 +91,10 @@ Overlay Forge includes a local Smoking Cessation module for recording cigarette 
 **Scheduler**
 
 Overlay Forge includes a local scheduler framework for bounded backend jobs. Scheduler records are stored in SQLite using new convention-based tables: `def_scheduler_type`, `obj_scheduler`, and `obj_scheduler_run`. The first scheduled job refreshes the Smoking Cessation ChatGPT Markdown export on startup and every 60 seconds. Scheduler types are dispatched through known Rust handlers only; SQLite rows do not execute arbitrary commands or scripts.
+
+**SQLite Naming Migration**
+
+Overlay Forge 0.6.1 normalizes SQLite tables to the `obj_`, `def_`, `o2o_`, and `n2n_` naming convention. Existing tables are migrated with non-destructive legacy table renames, current normalized tables receive `schema_json` and `modified_at`, and game support now uses `def_game`, `obj_game`, and generic `obj_game_setting` rows instead of table-per-game settings.
 
 **Overlay Forge 0.2.0 - GearBlocks Runtime API Interfaces**
 
