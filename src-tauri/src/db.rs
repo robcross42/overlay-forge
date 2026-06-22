@@ -1632,11 +1632,19 @@ impl AppDatabase {
         legacy_name: &str,
         normalized_name: &str,
     ) -> Result<()> {
-        if Self::table_exists(connection, normalized_name)?
-            || !Self::table_exists(connection, legacy_name)?
-        {
+        let legacy_exists = Self::table_exists(connection, legacy_name)?;
+        let normalized_exists = Self::table_exists(connection, normalized_name)?;
+
+        if !legacy_exists {
             return Ok(());
         }
+
+        if normalized_exists {
+            Self::copy_legacy_rows_to_normalized_table(connection, legacy_name, normalized_name)?;
+            connection.execute(&format!("DROP TABLE {legacy_name}"), [])?;
+            return Ok(());
+        }
+
         connection.execute(
             &format!("ALTER TABLE {legacy_name} RENAME TO {normalized_name}"),
             [],
@@ -1658,6 +1666,58 @@ impl AppDatabase {
             )
             .optional()
             .map(|value| value.is_some())
+    }
+
+    fn copy_legacy_rows_to_normalized_table(
+        connection: &Connection,
+        legacy_name: &str,
+        normalized_name: &str,
+    ) -> Result<()> {
+        let legacy_columns = Self::table_columns(connection, legacy_name)?;
+        let normalized_columns = Self::table_columns(connection, normalized_name)?;
+        let normalized_column_set = normalized_columns
+            .iter()
+            .map(String::as_str)
+            .collect::<HashSet<_>>();
+        let common_columns = legacy_columns
+            .iter()
+            .filter(|column| normalized_column_set.contains(column.as_str()))
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+
+        if common_columns.is_empty() {
+            return Ok(());
+        }
+
+        let quoted_columns = common_columns
+            .iter()
+            .map(|column| Self::quote_identifier(column))
+            .collect::<Vec<_>>()
+            .join(", ");
+        connection.execute(
+            &format!(
+                "
+                INSERT OR IGNORE INTO {normalized_name} ({quoted_columns})
+                SELECT {quoted_columns}
+                FROM {legacy_name}
+                "
+            ),
+            [],
+        )?;
+
+        Ok(())
+    }
+
+    fn table_columns(connection: &Connection, table_name: &str) -> Result<Vec<String>> {
+        let mut statement = connection.prepare(&format!("PRAGMA table_info({table_name})"))?;
+        let columns = statement
+            .query_map([], |row| row.get::<_, String>(1))?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(columns)
+    }
+
+    fn quote_identifier(identifier: &str) -> String {
+        format!("\"{}\"", identifier.replace('"', "\"\""))
     }
 
     fn ensure_schema_metadata_columns(connection: &Connection) -> Result<()> {
@@ -7093,6 +7153,113 @@ mod tests {
             .expect("legacy game row should survive migration");
         assert_eq!(id_game, 1);
         assert_eq!(summary, "legacy row");
+
+        drop(connection);
+        drop(database);
+        remove_db_files(&path);
+    }
+
+    #[test]
+    fn repairs_partial_legacy_and_normalized_table_state() {
+        let path = temp_db_path("partial-legacy-state");
+        remove_db_files(&path);
+
+        {
+            let connection = Connection::open(&path).expect("partial database should open");
+            connection
+                .execute_batch(
+                    "
+                    CREATE TABLE gearblocks_api_types (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        namespace TEXT NOT NULL,
+                        type_name TEXT NOT NULL,
+                        type_kind TEXT NOT NULL DEFAULT '',
+                        docs_url TEXT NOT NULL DEFAULT '',
+                        source TEXT NOT NULL DEFAULT '',
+                        source_version TEXT NOT NULL DEFAULT '',
+                        summary TEXT NOT NULL DEFAULT '',
+                        notes TEXT NOT NULL DEFAULT '',
+                        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    );
+
+                    CREATE UNIQUE INDEX idx_gearblocks_api_types_unique
+                        ON gearblocks_api_types (namespace, type_name);
+
+                    INSERT INTO gearblocks_api_types (
+                        namespace,
+                        type_name,
+                        type_kind,
+                        docs_url,
+                        source,
+                        source_version,
+                        summary,
+                        notes
+                    )
+                    VALUES (
+                        'Legacy.Namespace',
+                        'LegacyType',
+                        'class',
+                        '',
+                        'test',
+                        '1',
+                        'legacy row',
+                        ''
+                    );
+
+                    CREATE TABLE def_gearblocks_api_type (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        namespace TEXT NOT NULL,
+                        type_name TEXT NOT NULL,
+                        type_kind TEXT NOT NULL DEFAULT '',
+                        docs_url TEXT NOT NULL DEFAULT '',
+                        source TEXT NOT NULL DEFAULT '',
+                        source_version TEXT NOT NULL DEFAULT '',
+                        summary TEXT NOT NULL DEFAULT '',
+                        notes TEXT NOT NULL DEFAULT '',
+                        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    );
+                    ",
+                )
+                .expect("partial legacy/normalized schema should be created");
+        }
+
+        let database = AppDatabase::new(path.clone()).expect("database should repair and migrate");
+        let connection = Connection::open(&path).expect("database should reopen after repair");
+
+        assert!(
+            !AppDatabase::table_exists(&connection, "gearblocks_api_types")
+                .expect("legacy table lookup should work"),
+            "legacy duplicate table should be dropped after copy"
+        );
+        let copied_count: i64 = connection
+            .query_row(
+                "
+                SELECT COUNT(*)
+                FROM def_gearblocks_api_type
+                WHERE namespace = 'Legacy.Namespace'
+                    AND type_name = 'LegacyType'
+                ",
+                [],
+                |row| row.get(0),
+            )
+            .expect("copied legacy type count should be readable");
+        assert_eq!(copied_count, 1);
+
+        let unique_index_table: String = connection
+            .query_row(
+                "
+                SELECT tbl_name
+                FROM sqlite_master
+                WHERE type = 'index'
+                    AND name = 'idx_gearblocks_api_types_unique'
+                ",
+                [],
+                |row| row.get(0),
+            )
+            .expect("unique index should be recreated");
+        assert_eq!(unique_index_table, "def_gearblocks_api_type");
 
         drop(connection);
         drop(database);

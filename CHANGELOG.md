@@ -21,6 +21,10 @@ Development bucket for the SQLite naming normalization and scheduler-backed pers
 - 19:56:38 EDT - Changed project version metadata to start the `0.6.1` database migration bucket.
 - 20:07:26 EDT - Changed SQLite initialization to non-destructively rename legacy tables into the `obj_`, `def_`, and `n2n_` naming convention and add `schema_json` plus `modified_at` metadata columns.
 
+#### Fixed
+
+- 20:15:11 EDT - Fixed partially migrated SQLite databases by copying legacy rows into normalized tables and dropping copied legacy duplicates so normalized unique indexes can be recreated for `ON CONFLICT` upserts.
+
 #### Documentation
 
 - 20:07:26 EDT - Documented the 0.6.1 SQLite naming normalization, game definition model, and normalized-table project rules.
@@ -28,6 +32,7 @@ Development bucket for the SQLite naming normalization and scheduler-backed pers
 #### Validation
 
 - 20:09:58 EDT - Validated the 0.6.1 database migration with `cargo test`, `cargo check`, `npm run build`, and `git diff --check`.
+- 20:15:30 EDT - Validated the partial SQLite migration repair with `cargo test`, `cargo check`, `npm run build`, `git diff --check`, and a live startup check against the app-data database.
 
 ## 0.6.0 - 2026-06-21
 
