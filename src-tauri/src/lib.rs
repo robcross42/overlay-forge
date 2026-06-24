@@ -11,41 +11,45 @@ use commands::{
     attach_planning_conversation_context, catalog_game_parts_from_screenshots,
     clear_game_runtime_part_images_for_category, clear_gearblocks_markers, clear_openai_api_key,
     consume_pending_shortcut_action, create_bridge_file_draft_from_conversation,
-    create_calendar_event, create_game, create_game_chat_conversation,
-    create_game_chat_screenshot_capture, create_game_screenshot_capture_request, create_note,
-    create_planning_conversation, create_project, create_task, create_youtube_reference,
-    decode_gearblocks_construction_file, decode_gearblocks_construction_folder,
-    delete_bridge_file_draft, delete_calendar_event, delete_game, delete_game_chat_conversation,
-    delete_game_data_location, delete_game_screenshot, delete_note, delete_planning_conversation,
-    delete_project, delete_project_github_repository, delete_project_markdown_context,
-    delete_smoking_event, delete_task, delete_youtube_reference,
+    create_calendar_event, create_game, create_game_build_guide_from_chat,
+    create_game_chat_conversation, create_game_chat_screenshot_capture,
+    create_game_screenshot_capture_request, create_note, create_planning_conversation,
+    create_project, create_task, create_youtube_reference, decode_gearblocks_construction_file,
+    decode_gearblocks_construction_folder, delete_bridge_file_draft, delete_calendar_event,
+    delete_game, delete_game_chat_conversation, delete_game_data_location, delete_game_screenshot,
+    delete_note, delete_planning_conversation, delete_project, delete_project_github_repository,
+    delete_project_markdown_context, delete_smoking_event, delete_task, delete_youtube_reference,
     export_smoking_cessation_chatgpt_context, fetch_project_github_metadata,
-    focus_game_chat_overlay_window, focus_last_game_window, get_active_game_chat_overlay,
-    get_bridge_file_draft, get_gearblocks_third_party_dependency_status, get_milestone_status,
-    get_openai_api_key_status, get_project_github_repository, get_project_markdown_context,
-    get_scratchpad, get_smoking_cessation_settings, get_youtube_reference,
+    focus_game_chat_overlay_window, focus_last_game_window, get_active_game_build_guide_overlay,
+    get_active_game_chat_overlay, get_bridge_file_draft, get_game_build_guide,
+    get_gearblocks_third_party_dependency_status, get_milestone_status, get_openai_api_key_status,
+    get_overlay_forge_foreground_window_label, get_project_github_repository,
+    get_project_markdown_context, get_scratchpad, get_smoking_cessation_settings,
+    get_youtube_reference, import_game_build_guide_markdown,
     import_gearblocks_catalog_screenshot_images, import_gearblocks_runtime_context,
-    import_gearblocks_runtime_part_index, install_gearblocks_lua_exporter, list_bridge_file_drafts,
-    list_calendar_events, list_game_catalog_objects, list_game_chat_conversations,
+    import_gearblocks_runtime_part_index, install_gearblocks_lua_exporter,
+    is_overlay_forge_foreground, list_bridge_file_drafts, list_calendar_events,
+    list_game_build_guides, list_game_catalog_objects, list_game_chat_conversations,
     list_game_chat_messages, list_game_constructions, list_game_data_locations,
     list_game_part_categories, list_game_runtime_part_api_members, list_game_runtime_parts,
     list_game_screenshots, list_games, list_gearblocks_api_catalog,
     list_gearblocks_construction_files, list_gearblocks_runtime_exports, list_keybinds, list_notes,
     list_planning_conversation_context, list_planning_conversations, list_planning_messages,
     list_projects, list_schedulers, list_smoking_events, list_tasks, list_youtube_references,
-    load_project_markdown_context, open_game_chat_overlay_window, open_youtube_reference,
-    preview_planning_chat_prompt, record_smoking_event, remove_planning_conversation_context,
-    reset_keybinds, save_game_data_location, save_keybinds, save_openai_api_key,
-    save_project_github_repository, save_project_markdown_context, save_scratchpad,
-    send_game_chat_message, send_gearblocks_marker_commands, send_planning_message,
-    set_game_runtime_part_display_image, set_overlay_window_opacity, shutdown_app,
-    start_manual_overlay_drag, start_scheduler_worker, sync_gearblocks_runtime_context,
-    sync_gearblocks_saved_constructions, toggle_game_chat_overlay_window, update_calendar_event,
+    load_project_markdown_context, open_game_build_guide_overlay_window,
+    open_game_chat_overlay_window, open_youtube_reference, preview_planning_chat_prompt,
+    record_smoking_event, remove_planning_conversation_context, reset_keybinds,
+    save_game_data_location, save_keybinds, save_openai_api_key, save_project_github_repository,
+    save_project_markdown_context, save_scratchpad, send_game_chat_message,
+    send_gearblocks_marker_commands, send_planning_message, set_game_runtime_part_display_image,
+    set_overlay_window_opacity, shutdown_app, start_manual_overlay_drag, start_scheduler_worker,
+    sync_gearblocks_runtime_context, sync_gearblocks_saved_constructions,
+    toggle_game_build_guide_overlay_window, toggle_game_chat_overlay_window, update_calendar_event,
     update_game_runtime_part_notes, update_note, update_project, update_smoking_cigarette_count,
     update_task, update_youtube_reference,
 };
 use db::AppDatabase;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{Manager, WindowEvent};
 
 #[derive(Clone, Serialize)]
@@ -56,11 +60,20 @@ pub struct GameChatOverlaySelection {
     pub conversation_id: i64,
 }
 
+#[derive(Clone, Deserialize, Serialize)]
+pub struct GameBuildGuideOverlaySelection {
+    #[serde(rename = "gameId")]
+    pub game_id: i64,
+    #[serde(rename = "guideId")]
+    pub guide_id: i64,
+}
+
 pub struct AppState {
     pub database: AppDatabase,
     pub pending_shortcut_action: Mutex<Option<String>>,
     pub last_game_window: Mutex<Option<isize>>,
     pub active_game_chat_overlay: Mutex<Option<GameChatOverlaySelection>>,
+    pub active_game_build_guide_overlay: Mutex<Option<GameBuildGuideOverlaySelection>>,
 }
 
 pub fn run() {
@@ -92,6 +105,7 @@ pub fn run() {
                 pending_shortcut_action: Mutex::new(None),
                 last_game_window: Mutex::new(None),
                 active_game_chat_overlay: Mutex::new(None),
+                active_game_build_guide_overlay: Mutex::new(None),
             });
             hotkeys::register_toggle_hotkey(app)?;
             commands::start_gearblocks_runtime_import_monitor(app.handle().clone());
@@ -123,6 +137,51 @@ pub fn run() {
                     }
                 });
             }
+            if let Some(window) = app.get_webview_window("game-build-guide") {
+                window.set_always_on_top(true)?;
+                let app_handle = app.handle().clone();
+                window.on_window_event(move |event| {
+                    let state = app_handle.state::<AppState>();
+                    let selection = state
+                        .active_game_build_guide_overlay
+                        .lock()
+                        .ok()
+                        .and_then(|selection| selection.clone());
+                    let Some(selection) = selection else {
+                        return;
+                    };
+
+                    match event {
+                        WindowEvent::Moved(position) => {
+                            if let Err(error) =
+                                state.database.update_game_build_guide_overlay_bounds(
+                                    selection.guide_id,
+                                    Some(position.x),
+                                    Some(position.y),
+                                    None,
+                                    None,
+                                )
+                            {
+                                eprintln!("Could not save build guide overlay position: {error}");
+                            }
+                        }
+                        WindowEvent::Resized(size) => {
+                            if let Err(error) =
+                                state.database.update_game_build_guide_overlay_bounds(
+                                    selection.guide_id,
+                                    None,
+                                    None,
+                                    Some(size.width as i32),
+                                    Some(size.height as i32),
+                                )
+                            {
+                                eprintln!("Could not save build guide overlay size: {error}");
+                            }
+                        }
+                        _ => {}
+                    }
+                });
+            }
 
             Ok(())
         })
@@ -142,10 +201,19 @@ pub fn run() {
             start_manual_overlay_drag,
             set_overlay_window_opacity,
             focus_last_game_window,
+            is_overlay_forge_foreground,
+            get_overlay_forge_foreground_window_label,
             open_game_chat_overlay_window,
             focus_game_chat_overlay_window,
             toggle_game_chat_overlay_window,
             get_active_game_chat_overlay,
+            list_game_build_guides,
+            create_game_build_guide_from_chat,
+            import_game_build_guide_markdown,
+            get_game_build_guide,
+            open_game_build_guide_overlay_window,
+            toggle_game_build_guide_overlay_window,
+            get_active_game_build_guide_overlay,
             list_tasks,
             create_task,
             update_task,

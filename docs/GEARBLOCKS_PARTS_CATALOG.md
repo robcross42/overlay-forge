@@ -1,6 +1,6 @@
 # GearBlocks Parts Catalog
 
-This one-time reference documents the GearBlocks part categories and cataloged part names currently recognized from the screenshot set in Overlay Forge.
+This file documents the validated GearBlocks part categories and cataloged part names currently recognized from the Overlay Forge screenshot/runtime catalog workflow.
 
 Current catalog metadata:
 
@@ -8,7 +8,7 @@ Current catalog metadata:
 - Catalog status: complete
 - Validation status: validated
 
-Use this file as shared context for ChatGPT when asking for part identification, build planning, image analysis, or practical physics explanations. The category order follows the GearBlocks left-panel category layout from top left to bottom right.
+Use this file as the reference vocabulary for part identification, build planning, image analysis, and practical physics explanations. The category order follows the GearBlocks left-panel category layout from top left to bottom right.
 
 ## Runtime Catalog Image Workflow
 
@@ -546,7 +546,3 @@ The runtime part record stores both the copied display image path and the origin
 - Trolley Wheel 1x3
 - Truck Wheel 2.5x9
 - Truck Wheel 3x11
-
-## Suggested ChatGPT Prompt
-
-Use the GearBlocks categories and part names in this catalog as the reference vocabulary. When analyzing a screenshot, identify visible parts by likely name, category, confidence level, and practical physics role. If a part is visually similar to multiple entries, list the closest candidates and explain what visual details would distinguish them.

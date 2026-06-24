@@ -14,9 +14,11 @@ const TOGGLE_OVERLAY_WAS_VISIBLE_ACTION: &str = "toggle_overlay_was_visible";
 const TOGGLE_OVERLAY_WAS_HIDDEN_ACTION: &str = "toggle_overlay_was_hidden";
 const MAIN_WINDOW_LABEL: &str = "main";
 const GAME_CHAT_WINDOW_LABEL: &str = "game-chat";
+const GAME_BUILD_GUIDE_WINDOW_LABEL: &str = "game-build-guide";
 const GAME_CHAT_OVERLAY_ACTION: &str = "game_chat_overlay";
 const GAME_CHAT_OVERLAY_WAS_HIDDEN_ACTION: &str = "game_chat_overlay_was_hidden";
 const GAME_CHAT_SCREENSHOT_CAPTURE_ACTION: &str = "game_chat_region_capture";
+const GAME_BUILD_GUIDE_OVERLAY_ACTION: &str = "game_build_guide_overlay";
 const RECORD_SMOKING_EVENT_ACTION: &str = "record_smoking_event";
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -61,6 +63,9 @@ pub fn register_toggle_hotkey(app: &mut App) -> Result<(), Box<dyn Error>> {
                                 );
                                 let _ = app.emit("game-chat-screenshot-capture-requested", ());
                             }
+                            GAME_BUILD_GUIDE_OVERLAY_ACTION => {
+                                trigger_game_build_guide_overlay_shortcut(app);
+                            }
                             RECORD_SMOKING_EVENT_ACTION => record_smoking_event_from_shortcut(app),
                             _ => {}
                         }
@@ -92,6 +97,11 @@ pub fn default_keybinds() -> Vec<KeybindConfig> {
             action: GAME_CHAT_SCREENSHOT_CAPTURE_ACTION.to_string(),
             label: "Capture Screenshot For Gaming Chat".to_string(),
             keys: Vec::new(),
+        },
+        KeybindConfig {
+            action: GAME_BUILD_GUIDE_OVERLAY_ACTION.to_string(),
+            label: "Toggle Gaming Build Guide Overlay".to_string(),
+            keys: vec!["Ctrl".to_string(), "Shift".to_string(), "G".to_string()],
         },
         KeybindConfig {
             action: RECORD_SMOKING_EVENT_ACTION.to_string(),
@@ -267,6 +277,7 @@ fn trigger_shortcut_action(app: &tauri::AppHandle, action: &str) {
             set_pending_shortcut_action(app, GAME_CHAT_SCREENSHOT_CAPTURE_ACTION);
             let _ = app.emit("game-chat-screenshot-capture-requested", ());
         }
+        GAME_BUILD_GUIDE_OVERLAY_ACTION => trigger_game_build_guide_overlay_shortcut(app),
         RECORD_SMOKING_EVENT_ACTION => record_smoking_event_from_shortcut(app),
         _ => {}
     }
@@ -333,6 +344,31 @@ fn trigger_game_chat_overlay_shortcut(app: &tauri::AppHandle) {
     let _ = app.emit("game-chat-overlay-requested", ());
 }
 
+fn trigger_game_build_guide_overlay_shortcut(app: &tauri::AppHandle) {
+    let build_guide_was_visible = app
+        .get_webview_window(GAME_BUILD_GUIDE_WINDOW_LABEL)
+        .and_then(|window| window.is_visible().ok())
+        .unwrap_or(false);
+    if !is_window_foreground(app, GAME_BUILD_GUIDE_WINDOW_LABEL) {
+        remember_foreground_window_as_game(app);
+    }
+    match commands::toggle_active_game_build_guide_overlay_window(app) {
+        Ok(true) => {}
+        Ok(false) if build_guide_was_visible => {}
+        Ok(false) => {
+            set_pending_shortcut_action(app, GAME_BUILD_GUIDE_OVERLAY_ACTION);
+            wake_overlay_window(app);
+            let _ = app.emit("game-build-guide-overlay-requested", ());
+        }
+        Err(error) => {
+            eprintln!("Could not toggle game build guide overlay from shortcut: {error}");
+            set_pending_shortcut_action(app, GAME_BUILD_GUIDE_OVERLAY_ACTION);
+            wake_overlay_window(app);
+            let _ = app.emit("game-build-guide-overlay-requested", ());
+        }
+    }
+}
+
 #[cfg(windows)]
 fn is_window_foreground(app: &tauri::AppHandle, label: &str) -> bool {
     use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
@@ -360,7 +396,11 @@ fn remember_foreground_window_as_game(app: &tauri::AppHandle) {
         return;
     }
 
-    for label in [MAIN_WINDOW_LABEL, GAME_CHAT_WINDOW_LABEL] {
+    for label in [
+        MAIN_WINDOW_LABEL,
+        GAME_CHAT_WINDOW_LABEL,
+        GAME_BUILD_GUIDE_WINDOW_LABEL,
+    ] {
         if let Some(window) = app.get_webview_window(label) {
             if let Ok(hwnd) = window.hwnd() {
                 if foreground == hwnd.0 as windows_sys::Win32::Foundation::HWND {
@@ -428,6 +468,7 @@ fn validate_keybinds(keybinds: &[KeybindConfig]) -> Result<(), String> {
             TOGGLE_OVERLAY_ACTION,
             GAME_CHAT_OVERLAY_ACTION,
             GAME_CHAT_SCREENSHOT_CAPTURE_ACTION,
+            GAME_BUILD_GUIDE_OVERLAY_ACTION,
             RECORD_SMOKING_EVENT_ACTION,
         ]
         .contains(&keybind.action.as_str())

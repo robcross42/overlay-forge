@@ -42,6 +42,7 @@ local activeSection = "home"
 local sectionElements = {
     home = {},
     scene = {},
+    names = {},
     builder = {},
     weld = {},
     status = {}
@@ -50,14 +51,16 @@ local sectionElements = {
 local sectionTitles = {
     home = "Overlay Forge",
     scene = "Scene",
+    names = "Names",
     builder = "Builder",
     weld = "Weld",
     status = "Status"
 }
 
 local sectionSizes = {
-    home = { width = 320, height = 280, minWidth = 280, minHeight = 220 },
+    home = { width = 320, height = 328, minWidth = 280, minHeight = 260 },
     scene = { width = 420, height = 300, minWidth = 340, minHeight = 260 },
+    names = { width = 420, height = 330, minWidth = 340, minHeight = 290 },
     builder = { width = 560, height = 520, minWidth = 480, minHeight = 420 },
     weld = { width = 420, height = 360, minWidth = 340, minHeight = 300 },
     status = { width = 420, height = 360, minWidth = 340, minHeight = 300 }
@@ -152,19 +155,24 @@ homeSceneButton.SetAlignment( align_HorizEdges, 18, 18 )
 homeSceneButton.SetAlignment( align_TopEdge, 34, 38 )
 setText(homeSceneButton, "Scene")
 
+local homeNamesButton = track("home", win.CreateTextButton())
+homeNamesButton.SetAlignment( align_HorizEdges, 18, 18 )
+homeNamesButton.SetAlignment( align_TopEdge, 82, 38 )
+setText(homeNamesButton, "Names")
+
 local homeBuilderButton = track("home", win.CreateTextButton())
 homeBuilderButton.SetAlignment( align_HorizEdges, 18, 18 )
-homeBuilderButton.SetAlignment( align_TopEdge, 82, 38 )
+homeBuilderButton.SetAlignment( align_TopEdge, 130, 38 )
 setText(homeBuilderButton, "Builder")
 
 local homeWeldButton = track("home", win.CreateTextButton())
 homeWeldButton.SetAlignment( align_HorizEdges, 18, 18 )
-homeWeldButton.SetAlignment( align_TopEdge, 130, 38 )
+homeWeldButton.SetAlignment( align_TopEdge, 178, 38 )
 setText(homeWeldButton, "Weld")
 
 local homeStatusButton = track("home", win.CreateTextButton())
 homeStatusButton.SetAlignment( align_HorizEdges, 18, 18 )
-homeStatusButton.SetAlignment( align_TopEdge, 178, 38 )
+homeStatusButton.SetAlignment( align_TopEdge, 226, 38 )
 setText(homeStatusButton, "Status")
 
 local sceneHeadingLabel = track("scene", win.CreateLabel())
@@ -192,6 +200,43 @@ sceneResultLabel.SetAlignment( align_TopEdge, 208, 58 )
 sceneResultLabel.Alignment = textAnc_UpperLeft
 sceneResultLabel.LineSpacing = 1.05
 setText(sceneResultLabel, "No export run yet.")
+
+local namesHeadingLabel = track("names", win.CreateLabel())
+namesHeadingLabel.SetAlignment( align_HorizEdges, 14, 14 )
+namesHeadingLabel.SetAlignment( align_TopEdge, 58, 26 )
+namesHeadingLabel.Alignment = textAnc_MiddleLeft
+namesHeadingLabel.FontStyle = fontStyle_Bold
+setText(namesHeadingLabel, "Friendly Part Names")
+
+local namesTargetLabel = track("names", win.CreateLabel())
+namesTargetLabel.SetAlignment( align_HorizEdges, 14, 14 )
+namesTargetLabel.SetAlignment( align_TopEdge, 94, 48 )
+namesTargetLabel.Alignment = textAnc_UpperLeft
+namesTargetLabel.LineSpacing = 1.05
+setText(namesTargetLabel, "Target: N/A")
+
+local friendlyNameLabel = track("names", win.CreateLabel())
+friendlyNameLabel.SetAlignment( align_LeftEdge, 14, 120 )
+friendlyNameLabel.SetAlignment( align_TopEdge, 156, 28 )
+friendlyNameLabel.Alignment = textAnc_MiddleLeft
+setText(friendlyNameLabel, "Friendly name")
+
+local friendlyNameInputField = track("names", win.CreateInputField())
+friendlyNameInputField.SetAlignment( align_RightEdge, 14, 250 )
+friendlyNameInputField.SetAlignment( align_TopEdge, 156, 28 )
+friendlyNameInputField.Value = ""
+
+local saveFriendlyNameButton = track("names", win.CreateTextButton())
+saveFriendlyNameButton.SetAlignment( align_LeftEdge, 14, 170 )
+saveFriendlyNameButton.SetAlignment( align_TopEdge, 198, 34 )
+setText(saveFriendlyNameButton, "Save Name")
+
+local namesHelpLabel = track("names", win.CreateLabel())
+namesHelpLabel.SetAlignment( align_HorizEdges, 14, 14 )
+namesHelpLabel.SetAlignment( align_TopEdge, 246, 54 )
+namesHelpLabel.Alignment = textAnc_UpperLeft
+namesHelpLabel.LineSpacing = 1.05
+setText(namesHelpLabel, "Aim at a part or select a pivot part, type a name, then Save Name. Overlay Forge imports names from Player.log for chat context.")
 
 local builderHeadingLabel = track("builder", win.CreateLabel())
 builderHeadingLabel.SetAlignment( align_HorizEdges, 14, 14 )
@@ -1212,12 +1257,20 @@ local function describeSceneParts(parts)
 end
 
 local function runtimePartInstanceKey(part)
+    local parentConstruction = safeRead(function() return part.ParentConstruction end, nil)
+    local constructionId = safeRead(function() return parentConstruction.ID end, nil)
     local id = safeRead(function() return part.ID end, nil)
     if id ~= nil then
+        if constructionId ~= nil then
+            return "construction:" .. tostring(constructionId) .. ":id:" .. tostring(id)
+        end
         return "id:" .. tostring(id)
     end
     local index = safeRead(function() return part.Idx end, nil)
     if index ~= nil then
+        if constructionId ~= nil then
+            return "construction:" .. tostring(constructionId) .. ":idx:" .. tostring(index)
+        end
         return "idx:" .. tostring(index)
     end
     return "part:" .. tostring(part)
@@ -1295,6 +1348,47 @@ local function describePartDelta(part)
         apiAttributes = {},
         apiAttributeSource = "scene-delta"
     }
+end
+
+local function describePartAlias(part, friendlyName)
+    local parentConstruction = safeRead(function() return part.ParentConstruction end, nil)
+    return {
+        emittedAt = safeUtcDate("!%Y-%m-%dT%H:%M:%SZ"),
+        exporter = "OverlayForgeConstructionExporter",
+        eventKind = "partAlias",
+        partInstanceKey = runtimePartInstanceKey(part),
+        friendlyName = tostring(friendlyName or ""),
+        id = safeRead(function() return part.ID end, nil),
+        index = safeRead(function() return part.Idx end, nil),
+        parentConstructionId = safeRead(function() return parentConstruction.ID end, nil),
+        parentConstructionIsPlayerCharacter = safeRead(function() return parentConstruction.IsPlayerCharacter end, false),
+        parentConstructionIsAtomic = safeRead(function() return parentConstruction.IsAtomic end, false),
+        assetGuid = tostring(safeRead(function() return part.AssetGUID end, "")),
+        assetName = safeRead(function() return part.AssetName end, ""),
+        category = safeRead(function() return part.Category end, ""),
+        displayName = safeRead(function() return part.DisplayName end, ""),
+        fullDisplayName = safeRead(function() return part.FullDisplayName end, ""),
+        position = vectorToTable(safeRead(function() return part.Position end, nil)),
+        orientation = quaternionToTable(safeRead(function() return part.Orientation end, nil)),
+        localPosition = vectorToTable(safeRead(function() return part.LocalPosition end, nil)),
+        localOrientation = quaternionToTable(safeRead(function() return part.LocalOrientation end, nil)),
+        currentUnitSize = vectorToTable(safeRead(function() return part.CurrentUnitSize end, nil))
+    }
+end
+
+local function emitPartAlias(part, friendlyName)
+    if part == nil then
+        setStatus("Name failed: target or select a part first.")
+        return
+    end
+    local name = tostring(friendlyName or "")
+    if name == "" then
+        setStatus("Name failed: enter a friendly name first.")
+        return
+    end
+    local payload = describePartAlias(part, name)
+    print("[OverlayForgePartAlias]" .. encodeJson(payload))
+    setStatus("Saved friendly name '" .. name .. "' for " .. tostring(payload.fullDisplayName or payload.displayName or payload.assetName or "part") .. ".")
 end
 
 local function emitSceneDelta(added, updated, removed, totalParts)
@@ -1765,6 +1859,26 @@ local function onShowAllAttachmentsToggled()
     ShowAllAttachments.Value = showAllAttachmentsToggle.Value
 end
 
+local function trimText(text)
+    return tostring(text or ""):match("^%s*(.-)%s*$")
+end
+
+local function activeNamePart()
+    if currentTargetedPart ~= nil then
+        return currentTargetedPart
+    end
+    if partSelection then
+        return safeRead(function() return partSelection.PivotPart end, nil)
+    end
+    return nil
+end
+
+local function onSaveFriendlyNameClicked()
+    local part = activeNamePart()
+    local name = trimText(safeRead(function() return friendlyNameInputField.Value end, ""))
+    emitPartAlias(part, name)
+end
+
 local function pickPart(part)
     if weldOwnerPart == nil then
         weldOwnerPart = part
@@ -1823,12 +1937,16 @@ end
 
 addClickHandler(backButton, function() showSection("home") end)
 addClickHandler(homeSceneButton, function() showSection("scene") end)
+addClickHandler(homeNamesButton, function() showSection("names") end)
 addClickHandler(homeBuilderButton, function() showSection("builder") end)
 addClickHandler(homeWeldButton, function() showSection("weld") end)
 addClickHandler(homeStatusButton, function() showSection("status") end)
 
 if not addClickHandler(exportAllButton, onExportAll) then
     setStatus("Export Scene button could not bind click handler.")
+end
+if not addClickHandler(saveFriendlyNameButton, onSaveFriendlyNameClicked) then
+    setStatus("Save Name button could not bind click handler.")
 end
 
 addEventHandler(manipulatorOrientationDropdown.OnChanged, onDropdownChanged)
@@ -1956,6 +2074,15 @@ function Update()
         end
     else
         currentTargetedPart = nil
+    end
+
+    local namingPart = activeNamePart()
+    if namingPart ~= nil then
+        local namingLabel = tostring(safeRead(function() return namingPart.FullDisplayName end, safeRead(function() return namingPart.AssetName end, "part")))
+        local namingKey = runtimePartInstanceKey(namingPart)
+        setText(namesTargetLabel, "Target: " .. namingLabel .. "\nInstance: " .. tostring(namingKey))
+    else
+        setText(namesTargetLabel, "Target: N/A\nSelect a pivot part or aim at a part outside game UI.")
     end
 
     if Input.GetKeyDown("e") and isControlDown() and isShiftDown() then

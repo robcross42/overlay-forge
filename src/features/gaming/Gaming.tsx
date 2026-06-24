@@ -1,4 +1,5 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChatWorkspace } from "../../components/ChatWorkspace";
@@ -7,11 +8,13 @@ import {
   clearGameRuntimePartImagesForCategory,
   clearGearBlocksMarkers,
   createGame,
+  createGameBuildGuideFromChat,
   createGameChatConversation,
   createGameChatScreenshotCapture,
   createGameScreenshotCaptureRequest,
   decodeGearBlocksConstructionFile,
   getGearBlocksThirdPartyDependencyStatus,
+  importGameBuildGuideMarkdown,
   installGearBlocksLuaExporter,
   importGearBlocksCatalogScreenshotImages,
   importGearBlocksRuntimePartIndex,
@@ -27,9 +30,11 @@ import {
   listGameRuntimePartApiMembers,
   listGearBlocksApiCatalog,
   listGearBlocksConstructionFiles,
+  listGameBuildGuides,
   listGamePartCategories,
   listGameRuntimeParts,
   listGameScreenshots,
+  openGameBuildGuideOverlayWindow,
   saveGameDataLocation,
   setGameRuntimePartDisplayImage,
   sendGameChatMessage,
@@ -40,6 +45,7 @@ import {
 } from "../../services/gaming";
 import type {
   Game,
+  GameBuildGuide,
   GameChatConversation,
   GameChatMessage,
   GameCatalogObject,
@@ -76,7 +82,7 @@ type GamingProps = {
 };
 
 type GameNavAction = {
-  type: "home" | "newChat" | "chat" | "screenshots" | "parts";
+  type: "home" | "newChat" | "chat" | "screenshots" | "parts" | "build-guides";
   gameId?: number;
   conversationId?: number;
   nonce: number;
@@ -88,8 +94,75 @@ type ScreenshotContextMenu = {
   y: number;
 };
 
-type GameView = "home" | "chat" | "screenshots" | "parts" | "constructions" | "api" | "tools";
+type GameView =
+  | "home"
+  | "chat"
+  | "screenshots"
+  | "parts"
+  | "constructions"
+  | "api"
+  | "tools"
+  | "build-guides"
+  | "builds"
+  | "skill-tree"
+  | "items"
+  | "skill-gems"
+  | "support-gems"
+  | "loot-filter"
+  | "trade";
 const CHAT_SCREENSHOTS_PER_PAGE = 8;
+const PATH_OF_EXILE_2_SLUG = "path-of-exile-2";
+const ENABLE_GEARBLOCKS_MARKERS = false;
+const ENABLE_GEARBLOCKS_PLUGIN_STATUS = false;
+const PATH_OF_EXILE_2_SECTIONS: Array<{
+  view: GameView;
+  label: string;
+  eyebrow: string;
+  description: string;
+}> = [
+  {
+    view: "builds",
+    label: "Builds",
+    eyebrow: "Character Planning",
+    description: "Planned location for character builds, ascendancy choices, campaign notes, and endgame goals."
+  },
+  {
+    view: "skill-tree",
+    label: "Skill Tree",
+    eyebrow: "Passive Planning",
+    description: "Planned location for passive tree routes, keystones, weapon swaps, and respec notes."
+  },
+  {
+    view: "items",
+    label: "Items",
+    eyebrow: "Equipment",
+    description: "Planned location for gear targets, rare item notes, uniques, affixes, and upgrade priorities."
+  },
+  {
+    view: "skill-gems",
+    label: "Skill Gems",
+    eyebrow: "Active Skills",
+    description: "Planned location for active skill gems, gem levels, quality notes, and socket groups."
+  },
+  {
+    view: "support-gems",
+    label: "Support Gems",
+    eyebrow: "Links",
+    description: "Planned location for support gem combinations, damage conversions, and utility links."
+  },
+  {
+    view: "loot-filter",
+    label: "Loot Filter",
+    eyebrow: "Drops",
+    description: "Planned location for loot filter rules, strictness profiles, currency visibility, and leveling presets."
+  },
+  {
+    view: "trade",
+    label: "Trade",
+    eyebrow: "Market",
+    description: "Planned location for trade searches, price notes, acquisition targets, and economy references."
+  }
+];
 const GEARBLOCKS_PARTS_CATALOG_METADATA = {
   gameVersion: "0.8.96622",
   completeness: "Complete",
@@ -173,6 +246,10 @@ export function Gaming({
   const [chatConversations, setChatConversations] = useState<GameChatConversation[]>([]);
   const [selectedChatConversationId, setSelectedChatConversationId] = useState<number | null>(null);
   const [chatMessages, setChatMessages] = useState<GameChatMessage[]>([]);
+  const [buildGuides, setBuildGuides] = useState<GameBuildGuide[]>([]);
+  const [isImportingBuildGuide, setIsImportingBuildGuide] = useState(false);
+  const [isGeneratingBuildGuide, setIsGeneratingBuildGuide] = useState(false);
+  const [isOpeningBuildGuide, setIsOpeningBuildGuide] = useState(false);
   const [newChatTitle, setNewChatTitle] = useState("");
   const [chatDraft, setChatDraft] = useState("");
   const [isSendingChat, setIsSendingChat] = useState(false);
@@ -279,7 +356,17 @@ export function Gaming({
     if (
       selectedGame &&
       selectedGame.slug !== "gearblocks" &&
-      (gameView === "constructions" || gameView === "api")
+      (gameView === "constructions" || gameView === "api" || gameView === "tools")
+    ) {
+      setGameView("home");
+    }
+  }, [gameView, selectedGame?.id, selectedGame?.slug]);
+
+  useEffect(() => {
+    if (
+      selectedGame &&
+      selectedGame.slug !== PATH_OF_EXILE_2_SLUG &&
+      PATH_OF_EXILE_2_SECTIONS.some((section) => section.view === gameView)
     ) {
       setGameView("home");
     }
@@ -319,6 +406,10 @@ export function Gaming({
       setChatConversations([]);
       setSelectedChatConversationId(null);
       setChatMessages([]);
+      setBuildGuides([]);
+      setIsImportingBuildGuide(false);
+      setIsGeneratingBuildGuide(false);
+      setIsOpeningBuildGuide(false);
       setSelectedPromptScreenshotIds([]);
       setChatScreenshotPage(0);
       setIsChatScreenshotPickerOpen(false);
@@ -346,7 +437,9 @@ export function Gaming({
           void refreshGearBlocksConstructionFiles(selectedGame.id);
           void syncGearBlocksConstructions(selectedGame.id);
           void refreshGearBlocksApiCatalog();
-          void refreshGearBlocksDependencyStatus(selectedGame.id);
+          if (ENABLE_GEARBLOCKS_PLUGIN_STATUS) {
+            void refreshGearBlocksDependencyStatus(selectedGame.id);
+          }
         } else {
           setConstructionFiles([]);
           setGameConstructions([]);
@@ -356,6 +449,9 @@ export function Gaming({
           setGearBlocksDependencyStatus(null);
         }
       })
+      .catch((error) => setStatus(formatError(error)));
+    listGameBuildGuides(selectedGame.id)
+      .then(setBuildGuides)
       .catch((error) => setStatus(formatError(error)));
     listGameChatConversations(selectedGame.id)
       .then((conversations) => {
@@ -450,6 +546,31 @@ export function Gaming({
       .then(setChatMessages)
       .catch((error) => setStatus(formatError(error)));
   }, [selectedChatConversationId]);
+
+  useEffect(() => {
+    let isMounted = true;
+    let cleanup: (() => void) | null = null;
+
+    listen<GameBuildGuide>("game-build-guides-changed", (event) => {
+      if (!isMounted || event.payload.gameId !== selectedGameId) {
+        return;
+      }
+      listGameBuildGuides(event.payload.gameId)
+        .then(setBuildGuides)
+        .catch((error) => setStatus(formatError(error)));
+    }).then((nextCleanup) => {
+      if (isMounted) {
+        cleanup = nextCleanup;
+      } else {
+        nextCleanup();
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      cleanup?.();
+    };
+  }, [selectedGameId]);
 
   useEffect(
     () => () => {
@@ -727,6 +848,47 @@ export function Gaming({
     }
   }
 
+  async function generateBuildGuideFromChat() {
+    if (!selectedGame || selectedGame.slug !== "gearblocks") {
+      setStatus("Build guide generation requires the GearBlocks game section");
+      return;
+    }
+    if (!selectedChatConversationId) {
+      setStatus("Select a GearBlocks chat before generating a build guide");
+      return;
+    }
+
+    const latestUserMessage = [...chatMessages]
+      .reverse()
+      .find((message) => message.role === "user");
+    const buildGoal = chatDraft.trim() || latestUserMessage?.content.trim() || "";
+    if (!buildGoal) {
+      setStatus("Type a build goal or select a chat with a previous user message");
+      return;
+    }
+
+    setIsGeneratingBuildGuide(true);
+    setStatus("Generating build guide");
+    try {
+      const generated = await createGameBuildGuideFromChat(
+        selectedChatConversationId,
+        buildGoal
+      );
+      const guides = await listGameBuildGuides(selectedGame.id);
+      setBuildGuides(guides);
+      setChatDraft("");
+      setStatus(
+        `Generated build guide "${generated.guide.title}" with ${generated.parts.length} part row(s) and ${generated.steps.length} step(s)`
+      );
+      showToast("Build guide created");
+    } catch (error) {
+      setStatus(formatError(error));
+      window.alert(formatError(error));
+    } finally {
+      setIsGeneratingBuildGuide(false);
+    }
+  }
+
   async function sendGearBlocksMarkersFromMessage(message: GameChatMessage) {
     if (!selectedGame || selectedGame.slug !== "gearblocks") {
       setStatus("GearBlocks markers require the GearBlocks game section");
@@ -840,6 +1002,62 @@ export function Gaming({
       window.alert(formatError(error));
     } finally {
       setUpdatingDataLocationType(null);
+    }
+  }
+
+  async function importBuildGuide(game: Game) {
+    setIsImportingBuildGuide(true);
+    try {
+      const selected = await open({
+        directory: false,
+        multiple: false,
+        title: `Import ${game.name} build guide`,
+        filters: [
+          {
+            name: "Markdown",
+            extensions: ["md", "markdown"]
+          }
+        ]
+      });
+      const markdownPath = Array.isArray(selected) ? selected[0] : selected;
+      if (!markdownPath) {
+        setStatus("Build guide import cancelled");
+        return;
+      }
+
+      const imported = await importGameBuildGuideMarkdown(game.id, markdownPath);
+      const guides = await listGameBuildGuides(game.id);
+      setBuildGuides(guides);
+      setStatus(
+        `Imported "${imported.guide.title}" with ${imported.parts.length} part row(s) and ${imported.steps.length} step(s)`
+      );
+      showToast("Successful");
+    } catch (error) {
+      setStatus(formatError(error));
+      window.alert(formatError(error));
+    } finally {
+      setIsImportingBuildGuide(false);
+    }
+  }
+
+  async function openBuildGuideOverlay(game: Game, guide: GameBuildGuide) {
+    setIsOpeningBuildGuide(true);
+    try {
+      window.localStorage.setItem(
+        "overlayForgeActiveBuildGuide",
+        JSON.stringify({
+          gameId: game.id,
+          guideId: guide.id,
+          openedAt: new Date().toISOString()
+        })
+      );
+      await openGameBuildGuideOverlayWindow(game.id, guide.id);
+      setStatus(`Opened build guide overlay: ${guide.title}`);
+    } catch (error) {
+      setStatus(formatError(error));
+      window.alert(formatError(error));
+    } finally {
+      setIsOpeningBuildGuide(false);
     }
   }
 
@@ -1172,27 +1390,52 @@ export function Gaming({
               Tools
             </button>
           )}
-          <button
-            className={gameView === "screenshots" ? "primary-button" : "ghost-button"}
-            onClick={() => setGameView("screenshots")}
-            type="button"
-          >
-            Screenshots
-            <span className="button-count">{screenshots.length}</span>
-          </button>
-          <button
-            className={gameView === "parts" ? "primary-button" : "ghost-button"}
-            onClick={() => setGameView("parts")}
-            type="button"
-          >
-            Parts
-            <span className="button-count">
-              {selectedGame.slug === "gearblocks" ? runtimeParts.length : parts.length}
-            </span>
-          </button>
-          <button className="ghost-button" type="button">
-            Add Reference
-          </button>
+          {selectedGame.slug === "gearblocks" && (
+            <button
+              className={gameView === "build-guides" ? "primary-button" : "ghost-button"}
+              onClick={() => setGameView("build-guides")}
+              type="button"
+            >
+              Build Guides
+              <span className="button-count">{buildGuides.length}</span>
+            </button>
+          )}
+          {selectedGame.slug === PATH_OF_EXILE_2_SLUG ? (
+            PATH_OF_EXILE_2_SECTIONS.map((section) => (
+              <button
+                className={gameView === section.view ? "primary-button" : "ghost-button"}
+                key={section.view}
+                onClick={() => setGameView(section.view)}
+                type="button"
+              >
+                {section.label}
+              </button>
+            ))
+          ) : (
+            <>
+              <button
+                className={gameView === "screenshots" ? "primary-button" : "ghost-button"}
+                onClick={() => setGameView("screenshots")}
+                type="button"
+              >
+                Screenshots
+                <span className="button-count">{screenshots.length}</span>
+              </button>
+              <button
+                className={gameView === "parts" ? "primary-button" : "ghost-button"}
+                onClick={() => setGameView("parts")}
+                type="button"
+              >
+                Parts
+                <span className="button-count">
+                  {selectedGame.slug === "gearblocks" ? runtimeParts.length : parts.length}
+                </span>
+              </button>
+              <button className="ghost-button" type="button">
+                Add Reference
+              </button>
+            </>
+          )}
         </div>
         )}
 
@@ -1239,7 +1482,7 @@ export function Gaming({
               <span>{parts.length} cataloged parts</span>
               <span>{runtimeParts.length} runtime API parts</span>
               <span>{chatConversations.length} chats</span>
-              {selectedGame.slug === "gearblocks" && (
+              {selectedGame.slug === "gearblocks" && ENABLE_GEARBLOCKS_PLUGIN_STATUS && (
                 <section
                   className="game-third-party-panel"
                   aria-label="GearBlocks third-party dependencies"
@@ -1481,6 +1724,7 @@ export function Gaming({
                   )}
                 </section>
               )}
+              {selectedGame.slug === PATH_OF_EXILE_2_SLUG && <PathOfExile2HomeScaffold />}
             </section>
           )}
 
@@ -1691,6 +1935,58 @@ export function Gaming({
             </section>
           )}
 
+          {gameView === "build-guides" && selectedGame.slug === "gearblocks" && (
+            <section className="game-build-guides-panel" aria-label="GearBlocks build guides">
+              <div className="game-view-head">
+                <div>
+                  <p>GearBlocks</p>
+                  <h3>Build Guides</h3>
+                </div>
+                <button
+                  className="primary-button"
+                  disabled={isImportingBuildGuide}
+                  onClick={() => void importBuildGuide(selectedGame)}
+                  type="button"
+                >
+                  Import Markdown
+                </button>
+              </div>
+
+              <p>
+                Build guides are rendered in a separate narrow overlay window for in-game assembly
+                reference. Import a Markdown handoff, then open it and pin the overlay to the side
+                of the screen.
+              </p>
+
+              {buildGuides.length === 0 ? (
+                <div className="game-build-guides-empty">
+                  <strong>No build guides imported yet.</strong>
+                  <span>Use Import Markdown with a vehicle handoff or construction guide.</span>
+                </div>
+              ) : (
+                <div className="game-build-guides-list">
+                  {buildGuides.map((guide) => (
+                    <article className="game-build-guide-row" key={guide.id}>
+                      <div>
+                        <strong>{guide.title}</strong>
+                        <span>{guide.buildGoal || "No build goal summary found."}</span>
+                        <code>{guide.sourcePath || "Imported Markdown"}</code>
+                      </div>
+                      <button
+                        className="primary-button"
+                        disabled={isOpeningBuildGuide}
+                        onClick={() => void openBuildGuideOverlay(selectedGame, guide)}
+                        type="button"
+                      >
+                        Open
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
           {gameView === "chat" && (
             <ChatWorkspace
               conversations={chatConversations}
@@ -1714,12 +2010,26 @@ export function Gaming({
                         </button>
                         <button
                           className="ghost-button"
-                          disabled={isSendingGearBlocksMarkers}
-                          onClick={() => void clearGearBlocksChatMarkers()}
+                          disabled={
+                            isGeneratingBuildGuide ||
+                            isSendingChat ||
+                            !selectedChatConversationId
+                          }
+                          onClick={() => void generateBuildGuideFromChat()}
                           type="button"
                         >
-                          Clear Markers
+                          Generate Build Guide
                         </button>
+                        {ENABLE_GEARBLOCKS_MARKERS && (
+                          <button
+                            className="ghost-button"
+                            disabled={isSendingGearBlocksMarkers}
+                            onClick={() => void clearGearBlocksChatMarkers()}
+                            type="button"
+                          >
+                            Clear Markers
+                          </button>
+                        )}
                       </div>
                     </section>
                   )}
@@ -1823,6 +2133,22 @@ export function Gaming({
               emptyConversationLabel="No game chats yet."
               hideSidebarWhenSelected
               inputPlaceholder={`Ask about ${selectedGame.name}...`}
+              inputActionSlot={
+                selectedGame.slug === "gearblocks" ? (
+                  <button
+                    className="ghost-button chat-input-extra-action"
+                    disabled={
+                      isGeneratingBuildGuide ||
+                      isSendingChat ||
+                      !selectedChatConversationId
+                    }
+                    onClick={() => void generateBuildGuideFromChat()}
+                    type="button"
+                  >
+                    Guide
+                  </button>
+                ) : null
+              }
               isSending={isSendingChat}
               messages={chatMessages}
               newConversationTitle={newChatTitle}
@@ -1851,7 +2177,11 @@ export function Gaming({
                 return <p>{content}</p>;
               }}
               renderMessageActions={(message) => {
-                if (selectedGame.slug !== "gearblocks" || message.role !== "assistant") {
+                if (
+                  !ENABLE_GEARBLOCKS_MARKERS ||
+                  selectedGame.slug !== "gearblocks" ||
+                  message.role !== "assistant"
+                ) {
                   return null;
                 }
 
@@ -1886,6 +2216,13 @@ export function Gaming({
               title={`${selectedGame.name} chat`}
             />
           )}
+
+          {selectedGame.slug === PATH_OF_EXILE_2_SLUG &&
+            PATH_OF_EXILE_2_SECTIONS.map((section) =>
+              gameView === section.view ? (
+                <PathOfExile2SectionScaffold key={section.view} section={section} />
+              ) : null
+            )}
 
           {gameView === "parts" && (
             <section className="game-parts-panel" aria-label="Cataloged parts">
@@ -2627,6 +2964,54 @@ function RuntimePartApiMemberFlags({ member }: { member: GameRuntimePartApiMembe
         <span key={flag}>{flag}</span>
       ))}
     </div>
+  );
+}
+
+function PathOfExile2HomeScaffold() {
+  return (
+    <section className="poe2-home-scaffold" aria-label="Path of Exile 2 module sections">
+      <div className="game-data-locations-head">
+        <div>
+          <p>Module Scaffold</p>
+          <h4>Path of Exile 2</h4>
+        </div>
+      </div>
+      <div className="poe2-section-grid">
+        {PATH_OF_EXILE_2_SECTIONS.map((section) => (
+          <article className="poe2-section-card" key={section.view}>
+            <div>
+              <p>{section.eyebrow}</p>
+              <h4>{section.label}</h4>
+            </div>
+            <span>{section.description}</span>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function PathOfExile2SectionScaffold({
+  section
+}: {
+  section: (typeof PATH_OF_EXILE_2_SECTIONS)[number];
+}) {
+  return (
+    <section className="poe2-section-panel" aria-label={`Path of Exile 2 ${section.label}`}>
+      <div className="game-view-head">
+        <div>
+          <p>{section.eyebrow}</p>
+          <h3>{section.label}</h3>
+        </div>
+      </div>
+      <article className="poe2-section-card large">
+        <div>
+          <p>Scaffold</p>
+          <h4>{section.label}</h4>
+        </div>
+        <span>{section.description}</span>
+      </article>
+    </section>
   );
 }
 

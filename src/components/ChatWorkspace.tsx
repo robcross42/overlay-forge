@@ -34,6 +34,7 @@ type ChatWorkspaceProps<TConversation extends ChatConversation, TMessage extends
   emptyMainSlot?: ReactNode;
   hideSidebarWhenSelected?: boolean;
   showFocusedToolbar?: boolean;
+  showOverlaySideActions?: boolean;
   onEnterChatOverlayMode?: () => void;
   onExitChatOverlayMode?: () => void;
   onCaptureScreenshot?: () => void;
@@ -45,6 +46,7 @@ type ChatWorkspaceProps<TConversation extends ChatConversation, TMessage extends
   onSendMessage: () => void;
   renderMessageContent?: (message: TMessage) => ReactNode;
   renderMessageActions?: (message: TMessage) => ReactNode;
+  inputActionSlot?: ReactNode;
 };
 
 export function ChatWorkspace<TConversation extends ChatConversation, TMessage extends ChatMessage>({
@@ -65,6 +67,7 @@ export function ChatWorkspace<TConversation extends ChatConversation, TMessage e
   emptyMainSlot,
   hideSidebarWhenSelected = false,
   showFocusedToolbar = true,
+  showOverlaySideActions = true,
   onEnterChatOverlayMode,
   onExitChatOverlayMode,
   onCaptureScreenshot,
@@ -75,7 +78,8 @@ export function ChatWorkspace<TConversation extends ChatConversation, TMessage e
   onSelectConversation,
   onSendMessage,
   renderMessageContent,
-  renderMessageActions
+  renderMessageActions,
+  inputActionSlot
 }: ChatWorkspaceProps<TConversation, TMessage>) {
   const messageListRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
@@ -84,7 +88,9 @@ export function ChatWorkspace<TConversation extends ChatConversation, TMessage e
   const showEmptyMainSlot = !selectedConversation && emptyMainSlot;
   const showSidebar = !chatOverlayMode && (!hideSidebarWhenSelected || !selectedConversation);
   const showSideActions =
-    selectedConversation && !showSidebar && (chatOverlayMode || onEnterChatOverlayMode);
+    selectedConversation &&
+    !showSidebar &&
+    ((chatOverlayMode && showOverlaySideActions) || (!chatOverlayMode && onEnterChatOverlayMode));
 
   useEffect(() => {
     const messageList = messageListRef.current;
@@ -134,7 +140,9 @@ export function ChatWorkspace<TConversation extends ChatConversation, TMessage e
         showSidebar
           ? "chat-workspace"
           : chatOverlayMode
-            ? "chat-workspace chat-workspace-focused chat-workspace-overlay-mode"
+            ? showOverlaySideActions
+              ? "chat-workspace chat-workspace-focused chat-workspace-overlay-mode"
+              : "chat-workspace chat-workspace-focused chat-workspace-overlay-mode chat-workspace-overlay-no-controls"
             : showSideActions
               ? "chat-workspace chat-workspace-focused chat-workspace-with-side-actions"
               : "chat-workspace chat-workspace-focused"
@@ -308,6 +316,7 @@ export function ChatWorkspace<TConversation extends ChatConversation, TMessage e
                 placeholder={inputPlaceholder}
                 value={draft}
               />
+              {inputActionSlot}
               <button
                 className="primary-button"
                 disabled={!selectedConversation || isSending || draft.trim().length === 0}

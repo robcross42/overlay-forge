@@ -1,14 +1,148 @@
 # Changelog
 
-All notable changes to Overlay Forge will be documented in this file.
+All notable changes to Overlay Forge are documented in this file.
 
-Unreleased changes are grouped by day using `YYYY-MM-DD` headings so a single day's work can be reviewed quickly.
+Changelog entries keep local date and time stamps so a day's work can be reviewed quickly.
+
+## Changelog Policy
+
+Overlay Forge uses semantic versioning in `MAJOR.MINOR.PATCH` form. Do not increment the minor version just because a new chat, work session, or calendar day starts. Use `## Unreleased` for active work until a meaningful version is intentionally cut.
+
+Version rules:
+
+- `MAJOR`: incompatible or breaking release changes.
+- `MINOR`: substantial new user-visible capabilities.
+- `PATCH`: bug fixes, documentation-only changes, validation updates, small UX refinements, and internal refactors.
+
+During `0.x` development, minor versions may still contain breaking early-development changes. Patch versions should remain non-breaking fixes, documentation, and small refinements.
+
+Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.8.0 - 2026-06-24
+
+### 2026-06-24
+
+#### Added
+
+- 09:52:14 EDT - Added GearBlocks chat-to-build-guide generation so a chat draft or latest user message can produce a Markdown guide, save it under app data, and import it into the Build Guides list automatically.
+
+#### Changed
+
+- 10:21:59 EDT - Changed chat and build-guide overlay title bars to remain pinned and draggable while removing the chat overlay side controls.
+- 10:42:42 EDT - Changed standalone overlay windows to use shared focus-aware opacity so unfocused chat and build-guide windows are twice as transparent as their focused state.
+- 10:46:28 EDT - Changed standalone overlay unfocused opacity to be barely visible while the game has focus.
+- 10:50:38 EDT - Changed standalone overlay focus dimming to use CSS background transparency so chat and build-guide text stays fully opaque while the game has focus.
+- 10:55:45 EDT - Added a shared `standalone-overlay-window` class so chat, build guides, and future standalone overlays use the same focused and unfocused background transparency contract.
+- 11:09:07 EDT - Changed standalone overlay focus detection to follow whether any Overlay Forge window is focused and route chat and build-guide backgrounds through shared standalone window variables.
+- 11:14:12 EDT - Changed standalone overlay focus detection to use the OS foreground window instead of Tauri's app-local focused window state.
+- 11:26:47 EDT - Changed Tauri standalone overlay windows to use transparent window backing and full native opacity so CSS background alpha can reveal the game while text remains opaque.
+- 11:34:09 EDT - Changed standalone overlay transparency to default to the near-transparent state and only switch opaque when Overlay Forge foreground focus is positively identified.
+- 11:49:17 EDT - Changed the root HTML background fallback to transparent so standalone overlay window transparency is not blocked by the document backing layer.
+- 12:17:37 EDT - Changed project version metadata to `0.8.0` for the stable build cut.
+
+#### Fixed
+
+- 10:31:23 EDT - Fixed the chat overlay layout so the pinned title bar no longer pushes the prompt input below the visible window area.
+- 10:55:45 EDT - Fixed standalone overlay transparency regressions so chat no longer stays fully opaque and build guides no longer fall back to native low-opacity text.
+- 11:09:07 EDT - Fixed standalone window transparency state so chat and build-guide overlays share the same near-transparent game-focus background behavior.
+- 11:14:12 EDT - Fixed standalone overlays staying opaque while GearBlocks has focus by comparing the actual Windows foreground window against Overlay Forge windows.
+- 11:26:47 EDT - Fixed standalone overlays appearing fully opaque in-game by enabling transparent Tauri window surfaces and removing native low-opacity restores from standalone windows.
+- 11:34:09 EDT - Fixed stale foreground detection by returning the foreground Overlay Forge window label and ignoring stale current-standalone foreground results when the standalone webview is not focused.
+- 11:49:17 EDT - Fixed the remaining opaque standalone overlay backing layer caused by `index.html` forcing `html`, `body`, and `#root` to a solid background color.
+
+#### Documentation
+
+- 09:52:14 EDT - Documented the GearBlocks chat-generated build guide workflow.
+- 10:56:45 EDT - Added a design notes document for recording future design thoughts without creating implementation commitments.
+- 11:04:29 EDT - Updated reasoning model selection rules so Codex stops only when the current setting is too low for the task or unnecessarily High / Very High for Low / Medium work.
+- 11:49:17 EDT - Added a known issues document and recorded the deferred Codex reasoning escalation enforcement issue.
+- 12:14:48 EDT - Updated Codex and architecture rules with abstraction-first implementation guidance, stack-appropriate Rust/TypeScript patterns, and first-class window domain requirements.
+
+#### Validation
+
+- 09:52:14 EDT - Validated GearBlocks chat-to-build-guide generation with `npm run build`, `cargo check`, `cargo build`, and `git diff --check`.
+- 10:22:24 EDT - Validated overlay titlebar and scrollbar updates with `npm run build` and `git diff --check`.
+- 10:31:23 EDT - Validated the chat overlay height fix with `npm run build`.
+- 10:42:42 EDT - Validated standalone overlay focus-opacity handling with `npm run build`.
+- 10:46:28 EDT - Validated the lowered unfocused standalone overlay opacity with `npm run build`.
+- 10:50:38 EDT - Validated CSS-based standalone overlay focus dimming with `npm run build`.
+- 10:55:45 EDT - Validated the shared standalone overlay class and transparency regression fix with `npm run build`.
+- 11:09:07 EDT - Validated global standalone overlay focus-state handling with `npm run build`.
+- 11:14:12 EDT - Validated OS foreground based standalone overlay focus handling with `npm run build` and `cargo check`.
+- 11:26:47 EDT - Validated transparent standalone window backing and native opacity cleanup with `npm run build` and `cargo check`.
+- 11:34:09 EDT - Validated safe-default standalone transparency and foreground label handling with `npm run build` and `cargo check`.
+- 11:49:17 EDT - Validated root HTML transparency and known-issue documentation with `npm run build` and `git diff --check`.
+- 12:15:10 EDT - Validated architecture-rule documentation updates with `git diff --check -- AGENTS.md docs/ARCHITECTURE.md CHANGELOG.md`.
+- 12:18:57 EDT - Validated the `0.8.0` stable build cut with `npm run build`, `cargo build`, and `git diff --check`.
+
+### 2026-06-23
+
+#### Changed
+
+- 00:30:00 EDT - Changed GearBlocks chat so in-game marker prompting and marker action buttons are disabled while the marker feature is paused.
+- 00:30:00 EDT - Changed GearBlocks runtime coordinate context to support spatial reasoning without asking chat to emit marker blocks.
+- 00:47:51 EDT - Changed GearBlocks runtime prompt context to include user-defined friendly names for exact part instances when those aliases are imported from the in-game script.
+- 23:06:16 EDT - Changed the GearBlocks build-guide overlay to support three local text sizes with Ctrl+Shift+mousewheel.
+
+#### Fixed
+
+- 22:33:00 EDT - Fixed the GearBlocks Build Guides view so it no longer collides with the Path of Exile 2 Builds section and added a Ctrl+Shift+G fallback that opens the Build Guides panel when no guide overlay is active.
+- 22:47:43 EDT - Fixed the GearBlocks build-guide overlay so it loads the selected imported guide reliably, removes the redundant titlebar buttons, and uses the guide title box as the window drag handle.
+- 22:53:40 EDT - Fixed the GearBlocks build-guide overlay selection handoff by storing the clicked guide ID before opening the separate overlay window and removing the duplicate empty-state title text.
+- 23:06:16 EDT - Fixed GearBlocks build-guide Markdown cleanup so table separators, horizontal rules, and fenced code markers are filtered from parts, steps, and section text.
+
+#### Added
+
+- 00:47:51 EDT - Added a GearBlocks script `Names` section that emits targeted or pivot-part friendly name aliases into `Player.log`.
+- 00:47:51 EDT - Added SQLite persistence for GearBlocks runtime part aliases keyed by physical part instance.
+- 22:08:09 EDT - Added GearBlocks Markdown build guide import, normalized build-guide persistence, and an independent narrow build-guide overlay window with persisted bounds.
+
+#### Documentation
+
+- 00:30:00 EDT - Documented GearBlocks markers, BepInEx plugin status UI, and GearLib plugin work as backlog items until the marker feature is explicitly resumed.
+- 00:47:51 EDT - Documented the GearBlocks friendly part naming workflow and runtime alias table.
+- 22:08:09 EDT - Documented the GearBlocks build-guide overlay workflow and SQLite build-guide tables.
+
+#### Validation
+
+- 00:30:58 EDT - Validated the GearBlocks marker unwiring with `npm run build`, `cargo build`, and `git diff --check`.
+- 00:48:56 EDT - Validated GearBlocks friendly part names with `npm run build`, `cargo check`, `cargo build`, `git diff --check`, and installed-script marker checks.
+- 22:09:34 EDT - Validated the GearBlocks build-guide overlay with `npm run build`, `cargo check`, `cargo build`, and `git diff --check`.
+
+### 2026-06-22
+
+#### Documentation
+
+- 22:12:09 EDT - Reworked README, changelog, and repository Markdown structure around direct Codex use in VS Code.
+- 22:12:09 EDT - Added semantic versioning rules so version numbers change for meaningful release scope rather than each work session.
+
+## 0.7.0 - 2026-06-22
+
+Version section for the Path of Exile 2 game module work.
+
+### 2026-06-22
+
+#### Added
+
+- 21:23:27 EDT - Added a seeded Path of Exile 2 game module scaffold with Home, Chats, Builds, Skill Tree, Items, Skill Gems, Support Gems, Loot Filter, and Trade sections.
+
+#### Changed
+
+- 21:23:27 EDT - Changed project version metadata to `0.7.0`.
+
+#### Documentation
+
+- 21:23:27 EDT - Documented the Path of Exile 2 game module scaffold and updated the active version reference to `0.7.0`.
+
+#### Validation
+
+- 21:27:10 EDT - Validated the Path of Exile 2 game module scaffold with `npm run build`, `cargo check`, `cargo test`, and `git diff --check`.
+
 ## 0.6.1 - 2026-06-21
 
-Development bucket for the SQLite naming normalization and scheduler-backed persistence migration.
+Version section for the SQLite naming normalization and scheduler-backed persistence migration.
 
 ### 2026-06-22
 
@@ -63,12 +197,12 @@ Development bucket for the SQLite naming normalization and scheduler-backed pers
 
 - 20:07:26 EDT - Added normalized `def_game`, `obj_game`, and `obj_game_setting` persistence so static game definitions, local game rows, and deep per-game settings do not require table-per-game schemas.
 - 21:06:34 EDT - Added a source-only GearBlocks BepInEx/GearLib plugin template folder with local reference guidance and ignored workspace conventions.
-- 22:11:56 EDT - Added a direct Overlay Forge GearBlocks BepInEx plugin template with a file-backed command bridge and temporary center-raycast marker command.
+- 22:11:56 EDT - Added a direct Overlay Forge GearBlocks BepInEx plugin template with a file-backed command channel and temporary center-raycast marker command.
 - 22:47:46 EDT - Added a general GearBlocks chat marker capability where assistant responses can include user-approved `overlay-forge-markers` JSON plans that Overlay Forge sends to the BepInEx plugin as temporary world-coordinate marker commands.
 
 #### Changed
 
-- 19:56:38 EDT - Changed project version metadata to start the `0.6.1` database migration bucket.
+- 19:56:38 EDT - Changed project version metadata to `0.6.1`.
 - 20:07:26 EDT - Changed SQLite initialization to non-destructively rename legacy tables into the `obj_`, `def_`, and `n2n_` naming convention and add `schema_json` plus `modified_at` metadata columns.
 - 22:47:46 EDT - Changed GearBlocks runtime prompt context to include marker guidance and functional-part world coordinates so chat can point at connection points without using custom parts.
 - 23:38:51 EDT - Changed GearBlocks runtime part indexing to store first-class world and local coordinates for every exported part and backfill existing rows from stored runtime JSON.
@@ -104,7 +238,7 @@ Development bucket for the SQLite naming normalization and scheduler-backed pers
 
 ## 0.6.0 - 2026-06-21
 
-Development bucket for work starting on 2026-06-21 after the completed `0.5.0` GearBlocks scene-context workflow session.
+Version section for work starting on 2026-06-21 after the completed `0.5.0` GearBlocks scene-context workflow session.
 
 ### 2026-06-21
 
@@ -115,7 +249,7 @@ Development bucket for work starting on 2026-06-21 after the completed `0.5.0` G
 
 #### Changed
 
-- 12:09:22 EDT - Changed project version metadata to start the `0.6.0` development bucket.
+- 12:09:22 EDT - Changed project version metadata to `0.6.0`.
 - 12:30:17 EDT - Changed GearBlocks script integration so scene export, BuilderToolExt helpers, and WeldTool controls share one resizable Overlay Forge script window with clickable section navigation.
 - 12:49:09 EDT - Changed the GearBlocks script window navigation to start on a compact vertical home menu, replace content per tool view, and expose a top Back button for returning home.
 - 14:06:17 EDT - Changed GearBlocks scene export UI feedback to show export progress, success, and part count in the Scene view while preserving window position across section changes.
@@ -149,7 +283,7 @@ Development bucket for work starting on 2026-06-21 after the completed `0.5.0` G
 
 ## 0.5.0 - 2026-06-20
 
-Development bucket for GearBlocks scene-context workflow work starting on 2026-06-20 after the completed `0.4.0` documentation rules session.
+Version section for GearBlocks scene-context workflow work starting on 2026-06-20 after the completed `0.4.0` documentation rules session.
 
 ### 2026-06-20
 
@@ -162,7 +296,7 @@ Development bucket for GearBlocks scene-context workflow work starting on 2026-0
 - Changed GearBlocks runtime export import to use per-log SQLite cursors so explicit refresh reads only new `Player.log` / `Player-prev.log` additions when possible.
 - Added a compact runtime scene diff summary between the latest and previous scene exports and included it in GearBlocks chat prompt context.
 - 18:45:48 EDT - Changed chat prompt keyboard submission so pressing Enter on a blank line submits the prompt.
-- 18:55:37 EDT - Changed GearBlocks tool access by adding an Overlay Forge Tools view, installer, no-window script bridge, and whitelisted BuilderToolExt / WeldTool actions.
+- 18:55:37 EDT - Changed GearBlocks tool access by adding an Overlay Forge Tools view, installer, no-window script channel, and whitelisted BuilderToolExt / WeldTool actions.
 - 20:37:52 EDT - Changed GearBlocks scene context refresh so it requests a fresh in-game scene export before importing new `Player.log` context.
 
 #### Fixed
@@ -172,41 +306,41 @@ Development bucket for GearBlocks scene-context workflow work starting on 2026-0
 
 ## 0.4.0 - 2026-06-17
 
-Development bucket for work starting on 2026-06-17 after the completed `0.3.0` session.
+Version section for work starting on 2026-06-17 after the completed `0.3.0` session.
 
 ### 2026-06-18
 
 #### Documentation
 
-- Clarified session versioning so an unused version bucket stays active until substantive work for that version is committed and pushed.
-- Converted the project rules into a root `AGENTS.md` instruction file and kept `docs/PROJECT_RULES.md` as a compatibility pointer.
+- Clarified versioning so version metadata changes only when a meaningful version is intentionally cut.
+- Converted the project rules into a root `AGENTS.md` instruction file and kept `AGENTS.md` as a compatibility pointer.
 
 ### 2026-06-17
 
 #### Changed
 
-- Bumped Overlay Forge from `0.3.0` to `0.4.0` for the next early-development work session.
+- Set Overlay Forge version metadata from `0.3.0` to `0.4.0` for a new capability group.
 
 ## 0.3.0 - 2026-06-16
 
-Development bucket for work started on 2026-06-16. Related changes that continue into the early AM hours before the work session ends are included in this `0.3.0` bucket.
+Version section for work started on 2026-06-16. Related changes that continued into the early AM hours are retained in this `0.3.0` section.
 
 ### 2026-06-16
 
 #### Added
 
 - Added normalized GearBlocks runtime indexes for part API attributes, discovered `value` fields, properties, and attachments so repeated exports update searchable rows instead of relying only on each part's full JSON blob.
-- Added canonical GearBlocks API catalog tables for documented construction namespace types, members, and parameters, plus a runtime part/member bridge that maps observed API availability back to canonical member IDs.
+- Added canonical GearBlocks API catalog tables for documented construction namespace types, members, and parameters, plus a runtime part/member channel that maps observed API availability back to canonical member IDs.
 - Expanded the canonical GearBlocks API catalog seed to include documented construction namespace classes and enum values, including Lua constant names where documented.
 - Added a backend command and TypeScript service payload for browsing the indexed GearBlocks API catalog types, members, parameters, and enum values.
 - Added a GearBlocks API tab for browsing indexed API types, members, method parameters, and enum values from the Gaming workspace.
-- Added a GearBlocks runtime part API member detail query and changed the part detail view to show canonical API member availability from the indexed part/member bridge when available.
+- Added a GearBlocks runtime part API member detail query and changed the part detail view to show canonical API member availability from the indexed part/member channel when available.
 
 #### Changed
 
-- Bumped Overlay Forge from `0.2.0` to `0.3.0` for the next early-development work set.
-- Marked the 2026-06-16 work session as the `0.3.0` changelog bucket, including related early-AM rollover changes.
-- Added project rules for cutting a new `0.x.0` minor version bucket when a new chat starts on a later date than the latest changelog version heading.
+- Set Overlay Forge version metadata from `0.2.0` to `0.3.0` for a new capability group.
+- Marked 2026-06-16 work under the `0.3.0` changelog section, including related early-AM rollover changes.
+- Added project rules for cutting a new semantic version only when a meaningful version boundary is intentionally cut.
 
 #### Fixed
 
@@ -249,7 +383,7 @@ Minor version release for the GearBlocks construction runtime API interface incl
 
 #### Documentation
 
-- Updated README, bridge, project plan, architecture, and data model notes for the Overlay Forge `0.2.0` GearBlocks runtime API interface release and future troubleshooting path.
+- Updated README, project plan, architecture, and data model notes for the Overlay Forge `0.2.0` GearBlocks runtime API interface release and future troubleshooting path.
 
 #### Validation
 
@@ -326,7 +460,7 @@ Minor version release for the GearBlocks construction runtime API interface incl
 
 #### Documentation
 
-- Documented the Gaming chat overlay shortcut in README and bridge context.
+- Documented the Gaming chat overlay shortcut in README and project context.
 - Documented Settings as the place to configure Overlay Forge keybinds.
 - Documented game data-location persistence in the data model and architecture notes.
 - Documented the GearBlocks construction decoder, local save format discovery, and runtime API boundary.
@@ -349,10 +483,10 @@ Minor version release for the GearBlocks construction runtime API interface incl
 #### Documentation
 
 - Added project rules requiring future changelog entries to be grouped by change date.
-- Added `docs/PROJECT_RULES.md` to document the daily changelog tracking convention.
+- Added `AGENTS.md` to document the daily changelog tracking convention.
 - Added `docs/GAMING_SCREENSHOT_VALIDATION.md` to document Gaming Screenshot Capture as complete, passed, and successful.
 - Added `docs/GEARBLOCKS_PARTS_CATALOG.md` as a shareable ChatGPT reference for GearBlocks categories and cataloged parts.
-- Updated README, project plan, architecture, data model, and bridge docs with the validated screenshot capture status.
+- Updated README, project plan, architecture, data model, and project docs with the validated screenshot capture status.
 
 #### Added
 
@@ -403,10 +537,10 @@ Minor version release for the GearBlocks construction runtime API interface incl
 - Milestone 8 - Projects Navigation Tree Actions is complete, passed, and successful.
 - Milestone 9 - Manual Context Attachments is complete, passed, and successful.
 - Milestone 10 - Prompt Preview is complete, passed, and successful.
-- Milestone 11 - Bridge File Drafting is complete, passed, and successful.
+- Milestone 11 - Implementation Request Drafts is complete, passed, and successful.
 - Milestone 12 - Project Markdown Context is complete, passed, and successful.
 - Milestone 13 - Project Workspace UI Consolidation is complete, passed, and successful.
-- Milestone 13 refinement moves conversation attached context and local Markdown bridge drafts into a collapsible right-hand chat pane.
+- Milestone 13 refinement moves conversation attached context and local Markdown implementation request drafts into a collapsible right-hand chat pane.
 - Milestone 13 refinement changes the project row `...` Chat action to `New Chat`, which opens a new-conversation area instead of auto-selecting an existing chat.
 
 ### Added
@@ -423,55 +557,46 @@ Minor version release for the GearBlocks construction runtime API interface incl
 - Added a custom draggable titlebar for the borderless overlay window.
 - Added custom minimize, maximize/restore, and hide overlay controls.
 - Added edge and corner resize handles for adjusting the overlay size and shape.
-- Added root documentation for Milestone 0, architecture, project plan, and bridge files.
-- Added `bridge-files/OPENAI_APP_BRIDGE.md` as the manual ChatGPT/Codex bridge file.
+- Added root documentation for Milestone 0, architecture, project plan, and implementation requests.
+- Added `docs/PROJECT_OVERVIEW.md` as the manual repository context file.
 - Added Scratchpad, Tasks, Notes, and Calendar component navigation.
 - Added SQLite `tasks`, `notes`, and `calendar_events` tables.
 - Added Tauri CRUD commands for tasks, notes, and calendar events.
 - Added Tasks component with create, select, edit, delete, deadline, body, list, and restart restore support.
 - Added Notes component with create, select, edit, delete, list, and restart restore support.
 - Added Calendar component with create, edit, delete, list, and restart restore support.
-- Added `docs/MILESTONE_1.md` with user validation steps.
 - Added `docs/DATA_MODEL.md` for the current SQLite schema.
 - Added Projects component navigation.
 - Added SQLite `projects` table.
 - Added Tauri CRUD commands for local projects.
 - Added Projects component with create, select, read-only view, edit, delete, list, status, and restart restore support.
-- Added `docs/MILESTONE_2.md` with setup validation and manual validation steps.
 - Added Planning Chat component navigation.
 - Added SQLite `planning_conversations` and `planning_messages` tables.
 - Added Tauri planning chat commands for conversation listing, creation, deletion, message listing, and backend message sending.
 - Added a backend OpenAI Responses API integration using `OPENAI_API_KEY`.
 - Added Planning Chat project selection, conversation list, new conversation action, message history, message input, loading state, and readable error display.
-- Added `docs/MILESTONE_3.md` with setup validation and manual validation steps.
 - Added SQLite `project_github_repositories` table initialization for project-scoped GitHub repository linkage and metadata/status.
 - Added Rust/Tauri GitHub integration commands for getting, saving, deleting, and fetching project repository metadata.
 - Added backend-only GitHub metadata fetch behavior using `GITHUB_TOKEN`.
 - Added frontend GitHub project-link UI inside the Projects component.
 - Added readable missing-token, invalid repository full-name, and GitHub request error handling.
-- Added `docs/MILESTONE_4.md` with setup validation and manual validation steps.
 - Added YouTube component navigation.
 - Added SQLite `youtube_references` table initialization for local YouTube reference persistence.
 - Added Rust/Tauri YouTube reference commands for list, get, create, update, delete, and external open.
 - Added frontend YouTube reference CRUD UI with create, selected read-only view, edit, delete, list, and optional user-entered metadata.
 - Added YouTube URL validation for common watch, short link, and shorts URL forms.
 - Added external-open behavior for saved YouTube URLs through the system browser.
-- Added `docs/MILESTONE_5.md` with setup validation and manual validation steps.
 - Added Project workspace sections for Overview, GitHub, and Chat.
 - Added project-scoped Chat inside the selected project workspace.
 - Added a required conversation title field before creating a project workspace chat conversation.
-- Added `docs/MILESTONE_6.md` with setup validation and manual validation steps.
 - Added a refined selected-project workspace header in Projects.
 - Added Overview, GitHub, Chat, and References workspace sections.
 - Added a minimal References section with project-local context category summaries.
-- Added `docs/MILESTONE_7.md` with setup validation and manual validation steps.
-- Added `docs/MILESTONE_8.md` for Projects navigation tree actions.
 - Added the Projects navigation tree pattern in the left navigation shell.
 - Added an expandable Projects module row.
 - Added saved project child rows under Projects.
 - Added a compact Projects `+` creation action.
 - Added compact project row `...` edit/delete actions.
-- Added `docs/MILESTONE_9.md` for Manual Context Attachments.
 - Added manual context attachment support for project chat conversations.
 - Added SQLite `planning_conversation_context` table initialization for conversation-scoped context attachment links.
 - Added backend commands for listing, adding, and removing planning conversation context attachments.
@@ -482,34 +607,32 @@ Minor version release for the GearBlocks construction runtime API interface incl
 - Added backend prompt preview command that assembles local preview data without calling OpenAI.
 - Added display of selected project, selected conversation, draft message, and attached context in Prompt Preview.
 - Added display of assembled prompt preview.
-- Added bridge-file draft generation from selected project chat conversations.
-- Added SQLite `bridge_file_drafts` table initialization for local bridge draft persistence.
-- Added backend commands for bridge draft creation, listing, retrieval, and deletion.
-- Added frontend `Draft Bridge File` action in project workspace Chat.
-- Added read-only Bridge Drafts panel with saved draft list and generated Markdown content display.
+- Added implementation request draft generation from selected project chat conversations.
+- Added SQLite `obj_implementation_request_draft` table initialization for local implementation request draft persistence.
+- Added backend commands for implementation request draft creation, listing, retrieval, and deletion.
+- Added frontend `Draft Implementation Request` action in project workspace Chat.
+- Added read-only Implementation Request Drafts panel with saved draft list and generated Markdown content display.
 - Added generated Markdown draft structure with project, conversation source, goal, relevant context, implementation instructions, validation checklist, deferred items, and notes.
 - Added attached context inclusion for project chat sends, including linked GitHub repository metadata when available.
 - Added project-level local Markdown context configuration for selected projects.
 - Added SQLite `project_markdown_context` table initialization for per-project local Markdown context roots.
 - Added backend commands for getting, saving, clearing, and loading project Markdown context.
-- Added safe local Markdown loading from configured project roots, including `README.md`, `CHANGELOG.md`, `docs/*.md`, `bridge-files/*.md`, and explicit Markdown references found in `README.md`.
+- Added safe local Markdown loading from configured project roots, including `README.md`, `CHANGELOG.md`, `docs/*.md`, `docs/*.md`, and explicit Markdown references found in `README.md`.
 - Added readable warnings for missing, unreadable, unsafe, skipped, and truncated Markdown files.
 - Added Project Markdown context display in selected-project Chat.
-- Added project Markdown context inclusion for Prompt Preview, project chat sends, and bridge draft generation.
-- Added `docs/MILESTONE_13.md` as the baseline plan for Project Workspace UI Consolidation.
+- Added project Markdown context inclusion for Prompt Preview, project chat sends, and implementation request draft generation.
 - Added planning conversation child rows under project rows in the left navigation hierarchy.
 - Added compact chat markers for conversation rows.
 - Added direct conversation-row navigation into the focused project chat surface.
 - Added project row `...` menu routing for Overview, Chat, References, Edit, and Delete.
 - Added a focused chat surface that removes redundant Projects, Active Workspace, tab, and Planning Chat headings.
 - Added Project Edit as the consolidated surface for project details, GitHub repository linkage, and project Markdown context configuration.
-- Added `docs/PROJECT_DEFERRED_ITEMS.md` to centralize Project workspace deferred items.
 
 ### Changed
 
 - Configured the app bundle identifier as `com.overlayforge.desktop`.
 - Configured the Windows app icon for Tauri bundling.
-- Updated the bridge file with current validation status and manual checks.
+- Updated the implementation request with current validation status and manual checks.
 - Fixed custom window controls so titlebar drag handling no longer intercepts button clicks.
 - Added explicit Tauri window permissions for minimize, hide, maximize, drag, and resize commands.
 - Updated project documentation for Milestone 1 implementation status.
@@ -548,22 +671,21 @@ Minor version release for the GearBlocks construction runtime API interface incl
 - Confirmed linked GitHub repository metadata only needs to be defined once per project before it appears in project chat Attached Context.
 - Confirmed Prompt Preview does not send to OpenAI.
 - Clarified attached context is included in Prompt Preview only; actual OpenAI sends remain unchanged in Milestone 10.
-- Confirmed bridge drafts persist locally in SQLite.
-- Confirmed bridge draft deletion removes only the selected draft and does not delete source conversations, messages, or context records.
-- Confirmed linked GitHub repository metadata is resolved from the selected project for bridge drafts, prompt previews, and project chat sends.
-- Confirmed export, full editor workflows, and direct Codex handoff remain deferred beyond Milestone 11.
+- Confirmed implementation request drafts persist locally in SQLite.
+- Confirmed implementation request draft deletion removes only the selected draft and does not delete source conversations, messages, or context records.
+- Confirmed linked GitHub repository metadata is resolved from the selected project for implementation request drafts, prompt previews, and project chat sends.
+- Confirmed export, full editor workflows, and direct Codex automation remain deferred beyond Milestone 11.
 - Confirmed project Markdown context is project-scoped, local-first, and not stored as per-conversation manual attachments.
 - Confirmed conversation manual attachments remain an additional context layer after project Markdown context.
-- Confirmed GitHub file APIs, broad repository indexing, bridge export, and direct Codex handoff remain deferred beyond Milestone 12.
+- Confirmed GitHub file APIs, broad repository indexing, draft export, and direct Codex automation remain deferred beyond Milestone 12.
 - Confirmed that Milestone 12 is complete, passed, and successful after the Milestone 13 UI consolidation pass.
 - Clarified that Milestone 13 should preserve conversation-scoped manual attachment data semantics while moving attachment controls out of the primary chat surface.
-- Added the Milestone 13 right-hand pane for conversation attached context and local Markdown bridge drafts.
+- Added the Milestone 13 right-hand pane for conversation attached context and local Markdown implementation request drafts.
 - Added a `New Chat` project action that starts on an empty new-conversation area.
 - Preserved left-navigation conversation child-row selection as the only path for opening existing chats directly.
 - Confirmed Milestone 13 did not require schema changes.
 - Confirmed conversation manual attachments remain conversation-scoped after UI consolidation.
 - Synced `docs/DATA_MODEL.md` to mark the Milestone 12 data model as complete and revalidated after Milestone 13.
-- Linked `README.md`, `docs/BRIDGE_FILES.md`, and `docs/PROJECT_PLAN.md` to the centralized Project deferred items doc.
 
 ### Validation
 

@@ -6,6 +6,7 @@ const OPENAI_RESPONSES_URL: &str = "https://api.openai.com/v1/responses";
 const DEFAULT_MODEL: &str = "gpt-5";
 pub const PLANNING_SYSTEM_INSTRUCTION: &str = "You are helping plan the selected Overlay Forge local project. Keep responses concise, practical, and implementation-oriented. Prefer Codex-ready structure when the user asks for implementation planning. Do not claim repository access unless repository content was explicitly provided to the model request.";
 pub const GAME_SYSTEM_INSTRUCTION: &str = "You are helping plan, analyze, and document the selected game workspace in Overlay Forge. Keep responses concise, practical, and grounded in the provided game context. When discussing visible parts, builds, screenshots, or physics behavior, distinguish observed facts from assumptions.";
+pub const GAME_BUILD_GUIDE_SYSTEM_INSTRUCTION: &str = "You create practical GearBlocks build guides for Overlay Forge. Output only Markdown, with no conversational preface and no fenced code blocks. Use GearBlocks units and centimeters, never imperial units unless explicitly requested. Prefer known GearBlocks catalog part names from the provided context. Keep the guide phased, buildable, and focused on readable in-game assembly guidance.";
 
 #[derive(Serialize)]
 struct ResponsesRequest {
@@ -149,6 +150,57 @@ pub async fn create_game_response(
     extract_output_text(&body)
 }
 
+pub async fn create_game_build_guide_response(
+    api_key: &str,
+    game: &GameRecord,
+    messages: &[GameChatMessageRecord],
+    attached_context: &str,
+    build_goal: &str,
+) -> Result<String, String> {
+    if api_key.trim().is_empty() {
+        return Err(
+            "OpenAI API key is not configured. Save one in Settings or set OPENAI_API_KEY."
+                .to_string(),
+        );
+    }
+
+    let request = ResponsesRequest {
+        model: DEFAULT_MODEL,
+        instructions: GAME_BUILD_GUIDE_SYSTEM_INSTRUCTION,
+        input: build_game_build_guide_input(game, messages, attached_context, build_goal),
+        reasoning: low_latency_reasoning(),
+        text: concise_text(),
+        store: false,
+    };
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(OPENAI_RESPONSES_URL)
+        .bearer_auth(api_key.trim())
+        .json(&request)
+        .send()
+        .await
+        .map_err(|error| format!("OpenAI request failed: {error}"))?;
+
+    let status = response.status();
+    let body = response
+        .text()
+        .await
+        .map_err(|error| format!("OpenAI response could not be read: {error}"))?;
+
+    if !status.is_success() {
+        if let Ok(error_body) = serde_json::from_str::<ResponsesErrorBody>(&body) {
+            if let Some(error) = error_body.error {
+                return Err(format!("OpenAI request failed: {}", error.message));
+            }
+        }
+
+        return Err(format!("OpenAI request failed with status {status}"));
+    }
+
+    extract_output_text(&body)
+}
+
 fn build_input(
     project: &ProjectRecord,
     messages: &[PlanningMessageRecord],
@@ -209,6 +261,55 @@ fn build_game_input(
             },
         });
     }
+
+    input
+}
+
+fn build_game_build_guide_input(
+    game: &GameRecord,
+    messages: &[GameChatMessageRecord],
+    attached_context: &str,
+    build_goal: &str,
+) -> Vec<ResponsesInputMessage> {
+    let mut input = vec![ResponsesInputMessage {
+        role: "user".to_string(),
+        content: text_content(format!(
+            "Selected game workspace context:\nName: {}\nSlug: {}\nSummary: {}",
+            game.name, game.slug, game.summary
+        )),
+    }];
+
+    if !attached_context.trim().is_empty() {
+        input.push(ResponsesInputMessage {
+            role: "user".to_string(),
+            content: text_content(attached_context.to_string()),
+        });
+    }
+
+    if !messages.is_empty() {
+        input.push(ResponsesInputMessage {
+            role: "user".to_string(),
+            content: text_content("Recent conversation context follows.".to_string()),
+        });
+        input.extend(messages.iter().map(|message| ResponsesInputMessage {
+            role: message.role.clone(),
+            content: text_content(message.content.clone()),
+        }));
+    }
+
+    input.push(ResponsesInputMessage {
+        role: "user".to_string(),
+        content: text_content(format!(
+            "{}\n\n{}\n\n{}\n{}\n{}\n{}\n{}",
+            "Create an Overlay Forge GearBlocks build guide from this goal:",
+            build_goal.trim(),
+            "Required Markdown structure:",
+            "# <short build guide title>",
+            "## Build Goal\n## Scale Reference\n## Current Chosen Geometry\n## Main Parts List\n### <category>\n| Qty | Part | Purpose |\n| --- | --- | --- |",
+            "## Assembly Instructions\n### 1. <step title>\n## First Test Checklist",
+            "Output only the Markdown guide. Do not wrap it in triple backticks."
+        )),
+    });
 
     input
 }

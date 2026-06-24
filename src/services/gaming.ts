@@ -352,6 +352,59 @@ export type GameChatOverlaySelection = {
   conversationId: number;
 };
 
+export type GameBuildGuide = {
+  id: number;
+  gameId: number;
+  title: string;
+  sourcePath: string;
+  rawMarkdown: string;
+  buildGoal: string;
+  scaleReference: string;
+  geometryNotes: string;
+  checklistJson: string;
+  overlayX: number | null;
+  overlayY: number | null;
+  overlayWidth: number | null;
+  overlayHeight: number | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GameBuildGuidePart = {
+  id: number;
+  guideId: number;
+  section: string;
+  quantity: string;
+  partName: string;
+  purpose: string;
+  rowOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GameBuildGuideStep = {
+  id: number;
+  guideId: number;
+  stepNumber: number;
+  title: string;
+  body: string;
+  rowOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GameBuildGuidePayload = {
+  guide: GameBuildGuide;
+  parts: GameBuildGuidePart[];
+  steps: GameBuildGuideStep[];
+  checklist: string[];
+};
+
+export type GameBuildGuideOverlaySelection = {
+  gameId: number;
+  guideId: number;
+};
+
 export function listGames() {
   return invoke<Game[]>("list_games");
 }
@@ -554,6 +607,43 @@ export function toggleGameChatOverlayWindow() {
 
 export function getActiveGameChatOverlay() {
   return invoke<GameChatOverlaySelection | null>("get_active_game_chat_overlay");
+}
+
+export function listGameBuildGuides(gameId: number) {
+  return invoke<GameBuildGuide[]>("list_game_build_guides", { gameId });
+}
+
+export function importGameBuildGuideMarkdown(gameId: number, markdownPath: string) {
+  return invoke<GameBuildGuidePayload>("import_game_build_guide_markdown", {
+    gameId,
+    markdownPath
+  });
+}
+
+export function createGameBuildGuideFromChat(conversationId: number, buildGoal: string) {
+  return invoke<GameBuildGuidePayload>("create_game_build_guide_from_chat", {
+    conversationId,
+    buildGoal
+  });
+}
+
+export function getGameBuildGuide(guideId: number) {
+  return invoke<GameBuildGuidePayload>("get_game_build_guide", { guideId });
+}
+
+export function openGameBuildGuideOverlayWindow(gameId: number, guideId: number) {
+  return invoke<GameBuildGuideOverlaySelection>("open_game_build_guide_overlay_window", {
+    gameId,
+    guideId
+  });
+}
+
+export function toggleGameBuildGuideOverlayWindow() {
+  return invoke<boolean>("toggle_game_build_guide_overlay_window");
+}
+
+export function getActiveGameBuildGuideOverlay() {
+  return invoke<GameBuildGuideOverlaySelection | null>("get_active_game_build_guide_overlay");
 }
 
 export function listGameChatConversations(gameId: number) {

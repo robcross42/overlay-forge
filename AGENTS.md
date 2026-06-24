@@ -1,251 +1,197 @@
-# AGENTS.md
+# Overlay Forge Codex Instructions
 
-Agent instructions for Overlay Forge. This file applies to the entire repository.
+## Authority
 
-## Project Baseline
+This file is the top-level instruction file for Codex work in this repository.
 
-- Current stable app baseline: Milestone 13, complete / passed / successful.
-- Current active development bucket: `0.6.0`.
-- Overlay Forge is a local-first Tauri v2 desktop overlay app with a React + TypeScript frontend, Rust backend, and SQLite persistence.
-- Future work must preserve the completed overlay shell, Projects workspace, project chat, bridge draft, local Markdown context, Gaming, GearBlocks, screenshot, and runtime API indexing workflows unless a user request explicitly changes them.
+Codex should read this file before planning, editing, validation, documentation updates, or commits. Supporting documentation lives under `docs/` and should be read when relevant to the requested change.
 
-## Required Context
+## Current Workflow
 
-Before planning or implementing project work, read the relevant repo docs instead of relying only on the README.
+The user performs code requests directly from Codex chat in VS Code.
 
-- `README.md`
-- `CHANGELOG.md`
-- `docs/ARCHITECTURE.md`
-- `docs/DATA_MODEL.md`
-- `docs/PROJECT_PLAN.md`
-- `docs/PROJECT_DEFERRED_ITEMS.md`
-- GearBlocks work: also read `docs/GEARBLOCKS_CONSTRUCTION_DECODER.md`, `docs/GEARBLOCKS_PARTS_CATALOG.md`, `docs/GEARBLOCKS_RUNTIME_INTERFACES.md`, and `docs/GEARBLOCKS_GEARLIB.md` when the work involves BepInEx, GearLib, or compiled GearBlocks plugins.
-- Gaming screenshot work: also read `docs/GAMING_SCREENSHOT_VALIDATION.md`.
-- Bridge workflow work: also read `docs/BRIDGE_FILES.md` and `bridge-files/OPENAI_APP_BRIDGE.md`.
+This repository documentation is used as local project context for Codex. Do not treat Markdown files as a separate transfer workflow. Do not create external request documents unless the user explicitly asks for one.
 
-## Versioning
+## Documentation Map
 
-Each new substantive work session uses the next `0.x.0` minor version unless the user says otherwise.
+Read the smallest relevant set before editing:
 
-- Compare the current local date to the date of the latest changelog version heading.
-- If the latest version bucket only contains the version bump / setup entry and there are no committed or pending substantive changes for that version, keep using that existing version bucket instead of cutting another minor version.
-- Treat a version bucket as consumed only after substantive feature, fix, validation, or documentation work for that version has been committed and pushed. A version-only bump commit does not consume the bucket by itself.
-- If the current local date is greater than the date of the latest changelog version heading and the latest version bucket is already consumed, create the next minor version bucket before starting project work.
-- Increment only the minor version in the `0.x.0` sequence, such as `0.2.0`, `0.3.0`, `0.4.0`, and `0.5.0`.
-- Update `package.json` and `package-lock.json` to the new version when cutting a new session bucket.
-- Add the new version heading near the top of `CHANGELOG.md` using `## 0.x.0 - YYYY-MM-DD`, then add that session's daily `### YYYY-MM-DD` entries under it.
-- Related changes that continue into the early AM hours before the user considers the work session complete may stay in the existing session version bucket.
-
-## Changelog
+| Work area | Read first |
+| --- | --- |
+| General project direction | `docs/PROJECT_OVERVIEW.md`, `docs/PROJECT_HISTORY.md` |
+| Frontend/backend architecture | `docs/ARCHITECTURE.md` |
+| SQLite tables or migrations | `docs/DATA_MODEL.md` |
+| Scope boundaries or deferred work | `docs/FEATURE_SCOPE.md`, `docs/DEFERRED_ITEMS.md` |
+| Validation expectations | `docs/VALIDATION.md` |
+| Versioning or changelog updates | `docs/VERSIONING.md`, `CHANGELOG.md` |
+| Gaming screenshots | `docs/GAMING_SCREENSHOTS.md` |
+| GearBlocks feature work | `docs/GEARBLOCKS.md`, then the focused GearBlocks docs |
+| Smoking Cessation | `docs/SMOKING_CESSATION.md` |
 
-Keep `CHANGELOG.md` organized so changes can be reviewed by the day they were made.
-
-- Under the active version bucket, add a daily heading before new change entries using ISO format: `### YYYY-MM-DD`.
-- Put that day's changes under standard changelog subheadings such as `#### Added`, `#### Changed`, `#### Fixed`, `#### Validation`, or `#### Documentation`.
-- For new `#### Changed` and `#### Fixed` bullet entries, prefix each bullet with the current local system timestamp using `HH:MM:SS EDT -`, for example `- 18:34:15 EDT - Changed ...`.
-- Add all entries for the same calendar day under the same date heading instead of scattering them through older sections.
-- Keep older historical entries as-is unless a separate cleanup task explicitly asks to reorganize them.
-- When a milestone validation changes documentation, include the validation/documentation update under that day's heading so the daily work summary stays complete.
+## Reasoning Model Selection
 
-## Reasoning Model Selection Rules
+Classify the request before execution.
 
-Optimize cost, latency, and token usage by defaulting all tasks to Medium Reasoning unless the requested work meets the criteria for High Reasoning or Very High Reasoning.
+Default to **Medium Reasoning**.
 
-Codex should automatically evaluate each request before execution and select the lowest reasoning level capable of completing the task correctly.
-
-### Default Rule
+Use **Low Reasoning** only for narrow, obvious changes such as small copy edits, simple constant updates, or isolated style tweaks.
 
-Use Medium Reasoning for all tasks unless one or more escalation conditions are met.
+Use **High Reasoning** when the request affects:
 
-Do not escalate reasoning simply because a request is large, contains many files, or involves multiple steps. Escalation should be based on complexity, uncertainty, architectural impact, or risk.
+- architecture
+- persistence or migrations
+- Rust/Tauri command flow
+- OpenAI request assembly
+- GitHub integration
+- GearBlocks runtime import/export
+- scheduler behavior
+- security or token handling
+- cross-feature UI state
+- large refactors
 
-### Medium Reasoning
+Use **Very High Reasoning** when the request affects multiple major subsystems, requires uncertain reverse engineering, or could damage user data.
 
-Use for:
+If the current Codex reasoning setting is lower than the task requires, stop all processing before editing, tell the user which reasoning level to switch to, and wait for the user to resubmit the prompt with the correct reasoning setting.
 
-- Bug fixes with a clearly identified cause.
-- Small feature additions within an existing architecture.
-- UI adjustments.
-- Refactoring isolated code.
-- Documentation updates.
-- Unit test additions.
-- Data model additions that follow existing patterns.
-- Configuration changes.
-- Log analysis with obvious findings.
-- Simple database updates.
-- Export/import enhancements following existing implementation patterns.
-- Iterative tuning and refinement of existing functionality.
-- Game module feature development where requirements are already understood.
+If the current Codex reasoning setting is **Medium** and the task only requires **Low**, proceed at Medium without stopping.
 
-Examples:
+If the current Codex reasoning setting is **High** or **Very High** and the task only requires **Low** or **Medium**, stop all processing before editing, tell the user the lower recommended reasoning level, and wait for the user to resubmit the prompt.
 
-- Add a button.
-- Fix a null pointer exception.
-- Add a database field.
-- Update export behavior.
-- Adjust overlay positioning.
-- Improve error handling.
-- Add a new API endpoint following existing conventions.
+Do not flag after completion that a lower reasoning level would have been sufficient. Only stop before work begins when the current setting is either too low for the requested task or unnecessarily High / Very High for a Low / Medium task.
 
-### High Reasoning
+## Architecture And Abstraction Rules
 
-Use when the request requires substantial analysis, design decisions, or understanding of multiple interconnected systems.
+Overlay Forge uses Tauri v2, React + TypeScript, Rust/Tauri commands, and SQLite. Use architecture patterns that fit this stack. Do not apply Java-style inheritance directly to Rust; use Rust-native composition, structs, enums, traits, services, repositories, and thin command handlers.
 
-Escalate to High Reasoning when any of the following apply:
+Do not solve defects or add features with one-off procedural patches when the issue involves reusable behavior, repeated state shape, duplicated validation, duplicated mapping, or inconsistent object handling. Duplicated behavior is a defect risk.
 
-- Architectural changes affecting multiple modules.
-- Database schema redesign.
-- Significant refactoring across multiple files.
-- New subsystem creation.
-- Complex debugging where root cause is unknown.
-- Performance optimization requiring investigation.
-- State synchronization issues.
-- Multi-step workflows spanning several components.
-- Security-sensitive changes.
-- Concurrency or threading concerns.
-- Data migration planning.
-- New integration with external services.
-- Ambiguous requirements requiring design decisions.
-
-Examples:
-
-- Design a new overlay subsystem.
-- Implement a Graph API integration.
-- Investigate data inconsistencies across modules.
-- Rework export and database synchronization logic.
-- Design a plugin architecture.
-- Create a screenshot ingestion pipeline.
-- Diagnose intermittent synchronization failures.
-
-### Very High Reasoning
+Before implementing a non-trivial feature or fix, identify:
 
-Use only when failure would be costly or when extensive planning and deep analysis are required before implementation.
-
-Escalate to Very High Reasoning when any of the following apply:
-
-- Designing entirely new platform architecture.
-- Major framework-level changes.
-- Complex cross-module redesigns.
-- Large-scale data model redesigns.
-- Multi-phase migration strategies.
-- High-risk security architecture.
-- Complex AI-agent workflows.
-- Large project planning requiring extensive decomposition.
-- Requests where multiple valid architectural approaches exist and tradeoff analysis is required.
-- Situations where implementation without significant planning would likely create technical debt.
-
-Examples:
-
-- Designing Overlay Forge core architecture.
-- Defining a new module framework.
-- Planning a major persistence redesign.
-- Designing agent-to-agent coordination systems.
-- Reworking application lifecycle management.
-- Establishing project-wide standards affecting all modules.
+1. The domain concept involved.
+2. The abstraction that owns it.
+3. Whether a new abstraction is required.
+4. What regression-prone duplication this avoids.
 
-### Escalation Process
-
-Before beginning work:
-
-1. Classify the task.
-2. Select the lowest reasoning level capable of completing it.
-3. Briefly state the selected reasoning level.
-4. If the selected level is Medium, proceed with execution.
-5. If the selected level is High or Very High, stop before execution and ask the user to switch the VS Code/Codex reasoning setting to that level. Do not continue until the user confirms the setting has been changed or explicitly tells Codex to proceed anyway.
-
-After completing a Medium Reasoning task, briefly flag the user in the final response if Low Reasoning would likely have been sufficient. Do not stop or delay Medium Reasoning work for this; use it only as post-implementation calibration so the project can tune reasoning defaults over time.
-
-Reasoning levels should be selected conservatively.
-
-If uncertain between two levels:
-
-- Prefer Medium over High.
-- Prefer High over Very High.
-
-Escalate only when the complexity genuinely requires it.
-
-### Overlay Forge Specific Guidance
-
-Medium:
-
-- Routine feature additions.
-- UI changes.
-- Database field additions.
-- Export/import fixes.
-- Module-specific enhancements.
-- Iterative improvements discovered through gameplay.
-
-High:
-
-- New modules.
-- Cross-module integrations.
-- Database architecture changes.
-- State synchronization redesign.
-- External service integrations.
-- Complex troubleshooting with unknown root causes.
-
-Very High:
-
-- Core framework redesign.
-- Agent architecture changes.
-- Major persistence redesign.
-- Module framework redesign.
-- Changes affecting all modules and future development patterns.
-
-Goal: maintain maximum development velocity by using Medium Reasoning whenever practical while automatically escalating to High or Very High Reasoning only when complexity, risk, uncertainty, or architectural impact justify the additional cost.
-
-## Implementation Rules
-
-- Prefer existing repo patterns and feature boundaries over new abstractions.
-- Keep SQLite migrations non-destructive and idempotent.
-- Use normalized SQLite names: `obj_` for dynamic object tables, `def_` for static definition tables, `o2o_` for one-to-one mapping tables, and `n2n_` for many-to-many mapping tables. Include `created_at`, `modified_at`, and a `schema_json` field on normalized tables unless there is a concrete compatibility reason not to. Keep legacy table renames non-destructive and idempotent.
-- For game-specific persistence, prefer `def_game`, `obj_game`, `obj_game_setting`, or normalized feature tables keyed by `game_id` and `id_game`. Do not create per-game physical tables such as `obj_game_gearblocks` unless a future design explicitly justifies the migration cost.
-- Scheduler rows must map to explicit Rust handlers through `def_scheduler_type`; do not store or execute arbitrary commands, script bodies, Lua payloads, shell commands, or frontend-controlled executable strings from SQLite.
-- React must call local Tauri commands for backend-owned behavior.
-- Backend-only secrets stay in Rust/Tauri. Do not expose `OPENAI_API_KEY` or `GITHUB_TOKEN` to frontend source or SQLite.
-- Preserve local-first behavior. Do not introduce cloud sync, broad filesystem indexing, GitHub file browsing, vector stores, semantic search, or direct Codex handoff unless explicitly requested.
-- Use structured APIs/parsers when available instead of ad hoc string parsing.
-- Keep edits scoped. Do not refactor unrelated modules while implementing a requested change.
-
-## User-Facing Restart Warnings
-
-- If a completed change requires only Overlay Forge itself to restart and the local scripts can do it safely, automate the restart instead of only telling the user. During normal development, prefer starting the full dev workflow with `npm run tauri:dev` in a visible terminal so Vite and Tauri both run. Use the raw debug executable only when the user explicitly asks for it or when a dev-server workflow is not needed. Report that the restart was performed.
-- When a completed change requires the user to restart, relaunch, reload, or close and reopen any app, game, service, plugin host, dev server, overlay, or IDE, call this out clearly in the final response.
-- Format restart warnings as bold red text using inline HTML: `<span style="color:red"><strong>Restart required:</strong> ...</span>`.
-- Put the warning near the top of the final response so it is not missed.
-- Be specific about what must be restarted and why, such as GearBlocks needing to reload a BepInEx DLL, Overlay Forge needing to reload backend commands, or a dev server needing to pick up configuration changes.
-- Do not silently restart GearBlocks, Steam, an IDE, or another user-controlled app where state could be lost. For those, either ask first or provide the bold red warning.
-
-## GearBlocks Rules
-
-- GearBlocks save decoding, runtime log import, catalog metadata, screenshots, and chat context are local-first.
-- `construction.bytes` decoding reads local raw DEFLATE-compressed BSON and does not require GearBlocks to be running.
-- Runtime metadata comes from the installable GearBlocks Lua script mod, which now exports the whole live scene by default.
-- Do not trigger GearBlocks runtime log parsing from normal chat navigation; use explicit refresh or backend chat-send context assembly until a true background/latest-export importer is added.
-- Runtime API metadata is availability-only by default. Do not execute getter commands or include API getter values in default chat prompt context unless a future explicit user-controlled include/snapshot action is added.
-- Prefer normalized GearBlocks runtime/API tables and command-layer payloads over reparsing only the full runtime export JSON blob.
-- BepInEx and GearLib are third-party, user-installed dependencies. Overlay Forge may detect and document their presence, but must not bundle, redistribute, install, or modify them unless a future explicit license / permission review allows it.
-- GearBlocks scale guidance must use metric units: 1 GearBlocks unit equals 10 cm. Chat should answer GearBlocks build-distance advice in centimeters and/or GearBlocks units such as 1 unit, 0.5 units, or 16 units, and should not suggest imperial distances unless the user explicitly asks for imperial conversion.
-- GearBlocks scale caveat: the developer noted that the player character, wheels, and other parts are slightly oversized to allow room for gears and other parts inside vehicles. Treat those as gameplay-clearance exceptions, not strict real-world scale references.
-- Preserve the validated `game-screenshots/` folder layout, Tauri asset preview scope, overlay-hidden capture behavior, and screenshot delete cleanup semantics.
-
-## Validation
-
-Use focused validation that matches the change.
-
-- Frontend-only changes: run `npm run build` when practical.
-- Rust/backend changes: run `cargo check` or `cargo build` from `src-tauri` when practical.
-- Full app changes: run both frontend and Rust validation when practical.
-- Mention any validation that could not be run.
-
-## Milestone Handoff
-
-When the user reports that a milestone validation is complete:
-
-1. Update milestone, changelog, project plan, architecture, data model, and bridge docs from pending validation to `Complete / Passed / Successful`.
-2. Run a quick sanity check appropriate to the milestone.
-3. Review `git status` and include only intended milestone changes.
-4. Commit with a milestone-specific message.
-5. Push the current branch.
-
-Do not commit unrelated user changes.
+If the change is small and does not need a new abstraction, state why. If a concept appears in three or more places, or if two places already diverged and caused a bug, create or extend a reusable abstraction.
+
+Feature work must check whether the behavior belongs in an existing abstraction such as:
+
+- window manager
+- window config model
+- window state repository
+- module manager
+- app settings service
+- SQLite repository
+- chat/session model
+- screenshot/attachment model
+- export service
+- log ingestion service
+- Tauri command service layer
+
+If an appropriate abstraction exists, extend it. If none exists, create one before adding isolated call-site behavior.
+
+### Frontend Architecture
+
+React components should be function components with hooks. They should render UI and handle local interaction only. React must not own backend business rules, persistence rules, or Tauri window lifecycle behavior.
+
+Use TypeScript interfaces or type aliases for plain DTOs. Use TypeScript classes when an object has both data and behavior, especially repeated construction, validation, normalization, serialization, deserialization, comparison, default values, state transitions, command payload shaping, SQLite row mapping, or UI view-model mapping.
+
+### Rust And Tauri Architecture
+
+Tauri command handlers must stay thin. They may receive input, validate input, call a service, repository, or domain method, and return a typed result. They must not manually construct complex domain objects inline, duplicate default configuration, duplicate SQLite access logic, own business rules, or contain large procedural feature implementations.
+
+Use Rust `struct` plus `impl` for domain behavior, `enum` for finite variants, `trait` for shared behavior or interchangeable implementations, repository structs for SQLite persistence, service structs for business logic, and modules for domain boundaries.
+
+### SQLite Architecture
+
+Do not scatter SQL row mapping across the codebase. Each persisted domain concept should have one canonical mapping path between database rows, domain objects, database insert/update payloads, and frontend DTOs where needed.
+
+Avoid duplicating column names, SQL fragments, and row conversion logic in unrelated files.
+
+### Window Architecture
+
+Overlay Forge has a first-class window domain model. Do not create Tauri windows ad hoc in commands, React components, utility files, or one-off helpers.
+
+All window creation, configuration, restoration, state persistence, and lifecycle behavior should route through centralized Rust window abstractions. Expected concepts are:
+
+- `WindowKind`
+- `BaseWindowConfig`
+- `OverlayWindowConfig`
+- `StandaloneWindowConfig`
+- `WindowManager`
+- `WindowStateRepository`
+
+`WindowKind` should be an enum, not scattered strings. Window config should use Rust composition: `StandaloneWindowConfig` and `OverlayWindowConfig` compose shared `BaseWindowConfig`.
+
+`WindowManager` should be the only place that creates, opens, closes, focuses, restores, or mutates Tauri windows. `WindowStateRepository` should be the only place that persists or restores window size, position, visibility, and related SQLite-backed state.
+
+Before changing window behavior, inspect all existing window creation paths. If more than one file constructs windows, sets default options, generates labels, restores geometry, or handles standalone-window configuration, consolidate the shared path first.
+
+### Regression Prevention
+
+When fixing a bug, first check whether duplicated or inconsistent logic caused it. If yes, refactor the duplicated logic into a shared abstraction, update all call sites, add or update tests around the abstraction, and avoid leaving old duplicate logic behind.
+
+For every non-trivial code change, include a short architecture note in the final response covering the domain concept, reusable abstraction added or reused, duplicate logic removed, regression risk reduced, and tests added or updated. If no abstraction was added, explain why.
+
+Avoid copy/pasted object construction, repeated inline validation, repeated SQLite row mapping, repeated Tauri command payload shaping, business logic inside React components or Tauri command handlers, stringly typed command/status/result handling, large dumping-ground utility files, ad hoc Tauri window creation outside `WindowManager`, and duplicated standalone-window setup or default options.
+
+## Coding Rules
+
+- Preserve the local-first design.
+- Keep React/frontend code out of token handling.
+- Keep OpenAI and GitHub token usage backend-owned.
+- Treat SQLite as the source of truth for persisted app data.
+- Make migrations non-destructive and idempotent.
+- Do not remove existing user data unless the user explicitly requests cleanup.
+- Prefer focused changes over broad rewrites.
+- Do not commit unrelated user changes.
+- Do not introduce arbitrary command execution through SQLite, scheduler rows, Lua payloads, or user-editable config.
+- Keep generated local files, screenshots, plugin binaries, third-party DLLs, and machine-specific outputs out of git unless documentation explicitly says otherwise.
+
+## Documentation Rules
+
+- Update docs when behavior, scope, validation, or persistence changes.
+- Keep active documentation compact and task-facing.
+- Put historical milestone details in `docs/PROJECT_HISTORY.md`, not one file per milestone.
+- Put deferred items in `docs/DEFERRED_ITEMS.md`.
+- Use current terminology from these docs when naming UI, docs, and future features.
+- Do not reintroduce retired external-transfer terminology into new documentation or UI.
+
+## Versioning And Changelog Rules
+
+- Use semantic versioning in `MAJOR.MINOR.PATCH` form.
+- Do not increment the minor version just because a new chat, work session, or calendar day starts.
+- Keep changelog entries date/time-stamped under day headings.
+- Use `## Unreleased` for active work until the user intentionally cuts a version.
+- Use `PATCH` for fixes, documentation-only changes, validation updates, small UX refinements, and internal refactors.
+- Use `MINOR` for substantial new user-visible capabilities.
+- Use `MAJOR` for incompatible or breaking release changes.
+- Read `docs/VERSIONING.md` before changing version metadata or changelog structure.
+
+## Validation Rules
+
+Run validation appropriate to the touched area.
+
+Minimum defaults:
+
+| Changed area | Validation |
+| --- | --- |
+| Frontend / React / TypeScript | `npm run build` |
+| Rust / Tauri backend | `cd src-tauri && cargo build` |
+| Shared frontend/backend behavior | both commands |
+| Persistence changes | both commands plus migration review |
+| GearBlocks script/plugin work | build/type-check plus manual game-path validation where possible |
+| Scheduler changes | backend build plus bounded-job behavior review |
+
+If validation cannot be run, state that clearly and explain what was not validated.
+
+## Commit Rules
+
+When the user asks for a commit or milestone completion:
+
+1. Run appropriate validation.
+2. Review `git status`.
+3. Stage only intended files.
+4. Use a specific commit message.
+5. Do not include unrelated local changes.
+6. Push only when the user requested or the current workflow explicitly requires it.

@@ -344,6 +344,44 @@ pub struct GameRuntimePartRecord {
 }
 
 #[derive(Clone, Serialize)]
+pub struct GameRuntimePartAliasRecord {
+    pub id: i64,
+    #[serde(rename = "gameId")]
+    pub game_id: i64,
+    #[serde(rename = "partInstanceKey")]
+    pub part_instance_key: String,
+    #[serde(rename = "friendlyName")]
+    pub friendly_name: String,
+    #[serde(rename = "assetGuid")]
+    pub asset_guid: String,
+    #[serde(rename = "assetName")]
+    pub asset_name: String,
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    #[serde(rename = "fullDisplayName")]
+    pub full_display_name: String,
+    pub category: String,
+    #[serde(rename = "sourceLogPath")]
+    pub source_log_path: String,
+    #[serde(rename = "sourceConstructionId")]
+    pub source_construction_id: String,
+    #[serde(rename = "worldPositionJson")]
+    pub world_position_json: String,
+    #[serde(rename = "localPositionJson")]
+    pub local_position_json: String,
+    #[serde(rename = "currentUnitSizeJson")]
+    pub current_unit_size_json: String,
+    #[serde(rename = "payloadJson")]
+    pub payload_json: String,
+    #[serde(rename = "lastSeenAt")]
+    pub last_seen_at: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+#[derive(Clone, Serialize)]
 pub struct GameRuntimeConstructionExportRecord {
     pub id: i64,
     #[serde(rename = "gameId")]
@@ -617,6 +655,88 @@ pub struct GameChatConversationRecord {
     pub created_at: String,
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct GameBuildGuideRecord {
+    pub id: i64,
+    #[serde(rename = "gameId")]
+    pub game_id: i64,
+    pub title: String,
+    #[serde(rename = "sourcePath")]
+    pub source_path: String,
+    #[serde(rename = "rawMarkdown")]
+    pub raw_markdown: String,
+    #[serde(rename = "buildGoal")]
+    pub build_goal: String,
+    #[serde(rename = "scaleReference")]
+    pub scale_reference: String,
+    #[serde(rename = "geometryNotes")]
+    pub geometry_notes: String,
+    #[serde(rename = "checklistJson")]
+    pub checklist_json: String,
+    #[serde(rename = "overlayX")]
+    pub overlay_x: Option<i32>,
+    #[serde(rename = "overlayY")]
+    pub overlay_y: Option<i32>,
+    #[serde(rename = "overlayWidth")]
+    pub overlay_width: Option<i32>,
+    #[serde(rename = "overlayHeight")]
+    pub overlay_height: Option<i32>,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct GameBuildGuidePartRecord {
+    pub id: i64,
+    #[serde(rename = "guideId")]
+    pub guide_id: i64,
+    pub section: String,
+    pub quantity: String,
+    #[serde(rename = "partName")]
+    pub part_name: String,
+    pub purpose: String,
+    #[serde(rename = "rowOrder")]
+    pub row_order: i64,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct GameBuildGuideStepRecord {
+    pub id: i64,
+    #[serde(rename = "guideId")]
+    pub guide_id: i64,
+    #[serde(rename = "stepNumber")]
+    pub step_number: i64,
+    pub title: String,
+    pub body: String,
+    #[serde(rename = "rowOrder")]
+    pub row_order: i64,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+pub struct GameBuildGuidePartDraft {
+    pub section: String,
+    pub quantity: String,
+    pub part_name: String,
+    pub purpose: String,
+    pub row_order: i64,
+}
+
+pub struct GameBuildGuideStepDraft {
+    pub step_number: i64,
+    pub title: String,
+    pub body: String,
+    pub row_order: i64,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -1043,6 +1163,27 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS obj_game_runtime_part_alias (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                part_instance_key TEXT NOT NULL,
+                friendly_name TEXT NOT NULL,
+                asset_guid TEXT NOT NULL DEFAULT '',
+                asset_name TEXT NOT NULL DEFAULT '',
+                display_name TEXT NOT NULL DEFAULT '',
+                full_display_name TEXT NOT NULL DEFAULT '',
+                category TEXT NOT NULL DEFAULT '',
+                source_log_path TEXT NOT NULL DEFAULT '',
+                source_construction_id TEXT NOT NULL DEFAULT '',
+                world_position_json TEXT NOT NULL DEFAULT '{}',
+                local_position_json TEXT NOT NULL DEFAULT '{}',
+                current_unit_size_json TEXT NOT NULL DEFAULT '{}',
+                payload_json TEXT NOT NULL DEFAULT '{}',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE TABLE IF NOT EXISTS obj_game_runtime_part_api_attribute (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
@@ -1260,6 +1401,47 @@ impl AppDatabase {
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS obj_game_build_guide (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                title TEXT NOT NULL DEFAULT 'Build guide',
+                source_path TEXT NOT NULL DEFAULT '',
+                raw_markdown TEXT NOT NULL DEFAULT '',
+                build_goal TEXT NOT NULL DEFAULT '',
+                scale_reference TEXT NOT NULL DEFAULT '',
+                geometry_notes TEXT NOT NULL DEFAULT '',
+                checklist_json TEXT NOT NULL DEFAULT '[]',
+                overlay_x INTEGER,
+                overlay_y INTEGER,
+                overlay_width INTEGER,
+                overlay_height INTEGER,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_game_build_guide_part (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guide_id INTEGER NOT NULL,
+                section TEXT NOT NULL DEFAULT '',
+                quantity TEXT NOT NULL DEFAULT '',
+                part_name TEXT NOT NULL DEFAULT '',
+                purpose TEXT NOT NULL DEFAULT '',
+                row_order INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_game_build_guide_step (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guide_id INTEGER NOT NULL,
+                step_number INTEGER NOT NULL DEFAULT 0,
+                title TEXT NOT NULL DEFAULT '',
+                body TEXT NOT NULL DEFAULT '',
+                row_order INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE INDEX IF NOT EXISTS idx_game_catalog_objects_game_id
                 ON obj_game_catalog_object (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_catalog_objects_game_name
@@ -1278,8 +1460,16 @@ impl AppDatabase {
                 ON obj_game_chat_conversation (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_chat_messages_conversation_id
                 ON obj_game_chat_message (conversation_id);
+            CREATE INDEX IF NOT EXISTS idx_game_build_guides_game_id
+                ON obj_game_build_guide (game_id);
+            CREATE INDEX IF NOT EXISTS idx_game_build_guide_parts_guide_id
+                ON obj_game_build_guide_part (guide_id);
+            CREATE INDEX IF NOT EXISTS idx_game_build_guide_steps_guide_id
+                ON obj_game_build_guide_step (guide_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_parts_game_id
                 ON obj_game_runtime_part (game_id);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_part_aliases_game_id
+                ON obj_game_runtime_part_alias (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_part_api_attributes_game_id
                 ON obj_game_runtime_part_api_attribute (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_part_api_attributes_interface
@@ -1340,6 +1530,22 @@ impl AppDatabase {
                 'gearblocks',
                 'Game-specific workspace section for GearBlocks planning, object cataloging, references, and screenshots.'
             );
+
+            INSERT OR IGNORE INTO def_game (id_game, game_key, ui_name, summary, schema_json)
+            VALUES (
+                2,
+                'path-of-exile-2',
+                'Path of Exile 2',
+                'Supported Path of Exile 2 game module definition.',
+                '{\"fields\":{\"id_game\":\"stable integer game definition id\",\"game_key\":\"stable lowercase game key\",\"ui_name\":\"visible game definition name\",\"summary\":\"definition summary\"}}'
+            );
+
+            INSERT OR IGNORE INTO obj_game (name, slug, summary)
+            VALUES (
+                'Path of Exile 2',
+                'path-of-exile-2',
+                'Game-specific workspace section for Path of Exile 2 chats, builds, passive planning, item tracking, gems, loot filters, and trade.'
+            );
             ",
         )?;
         Self::ensure_column(&connection, "obj_task", "body", "TEXT NOT NULL DEFAULT ''")?;
@@ -1354,6 +1560,10 @@ impl AppDatabase {
             "obj_game",
             "id_game",
             "INTEGER NOT NULL DEFAULT 1",
+        )?;
+        connection.execute(
+            "UPDATE obj_game SET id_game = 2 WHERE slug = 'path-of-exile-2'",
+            [],
         )?;
         Self::ensure_column(
             &connection,
@@ -1494,6 +1704,13 @@ impl AppDatabase {
             "
             CREATE UNIQUE INDEX IF NOT EXISTS idx_game_runtime_parts_game_part_key_unique
                 ON obj_game_runtime_part (game_id, part_key)
+            ",
+            [],
+        )?;
+        connection.execute(
+            "
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_game_runtime_part_aliases_game_instance_unique
+                ON obj_game_runtime_part_alias (game_id, part_instance_key)
             ",
             [],
         )?;
@@ -1815,6 +2032,7 @@ impl AppDatabase {
             ("obj_game_data_location", "id"),
             ("obj_game_catalog_screenshot", "id"),
             ("obj_game_runtime_part", "id"),
+            ("obj_game_runtime_part_alias", "id"),
             ("obj_game_runtime_part_api_attribute", "id"),
             ("obj_game_runtime_part_value", "id"),
             ("obj_game_runtime_part_property", "id"),
@@ -1870,7 +2088,7 @@ impl AppDatabase {
         Ok(())
     }
 
-    fn normalized_schema_tables() -> [&'static str; 39] {
+    fn normalized_schema_tables() -> [&'static str; 43] {
         [
             "obj_scratchpad",
             "obj_setting",
@@ -1898,6 +2116,7 @@ impl AppDatabase {
             "obj_game_data_location",
             "obj_game_catalog_screenshot",
             "obj_game_runtime_part",
+            "obj_game_runtime_part_alias",
             "obj_game_runtime_part_api_attribute",
             "obj_game_runtime_part_value",
             "obj_game_runtime_part_property",
@@ -1911,6 +2130,9 @@ impl AppDatabase {
             "obj_game_runtime_construction_export",
             "obj_game_chat_conversation",
             "obj_game_chat_message",
+            "obj_game_build_guide",
+            "obj_game_build_guide_part",
+            "obj_game_build_guide_step",
         ]
     }
 
@@ -3782,6 +4004,46 @@ impl AppDatabase {
         Ok(parts)
     }
 
+    pub fn list_game_runtime_part_aliases(
+        &self,
+        game_id: i64,
+    ) -> Result<Vec<GameRuntimePartAliasRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                id,
+                game_id,
+                part_instance_key,
+                friendly_name,
+                asset_guid,
+                asset_name,
+                display_name,
+                full_display_name,
+                category,
+                source_log_path,
+                source_construction_id,
+                world_position_json,
+                local_position_json,
+                current_unit_size_json,
+                payload_json,
+                last_seen_at,
+                created_at,
+                updated_at
+            FROM obj_game_runtime_part_alias
+            WHERE game_id = ?1
+            ORDER BY friendly_name COLLATE NOCASE ASC, part_instance_key COLLATE NOCASE ASC
+            ",
+        )?;
+
+        let aliases = statement
+            .query_map(params![game_id], game_runtime_part_alias_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(aliases)
+    }
+
     pub fn count_game_runtime_parts(&self, game_id: i64) -> Result<usize> {
         let connection = self.connection.lock().expect("database mutex poisoned");
         Self::get_game_by_id(&connection, game_id)?;
@@ -4250,6 +4512,111 @@ impl AppDatabase {
         )?;
 
         Self::get_game_runtime_part_by_key(&connection, game_id, part_key)
+    }
+
+    pub fn upsert_game_runtime_part_alias(
+        &self,
+        game_id: i64,
+        part_instance_key: &str,
+        friendly_name: &str,
+        asset_guid: &str,
+        asset_name: &str,
+        display_name: &str,
+        full_display_name: &str,
+        category: &str,
+        source_log_path: &str,
+        source_construction_id: &str,
+        world_position_json: &str,
+        local_position_json: &str,
+        current_unit_size_json: &str,
+        payload_json: &str,
+        last_seen_at: &str,
+    ) -> Result<GameRuntimePartAliasRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        connection.execute(
+            "
+            INSERT INTO obj_game_runtime_part_alias (
+                game_id,
+                part_instance_key,
+                friendly_name,
+                asset_guid,
+                asset_name,
+                display_name,
+                full_display_name,
+                category,
+                source_log_path,
+                source_construction_id,
+                world_position_json,
+                local_position_json,
+                current_unit_size_json,
+                payload_json,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
+            ON CONFLICT(game_id, part_instance_key) DO UPDATE SET
+                friendly_name = excluded.friendly_name,
+                asset_guid = excluded.asset_guid,
+                asset_name = excluded.asset_name,
+                display_name = excluded.display_name,
+                full_display_name = excluded.full_display_name,
+                category = excluded.category,
+                source_log_path = excluded.source_log_path,
+                source_construction_id = excluded.source_construction_id,
+                world_position_json = excluded.world_position_json,
+                local_position_json = excluded.local_position_json,
+                current_unit_size_json = excluded.current_unit_size_json,
+                payload_json = excluded.payload_json,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                game_id,
+                part_instance_key.trim(),
+                friendly_name.trim(),
+                asset_guid.trim(),
+                asset_name.trim(),
+                display_name.trim(),
+                full_display_name.trim(),
+                category.trim(),
+                source_log_path.trim(),
+                source_construction_id.trim(),
+                world_position_json.trim(),
+                local_position_json.trim(),
+                current_unit_size_json.trim(),
+                payload_json.trim(),
+                last_seen_at.trim()
+            ],
+        )?;
+
+        connection.query_row(
+            "
+            SELECT
+                id,
+                game_id,
+                part_instance_key,
+                friendly_name,
+                asset_guid,
+                asset_name,
+                display_name,
+                full_display_name,
+                category,
+                source_log_path,
+                source_construction_id,
+                world_position_json,
+                local_position_json,
+                current_unit_size_json,
+                payload_json,
+                last_seen_at,
+                created_at,
+                updated_at
+            FROM obj_game_runtime_part_alias
+            WHERE game_id = ?1
+                AND part_instance_key = ?2
+            ",
+            params![game_id, part_instance_key.trim()],
+            game_runtime_part_alias_from_row,
+        )
     }
 
     pub fn upsert_game_runtime_part_api_attribute(
@@ -4984,6 +5351,213 @@ impl AppDatabase {
             .collect::<Result<Vec<_>>>()?;
 
         Ok(conversations)
+    }
+
+    pub fn list_game_build_guides(&self, game_id: i64) -> Result<Vec<GameBuildGuideRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        let mut statement = connection.prepare(
+            "
+            SELECT id, game_id, title, source_path, raw_markdown, build_goal, scale_reference,
+                geometry_notes, checklist_json, overlay_x, overlay_y, overlay_width,
+                overlay_height, created_at, updated_at
+            FROM obj_game_build_guide
+            WHERE game_id = ?1
+            ORDER BY updated_at DESC, id DESC
+            ",
+        )?;
+
+        let guides = statement
+            .query_map(params![game_id], game_build_guide_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(guides)
+    }
+
+    pub fn latest_game_build_guide(&self, game_id: i64) -> Result<Option<GameBuildGuideRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        connection
+            .query_row(
+                "
+                SELECT id, game_id, title, source_path, raw_markdown, build_goal, scale_reference,
+                    geometry_notes, checklist_json, overlay_x, overlay_y, overlay_width,
+                    overlay_height, created_at, updated_at
+                FROM obj_game_build_guide
+                WHERE game_id = ?1
+                ORDER BY updated_at DESC, id DESC
+                LIMIT 1
+                ",
+                params![game_id],
+                game_build_guide_from_row,
+            )
+            .optional()
+    }
+
+    pub fn get_game_build_guide(&self, id: i64) -> Result<GameBuildGuideRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_build_guide_by_id(&connection, id)
+    }
+
+    pub fn create_game_build_guide(
+        &self,
+        game_id: i64,
+        title: &str,
+        source_path: &str,
+        raw_markdown: &str,
+        build_goal: &str,
+        scale_reference: &str,
+        geometry_notes: &str,
+        checklist_json: &str,
+    ) -> Result<GameBuildGuideRecord> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_by_id(&connection, game_id)?;
+        let clean_title = if title.trim().is_empty() {
+            "Build guide"
+        } else {
+            title.trim()
+        };
+        connection.execute(
+            "
+            INSERT INTO obj_game_build_guide (
+                game_id, title, source_path, raw_markdown, build_goal, scale_reference,
+                geometry_notes, checklist_json
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            ",
+            params![
+                game_id,
+                clean_title,
+                source_path.trim(),
+                raw_markdown,
+                build_goal.trim(),
+                scale_reference.trim(),
+                geometry_notes.trim(),
+                checklist_json.trim()
+            ],
+        )?;
+
+        let id = connection.last_insert_rowid();
+        Self::get_game_build_guide_by_id(&connection, id)
+    }
+
+    pub fn replace_game_build_guide_parts(
+        &self,
+        guide_id: i64,
+        parts: &[GameBuildGuidePartDraft],
+    ) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_build_guide_by_id(&connection, guide_id)?;
+        connection.execute(
+            "DELETE FROM obj_game_build_guide_part WHERE guide_id = ?1",
+            params![guide_id],
+        )?;
+        for part in parts {
+            connection.execute(
+                "
+                INSERT INTO obj_game_build_guide_part (
+                    guide_id, section, quantity, part_name, purpose, row_order
+                )
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                ",
+                params![
+                    guide_id,
+                    part.section.trim(),
+                    part.quantity.trim(),
+                    part.part_name.trim(),
+                    part.purpose.trim(),
+                    part.row_order
+                ],
+            )?;
+        }
+        connection.execute(
+            "UPDATE obj_game_build_guide SET updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
+            params![guide_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn replace_game_build_guide_steps(
+        &self,
+        guide_id: i64,
+        steps: &[GameBuildGuideStepDraft],
+    ) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_build_guide_by_id(&connection, guide_id)?;
+        connection.execute(
+            "DELETE FROM obj_game_build_guide_step WHERE guide_id = ?1",
+            params![guide_id],
+        )?;
+        for step in steps {
+            connection.execute(
+                "
+                INSERT INTO obj_game_build_guide_step (
+                    guide_id, step_number, title, body, row_order
+                )
+                VALUES (?1, ?2, ?3, ?4, ?5)
+                ",
+                params![
+                    guide_id,
+                    step.step_number,
+                    step.title.trim(),
+                    step.body.trim(),
+                    step.row_order
+                ],
+            )?;
+        }
+        connection.execute(
+            "UPDATE obj_game_build_guide SET updated_at = CURRENT_TIMESTAMP WHERE id = ?1",
+            params![guide_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn list_game_build_guide_parts(
+        &self,
+        guide_id: i64,
+    ) -> Result<Vec<GameBuildGuidePartRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_build_guide_by_id(&connection, guide_id)?;
+        Self::list_game_build_guide_parts_for_connection(&connection, guide_id)
+    }
+
+    pub fn list_game_build_guide_steps(
+        &self,
+        guide_id: i64,
+    ) -> Result<Vec<GameBuildGuideStepRecord>> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_build_guide_by_id(&connection, guide_id)?;
+        Self::list_game_build_guide_steps_for_connection(&connection, guide_id)
+    }
+
+    pub fn update_game_build_guide_overlay_bounds(
+        &self,
+        guide_id: i64,
+        overlay_x: Option<i32>,
+        overlay_y: Option<i32>,
+        overlay_width: Option<i32>,
+        overlay_height: Option<i32>,
+    ) -> Result<()> {
+        let connection = self.connection.lock().expect("database mutex poisoned");
+        Self::get_game_build_guide_by_id(&connection, guide_id)?;
+        connection.execute(
+            "
+            UPDATE obj_game_build_guide
+            SET overlay_x = COALESCE(?2, overlay_x),
+                overlay_y = COALESCE(?3, overlay_y),
+                overlay_width = COALESCE(?4, overlay_width),
+                overlay_height = COALESCE(?5, overlay_height),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?1
+            ",
+            params![
+                guide_id,
+                overlay_x,
+                overlay_y,
+                overlay_width,
+                overlay_height
+            ],
+        )?;
+        Ok(())
     }
 
     pub fn create_game_chat_conversation(
@@ -5853,6 +6427,62 @@ impl AppDatabase {
             params![id],
             game_chat_conversation_from_row,
         )
+    }
+
+    fn get_game_build_guide_by_id(
+        connection: &Connection,
+        id: i64,
+    ) -> Result<GameBuildGuideRecord> {
+        connection.query_row(
+            "
+            SELECT id, game_id, title, source_path, raw_markdown, build_goal, scale_reference,
+                geometry_notes, checklist_json, overlay_x, overlay_y, overlay_width,
+                overlay_height, created_at, updated_at
+            FROM obj_game_build_guide
+            WHERE id = ?1
+            ",
+            params![id],
+            game_build_guide_from_row,
+        )
+    }
+
+    fn list_game_build_guide_parts_for_connection(
+        connection: &Connection,
+        guide_id: i64,
+    ) -> Result<Vec<GameBuildGuidePartRecord>> {
+        let mut statement = connection.prepare(
+            "
+            SELECT id, guide_id, section, quantity, part_name, purpose, row_order, created_at,
+                updated_at
+            FROM obj_game_build_guide_part
+            WHERE guide_id = ?1
+            ORDER BY row_order ASC, id ASC
+            ",
+        )?;
+
+        let parts = statement
+            .query_map(params![guide_id], game_build_guide_part_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(parts)
+    }
+
+    fn list_game_build_guide_steps_for_connection(
+        connection: &Connection,
+        guide_id: i64,
+    ) -> Result<Vec<GameBuildGuideStepRecord>> {
+        let mut statement = connection.prepare(
+            "
+            SELECT id, guide_id, step_number, title, body, row_order, created_at, updated_at
+            FROM obj_game_build_guide_step
+            WHERE guide_id = ?1
+            ORDER BY row_order ASC, id ASC
+            ",
+        )?;
+
+        let steps = statement
+            .query_map(params![guide_id], game_build_guide_step_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(steps)
     }
 
     fn get_game_chat_message_by_id(
@@ -7140,6 +7770,29 @@ fn game_runtime_part_from_row(row: &rusqlite::Row<'_>) -> Result<GameRuntimePart
     })
 }
 
+fn game_runtime_part_alias_from_row(row: &rusqlite::Row<'_>) -> Result<GameRuntimePartAliasRecord> {
+    Ok(GameRuntimePartAliasRecord {
+        id: row.get(0)?,
+        game_id: row.get(1)?,
+        part_instance_key: row.get(2)?,
+        friendly_name: row.get(3)?,
+        asset_guid: row.get(4)?,
+        asset_name: row.get(5)?,
+        display_name: row.get(6)?,
+        full_display_name: row.get(7)?,
+        category: row.get(8)?,
+        source_log_path: row.get(9)?,
+        source_construction_id: row.get(10)?,
+        world_position_json: row.get(11)?,
+        local_position_json: row.get(12)?,
+        current_unit_size_json: row.get(13)?,
+        payload_json: row.get(14)?,
+        last_seen_at: row.get(15)?,
+        created_at: row.get(16)?,
+        updated_at: row.get(17)?,
+    })
+}
+
 fn db_json_vector3(value: &serde_json::Value) -> Option<(f64, f64, f64)> {
     Some((
         value.get("x")?.as_f64()?,
@@ -7233,6 +7886,53 @@ fn game_chat_conversation_from_row(row: &rusqlite::Row<'_>) -> Result<GameChatCo
     })
 }
 
+fn game_build_guide_from_row(row: &rusqlite::Row<'_>) -> Result<GameBuildGuideRecord> {
+    Ok(GameBuildGuideRecord {
+        id: row.get(0)?,
+        game_id: row.get(1)?,
+        title: row.get(2)?,
+        source_path: row.get(3)?,
+        raw_markdown: row.get(4)?,
+        build_goal: row.get(5)?,
+        scale_reference: row.get(6)?,
+        geometry_notes: row.get(7)?,
+        checklist_json: row.get(8)?,
+        overlay_x: row.get(9)?,
+        overlay_y: row.get(10)?,
+        overlay_width: row.get(11)?,
+        overlay_height: row.get(12)?,
+        created_at: row.get(13)?,
+        updated_at: row.get(14)?,
+    })
+}
+
+fn game_build_guide_part_from_row(row: &rusqlite::Row<'_>) -> Result<GameBuildGuidePartRecord> {
+    Ok(GameBuildGuidePartRecord {
+        id: row.get(0)?,
+        guide_id: row.get(1)?,
+        section: row.get(2)?,
+        quantity: row.get(3)?,
+        part_name: row.get(4)?,
+        purpose: row.get(5)?,
+        row_order: row.get(6)?,
+        created_at: row.get(7)?,
+        updated_at: row.get(8)?,
+    })
+}
+
+fn game_build_guide_step_from_row(row: &rusqlite::Row<'_>) -> Result<GameBuildGuideStepRecord> {
+    Ok(GameBuildGuideStepRecord {
+        id: row.get(0)?,
+        guide_id: row.get(1)?,
+        step_number: row.get(2)?,
+        title: row.get(3)?,
+        body: row.get(4)?,
+        row_order: row.get(5)?,
+        created_at: row.get(6)?,
+        updated_at: row.get(7)?,
+    })
+}
+
 fn game_chat_message_from_row(row: &rusqlite::Row<'_>) -> Result<GameChatMessageRecord> {
     Ok(GameChatMessageRecord {
         id: row.get(0)?,
@@ -7321,6 +8021,15 @@ mod tests {
             )
             .expect("seeded game should have schema metadata");
         assert!(game_schema.contains("\"table\":\"obj_game\""));
+
+        let path_of_exile_id_game: i64 = connection
+            .query_row(
+                "SELECT id_game FROM obj_game WHERE slug = 'path-of-exile-2'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("Path of Exile 2 game row should be seeded");
+        assert_eq!(path_of_exile_id_game, 2);
 
         drop(connection);
         drop(database);

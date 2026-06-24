@@ -65,7 +65,7 @@ type ProjectNavAction = {
 };
 
 type GameNavAction = {
-  type: "home" | "newChat" | "chat" | "screenshots" | "parts";
+  type: "home" | "newChat" | "chat" | "screenshots" | "parts" | "build-guides";
   gameId?: number;
   conversationId?: number;
   nonce: number;
@@ -151,6 +151,7 @@ export default function App() {
     let isMounted = true;
     let unlisten: (() => void) | null = null;
     let unlistenOverlayToggle: (() => void) | null = null;
+    let unlistenBuildGuideOverlay: (() => void) | null = null;
 
     function consumePendingShortcut() {
       invoke<string | null>("consume_pending_shortcut_action")
@@ -173,6 +174,8 @@ export default function App() {
             void handleGameChatOverlayShortcut();
           } else if (action === "game_chat_overlay_focus_game") {
             void handleGameChatOverlayShortcut();
+          } else if (action === "game_build_guide_overlay") {
+            void handleGameBuildGuideOverlayShortcut();
           }
         })
         .catch(() => {});
@@ -210,6 +213,22 @@ export default function App() {
       })
       .catch(() => {});
 
+    listen("game-build-guide-overlay-requested", () => {
+      if (!isMounted) {
+        return;
+      }
+
+      consumePendingShortcut();
+    })
+      .then((cleanup) => {
+        if (isMounted) {
+          unlistenBuildGuideOverlay = cleanup;
+        } else {
+          cleanup();
+        }
+      })
+      .catch(() => {});
+
     window.addEventListener("focus", consumePendingShortcut);
     consumePendingShortcut();
 
@@ -217,6 +236,7 @@ export default function App() {
       isMounted = false;
       unlisten?.();
       unlistenOverlayToggle?.();
+      unlistenBuildGuideOverlay?.();
       window.removeEventListener("focus", consumePendingShortcut);
     };
   }, [activeComponent, gameNavAction, gameSections, isChatOverlayMode, selectedGameId]);
@@ -375,6 +395,30 @@ export default function App() {
     await showOverlayWindow().catch(() => {});
     setGameNavAction({
       type: "newChat",
+      gameId: selectedGame.id,
+      nonce: Date.now()
+    });
+  }
+
+  async function handleGameBuildGuideOverlayShortcut() {
+    const selectedGame =
+      gameSections.find((game) => game.slug === "gearblocks") ??
+      gameSections.find((game) => game.id === selectedGameId) ??
+      gameSections[0] ??
+      null;
+    if (!selectedGame) {
+      openGaming();
+      await showOverlayWindow().catch(() => {});
+      return;
+    }
+
+    openGaming();
+    setGamingExpanded(true);
+    setGameMenuId(null);
+    setSelectedGameId(selectedGame.id);
+    await showOverlayWindow().catch(() => {});
+    setGameNavAction({
+      type: "build-guides",
       gameId: selectedGame.id,
       nonce: Date.now()
     });

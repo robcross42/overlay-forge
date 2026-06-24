@@ -59,7 +59,7 @@ button {
 
 .overlay-frame-chat-mode {
   grid-template-rows: minmax(0, 1fr);
-  background: rgba(8, 10, 13, 0.82);
+  background: var(--standalone-frame-bg, rgba(8, 10, 13, 0.82));
   border-color: transparent;
   box-shadow: none;
   backdrop-filter: none;
@@ -67,8 +67,111 @@ button {
 
 .overlay-frame-chat-mode .overlay-shell {
   grid-template-columns: minmax(0, 1fr);
-  height: 100vh;
-  max-height: 100vh;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+}
+
+.game-chat-overlay-frame {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.game-chat-overlay-frame .overlay-shell {
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  padding-top: 10px;
+}
+
+.overlay-window-titlebar {
+  z-index: 2;
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  margin: 10px 10px 0;
+  padding: 10px;
+  border: 1px solid rgba(185, 205, 222, 0.18);
+  border-radius: 8px;
+  background: var(--standalone-title-bg, rgba(14, 18, 23, 0.84));
+  cursor: move;
+  user-select: none;
+}
+
+.overlay-window-titlebar h1 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.overlay-window-titlebar span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.standalone-overlay-window {
+  --standalone-frame-bg: rgba(8, 10, 13, 0.02);
+  --standalone-title-bg: rgba(14, 18, 23, 0.05);
+  --standalone-panel-bg: rgba(8, 10, 13, 0.05);
+  --standalone-panel-strong-bg: rgba(28, 36, 47, 0.06);
+  --standalone-user-panel-bg: rgba(255, 255, 255, 0.03);
+  --standalone-input-bg: rgba(6, 8, 11, 0.06);
+  --standalone-accent-bg: rgba(79, 208, 165, 0.04);
+  background: var(--standalone-frame-bg);
+}
+
+.standalone-overlay-focused .standalone-overlay-window {
+  --standalone-frame-bg: rgba(8, 10, 13, 0.82);
+  --standalone-title-bg: rgba(14, 18, 23, 0.84);
+  --standalone-panel-bg: rgba(8, 10, 13, 0.68);
+  --standalone-panel-strong-bg: rgba(28, 36, 47, 0.62);
+  --standalone-user-panel-bg: rgba(255, 255, 255, 0.2);
+  --standalone-input-bg: rgba(6, 8, 11, 0.72);
+  --standalone-accent-bg: rgba(79, 208, 165, 0.14);
+}
+
+.standalone-overlay-window .overlay-window-titlebar {
+  background: var(--standalone-title-bg);
+}
+
+.standalone-overlay-window .message-list,
+.standalone-overlay-window .build-guide-overlay-content {
+  background: transparent;
+}
+
+.standalone-overlay-window .chat-workspace-overlay-mode .chat-message {
+  background: var(--standalone-panel-bg);
+}
+
+.standalone-overlay-window .chat-workspace-overlay-mode .chat-message-user {
+  background: var(--standalone-user-panel-bg);
+}
+
+.standalone-overlay-window .chat-workspace-overlay-mode .body-input.compact {
+  background: var(--standalone-input-bg);
+}
+
+.standalone-overlay-window .build-guide-section,
+.standalone-overlay-window .build-guide-part-group,
+.standalone-overlay-window .build-guide-step {
+  background: var(--standalone-panel-strong-bg);
+}
+
+.standalone-overlay-window .build-guide-part-row {
+  background: var(--standalone-panel-bg);
+}
+
+.standalone-overlay-window .build-guide-meta-row span,
+.standalone-overlay-window .build-guide-qty {
+  background: var(--standalone-accent-bg);
 }
 
 .window-titlebar {
@@ -623,8 +726,9 @@ button {
 }
 
 .workspace-chat-overlay-mode {
-  height: 100vh;
-  max-height: 100vh;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
   padding: 8px;
 }
 
@@ -882,20 +986,24 @@ select.text-input option:hover {
 
 .item-list::-webkit-scrollbar,
 .sub-list::-webkit-scrollbar,
-.message-list::-webkit-scrollbar {
+.message-list::-webkit-scrollbar,
+.build-guide-overlay-content::-webkit-scrollbar {
   width: 10px;
+  height: 10px;
 }
 
 .item-list::-webkit-scrollbar-track,
 .sub-list::-webkit-scrollbar-track,
-.message-list::-webkit-scrollbar-track {
+.message-list::-webkit-scrollbar-track,
+.build-guide-overlay-content::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.06);
   border-radius: 999px;
 }
 
 .item-list::-webkit-scrollbar-thumb,
 .sub-list::-webkit-scrollbar-thumb,
-.message-list::-webkit-scrollbar-thumb {
+.message-list::-webkit-scrollbar-thumb,
+.build-guide-overlay-content::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
   border-radius: 999px;
   background: rgba(79, 208, 165, 0.48);
@@ -1935,6 +2043,62 @@ select.text-input option:hover {
   line-height: 1.45;
 }
 
+.poe2-home-scaffold,
+.poe2-section-panel {
+  display: grid;
+  flex: 1 0 100%;
+  gap: 12px;
+  min-width: 0;
+}
+
+.poe2-section-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+
+.poe2-section-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.poe2-section-card.large {
+  max-width: 720px;
+}
+
+.poe2-section-card p,
+.poe2-section-card h4 {
+  margin: 0;
+}
+
+.poe2-section-card p {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.poe2-section-card h4 {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.poe2-section-card span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
 .game-script-tool-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2444,6 +2608,10 @@ select.text-input option:hover {
   grid-template-columns: 38px minmax(0, 1fr);
 }
 
+.chat-workspace-overlay-mode.chat-workspace-overlay-no-controls {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .chat-workspace-overlay-mode {
   height: 100%;
   min-height: 0;
@@ -2487,9 +2655,17 @@ select.text-input option:hover {
   min-height: 56px;
   max-height: 56px;
   border-color: rgba(255, 255, 255, 0.18);
-  background: rgba(6, 8, 11, 0.72);
-  padding: 8px 84px 8px 10px;
+  background: var(--standalone-input-bg, rgba(6, 8, 11, 0.72));
+  padding: 8px 148px 8px 10px;
   line-height: 1.35;
+}
+
+.chat-workspace-overlay-mode .chat-input-extra-action {
+  position: absolute;
+  right: 72px;
+  bottom: 8px;
+  min-height: 32px;
+  padding: 0 10px;
 }
 
 .chat-workspace-overlay-mode .chat-input-row .primary-button {
@@ -4239,12 +4415,12 @@ select.text-input option:hover {
 
 .chat-workspace-overlay-mode .chat-message {
   border-color: rgba(255, 255, 255, 0.14);
-  background: rgba(6, 8, 11, 0.72);
+  background: var(--standalone-panel-bg, rgba(6, 8, 11, 0.72));
 }
 
 .chat-workspace-overlay-mode .chat-message-user {
   border-color: rgba(255, 255, 255, 0.26);
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--standalone-user-panel-bg, rgba(255, 255, 255, 0.2));
 }
 
 .planning-panel-focused .planning-chat-surface {
@@ -4474,7 +4650,7 @@ select.text-input option:hover {
 
 .chat-input-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: end;
   gap: 10px;
   min-width: 0;
@@ -4687,6 +4863,277 @@ select.text-input option:hover {
   font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
   font-size: 0.78rem;
   line-height: 1.45;
+}
+
+.game-build-guides-panel,
+.build-guide-overlay-shell {
+  min-width: 0;
+}
+
+.game-build-guides-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.game-build-guides-empty,
+.game-build-guide-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(28, 36, 47, 0.7);
+}
+
+.game-build-guides-empty {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.game-build-guides-list {
+  display: grid;
+  gap: 10px;
+}
+
+.game-build-guide-row > div {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.game-build-guide-row span,
+.game-build-guides-empty span {
+  color: var(--muted);
+}
+
+.game-build-guide-row code {
+  max-width: 100%;
+  overflow: hidden;
+  color: #b9cbe0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.build-guide-overlay-frame {
+  background: var(--standalone-frame-bg);
+}
+
+.build-guide-overlay-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.build-guide-overlay-content {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+  padding: 10px;
+  overflow-x: auto;
+  overflow-y: auto;
+  scrollbar-color: rgba(79, 208, 165, 0.48) rgba(255, 255, 255, 0.06);
+  scrollbar-width: thin;
+}
+
+.build-guide-title-drag-box {
+  flex-shrink: 0;
+}
+
+.build-guide-status,
+.build-guide-section,
+.build-guide-part-group,
+.build-guide-step {
+  min-width: 0;
+  border: 1px solid rgba(185, 205, 222, 0.16);
+  background: var(--standalone-panel-strong-bg, rgba(28, 36, 47, 0.62));
+}
+
+.build-guide-status {
+  margin: 0;
+  padding: 10px;
+  border-radius: 8px;
+  color: var(--muted);
+}
+
+.build-guide-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.build-guide-meta-row span,
+.build-guide-qty {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(79, 208, 165, 0.14);
+  color: #baf5dd;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.build-guide-section {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.build-guide-section h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.build-guide-section p {
+  margin: 0;
+  color: #d7e2ec;
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.build-guide-part-group {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 7px;
+}
+
+.build-guide-part-group h3 {
+  margin: 0;
+  color: #c6d5e2;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.build-guide-part-list,
+.build-guide-step-list {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.build-guide-part-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(185, 205, 222, 0.1);
+  border-radius: 7px;
+  background: var(--standalone-panel-bg, rgba(13, 18, 24, 0.58));
+}
+
+.build-guide-part-row > div {
+  min-width: 0;
+}
+
+.build-guide-part-row strong {
+  display: block;
+  color: var(--text);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.build-guide-part-row p {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.build-guide-step {
+  display: grid;
+  gap: 8px;
+  padding: 9px;
+  border-radius: 8px;
+}
+
+.build-guide-step-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.build-guide-step-head span {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #07110d;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.build-guide-step-head h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.build-guide-checklist {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: #d7e2ec;
+  font-size: 13px;
+}
+
+.build-guide-font-medium .build-guide-title-drag-box h1 {
+  font-size: 17px;
+}
+
+.build-guide-font-medium .build-guide-section h2,
+.build-guide-font-medium .build-guide-part-group h3,
+.build-guide-font-medium .build-guide-step-head h3 {
+  font-size: 15px;
+}
+
+.build-guide-font-medium .build-guide-section p,
+.build-guide-font-medium .build-guide-part-row strong,
+.build-guide-font-medium .build-guide-checklist {
+  font-size: 15px;
+}
+
+.build-guide-font-medium .build-guide-part-row p,
+.build-guide-font-medium .build-guide-meta-row span,
+.build-guide-font-medium .build-guide-qty {
+  font-size: 13px;
+}
+
+.build-guide-font-large .build-guide-title-drag-box h1 {
+  font-size: 20px;
+}
+
+.build-guide-font-large .build-guide-section h2,
+.build-guide-font-large .build-guide-part-group h3,
+.build-guide-font-large .build-guide-step-head h3 {
+  font-size: 17px;
+}
+
+.build-guide-font-large .build-guide-section p,
+.build-guide-font-large .build-guide-part-row strong,
+.build-guide-font-large .build-guide-checklist {
+  font-size: 17px;
+}
+
+.build-guide-font-large .build-guide-part-row p,
+.build-guide-font-large .build-guide-meta-row span,
+.build-guide-font-large .build-guide-qty {
+  font-size: 15px;
 }
 
 @media (max-width: 780px) {

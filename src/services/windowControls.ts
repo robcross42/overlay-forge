@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { LogicalSize } from "@tauri-apps/api/dpi";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import type { Window as TauriWindow } from "@tauri-apps/api/window";
 
 type ResizeDirection =
   | "East"
@@ -28,6 +29,46 @@ export function setOverlayMinimumSize(width: number, height: number) {
 
 export function setOverlayWindowOpacity(opacity: number) {
   return invoke<void>("set_overlay_window_opacity", { opacity });
+}
+
+export function isOverlayForgeForeground() {
+  return invoke<boolean>("is_overlay_forge_foreground");
+}
+
+export function getOverlayForgeForegroundWindowLabel() {
+  return invoke<string | null>("get_overlay_forge_foreground_window_label");
+}
+
+export async function applyStandaloneOverlayFocusState(window: TauriWindow = overlayWindow) {
+  async function applyFocusState() {
+    const [currentWindowFocused, foregroundOverlayLabel] = await Promise.all([
+      window.isFocused().catch(() => false),
+      getOverlayForgeForegroundWindowLabel().catch(() => null)
+    ]);
+    const overlayIsForeground =
+      currentWindowFocused ||
+      (foregroundOverlayLabel !== null && foregroundOverlayLabel !== window.label);
+
+    document.documentElement.classList.toggle("standalone-overlay-focused", overlayIsForeground);
+    document.documentElement.classList.toggle("standalone-overlay-unfocused", !overlayIsForeground);
+    await setOverlayWindowOpacity(1).catch(() => {});
+  }
+
+  await applyFocusState();
+
+  const focusPollId = globalThis.setInterval(() => {
+    void applyFocusState();
+  }, 250);
+  const unlistenFocus = await window.onFocusChanged(() => {
+    globalThis.setTimeout(() => {
+      void applyFocusState();
+    }, 50);
+  });
+
+  return () => {
+    globalThis.clearInterval(focusPollId);
+    unlistenFocus();
+  };
 }
 
 export function focusLastGameWindow() {

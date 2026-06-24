@@ -1,12 +1,35 @@
-# Architecture
+# Overlay Forge Architecture
 
-## Shell
+## Application Shape
 
-The overlay shell owns the top-level layout, navigation, and component host. Feature modules should render inside the host instead of controlling window behavior directly.
+Overlay Forge is a Tauri desktop application with a React + TypeScript frontend and a Rust/Tauri backend. SQLite is the local source of truth.
 
-## Frontend
+The shell owns top-level layout, navigation, component hosting, window behavior, always-on-top behavior, global hotkeys, and overlay show/hide behavior.
 
-The frontend is a React + TypeScript app organized around feature folders:
+Feature modules render inside the shell-owned component host and should not directly own top-level window behavior.
+
+## Architecture Principles
+
+Overlay Forge architecture should prefer reusable domain abstractions over one-off procedural patches when behavior is repeated or state crosses feature boundaries.
+
+Repeated behavior, repeated state shape, duplicated validation, duplicated SQLite mapping, duplicated command payload shaping, and duplicated window setup are regression risks. New features and fixes should first determine whether they belong to an existing domain abstraction, such as a window manager, window config model, window state repository, module manager, settings service, SQLite repository, chat/session model, screenshot/attachment model, export service, log ingestion service, or Tauri command service layer.
+
+If an appropriate abstraction already exists, extend it. If none exists and the concept appears in three or more places, or if two existing places have already diverged and caused a bug, create a shared abstraction before adding more call-site behavior.
+
+The stack-specific model is:
+
+- React + TypeScript renders UI and handles local interaction.
+- TypeScript classes may own repeated state plus behavior for domain objects, validation, normalization, serialization, deserialization, command payload creation, and UI view-model mapping.
+- TypeScript interfaces and type aliases should remain the default for plain DTOs.
+- Rust uses structs, impl blocks, enums, traits, services, repositories, and modules rather than Java-style inheritance.
+- Tauri command handlers stay thin and delegate business logic to services, repositories, or domain methods.
+- SQLite access and row mapping should be centralized by persisted domain concept.
+
+For non-trivial code changes, implementation notes should identify the domain concept involved, the reusable abstraction added or reused, duplicate logic removed, regression risk reduced, and tests added or updated. If no abstraction is needed, the implementation note should explain why.
+
+## Frontend Structure
+
+The frontend is organized around feature folders:
 
 ```text
 src/
@@ -18,143 +41,123 @@ src/
 └─ main.tsx
 ```
 
-Milestone 0 is complete and includes the shell and scratchpad feature. The scratchpad feature passed Milestone 0 validation by saving content to SQLite and restoring it between app sessions.
+Feature modules should keep UI state local where possible and call backend-owned Tauri commands for persistence, filesystem access, secret-backed requests, game capture, runtime import, and other privileged operations.
 
-Milestone 1 is complete, passed, and successful. It adds feature folders for Tasks, Notes, and Calendar while keeping all feature modules inside the shell-owned component host.
+React components should remain function components with hooks unless a specific task documents why a class component is needed. Components should not own backend business rules, persistence rules, or Tauri window lifecycle behavior.
 
-Milestone 2 is complete, passed, and successful. It adds a Projects feature folder while preserving the shell-owned component host and Milestone 1 organizer components.
+## UI Consistency Rules
 
-Milestone 3 is complete, passed, and successful. It adds a Planning Chat feature folder inside the shell-owned component host while preserving Scratchpad, Tasks, Notes, Calendar, and Projects.
-
-Milestone 4 - GitHub Integration is complete, passed, and successful. It extends the Projects feature with a project-scoped GitHub Repository section while preserving the existing shell-owned component host and all Milestone 0 through Milestone 3 components.
-
-Milestone 5 - Controlled YouTube Component is complete, passed, and successful. It adds a YouTube feature folder inside the shell-owned component host while preserving Scratchpad, Tasks, Notes, Calendar, Projects, Planning Chat, and GitHub Repository behavior.
-
-Milestone 6 - Project Workspace Chat is complete, passed, and successful. It makes Projects the workspace shell for selected-project planning chat by rendering Overview, GitHub, and Chat sections inside the selected project context. The existing Planning Chat feature is reused in project-bound mode so chat no longer needs a second project selector.
-
-Milestone 7 - Project Workspace Layout Refinement is complete, passed, and successful. It refines Projects as the primary workspace shell by adding a stable active-project header and four selected-project workspace sections: Overview, GitHub, Chat, and References.
-
-Milestone 8 - Projects Navigation Tree Actions is complete, passed, and successful. It moves Projects object-level actions toward the shell navigation by making Projects expandable in the left navigation and listing saved projects as children. This pattern was validated on Projects before generalizing it to other modules.
-
-Milestone 9 - Manual Context Attachments is complete, passed, and successful. It adds a conversation-scoped Attached Context area inside selected-project Chat. Attachments link to existing local app records and store only the link metadata needed to display those attachments.
-
-Milestone 10 - Prompt Preview is complete, passed, and successful. It adds a read-only Prompt Preview surface inside selected-project Chat and a backend preview command that assembles local preview data without calling OpenAI.
-
-Milestone 11 - Bridge File Drafting is complete, passed, and successful. It adds a read-only bridge draft generation surface inside selected-project Chat and backend commands that store generated Markdown drafts locally in SQLite.
-
-Milestone 12 - Project Markdown Context is complete, passed, and successful. It adds a project-scoped local Markdown context configuration so README-driven project documentation can feed project chat and bridge draft generation without per-conversation attachment.
-
-Milestone 13 - Project Workspace UI Consolidation is complete, passed, and successful. It removes redundant project workspace framing, moves project configuration into a clean Project Edit surface, shows conversations in the left navigation hierarchy, keeps the primary chat surface focused, and moves conversation attached context plus local Markdown bridge drafts into a collapsible right-hand chat pane.
-
-Gaming Screenshot Capture is complete, passed, and successful. It adds a Gaming feature surface with a GearBlocks workspace, selected-game screenshot capture controls, thumbnail previews, and screenshot context-menu cleanup while preserving the shell-owned component host.
-
-Overlay Forge 0.2.0 GearBlocks runtime API interface support is complete, passed, and successful. It adds documented construction namespace interface descriptors, Lua exporter availability metadata, runtime-log import normalization, SQLite persistence of indexed interface data, and catalog display of attribute availability. API metadata is excluded from default prompt context unless a future explicit include control is added.
-
-Smoking Cessation is implemented as a local-first core feature module inside the shell-owned component host. The React feature reads and writes through Tauri commands, records cigarette events in SQLite, tracks the current cigarette inventory count, shows the seeded `Nicoderm Step 1` patch marker, and uses the existing Settings keybind system for the optional `Record Cigarette` shortcut. Cigarette record actions decrement the inventory count in SQLite, while the frontend derives recent spacing and run-out prediction from event timestamps. Cigarette record, delete, refresh, and keybind paths update a local ChatGPT-readable Markdown export under the app data `chatgpt-exports` folder so external chat context can use a narrow file instead of the live SQLite database.
-
-The Scheduler framework is a backend-owned worker loop backed by convention-based SQLite tables. Schedule rows are dynamic `obj_scheduler` records that point to static `def_scheduler_type` definitions. The dispatcher is closed over known Rust handlers, so scheduler records cannot execute arbitrary commands or Lua/script payloads from SQLite. The first registered scheduler type refreshes the Smoking Cessation ChatGPT Markdown export on startup and then every 60 seconds.
-
-## UI Consistency
-
-Organizer components should follow the same interaction pattern unless a milestone explicitly documents a reason to diverge:
+Organizer-style components should follow the same interaction pattern unless a task explicitly documents a reason to diverge:
 
 - Empty components show the primary New action and keep editor fields hidden.
 - New actions reveal the editor for the first item.
-- Selecting an existing list item opens that item in selected/read-only mode.
+- Selecting an existing list item opens it in selected/read-only mode.
 - Selected existing items expose an explicit Edit action before fields become editable.
-- Destructive actions are available only inside an edit/selected-item context.
-- Active clickable actions use consistent enabled button styling across components.
-
-Milestone 8 adds navigation action consistency rules:
-
+- Destructive actions are available only inside edit or selected-item context.
+- Active clickable actions use consistent enabled button styling.
 - Module-level `+` actions create new items for that module.
 - Item-level `...` actions open item menus such as Edit and Delete.
 - Hover-revealed actions must also be visible or reachable by keyboard focus.
-- The workspace surface should prioritize selected item content while navigation owns object-level actions.
+- Workspace surfaces should prioritize selected item content while navigation owns object-level actions.
 
-Milestone 8 applies these rules to Projects only. The Projects row is expandable/collapsible, the row-level `+` starts project creation, and project child rows can select the active workspace project or open an item menu for Edit/Delete. The main panel remains the selected-project workspace with Overview, GitHub, Chat, and References sections.
-
-Milestone 13 consolidates these rules further for Projects. Conversation rows appear under project rows in the left navigation hierarchy, project row menus route to Overview, New Chat, References, Edit, and Delete, and the main chat surface removes redundant workspace headers so message history and input receive most of the available space. Existing conversations open from their left-nav child rows; `New Chat` opens an empty new-conversation area.
-
-## Backend
+## Backend Responsibilities
 
 The Tauri backend owns:
 
-- SQLite initialization
-- Scratchpad persistence commands
-- Task CRUD commands
-- Note CRUD commands
-- Calendar event CRUD commands
-- Project CRUD commands
-- Planning conversation and message CRUD commands
-- Backend-only OpenAI Responses API request handling
-- Project-scoped GitHub repository link commands
-- Backend-only GitHub repository metadata fetch handling
-- YouTube reference CRUD commands
-- YouTube URL validation and external-open handling
-- Planning conversation context attachment commands
-- Planning prompt preview command
-- Bridge file draft commands
-- Project Markdown context configuration and loading commands
-- Gaming and screenshot capture commands
-- Smoking Cessation event and settings commands
-- Scheduler commands and backend worker dispatch
-- Global hotkey registration
-- Window show/hide behavior
+- SQLite initialization and migrations.
+- Scratchpad persistence commands.
+- Task CRUD commands.
+- Note CRUD commands.
+- Calendar event CRUD commands.
+- Project CRUD commands.
+- Planning conversation and message CRUD commands.
+- Backend-only OpenAI Responses API request handling.
+- Project-scoped GitHub repository link commands.
+- Backend-only GitHub repository metadata fetch handling.
+- YouTube reference CRUD commands.
+- YouTube URL validation and external-open handling.
+- Planning conversation context attachment commands.
+- Prompt Preview commands.
+- Project Markdown context configuration and loading.
+- Gaming and screenshot capture commands.
+- GearBlocks saved construction decoding and runtime import.
+- GearBlocks API catalog and runtime API availability indexing.
+- Game build guide import, persistence, and overlay-window commands.
+- Smoking Cessation event and settings commands.
+- Scheduler commands and backend worker dispatch.
+- Global hotkey registration.
+- Window show/hide behavior.
 
-## Persistence
+Backend command handlers should receive input, validate it, call a service, repository, or domain method, and return typed results. They should not manually construct complex domain objects inline, duplicate defaults, duplicate SQLite access logic, or own large procedural feature implementations.
 
-SQLite is the local source of truth. The first schema contains a single-row `obj_scratchpad` table. This Milestone 0 scratchpad persistence path is complete and passed.
+## Persistence Boundary
 
-Milestone 1 adds idempotent table initialization for `obj_task`, `obj_note`, and `obj_calendar_event`.
+SQLite is the local source of truth. Migrations must be idempotent and non-destructive.
 
-Milestone 2 adds idempotent table initialization for `obj_project`.
+New persistence should follow the current naming convention:
 
-Milestone 3 adds idempotent table initialization for `obj_planning_conversation` and `obj_planning_message`. Later milestones should add tables for bridge file drafts and exported bridge-file workflow state.
+| Prefix | Meaning |
+| --- | --- |
+| `obj_` | Dynamic object rows. |
+| `def_` | Static definition rows. |
+| `o2o_` | One-to-one mapping rows. |
+| `n2n_` | Many-to-many mapping rows. |
 
-Milestone 4 adds idempotent table initialization for `obj_project_github_repository`. The table stores project repository linkage and fetched metadata/status only. Migrations are non-destructive and must not remove existing Scratchpad, Tasks, Notes, Calendar, Projects, or Planning Chat data.
+Avoid table-per-game settings. Use `obj_game_setting` or a normalized feature table keyed by `game_id` and `id_game`.
 
-Milestone 5 adds idempotent table initialization for `obj_youtube_reference`. The table stores only user-created YouTube references and user-entered metadata. Migrations are non-destructive and must not remove existing Scratchpad, Tasks, Notes, Calendar, Projects, Planning Chat, or GitHub repository data.
+Do not scatter SQL row mapping across unrelated files. Each persisted domain concept should have one canonical mapping path between database rows, domain objects, database insert/update payloads, and frontend DTOs where needed.
 
-Milestone 6 adds no new tables. It preserves existing `obj_planning_conversation` and `obj_planning_message` records and scopes the frontend Chat section through the selected Projects workspace.
+Generated screenshots, manifests, runtime game data, copied DLLs, plugin build output, and local workspaces should remain ignored by git.
 
-Milestone 7 adds no new tables. Overview continues to use `obj_project`, GitHub continues to use `obj_project_github_repository`, Chat continues to use `obj_planning_conversation` and `obj_planning_message`, and References only summarizes existing local context categories.
+## Window Boundary
 
-Milestone 8 adds no new tables. The shell-owned Projects navigation tree reads existing `obj_project` rows and continues to use the same project CRUD commands. Chat and GitHub behavior continue to use the existing selected-project data paths.
+Overlay Forge treats windows as a first-class domain concept.
 
-Milestone 9 adds idempotent table initialization for `n2n_planning_conversation_context`. Attachments are scoped to a single planning conversation, link to existing local records by `context_type` and `source_id`, and store a readable label. Removing an attachment deletes only the attachment link and does not delete the source record.
+All Tauri window creation, configuration, restoration, state persistence, and lifecycle behavior should route through centralized Rust window abstractions. Standalone overlays, the main overlay, and future independent windows should not copy setup logic across commands, React components, utility files, or one-off helpers.
 
-Milestone 10 adds no new tables. Prompt Preview uses existing project, planning conversation, planning message, and context attachment data.
+The expected Rust model uses composition:
 
-Milestone 11 adds idempotent table initialization for `obj_bridge_file_draft`. Drafts are project-scoped, may link to a source planning conversation, and store generated Markdown content locally. Migrations are non-destructive and must not remove existing user data.
+```text
+BaseWindowConfig
+  common settings shared by all windows
 
-Milestone 12 adds idempotent table initialization for `obj_project_markdown_context`. Each row stores one configured local Markdown root per project. Markdown file content is read freshly from disk for chat load, Prompt Preview, project chat sends, and bridge draft generation; file snapshots are not cached in SQLite.
+OverlayWindowConfig
+  main overlay-specific configuration
 
-Gaming adds idempotent table initialization for `def_game`, `obj_game`, `obj_game_setting`, `obj_game_data_location`, `obj_game_catalog_object`, `obj_game_catalog_reference`, and `obj_game_catalog_screenshot`. `def_game` holds static game definitions such as the visible UI definition name, while `obj_game` stores local game sections. `obj_game_setting` is the generic per-game settings table for deep game-specific settings without creating table-per-game schemas. Screenshot image bytes are stored as PNG files under `game-screenshots/`, while SQLite stores metadata and local paths only. The screenshot preview path uses Tauri asset loading scoped to `game-screenshots/`.
+StandaloneWindowConfig
+  standalone-specific configuration
 
-Game chat overlay position is persisted on each `obj_game_chat_conversation` row through nullable `overlay_x` and `overlay_y` coordinates. The backend saves the active chat overlay's outer window position when the overlay moves and reapplies those coordinates when that same chat opens, so placement survives app restarts while the chat exists.
+WindowKind
+  enum describing allowed window types
 
-GearBlocks construction decoding is local-first and file-based. GearBlocks' default user data location is `%USERPROFILE%\AppData\LocalLow\SmashHammer Games\GearBlocks\`. Overlay Forge discovers `construction.bytes` files from the configured GearBlocks Save Location or that default root's `SavedConstructions` folder, inflates the raw DEFLATE payload, parses the BSON document, and renders a JSON-friendly summary on the GearBlocks Home screen. Runtime-only metadata such as display names, categories, mass, active stage, and documented construction namespace interface availability is handled through an installable GearBlocks Lua script mod under the default root's `ScriptMods` folder that exports the full live scene through marked `Player.log` JSON chunks when direct Lua file writes are unavailable. Overlay Forge indexes those runtime chunks through explicit refresh/import, a passive cursor-based GearBlocks runtime import monitor, and backend chat-send context assembly; normal chat navigation must not synchronously parse full-scene runtime logs. GearBlocks chat converts the latest whole-scene runtime export into a semantic vehicle-build summary that aggregates welded structural pieces and lists functional systems with inferred purposes.
+WindowManager
+  centralized creation, open, close, focus, restore, and mutation behavior
 
-GearBlocks Tools uses the same installable Overlay Forge GearBlocks script as scene context export. The script creates one movable, resizable GearBlocks window with a compact home menu for Scene, Builder, Weld, and Status. Each menu item replaces the content with a single tool view, updates the window title, and exposes a Back button. Scene export remains the explicit whole-scene runtime context path, while BuilderToolExt and WeldTool helpers run inside that single in-game script window instead of through a separate no-window hotkey bridge.
+WindowStateRepository
+  SQLite-backed persistence for size, position, visibility, and related state
+```
 
-Smoking Cessation adds idempotent table initialization for `obj_smoking_event` and `obj_smoking_cessation_setting`. Cigarette events are stored as local timestamped rows with a source marker for module or keybind entry. The singleton cessation settings row stores the current patch label, start time, and timezone. The frontend charts are derived from SQLite rows at render time rather than storing aggregate data.
+`WindowKind` should be an enum, not scattered string labels. `StandaloneWindowConfig` and `OverlayWindowConfig` should compose `BaseWindowConfig` rather than model Java-style inheritance.
 
-Scheduler persistence adds `def_scheduler_type`, `obj_scheduler`, and `obj_scheduler_run`. These tables establish the forward naming convention for new persistence: `obj_` for dynamic objects, `def_` for static definitions, `o2o_` for one-to-one mappings, and `n2n_` for many-to-many mappings. Scheduler jobs use leases and run history so future modules, including GearBlocks, can add bounded background work without each module inventing its own polling table.
-
-Overlay Forge 0.6.1 applies the same naming convention to existing SQLite tables with non-destructive legacy table renames, adds `schema_json` and `modified_at` metadata columns to normalized tables, and keeps existing `updated_at` columns in place for frontend/API compatibility.
+Before changing window behavior, inspect all existing creation paths. If more than one file constructs windows, sets default options, generates labels, restores geometry, or handles standalone-window configuration, consolidate the shared path before applying the feature or fix.
 
 ## OpenAI Boundary
 
-Planning Chat calls the OpenAI Responses API from the Rust/Tauri backend. React invokes local Tauri commands only and never reads `OPENAI_API_KEY`. Model selection, request shape, and the planning assistant instruction are centralized in the backend OpenAI service module so later bridge-file generation, tools, streaming, or model changes do not leak through the frontend.
+Project Chat calls the OpenAI Responses API from the Rust/Tauri backend. React invokes local Tauri commands only and never reads `OPENAI_API_KEY`.
 
-In Milestone 6, the primary UI path for Planning Chat is Projects -> selected project -> Chat. The selected project is passed directly into the chat surface, while the backend continues to enforce conversation ownership through `obj_planning_conversation.project_id`.
+Model selection, request shape, and assistant instructions should stay centralized in backend OpenAI service code so frontend components do not leak API details or secrets.
 
-Milestone 7 preserves this boundary. Chat remains a selected-project workspace section and remains backed by the existing planning conversation/message tables.
+## Codex Boundary
+
+Codex implementation happens directly in VS Code against the repository.
+
+Overlay Forge repository docs should provide project context, constraints, and validation expectations. The app should not automate VS Code/Codex implementation workflows unless the user explicitly scopes a future feature for that.
 
 ## GitHub Boundary
 
-Milestone 4 GitHub metadata fetches are backend-owned. React invokes local Tauri commands and never receives `GITHUB_TOKEN`. The token is read from the Rust process environment, is not stored in SQLite, and is not passed into frontend state.
+GitHub repository metadata fetches are backend-owned.
+
+React invokes local Tauri commands and never receives `GITHUB_TOKEN`. The token is read from the Rust process environment, is not stored in SQLite, and is not passed into frontend state.
 
 SQLite stores repository linkage and fetched metadata/status only:
 
@@ -168,82 +171,85 @@ last_fetched_at
 last_fetch_status
 ```
 
-The integration is project-scoped and read-only. Milestone 4 does not perform Codex handoff, GitHub write operations, branch creation, commit creation, pull request creation, issue management, repository file browsing, GitHub Actions integration, OAuth, or multi-account workflows.
+The existing GitHub integration is project-scoped. Do not add write operations, branch creation, commit creation, pull request creation, issue management, repository file browsing, GitHub Actions integration, OAuth, or multi-account behavior unless explicitly requested.
 
-In Milestone 7, GitHub remains a selected-project workspace section backed by the existing project GitHub repository table. No token exposure or GitHub write behavior is added.
+## Project Context Boundary
 
-Milestone 8 preserves this boundary. Project selection can now happen from the left navigation tree, but GitHub repository linkage and metadata fetches still happen inside the selected-project GitHub workspace section.
+Manual context attachments are conversation-scoped links to existing local app records.
 
-## Context Attachment Boundary
+Supported source types:
 
-Milestone 9 context attachments are manual and conversation-scoped. The user chooses existing local app context from the selected project Chat section. Supported source types are project details, project GitHub repository metadata, notes, tasks, calendar events, YouTube references, and scratchpad content.
+- Project details.
+- Project GitHub repository metadata.
+- Notes.
+- Tasks.
+- Calendar events.
+- YouTube references.
+- Scratchpad content.
 
-GitHub repository context is the only Milestone 9 automatic attachment path: when a selected project has a repository link defined in the GitHub section, the Chat section adds that repository metadata link to the selected conversation's Attached Context list with a duplicate guard. The repository link is still configured once per project in the GitHub workspace section.
-
-The attachment layer stores links only. It does not count tokens, read GitHub files, fetch YouTube transcripts, export bridge files, or send context outside the local project chat request path. Milestone 10 adds read-only Prompt Preview for these links. Milestone 11 includes resolved attached context in normal project chat sends and bridge draft generation.
-
-Projects remains the primary workspace shell, and the Projects navigation tree remains unchanged from Milestone 8.
+The attachment layer stores links only. Removing an attachment removes only the link and must not delete the source record.
 
 ## Prompt Preview Boundary
 
-Milestone 10 Prompt Preview is scoped to selected-project Chat. It uses existing local project, conversation, message, and context attachment data to show a read-only preview of the intended prompt/context package.
+Prompt Preview is scoped to selected-project Chat. It uses existing local project, conversation, draft message, and attached context data to show a read-only preview of the intended prompt/context package.
 
-Prompt Preview must not call OpenAI. It does not send messages, mutate chat history, generate bridge files, count tokens, rewrite prompts, or change the model request path.
-
-In Milestone 10, attached context appears in the preview only. Milestone 11 extends the project chat send path so resolved attached context is included with the selected project and recent conversation messages.
-
-Projects remains the primary workspace shell.
-
-## Bridge Draft Boundary
-
-Milestone 11 bridge drafts are local SQLite records generated from selected-project Chat data. The generator uses the selected project, source planning conversation, saved conversation messages, and resolved attached context where safely available. Linked GitHub repository metadata is resolved from the selected project if the attachment row is stale or missing a source id.
-
-Bridge drafts are project-scoped through `project_id` and may link to the source conversation through `conversation_id`. Deleting a bridge draft removes only the draft row; it does not delete the project, conversation, messages, or attached context.
-
-Milestone 11 does not export Markdown files, copy drafts to the clipboard, open Codex, send content to Codex, write to GitHub, create commits, create pull requests, or approve generated drafts. User review remains required before a draft is used outside Overlay Forge.
-
-Milestone 12 extends bridge draft generation by adding project Markdown context before conversation manual attachments. Drafts may include local README-driven project documentation, but they remain local SQLite records and still require user review.
+Prompt Preview must not call OpenAI, mutate chat history, send messages, rewrite prompts, or change model request paths.
 
 ## Project Markdown Context Boundary
 
-Milestone 12 project Markdown context is project-scoped. A selected project can store a configured local documentation root and README path in SQLite. The backend reads a fresh copy of `README.md`, known local documentation paths, and explicit Markdown references found in README whenever the context is loaded.
+A selected project can store a configured local documentation root and README path in SQLite.
 
-Markdown resolution is constrained to the configured local project root. Unsafe path traversal, absolute paths, external URLs, missing files, unreadable files, non-Markdown files, and files that resolve outside the root are skipped or warned about instead of crashing the app.
+The backend reads a fresh copy of `README.md`, known local documentation paths, and explicit Markdown references found in README whenever context is loaded.
 
-Project Markdown context is assembled before conversation manual attachments for project chat sends, Prompt Preview, and bridge draft generation. Manual attachments remain conversation-scoped and continue to act as an additional context layer.
-
-Milestone 12 does not read GitHub repository file contents through the GitHub API, upload files, add vector stores, add semantic search, broadly index repositories, export bridge files, or hand off directly to Codex.
-
-## Project Workspace UI Boundary
-
-Milestone 13 is a frontend workspace consolidation. It does not add tables or change context ownership. Project Markdown context remains project-scoped. Manual context attachments remain conversation-scoped through `n2n_planning_conversation_context`.
-
-GitHub repository linkage and project Markdown context configuration now live in Project Edit instead of occupying the primary chat path. The focused chat surface keeps message history and message input close to the selected conversation while moving manual attachment controls and local Markdown bridge drafts into a collapsible right-hand pane.
+Markdown resolution is constrained to the configured local project root. Unsafe path traversal, absolute paths, external URLs, missing files, unreadable files, non-Markdown files, and files resolving outside the root must be skipped or warned about instead of crashing the app.
 
 ## YouTube Boundary
 
-Milestone 5 YouTube references are local-first and user-curated. React invokes local Tauri commands to save, list, edit, delete, and open references. SQLite stores the title, URL, parsed video id, optional channel name, notes, tags, and timestamps.
+YouTube references are local-first and user-curated. SQLite stores title, URL, parsed video id, optional channel name, notes, tags, and timestamps.
 
-No YouTube API key is required. No YouTube account login, OAuth flow, watch history, subscription import, playlist sync, comment sync, transcript extraction, recommendations, downloads, scraping, background metadata crawler, or account sync is used.
+No YouTube API key, account login, OAuth flow, watch history, subscription import, playlist sync, comment sync, transcript extraction, recommendations, downloads, scraping, background metadata crawler, or account sync is used.
 
-Saved YouTube URLs open externally in the system browser. This is preferred over an unrestricted embedded browser so the overlay workflow remains controlled.
+Saved YouTube URLs open externally in the system browser.
 
-## Gaming Screenshot Boundary
+## Gaming Boundary
 
-Gaming Screenshot Capture is local-first and user-initiated. React invokes local Tauri commands to list games, create/delete game sections, capture screenshots, list screenshot metadata, and delete screenshot records/files.
+Gaming is a workspace under the shell-owned component host. Game rows are backed by `def_game` definitions and `obj_game` local sections.
 
-The validated capture path hides Overlay Forge before capture, captures the visible foreground game display through Windows GDI for the current implementation, forces PNG alpha values to 255, saves unique PNG files under `game-screenshots/<game-slug>/`, writes capture manifests under `game-screenshots/capture-requests/`, and then restores the overlay.
+Screenshot image bytes are stored as PNG files under `game-screenshots/`. SQLite stores metadata and local paths only. Tauri asset loading is scoped to `game-screenshots/` for thumbnail previews.
 
-The webview may render screenshot thumbnails only through the Tauri asset protocol scoped to `game-screenshots/`. Deletion is constrained to that folder and removes the PNG, capture manifest, screenshot metadata row, and local-path reference rows that point at either deleted file.
+Game build guides are imported from user-selected Markdown files into normalized SQLite rows. The independent build-guide overlay window is shell-owned like the game chat overlay: Rust/Tauri stores the active guide selection, applies persisted bounds, and exposes a keybind-driven show/hide path. The overlay renders narrow, stacked rows rather than wide tables so it can stay pinned to the left or right side of the screen during gameplay.
 
-The preferred future GearBlocks path remains game-internal rendered-frame export from the game engine. Clipboard capture, `Win+Shift+S`, Snipping Tool dependency, HDR output, wide-gamut output, and alpha-dependent image files remain avoided for the long-term capture target.
+See `docs/GAMING_SCREENSHOTS.md` for capture behavior.
 
-## References Boundary
+## GearBlocks Boundary
 
-Milestone 7 References are intentionally minimal. The References workspace section summarizes selected project details, linked GitHub metadata, future attachment availability, and future prompt context availability. It does not attach context to chat, generate prompt previews, browse GitHub files, generate bridge files, or include unrelated app-level YouTube library data.
+GearBlocks support is local-first and split across:
 
-## Bridge Files
+- Saved construction decoding.
+- Runtime scene export/import.
+- Runtime API availability indexing.
+- Part catalog display.
+- Optional in-game script window tools.
+- Backlog direct BepInEx plugin marker support.
 
-Bridge files are markdown documents used to keep ChatGPT and Codex aligned while the in-app OpenAI workflow is deferred.
+Normal chat navigation must not synchronously parse full-scene runtime logs. Runtime import should use explicit refresh/import paths, passive cursor-based log import, or bounded chat-send context assembly.
 
-Milestone 11 introduces local bridge-file drafts as SQLite records. These drafts are generated from selected-project Chat and remain in-app for review. They are not exported to disk and are not sent to Codex automatically.
+API availability metadata is excluded from default prompt context unless a future explicit include/snapshot control is added.
+
+GearBlocks chat does not currently request marker placement or emit marker blocks; BepInEx marker work remains backlog.
+
+See `docs/GEARBLOCKS.md`, `docs/GEARBLOCKS_RUNTIME.md`, `docs/GEARBLOCKS_PLUGIN.md`, and `docs/GEARBLOCKS_PARTS_CATALOG.md`.
+
+## Smoking Cessation Boundary
+
+Smoking Cessation is a local-first core feature module. The React feature reads and writes through Tauri commands. Cigarette events and settings are stored in SQLite. Frontend charts are derived from SQLite rows at render time rather than storing aggregate data.
+
+The module may render a narrow Markdown export under app data for personal context review, but SQLite remains the source of truth.
+
+See `docs/SMOKING_CESSATION.md`.
+
+## Scheduler Boundary
+
+The Scheduler framework is a backend-owned worker loop backed by convention-based SQLite tables.
+
+Schedule rows are dynamic `obj_scheduler` records pointing to static `def_scheduler_type` definitions. The dispatcher is closed over known Rust handlers. Scheduler records must not execute arbitrary commands, scripts, or Lua payloads stored in SQLite.

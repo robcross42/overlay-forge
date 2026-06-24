@@ -1,10 +1,12 @@
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { MouseEvent } from "react";
 import { ChatWorkspace } from "../components/ChatWorkspace";
 import { WindowResizeHandles } from "../components/WindowControls";
 import {
   createGameChatScreenshotCapture,
+  createGameBuildGuideFromChat,
   focusGameChatOverlayWindow,
   getActiveGameChatOverlay,
   listGameChatConversations,
@@ -17,7 +19,12 @@ import type {
   GameChatConversation,
   GameChatMessage
 } from "../services/gaming";
-import { focusLastGameWindow, setOverlayWindowOpacity } from "../services/windowControls";
+import {
+  applyStandaloneOverlayFocusState,
+  focusLastGameWindow,
+  setOverlayWindowOpacity,
+  startOverlayDrag
+} from "../services/windowControls";
 
 export default function GameChatOverlayApp() {
   const [game, setGame] = useState<Game | null>(null);
@@ -26,6 +33,7 @@ export default function GameChatOverlayApp() {
   const [draft, setDraft] = useState("");
   const [status, setStatus] = useState("Loading chat");
   const [isSending, setIsSending] = useState(false);
+  const [isGeneratingBuildGuide, setIsGeneratingBuildGuide] = useState(false);
   const [isCapturingPromptScreenshot, setIsCapturingPromptScreenshot] = useState(false);
   const [selectedPromptScreenshotIds, setSelectedPromptScreenshotIds] = useState<number[]>([]);
   const [focusInputRequestNonce, setFocusInputRequestNonce] = useState(0);
@@ -37,8 +45,21 @@ export default function GameChatOverlayApp() {
   );
 
   useEffect(() => {
-    void prepareChatOverlayWindow();
+    let isMounted = true;
+    let cleanup: (() => void) | null = null;
+    void prepareChatOverlayWindow().then((nextCleanup) => {
+      if (isMounted) {
+        cleanup = nextCleanup;
+      } else {
+        nextCleanup?.();
+      }
+    });
     void loadActiveChat();
+
+    return () => {
+      isMounted = false;
+      cleanup?.();
+    };
   }, []);
 
   useEffect(() => {
@@ -166,7 +187,7 @@ export default function GameChatOverlayApp() {
     await window.setIgnoreCursorEvents(false).catch(() => {});
     await window.show().catch(() => {});
     await window.setAlwaysOnTop(true).catch(() => {});
-    await setOverlayWindowOpacity(0.78).catch(() => {});
+    await setOverlayWindowOpacity(1).catch(() => {});
     await waitForOverlayRepaint();
     await window.setIgnoreCursorEvents(false).catch(() => {});
     await focusLastGameWindow().catch(() => false);
@@ -215,20 +236,62 @@ export default function GameChatOverlayApp() {
     }
   }
 
+  async function generateBuildGuide() {
+    if (!conversation || isGeneratingBuildGuide) {
+      return;
+    }
+    const latestUserMessage = [...messages]
+      .reverse()
+      .find((message) => message.role === "user");
+    const buildGoal = draft.trim() || latestUserMessage?.content.trim() || "";
+    if (!buildGoal) {
+      setStatus("Type a build goal first");
+      return;
+    }
+
+    setIsGeneratingBuildGuide(true);
+    setStatus("Generating build guide");
+    try {
+      const generated = await createGameBuildGuideFromChat(conversation.id, buildGoal);
+      setDraft("");
+      setStatus(`Build guide created: ${generated.guide.title}`);
+    } catch (error) {
+      setStatus(formatError(error));
+    } finally {
+      setIsGeneratingBuildGuide(false);
+      setFocusInputRequestNonce(Date.now());
+    }
+  }
+
   async function closeChatWindow() {
     const window = getCurrentWindow();
     await window.setIgnoreCursorEvents(false).catch(() => {});
     await window.hide();
   }
 
+  function startChatDrag(event: MouseEvent) {
+    if (event.detail !== 1 || event.button !== 0) {
+      return;
+    }
+    void startOverlayDrag();
+  }
+
   return (
     <main
-      className="overlay-frame overlay-frame-chat-mode"
+      className="overlay-frame overlay-frame-chat-mode standalone-overlay-window game-chat-overlay-frame"
       onMouseDownCapture={() => {
         void getCurrentWindow().setIgnoreCursorEvents(false);
       }}
     >
       <WindowResizeHandles />
+      <div
+        className="overlay-window-titlebar chat-overlay-titlebar"
+        onMouseDown={startChatDrag}
+        role="presentation"
+      >
+        <h1>{conversation?.title ?? status}</h1>
+        {game && <span>{game.name}</span>}
+      </div>
       <div className="overlay-shell">
         <section className="workspace workspace-chat-overlay-mode" aria-label="Game chat overlay">
           <ChatWorkspace
@@ -239,6 +302,18 @@ export default function GameChatOverlayApp() {
             focusInputRequestNonce={focusInputRequestNonce}
             hideSidebarWhenSelected
             inputPlaceholder={game ? `Ask about ${game.name}...` : "Select a game chat..."}
+            inputActionSlot={
+              game?.slug === "gearblocks" ? (
+                <button
+                  className="ghost-button chat-input-extra-action"
+                  disabled={!conversation || isSending || isGeneratingBuildGuide}
+                  onClick={() => void generateBuildGuide()}
+                  type="button"
+                >
+                  Guide
+                </button>
+              ) : null
+            }
             isSending={isSending}
             messages={messages}
             newConversationTitle=""
@@ -259,6 +334,7 @@ export default function GameChatOverlayApp() {
             }
             selectedConversationId={conversation?.id ?? null}
             showFocusedToolbar={false}
+            showOverlaySideActions={false}
             status={status}
             title={game ? `${game.name} chat` : "Game chat"}
           />
@@ -275,7 +351,7 @@ function formatError(error: unknown) {
 async function prepareChatOverlayWindow() {
   const window = getCurrentWindow();
   await window.setIgnoreCursorEvents(false).catch(() => {});
-  await setOverlayWindowOpacity(0.78).catch(() => {});
+  return applyStandaloneOverlayFocusState(window);
 }
 
 function waitForOverlayRepaint() {
