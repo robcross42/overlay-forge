@@ -1,13 +1,17 @@
 {
   "name": "overlay-forge",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "check": "npm run build && npm run cargo:build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "cargo:build": "cargo build --manifest-path src-tauri/Cargo.toml",
+    "cargo:test": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "cargo:clippy": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets",
     "pretauri:dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stop-overlay-forge.ps1",
     "tauri:dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tauri-dev-with-log.ps1",
     "tauri:build": "tauri build",

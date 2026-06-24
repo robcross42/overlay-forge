@@ -3,6 +3,7 @@ use std::error::Error;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use crate::windows::{WindowKind, WindowManager};
 use crate::{commands, AppState};
 use serde::{Deserialize, Serialize};
 use tauri::{App, Emitter, Manager};
@@ -12,9 +13,6 @@ const KEYBINDS_SETTING_KEY: &str = "keybinds_v1";
 const TOGGLE_OVERLAY_ACTION: &str = "toggle_overlay";
 const TOGGLE_OVERLAY_WAS_VISIBLE_ACTION: &str = "toggle_overlay_was_visible";
 const TOGGLE_OVERLAY_WAS_HIDDEN_ACTION: &str = "toggle_overlay_was_hidden";
-const MAIN_WINDOW_LABEL: &str = "main";
-const GAME_CHAT_WINDOW_LABEL: &str = "game-chat";
-const GAME_BUILD_GUIDE_WINDOW_LABEL: &str = "game-build-guide";
 const GAME_CHAT_OVERLAY_ACTION: &str = "game_chat_overlay";
 const GAME_CHAT_OVERLAY_WAS_HIDDEN_ACTION: &str = "game_chat_overlay_was_hidden";
 const GAME_CHAT_SCREENSHOT_CAPTURE_ACTION: &str = "game_chat_region_capture";
@@ -56,7 +54,7 @@ pub fn register_toggle_hotkey(app: &mut App) -> Result<(), Box<dyn Error>> {
                                 trigger_game_chat_overlay_shortcut(app);
                             }
                             GAME_CHAT_SCREENSHOT_CAPTURE_ACTION => {
-                                remember_foreground_window_as_game(app);
+                                WindowManager::new(app).remember_foreground_window_as_game();
                                 set_pending_shortcut_action(
                                     app,
                                     GAME_CHAT_SCREENSHOT_CAPTURE_ACTION,
@@ -206,8 +204,8 @@ fn resolve_shortcut_action(app: &tauri::AppHandle, shortcut: &Shortcut) -> Resul
 }
 
 fn toggle_overlay_window(app: &tauri::AppHandle) {
-    let was_visible = app
-        .get_webview_window(MAIN_WINDOW_LABEL)
+    let was_visible = WindowManager::new(app)
+        .window(WindowKind::Main)
         .and_then(|window| window.is_visible().ok())
         .unwrap_or(false);
     let action = if was_visible {
@@ -273,7 +271,7 @@ fn trigger_shortcut_action(app: &tauri::AppHandle, action: &str) {
         TOGGLE_OVERLAY_ACTION => toggle_overlay_window(app),
         GAME_CHAT_OVERLAY_ACTION => trigger_game_chat_overlay_shortcut(app),
         GAME_CHAT_SCREENSHOT_CAPTURE_ACTION => {
-            remember_foreground_window_as_game(app);
+            WindowManager::new(app).remember_foreground_window_as_game();
             set_pending_shortcut_action(app, GAME_CHAT_SCREENSHOT_CAPTURE_ACTION);
             let _ = app.emit("game-chat-screenshot-capture-requested", ());
         }
@@ -304,8 +302,9 @@ fn record_smoking_event_from_shortcut(app: &tauri::AppHandle) {
 }
 
 fn trigger_game_chat_overlay_shortcut(app: &tauri::AppHandle) {
-    let chat_was_visible = app
-        .get_webview_window(GAME_CHAT_WINDOW_LABEL)
+    let window_manager = WindowManager::new(app);
+    let chat_was_visible = window_manager
+        .window(WindowKind::GameChat)
         .and_then(|window| window.is_visible().ok())
         .unwrap_or(false);
     let has_active_chat_context = app
@@ -314,9 +313,9 @@ fn trigger_game_chat_overlay_shortcut(app: &tauri::AppHandle) {
         .lock()
         .map(|selection| selection.is_some())
         .unwrap_or(false);
-    let chat_is_foreground = is_window_foreground(app, GAME_CHAT_WINDOW_LABEL);
+    let chat_is_foreground = window_manager.is_foreground(WindowKind::GameChat);
     if !chat_is_foreground {
-        remember_foreground_window_as_game(app);
+        window_manager.remember_foreground_window_as_game();
     }
 
     if has_active_chat_context {
@@ -345,12 +344,12 @@ fn trigger_game_chat_overlay_shortcut(app: &tauri::AppHandle) {
 }
 
 fn trigger_game_build_guide_overlay_shortcut(app: &tauri::AppHandle) {
-    let build_guide_was_visible = app
-        .get_webview_window(GAME_BUILD_GUIDE_WINDOW_LABEL)
-        .and_then(|window| window.is_visible().ok())
+    let window_manager = WindowManager::new(app);
+    let build_guide_was_visible = window_manager
+        .is_visible(WindowKind::GameBuildGuide)
         .unwrap_or(false);
-    if !is_window_foreground(app, GAME_BUILD_GUIDE_WINDOW_LABEL) {
-        remember_foreground_window_as_game(app);
+    if !window_manager.is_foreground(WindowKind::GameBuildGuide) {
+        window_manager.remember_foreground_window_as_game();
     }
     match commands::toggle_active_game_build_guide_overlay_window(app) {
         Ok(true) => {}
@@ -369,65 +368,8 @@ fn trigger_game_build_guide_overlay_shortcut(app: &tauri::AppHandle) {
     }
 }
 
-#[cfg(windows)]
-fn is_window_foreground(app: &tauri::AppHandle, label: &str) -> bool {
-    use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
-
-    let Some(window) = app.get_webview_window(label) else {
-        return false;
-    };
-    let Ok(hwnd) = window.hwnd() else {
-        return false;
-    };
-    unsafe { GetForegroundWindow() == hwnd.0 as windows_sys::Win32::Foundation::HWND }
-}
-
-#[cfg(not(windows))]
-fn is_window_foreground(_app: &tauri::AppHandle, _label: &str) -> bool {
-    false
-}
-
-#[cfg(windows)]
-fn remember_foreground_window_as_game(app: &tauri::AppHandle) {
-    use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
-
-    let foreground = unsafe { GetForegroundWindow() };
-    if foreground.is_null() {
-        return;
-    }
-
-    for label in [
-        MAIN_WINDOW_LABEL,
-        GAME_CHAT_WINDOW_LABEL,
-        GAME_BUILD_GUIDE_WINDOW_LABEL,
-    ] {
-        if let Some(window) = app.get_webview_window(label) {
-            if let Ok(hwnd) = window.hwnd() {
-                if foreground == hwnd.0 as windows_sys::Win32::Foundation::HWND {
-                    return;
-                }
-            }
-        }
-    }
-
-    let state = app.state::<AppState>();
-    match state.last_game_window.lock() {
-        Ok(mut last_game_window) => {
-            *last_game_window = Some(foreground as isize);
-        }
-        Err(_) => {}
-    };
-}
-
-#[cfg(not(windows))]
-fn remember_foreground_window_as_game(_app: &tauri::AppHandle) {}
-
 fn wake_overlay_window(app: &tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
-        let _ = window.show();
-        let _ = window.set_always_on_top(true);
-        let _ = window.set_focus();
-    }
+    let _ = WindowManager::new(app).show_and_focus(WindowKind::Main);
 }
 
 fn merge_with_defaults(keybinds: Vec<KeybindConfig>) -> Vec<KeybindConfig> {

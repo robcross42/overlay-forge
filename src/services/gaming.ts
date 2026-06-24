@@ -224,6 +224,17 @@ export type GearBlocksApiCatalog = {
   enumValues: GearBlocksApiEnumValue[];
 };
 
+export type GearBlocksApiImportResult = {
+  source: string;
+  sourceVersion: string;
+  docsRoot: string;
+  fetchedPages: number;
+  importedTypeCount: number;
+  importedMemberCount: number;
+  importedParameterCount: number;
+  importedEnumValueCount: number;
+};
+
 export type GameRuntimePartApiMember = {
   id: number;
   gameId: number;
@@ -361,6 +372,7 @@ export type GameBuildGuide = {
   buildGoal: string;
   scaleReference: string;
   geometryNotes: string;
+  glossaryText: string;
   checklistJson: string;
   overlayX: number | null;
   overlayY: number | null;
@@ -500,6 +512,10 @@ export function listGearBlocksRuntimeExports(gameId: number) {
 
 export function listGearBlocksApiCatalog() {
   return invoke<GearBlocksApiCatalog>("list_gearblocks_api_catalog");
+}
+
+export function importGearBlocksOfficialApiDocs() {
+  return invoke<GearBlocksApiImportResult>("import_gearblocks_official_api_docs");
 }
 
 export function importGearBlocksRuntimePartIndex(gameId: number) {

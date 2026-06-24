@@ -11,9 +11,11 @@ use crate::db::{
     ProjectRecord, SchedulerRecord, SmokingCessationSettingsRecord, SmokingEventRecord, TaskRecord,
     YouTubeReferenceRecord,
 };
+use crate::gearblocks_api_scraper::{scrape_official_gearblocks_api, GearBlocksApiImportResult};
 use crate::github;
 use crate::hotkeys;
 use crate::openai;
+use crate::windows::{self, WindowKind, WindowManager};
 use crate::{AppState, GameBuildGuideOverlaySelection, GameChatOverlaySelection};
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
@@ -29,9 +31,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, State, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 
-static MANUAL_OVERLAY_DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);
 static GEARBLOCKS_RUNTIME_IMPORT_MONITOR_ACTIVE: AtomicBool = AtomicBool::new(false);
 static SCHEDULER_WORKER_ACTIVE: AtomicBool = AtomicBool::new(false);
 const ACTIVE_GAME_BUILD_GUIDE_OVERLAY_SETTING: &str = "active_game_build_guide_overlay_v1";
@@ -379,27 +380,27 @@ pub fn shutdown_app(app: AppHandle) {
 
 #[tauri::command]
 pub fn start_manual_overlay_drag(window: WebviewWindow) -> Result<(), String> {
-    manual_overlay_drag(window)
+    windows::start_manual_drag(window)
 }
 
 #[tauri::command]
 pub fn set_overlay_window_opacity(window: WebviewWindow, opacity: f64) -> Result<(), String> {
-    set_overlay_opacity(&window, opacity)
+    windows::set_overlay_opacity(&window, opacity)
 }
 
 #[tauri::command]
 pub fn focus_last_game_window(state: State<'_, AppState>) -> Result<bool, String> {
-    focus_last_game_window_impl(state)
+    windows::focus_last_game_window_from_state(state.inner())
 }
 
 #[tauri::command]
 pub fn is_overlay_forge_foreground(app: AppHandle) -> Result<bool, String> {
-    Ok(get_overlay_forge_foreground_window_label_impl(&app)?.is_some())
+    Ok(WindowManager::new(&app).foreground_label()?.is_some())
 }
 
 #[tauri::command]
 pub fn get_overlay_forge_foreground_window_label(app: AppHandle) -> Result<Option<String>, String> {
-    get_overlay_forge_foreground_window_label_impl(&app)
+    WindowManager::new(&app).foreground_label()
 }
 
 pub fn start_gearblocks_runtime_import_monitor(app: AppHandle) {
@@ -531,14 +532,9 @@ fn show_game_chat_overlay_window(
     app: &AppHandle,
     selection: &GameChatOverlaySelection,
 ) -> Result<(), String> {
-    let window = app
-        .get_webview_window("game-chat")
-        .ok_or_else(|| "Game chat overlay window was not created at startup.".to_string())?;
-
-    window
-        .set_always_on_top(true)
-        .map_err(|error| error.to_string())?;
-    ensure_window_accepts_mouse_input(&window)?;
+    let window_manager = WindowManager::new(app);
+    let window = window_manager.required_window(WindowKind::GameChat)?;
+    window_manager.prepare_for_interaction(&window)?;
     let state = app.state::<AppState>();
     if let Ok(conversation) = state
         .database
@@ -546,11 +542,11 @@ fn show_game_chat_overlay_window(
     {
         if let (Some(overlay_x), Some(overlay_y)) = (conversation.overlay_x, conversation.overlay_y)
         {
-            let _ = window.set_position(PhysicalPosition::new(overlay_x, overlay_y));
+            let _ = window_manager.set_position(WindowKind::GameChat, overlay_x, overlay_y);
         }
     }
     window.show().map_err(|error| error.to_string())?;
-    let _ = set_overlay_opacity(&window, 1.0);
+    let _ = windows::set_overlay_opacity(&window, windows::ACTIVE_WINDOW_OPACITY);
     window.set_focus().map_err(|error| error.to_string())?;
     let _ = app.emit("game-chat-overlay-selection-changed", selection.clone());
     let _ = app.emit("game-chat-overlay-focus-prompt", ());
@@ -560,18 +556,17 @@ fn show_game_chat_overlay_window(
 
 #[tauri::command]
 pub fn focus_game_chat_overlay_window(app: AppHandle) -> Result<bool, String> {
-    if app.get_webview_window("game-chat").is_none() {
+    if WindowManager::new(&app)
+        .window(WindowKind::GameChat)
+        .is_none()
+    {
         return Ok(false);
     }
 
     let app_for_window = app.clone();
     app.run_on_main_thread(move || {
-        if let Some(window) = app_for_window.get_webview_window("game-chat") {
-            let _ = ensure_window_accepts_mouse_input(&window);
-            let _ = window.show();
-            let _ = window.set_always_on_top(true);
-            let _ = set_overlay_opacity(&window, 1.0);
-            let _ = window.set_focus();
+        let window_manager = WindowManager::new(&app_for_window);
+        if window_manager.show_and_focus(WindowKind::GameChat).is_ok() {
             let _ = app_for_window.emit("game-chat-overlay-focus-prompt", ());
         }
     })
@@ -598,15 +593,13 @@ pub fn toggle_active_game_chat_overlay_window(app: &AppHandle) -> Result<bool, S
         return Ok(false);
     };
 
-    let window = app
-        .get_webview_window("game-chat")
-        .ok_or_else(|| "Game chat overlay window was not created at startup.".to_string())?;
-    if window.is_visible().map_err(|error| error.to_string())? {
-        window.hide().map_err(|error| error.to_string())?;
+    let window_manager = WindowManager::new(app);
+    if window_manager.is_visible(WindowKind::GameChat)? {
+        window_manager.hide(WindowKind::GameChat)?;
         return Ok(false);
     }
 
-    show_game_chat_overlay_window(&app, &selection)?;
+    show_game_chat_overlay_window(app, &selection)?;
     Ok(true)
 }
 
@@ -758,7 +751,7 @@ fn import_game_build_guide_markdown_content(
         .database
         .get_game(game_id)
         .map_err(|error| error.to_string())?;
-    let parsed = parse_game_build_guide_markdown(&raw_markdown);
+    let parsed = parse_game_build_guide_markdown(raw_markdown);
     let checklist_json =
         serde_json::to_string(&parsed.checklist).map_err(|error| error.to_string())?;
     let guide = state
@@ -767,13 +760,22 @@ fn import_game_build_guide_markdown_content(
             game.id,
             &parsed.title,
             source_path,
-            &raw_markdown,
+            raw_markdown,
             &parsed.build_goal,
             &parsed.scale_reference,
             &parsed.geometry_notes,
+            &parsed.glossary_text,
             &checklist_json,
         )
         .map_err(|error| error.to_string())?;
+    let selection = GameBuildGuideOverlaySelection {
+        game_id: game.id,
+        guide_id: guide.id,
+    };
+    if let Ok(mut active_selection) = state.active_game_build_guide_overlay.lock() {
+        active_selection.replace(selection.clone());
+    }
+    persist_game_build_guide_overlay_selection(state, &selection);
     state
         .database
         .replace_game_build_guide_parts(guide.id, &parsed.parts)
@@ -868,30 +870,26 @@ fn show_game_build_guide_overlay_window(
     app: &AppHandle,
     selection: &GameBuildGuideOverlaySelection,
 ) -> Result<(), String> {
-    let window = app
-        .get_webview_window("game-build-guide")
-        .ok_or_else(|| "Build guide overlay window was not created at startup.".to_string())?;
-
-    window
-        .set_always_on_top(true)
-        .map_err(|error| error.to_string())?;
-    ensure_window_accepts_mouse_input(&window)?;
+    let window_manager = WindowManager::new(app);
+    let window = window_manager.required_window(WindowKind::GameBuildGuide)?;
+    window_manager.prepare_for_interaction(&window)?;
     let state = app.state::<AppState>();
     if let Ok(guide) = state.database.get_game_build_guide(selection.guide_id) {
         if let (Some(overlay_x), Some(overlay_y)) = (guide.overlay_x, guide.overlay_y) {
-            let _ = window.set_position(PhysicalPosition::new(overlay_x, overlay_y));
+            let _ = window_manager.set_position(WindowKind::GameBuildGuide, overlay_x, overlay_y);
         }
         if let (Some(overlay_width), Some(overlay_height)) =
             (guide.overlay_width, guide.overlay_height)
         {
-            let _ = window.set_size(tauri::PhysicalSize::new(
+            let _ = window_manager.set_size(
+                WindowKind::GameBuildGuide,
                 overlay_width.max(300) as u32,
                 overlay_height.max(360) as u32,
-            ));
+            );
         }
     }
     window.show().map_err(|error| error.to_string())?;
-    let _ = set_overlay_opacity(&window, 1.0);
+    let _ = windows::set_overlay_opacity(&window, windows::ACTIVE_WINDOW_OPACITY);
     window.set_focus().map_err(|error| error.to_string())?;
     let _ = app.emit(
         "game-build-guide-overlay-selection-changed",
@@ -940,11 +938,9 @@ pub fn toggle_active_game_build_guide_overlay_window(app: &AppHandle) -> Result<
         .replace(selection.clone());
     persist_game_build_guide_overlay_selection(state.inner(), &selection);
 
-    let window = app
-        .get_webview_window("game-build-guide")
-        .ok_or_else(|| "Build guide overlay window was not created at startup.".to_string())?;
-    if window.is_visible().map_err(|error| error.to_string())? {
-        window.hide().map_err(|error| error.to_string())?;
+    let window_manager = WindowManager::new(app);
+    if window_manager.is_visible(WindowKind::GameBuildGuide)? {
+        window_manager.hide(WindowKind::GameBuildGuide)?;
         return Ok(false);
     }
 
@@ -1018,6 +1014,7 @@ struct ParsedGameBuildGuide {
     build_goal: String,
     scale_reference: String,
     geometry_notes: String,
+    glossary_text: String,
     checklist: Vec<String>,
     parts: Vec<GameBuildGuidePartDraft>,
     steps: Vec<GameBuildGuideStepDraft>,
@@ -1029,6 +1026,7 @@ fn parse_game_build_guide_markdown(markdown: &str) -> ParsedGameBuildGuide {
         build_goal: markdown_section_text(markdown, "Build Goal"),
         scale_reference: markdown_section_text(markdown, "Scale Reference"),
         geometry_notes: markdown_section_text(markdown, "Current Chosen Geometry"),
+        glossary_text: markdown_section_text(markdown, "Glossary"),
         checklist: markdown_bullets_in_section(markdown, "First Test Checklist"),
         parts: markdown_parts_tables(markdown),
         steps: markdown_assembly_steps(markdown),
@@ -1154,7 +1152,7 @@ fn markdown_parts_tables(markdown: &str) -> Vec<GameBuildGuidePartDraft> {
         row_order += 1;
         parts.push(GameBuildGuidePartDraft {
             section: current_section.clone(),
-            quantity: columns.get(0).cloned().unwrap_or_default(),
+            quantity: columns.first().cloned().unwrap_or_default(),
             part_name,
             purpose: columns.get(2).cloned().unwrap_or_default(),
             row_order,
@@ -1665,10 +1663,7 @@ fn append_smoking_count_table(content: &mut String, label: &str, counts: Vec<(St
 }
 
 fn markdown_table_cell(value: &str) -> String {
-    value
-        .replace('|', "\\|")
-        .replace('\r', " ")
-        .replace('\n', " ")
+    value.replace('|', "\\|").replace(['\r', '\n'], " ")
 }
 
 #[tauri::command]
@@ -2613,7 +2608,7 @@ pub fn get_gearblocks_third_party_dependency_status(
 }
 
 fn request_gearblocks_scene_export_from_game(state: &AppState) -> Result<(), String> {
-    if !focus_last_game_window_from_state(state)? {
+    if !windows::focus_last_game_window_from_state(state)? {
         return Err(
             "No remembered GearBlocks window is available for scene export. Focus GearBlocks from Overlay Forge once, then refresh scene context again."
                 .to_string(),
@@ -2902,6 +2897,17 @@ pub fn list_gearblocks_api_catalog(
     state
         .database
         .list_gearblocks_api_catalog()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn import_gearblocks_official_api_docs(
+    state: State<'_, AppState>,
+) -> Result<GearBlocksApiImportResult, String> {
+    let scrape = scrape_official_gearblocks_api()?;
+    state
+        .database
+        .import_gearblocks_api_catalog(&scrape)
         .map_err(|error| error.to_string())
 }
 
@@ -3491,14 +3497,8 @@ fn create_game_screenshot_capture(
         .map_err(|error| error.to_string())
 }
 
-const OVERLAY_CAPTURE_WINDOW_LABELS: [&str; 3] = ["main", "game-chat", "game-build-guide"];
-
-fn is_standalone_overlay_window_label(label: &str) -> bool {
-    matches!(label, "game-chat" | "game-build-guide")
-}
-
 struct HiddenOverlayCaptureWindow {
-    label: &'static str,
+    kind: WindowKind,
     window: WebviewWindow,
     was_visible: bool,
 }
@@ -3507,9 +3507,10 @@ fn hide_overlay_windows_for_capture(
     app: &AppHandle,
 ) -> Result<Vec<HiddenOverlayCaptureWindow>, String> {
     let mut hidden_windows = Vec::new();
+    let window_manager = WindowManager::new(app);
 
-    for label in OVERLAY_CAPTURE_WINDOW_LABELS {
-        let Some(window) = app.get_webview_window(label) else {
+    for kind in windows::CAPTURE_WINDOW_KINDS {
+        let Some(window) = window_manager.window(kind) else {
             continue;
         };
         let was_visible = window.is_visible().map_err(|error| error.to_string())?;
@@ -3517,7 +3518,7 @@ fn hide_overlay_windows_for_capture(
             window.hide().map_err(|error| error.to_string())?;
         }
         hidden_windows.push(HiddenOverlayCaptureWindow {
-            label,
+            kind,
             window,
             was_visible,
         });
@@ -3531,18 +3532,16 @@ fn restore_previously_visible_overlay_windows(
     invoking_window_label: &str,
 ) {
     for hidden_window in hidden_windows {
-        if !hidden_window.was_visible || hidden_window.label == invoking_window_label {
+        if !hidden_window.was_visible || hidden_window.kind.label() == invoking_window_label {
             continue;
         }
         let _ = hidden_window.window.set_always_on_top(true);
-        let _ = ensure_window_accepts_mouse_input(&hidden_window.window);
-        let opacity = if is_standalone_overlay_window_label(hidden_window.label) {
-            1.0
-        } else {
-            0.78
-        };
-        let _ = set_overlay_opacity(&hidden_window.window, opacity);
-        let _ = show_window_without_activation(&hidden_window.window);
+        let _ = windows::ensure_window_accepts_mouse_input(&hidden_window.window);
+        let _ = windows::set_overlay_opacity(
+            &hidden_window.window,
+            hidden_window.kind.runtime_config().restore_opacity,
+        );
+        let _ = windows::show_window_without_activation(&hidden_window.window);
     }
 }
 
@@ -3550,17 +3549,12 @@ fn restore_game_chat_overlay_after_capture(
     app: &AppHandle,
     state: &State<'_, AppState>,
 ) -> Result<(), String> {
-    let Some(window) = app.get_webview_window("game-chat") else {
+    let window_manager = WindowManager::new(app);
+    if window_manager.window(WindowKind::GameChat).is_none() {
         return Ok(());
-    };
-
-    window
-        .set_always_on_top(true)
-        .map_err(|error| error.to_string())?;
-    ensure_window_accepts_mouse_input(&window)?;
-    let _ = set_overlay_opacity(&window, 1.0);
-    show_window_without_activation(&window)?;
-    let _ = focus_last_game_window_from_state(state.inner());
+    }
+    window_manager.show_without_activation(WindowKind::GameChat)?;
+    let _ = windows::focus_last_game_window_from_state(state.inner());
 
     Ok(())
 }
@@ -3672,6 +3666,11 @@ fn gearblocks_prompt_context(state: &State<'_, AppState>, game_id: i64) -> Resul
         sections.push(gearblocks_marker_prompt_context());
     }
     sections.push(gearblocks_parts_catalog_prompt_context()?);
+    if let Some(build_guide_context) =
+        gearblocks_current_build_guide_prompt_context(state, game_id)?
+    {
+        sections.push(build_guide_context);
+    }
     if let Some(saved_context) = gearblocks_latest_saved_construction_context(state, game_id)? {
         sections.push(saved_context);
     }
@@ -3706,6 +3705,146 @@ fn gearblocks_marker_prompt_context() -> String {
         "Keep marker counts small, normally 1-5. Explain the marker purpose in normal prose before the block. Do not include markers when coordinates are uncertain; ask for a fresh scene export or screenshot instead.",
     ]
     .join("\n")
+}
+
+fn gearblocks_current_build_guide_prompt_context(
+    state: &State<'_, AppState>,
+    game_id: i64,
+) -> Result<Option<String>, String> {
+    let guide = active_or_latest_game_build_guide(state.inner(), game_id)?
+        .filter(|guide| guide.game_id == game_id);
+    let Some(guide) = guide else {
+        return Ok(None);
+    };
+
+    let parts = state
+        .database
+        .list_game_build_guide_parts(guide.id)
+        .map_err(|error| error.to_string())?;
+    let steps = state
+        .database
+        .list_game_build_guide_steps(guide.id)
+        .map_err(|error| error.to_string())?;
+    let checklist = serde_json::from_str::<Vec<String>>(&guide.checklist_json).unwrap_or_default();
+
+    let mut sections = vec![
+        "# Current GearBlocks Build Guide".to_string(),
+        "Treat this guide as the active build plan for this chat session. Use it when answering follow-up questions, explaining terminology, checking progress, or suggesting next steps. Keep advice relative to the guide's reference parts, jigs, and subassemblies rather than absolute world coordinates.".to_string(),
+        format!("Title: {}", guide.title),
+    ];
+    if !guide.build_goal.trim().is_empty() {
+        sections.push(format!("## Build Goal\n{}", guide.build_goal.trim()));
+    }
+    if !guide.scale_reference.trim().is_empty() {
+        sections.push(format!(
+            "## Scale Reference\n{}",
+            guide.scale_reference.trim()
+        ));
+    }
+    if !guide.geometry_notes.trim().is_empty() {
+        sections.push(format!(
+            "## Geometry Notes\n{}",
+            guide.geometry_notes.trim()
+        ));
+    }
+    if !guide.glossary_text.trim().is_empty() {
+        sections.push(format!("## Glossary\n{}", guide.glossary_text.trim()));
+    } else {
+        sections.push("## Glossary\nNo glossary was parsed for this guide. When using real-life terms, define them in terms of exact GearBlocks parts or relative subassemblies before relying on them.".to_string());
+    }
+
+    if !parts.is_empty() {
+        let mut rows = parts
+            .iter()
+            .take(80)
+            .map(|part| {
+                format!(
+                    "- [{}] {} x{}: {}",
+                    if part.section.trim().is_empty() {
+                        "Parts"
+                    } else {
+                        part.section.trim()
+                    },
+                    part.part_name.trim(),
+                    if part.quantity.trim().is_empty() {
+                        "?"
+                    } else {
+                        part.quantity.trim()
+                    },
+                    part.purpose.trim()
+                )
+            })
+            .collect::<Vec<_>>();
+        if parts.len() > rows.len() {
+            rows.push(format!(
+                "- {} additional build-guide part row(s) omitted from prompt context for size.",
+                parts.len() - rows.len()
+            ));
+        }
+        sections.push(format!("## Build Guide Parts\n{}", rows.join("\n")));
+    }
+
+    if !steps.is_empty() {
+        let mut rows = steps
+            .iter()
+            .take(30)
+            .map(|step| {
+                format!(
+                    "### {}. {}\n{}",
+                    step.step_number,
+                    step.title.trim(),
+                    step.body.trim()
+                )
+            })
+            .collect::<Vec<_>>();
+        if steps.len() > rows.len() {
+            rows.push(format!(
+                "{} additional build-guide step(s) omitted from prompt context for size.",
+                steps.len() - rows.len()
+            ));
+        }
+        sections.push(format!("## Build Guide Steps\n{}", rows.join("\n")));
+    }
+
+    if !checklist.is_empty() {
+        sections.push(format!(
+            "## First Test Checklist\n{}",
+            checklist
+                .iter()
+                .take(30)
+                .map(|item| format!("- {item}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        ));
+    }
+
+    Ok(Some(sections.join("\n\n")))
+}
+
+fn active_or_latest_game_build_guide(
+    state: &AppState,
+    game_id: i64,
+) -> Result<Option<GameBuildGuideRecord>, String> {
+    let active_selection = state
+        .active_game_build_guide_overlay
+        .lock()
+        .ok()
+        .and_then(|selection| selection.clone())
+        .or_else(|| stored_build_guide_overlay_selection(state))
+        .filter(|selection| selection.game_id == game_id);
+
+    if let Some(selection) = active_selection {
+        if let Ok(guide) = state.database.get_game_build_guide(selection.guide_id) {
+            if guide.game_id == game_id {
+                return Ok(Some(guide));
+            }
+        }
+    }
+
+    state
+        .database
+        .latest_game_build_guide(game_id)
+        .map_err(|error| error.to_string())
 }
 
 fn gearblocks_latest_saved_construction_context(
@@ -4121,215 +4260,6 @@ fn validate_youtube_video_id(value: &str) -> Result<String, String> {
     }
 
     Ok(video_id.to_string())
-}
-
-#[cfg(target_os = "windows")]
-fn manual_overlay_drag(window: WebviewWindow) -> Result<(), String> {
-    if MANUAL_OVERLAY_DRAG_ACTIVE.swap(true, Ordering::SeqCst) {
-        return Ok(());
-    }
-
-    thread::spawn(move || {
-        let _ = manual_overlay_drag_loop(window);
-        MANUAL_OVERLAY_DRAG_ACTIVE.store(false, Ordering::SeqCst);
-    });
-
-    Ok(())
-}
-
-#[cfg(target_os = "windows")]
-fn manual_overlay_drag_loop(window: WebviewWindow) -> Result<(), String> {
-    use std::mem;
-    use windows_sys::Win32::Foundation::POINT;
-    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
-    use windows_sys::Win32::UI::WindowsAndMessaging::GetCursorPos;
-
-    let started_at = std::time::Instant::now();
-    let start_window_position = window.outer_position().map_err(|error| error.to_string())?;
-    let start_cursor = unsafe {
-        let mut point: POINT = mem::zeroed();
-        if GetCursorPos(&mut point) == 0 {
-            return Err("Could not read the mouse position.".to_string());
-        }
-        point
-    };
-
-    loop {
-        let left_button_down =
-            unsafe { (GetAsyncKeyState(VK_LBUTTON as i32) & 0x8000u16 as i16) != 0 };
-        if !left_button_down {
-            break;
-        }
-
-        let cursor = unsafe {
-            let mut point: POINT = mem::zeroed();
-            if GetCursorPos(&mut point) == 0 {
-                break;
-            }
-            point
-        };
-        let next_x = start_window_position.x + (cursor.x - start_cursor.x);
-        let next_y = start_window_position.y + (cursor.y - start_cursor.y);
-        let _ = window.set_position(PhysicalPosition::new(next_x, next_y));
-        if started_at.elapsed() > Duration::from_secs(8) {
-            break;
-        }
-        thread::sleep(Duration::from_millis(8));
-    }
-
-    Ok(())
-}
-
-#[cfg(not(target_os = "windows"))]
-fn manual_overlay_drag(_window: WebviewWindow) -> Result<(), String> {
-    Err("Manual no-snap overlay drag is only available on Windows.".to_string())
-}
-
-#[cfg(target_os = "windows")]
-fn focus_last_game_window_impl(state: State<'_, AppState>) -> Result<bool, String> {
-    focus_last_game_window_from_state(state.inner())
-}
-
-#[cfg(target_os = "windows")]
-fn focus_last_game_window_from_state(state: &AppState) -> Result<bool, String> {
-    use windows_sys::Win32::Foundation::HWND;
-    use windows_sys::Win32::UI::WindowsAndMessaging::{IsWindow, SetForegroundWindow};
-
-    let hwnd = state
-        .last_game_window
-        .lock()
-        .map_err(|_| "Last game window state is unavailable.".to_string())?
-        .unwrap_or_default();
-    if hwnd == 0 {
-        return Ok(false);
-    }
-
-    let hwnd = hwnd as HWND;
-    unsafe {
-        if IsWindow(hwnd) == 0 {
-            return Ok(false);
-        }
-        Ok(SetForegroundWindow(hwnd) != 0)
-    }
-}
-
-#[cfg(not(target_os = "windows"))]
-fn focus_last_game_window_impl(_state: State<'_, AppState>) -> Result<bool, String> {
-    Ok(false)
-}
-
-#[cfg(not(target_os = "windows"))]
-fn focus_last_game_window_from_state(_state: &AppState) -> Result<bool, String> {
-    Ok(false)
-}
-
-#[cfg(target_os = "windows")]
-fn get_overlay_forge_foreground_window_label_impl(
-    app: &AppHandle,
-) -> Result<Option<String>, String> {
-    use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
-
-    let foreground = unsafe { GetForegroundWindow() };
-    if foreground.is_null() {
-        return Ok(None);
-    }
-
-    for window in app.webview_windows().values() {
-        let hwnd = window.hwnd().map_err(|error| error.to_string())?.0
-            as windows_sys::Win32::Foundation::HWND;
-        if foreground == hwnd {
-            return Ok(Some(window.label().to_string()));
-        }
-    }
-
-    Ok(None)
-}
-
-#[cfg(not(target_os = "windows"))]
-fn get_overlay_forge_foreground_window_label_impl(
-    _app: &AppHandle,
-) -> Result<Option<String>, String> {
-    Ok(Some("main".to_string()))
-}
-
-#[cfg(target_os = "windows")]
-fn show_window_without_activation(window: &WebviewWindow) -> Result<(), String> {
-    use windows_sys::Win32::Foundation::HWND;
-    use windows_sys::Win32::UI::WindowsAndMessaging::{
-        SetWindowPos, ShowWindow, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
-        SWP_SHOWWINDOW, SW_SHOWNOACTIVATE,
-    };
-
-    let hwnd = window.hwnd().map_err(|error| error.to_string())?;
-    unsafe {
-        ShowWindow(hwnd.0 as HWND, SW_SHOWNOACTIVATE);
-        SetWindowPos(
-            hwnd.0 as HWND,
-            HWND_TOPMOST,
-            0,
-            0,
-            0,
-            0,
-            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW,
-        );
-    }
-    Ok(())
-}
-
-#[cfg(target_os = "windows")]
-fn ensure_window_accepts_mouse_input(window: &WebviewWindow) -> Result<(), String> {
-    use windows_sys::Win32::UI::WindowsAndMessaging::{
-        GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_NOACTIVATE, WS_EX_TRANSPARENT,
-    };
-
-    let hwnd =
-        window.hwnd().map_err(|error| error.to_string())?.0 as windows_sys::Win32::Foundation::HWND;
-    unsafe {
-        let style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-        let next_style = style & !(WS_EX_TRANSPARENT as isize) & !(WS_EX_NOACTIVATE as isize);
-        if next_style != style {
-            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, next_style);
-        }
-    }
-
-    Ok(())
-}
-
-#[cfg(not(target_os = "windows"))]
-fn ensure_window_accepts_mouse_input(_window: &WebviewWindow) -> Result<(), String> {
-    Ok(())
-}
-
-#[cfg(not(target_os = "windows"))]
-fn show_window_without_activation(window: &WebviewWindow) -> Result<(), String> {
-    window.show().map_err(|error| error.to_string())
-}
-
-#[cfg(target_os = "windows")]
-fn set_overlay_opacity(window: &WebviewWindow, opacity: f64) -> Result<(), String> {
-    use windows_sys::Win32::UI::WindowsAndMessaging::{
-        GetWindowLongPtrW, SetLayeredWindowAttributes, SetWindowLongPtrW, GWL_EXSTYLE, LWA_ALPHA,
-        WS_EX_LAYERED,
-    };
-
-    let hwnd =
-        window.hwnd().map_err(|error| error.to_string())?.0 as windows_sys::Win32::Foundation::HWND;
-    let alpha = (opacity.clamp(0.2, 1.0) * 255.0).round() as u8;
-
-    unsafe {
-        let style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED as isize);
-        if SetLayeredWindowAttributes(hwnd, 0, alpha, LWA_ALPHA) == 0 {
-            return Err("Could not set overlay window opacity.".to_string());
-        }
-    }
-
-    Ok(())
-}
-
-#[cfg(not(target_os = "windows"))]
-fn set_overlay_opacity(_window: &WebviewWindow, _opacity: f64) -> Result<(), String> {
-    Ok(())
 }
 
 fn open_external_url(url: &str) -> Result<(), String> {
@@ -6964,10 +6894,7 @@ fn safe_filename_part(value: &str) -> String {
     let mut previous_was_separator = false;
 
     for character in value.trim().chars() {
-        if character.is_ascii_alphanumeric() {
-            output.push(character);
-            previous_was_separator = false;
-        } else if matches!(character, '-' | '_') {
+        if character.is_ascii_alphanumeric() || matches!(character, '-' | '_') {
             output.push(character);
             previous_was_separator = false;
         } else if !previous_was_separator && !output.is_empty() {

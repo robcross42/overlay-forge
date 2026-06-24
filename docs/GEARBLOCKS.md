@@ -31,6 +31,7 @@ OverlayForgePlugin
 | Chat | GearBlocks-specific chat using saved-file context and latest runtime context. |
 | Parts | Runtime-indexed part catalog, part images, API availability display, notes. |
 | Constructions | Saved construction folder index and decoded construction summaries. |
+| API | Official GearBlocks API documentation index imported into the local SQLite catalog. |
 | Tools | In-game script-window tooling for scene export, builder helpers, weld helpers, and status. |
 | Build Guides | Imported Markdown construction handoffs rendered in a narrow independent overlay window. |
 
@@ -87,6 +88,12 @@ GearBlocks build guides are imported from Markdown handoffs and stored locally i
 
 GearBlocks chat can also generate a build guide directly. Use the Guide action in a GearBlocks chat after typing a build goal, or after a recent user message already describes the intended build. Overlay Forge sends the goal and current GearBlocks context to the backend OpenAI path, saves the generated Markdown under app data, imports it into SQLite, and refreshes the Build Guides list during the same session.
 
+The active or latest GearBlocks build guide is included in GearBlocks chat prompt context. A newly imported or generated guide becomes the current guide for chat until another guide is imported, generated, or selected.
+
+Generated build guides include a Glossary section. The glossary maps real-world vehicle terms to exact GearBlocks part names when one part is enough, or to relative mini-assembly instructions when multiple GearBlocks parts are needed. Chat may use real-world terms such as axle tube, skid plate, rail, crossmember, hub, or jig, but those terms should remain grounded in the glossary.
+
+Generated assembly guidance should use relative placement from the first reference part, named subassemblies, or temporary jigs. Avoid absolute world coordinates because the user may build in the air and GearBlocks may introduce small angle drift.
+
 The build-guide overlay is independent from the main Overlay Forge window and the game chat overlay. It is translucent, resizable, movable, always-on-top, and remembers its last position and size per guide.
 
 The overlay is optimized for a side-of-screen layout. Parts are rendered as compact stacked rows instead of wide tables so the window can stay pinned to roughly one quarter to one third of the screen while building.
@@ -134,6 +141,12 @@ The GearBlocks part catalog is validated for game version `0.8.96622`.
 Use `docs/GEARBLOCKS_PARTS_CATALOG.md` as the reference vocabulary for part names, categories, and practical physics roles.
 
 Runtime API imports remain the source of truth for the user's current scene and observed runtime parts.
+
+## Official API Catalog
+
+The GearBlocks API screen can import the official Doxygen documentation from `https://www.gearblocksgame.com/apidoc/` into SQLite.
+
+This index is for documented metadata only: type names, members, parameters, enum values, source URLs, and summaries. Overlay Forge must not execute documented API getters or mutating methods from this import unless a future explicit user-controlled runtime action is added.
 
 ## External Dependency Boundary
 

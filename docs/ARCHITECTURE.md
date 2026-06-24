@@ -24,6 +24,9 @@ The stack-specific model is:
 - Rust uses structs, impl blocks, enums, traits, services, repositories, and modules rather than Java-style inheritance.
 - Tauri command handlers stay thin and delegate business logic to services, repositories, or domain methods.
 - SQLite access and row mapping should be centralized by persisted domain concept.
+- Long command, service, and repository argument lists should be converted into typed request, draft, options, or parameter structs when the values describe one domain operation.
+- Repeated frontend helpers such as unknown-error formatting, timestamp labels, local storage keys, Markdown cleanup, and command payload normalization should live in shared utilities or domain helpers.
+- Large source files should be split by domain boundary before they become dumping grounds for unrelated behavior.
 
 For non-trivial code changes, implementation notes should identify the domain concept involved, the reusable abstraction added or reused, duplicate logic removed, regression risk reduced, and tests added or updated. If no abstraction is needed, the implementation note should explain why.
 
@@ -44,6 +47,8 @@ src/
 Feature modules should keep UI state local where possible and call backend-owned Tauri commands for persistence, filesystem access, secret-backed requests, game capture, runtime import, and other privileged operations.
 
 React components should remain function components with hooks unless a specific task documents why a class component is needed. Components should not own backend business rules, persistence rules, or Tauri window lifecycle behavior.
+
+Shared frontend utility behavior belongs under focused utility or service modules rather than being redefined inside feature components.
 
 ## UI Consistency Rules
 
@@ -90,6 +95,8 @@ The Tauri backend owns:
 
 Backend command handlers should receive input, validate it, call a service, repository, or domain method, and return typed results. They should not manually construct complex domain objects inline, duplicate defaults, duplicate SQLite access logic, or own large procedural feature implementations.
 
+Broad backend cleanup should include `cargo clippy --all-targets` when practical. Clear no-risk Clippy warnings should be fixed immediately. Larger warnings, such as high-arity persistence methods that need typed parameter structs, should be captured as explicit refactor work rather than suppressed silently.
+
 ## Persistence Boundary
 
 SQLite is the local source of truth. Migrations must be idempotent and non-destructive.
@@ -106,6 +113,8 @@ New persistence should follow the current naming convention:
 Avoid table-per-game settings. Use `obj_game_setting` or a normalized feature table keyed by `game_id` and `id_game`.
 
 Do not scatter SQL row mapping across unrelated files. Each persisted domain concept should have one canonical mapping path between database rows, domain objects, database insert/update payloads, and frontend DTOs where needed.
+
+SQLite access should surface recoverable infrastructure failures through `Result` values. Repository methods should not panic on normal database lock or mapping failures.
 
 Generated screenshots, manifests, runtime game data, copied DLLs, plugin build output, and local workspaces should remain ignored by git.
 

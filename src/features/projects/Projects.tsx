@@ -20,6 +20,7 @@ import type {
 } from "../../services/planningChat";
 import { createProject, deleteProject, updateProject } from "../../services/projects";
 import type { Project, ProjectInput, ProjectStatus } from "../../services/projects";
+import { formatUnknownError as formatError } from "../../utils/errors";
 
 const emptyProject: ProjectInput = {
   name: "",
@@ -748,8 +749,4 @@ export function Projects({
 
 function formatProjectStatus(status: ProjectStatus) {
   return status === "ARCHIVED" ? "Archived" : "Active";
-}
-
-function formatError(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
 }

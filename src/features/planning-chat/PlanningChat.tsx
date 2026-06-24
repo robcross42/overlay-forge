@@ -40,6 +40,7 @@ import type { Task } from "../../services/tasks";
 import { listYouTubeReferences } from "../../services/youtube";
 import type { YouTubeReference } from "../../services/youtube";
 import { startOverlayDrag, startOverlayResize } from "../../services/windowControls";
+import { formatUnknownError as formatError } from "../../utils/errors";
 
 type PlanningChatProps = {
   chatOverlayMode?: boolean;
@@ -1494,8 +1495,4 @@ function formatDate(value: string) {
   }
 
   return value.replace("T", " ").slice(0, 16);
-}
-
-function formatError(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
 }

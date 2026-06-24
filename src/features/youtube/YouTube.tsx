@@ -7,6 +7,7 @@ import {
   updateYouTubeReference
 } from "../../services/youtube";
 import type { YouTubeReference, YouTubeReferenceInput } from "../../services/youtube";
+import { formatUnknownError as formatError } from "../../utils/errors";
 
 const emptyReference: YouTubeReferenceInput = {
   title: "",
@@ -288,8 +289,4 @@ export function YouTube() {
       </div>
     </section>
   );
-}
-
-function formatError(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
 }

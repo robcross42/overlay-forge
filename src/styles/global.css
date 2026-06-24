@@ -125,6 +125,10 @@ button {
   --standalone-user-panel-bg: rgba(255, 255, 255, 0.03);
   --standalone-input-bg: rgba(6, 8, 11, 0.06);
   --standalone-accent-bg: rgba(79, 208, 165, 0.04);
+  --standalone-border: rgba(185, 205, 222, 0.035);
+  --standalone-border-strong: rgba(255, 255, 255, 0.055);
+  --standalone-scrollbar-thumb: rgba(79, 208, 165, 0.08);
+  --standalone-scrollbar-track: rgba(255, 255, 255, 0.015);
   background: var(--standalone-frame-bg);
 }
 
@@ -136,36 +140,68 @@ button {
   --standalone-user-panel-bg: rgba(255, 255, 255, 0.2);
   --standalone-input-bg: rgba(6, 8, 11, 0.72);
   --standalone-accent-bg: rgba(79, 208, 165, 0.14);
+  --standalone-border: rgba(185, 205, 222, 0.16);
+  --standalone-border-strong: rgba(255, 255, 255, 0.2);
+  --standalone-scrollbar-thumb: rgba(79, 208, 165, 0.48);
+  --standalone-scrollbar-track: rgba(255, 255, 255, 0.06);
 }
 
 .standalone-overlay-window .overlay-window-titlebar {
+  border-color: var(--standalone-border);
   background: var(--standalone-title-bg);
 }
 
 .standalone-overlay-window .message-list,
 .standalone-overlay-window .build-guide-overlay-content {
   background: transparent;
+  scrollbar-color: var(--standalone-scrollbar-thumb) var(--standalone-scrollbar-track);
+}
+
+.standalone-overlay-window .message-list::-webkit-scrollbar-track,
+.standalone-overlay-window .build-guide-overlay-content::-webkit-scrollbar-track {
+  background: var(--standalone-scrollbar-track);
+}
+
+.standalone-overlay-window .message-list::-webkit-scrollbar-thumb,
+.standalone-overlay-window .build-guide-overlay-content::-webkit-scrollbar-thumb {
+  background: var(--standalone-scrollbar-thumb);
 }
 
 .standalone-overlay-window .chat-workspace-overlay-mode .chat-message {
+  border-color: var(--standalone-border);
   background: var(--standalone-panel-bg);
 }
 
 .standalone-overlay-window .chat-workspace-overlay-mode .chat-message-user {
+  border-color: var(--standalone-border-strong);
   background: var(--standalone-user-panel-bg);
 }
 
 .standalone-overlay-window .chat-workspace-overlay-mode .body-input.compact {
+  border-color: var(--standalone-border-strong);
   background: var(--standalone-input-bg);
 }
 
+.standalone-overlay-window .chat-overlay-context-summary {
+  border-color: var(--standalone-border);
+  background: var(--standalone-panel-bg);
+}
+
+.standalone-overlay-window .chat-workspace-overlay-mode .chat-input-row .primary-button,
+.standalone-overlay-window .chat-workspace-overlay-mode .chat-input-extra-action {
+  border-color: var(--standalone-border-strong);
+}
+
+.standalone-overlay-window .build-guide-status,
 .standalone-overlay-window .build-guide-section,
 .standalone-overlay-window .build-guide-part-group,
 .standalone-overlay-window .build-guide-step {
+  border-color: var(--standalone-border);
   background: var(--standalone-panel-strong-bg);
 }
 
 .standalone-overlay-window .build-guide-part-row {
+  border-color: var(--standalone-border);
   background: var(--standalone-panel-bg);
 }
 
@@ -1516,6 +1552,13 @@ select.text-input option:hover {
   display: grid;
   gap: 2px;
   min-width: 0;
+}
+
+.game-view-head .game-view-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .game-view-head p,

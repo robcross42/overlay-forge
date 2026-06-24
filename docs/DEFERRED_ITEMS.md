@@ -27,6 +27,7 @@ This file centralizes deferred work. Items listed here are not approved scope un
 
 ## Codex Reasoning And Escalation
 
+- Fix the observed escalation enforcement failure where Codex proceeded on Low reasoning after classifying a request as Medium instead of stopping before tool use and asking the user to switch to Medium.
 - Flesh out reasoning-level rules and escalation methods beyond the current project guidance.
 - Explore whether reasoning level can be chosen automatically instead of requiring manual VS Code/Codex setting changes.
 - Investigate options for modifying or extending the VS Code Codex chat experience to better support reasoning-level selection and escalation workflows.
@@ -74,6 +75,13 @@ This file centralizes deferred work. Items listed here are not approved scope un
 - Multi-user auth.
 - Project import/export.
 - External calendar sync.
+
+## Architecture Cleanup Backlog
+
+- Split large Rust backend modules by domain boundary, starting with `commands.rs` and `db.rs`, so Tauri command routing, domain services, repositories, parsers, and platform window code are easier to review independently.
+- Convert high-arity command and repository methods into typed request, draft, options, or parameter structs. Clippy currently flags several calendar, YouTube, screenshot, build guide, GearBlocks runtime, and catalog persistence methods for this pattern.
+- Continue moving repeated frontend helpers into shared utilities or domain helpers when a behavior appears in more than one component.
+- Add stricter lint gates only after the current broad Clippy findings have been reduced enough that the checks can run cleanly in normal development.
 
 ## GearBlocks Markers And Plugins
 

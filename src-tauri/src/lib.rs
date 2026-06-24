@@ -1,9 +1,11 @@
 mod commands;
 mod db;
 mod gearblocks_api;
+mod gearblocks_api_scraper;
 mod github;
 mod hotkeys;
 mod openai;
+mod windows;
 
 use std::sync::Mutex;
 
@@ -26,13 +28,13 @@ use commands::{
     get_overlay_forge_foreground_window_label, get_project_github_repository,
     get_project_markdown_context, get_scratchpad, get_smoking_cessation_settings,
     get_youtube_reference, import_game_build_guide_markdown,
-    import_gearblocks_catalog_screenshot_images, import_gearblocks_runtime_context,
-    import_gearblocks_runtime_part_index, install_gearblocks_lua_exporter,
-    is_overlay_forge_foreground, list_bridge_file_drafts, list_calendar_events,
-    list_game_build_guides, list_game_catalog_objects, list_game_chat_conversations,
-    list_game_chat_messages, list_game_constructions, list_game_data_locations,
-    list_game_part_categories, list_game_runtime_part_api_members, list_game_runtime_parts,
-    list_game_screenshots, list_games, list_gearblocks_api_catalog,
+    import_gearblocks_catalog_screenshot_images, import_gearblocks_official_api_docs,
+    import_gearblocks_runtime_context, import_gearblocks_runtime_part_index,
+    install_gearblocks_lua_exporter, is_overlay_forge_foreground, list_bridge_file_drafts,
+    list_calendar_events, list_game_build_guides, list_game_catalog_objects,
+    list_game_chat_conversations, list_game_chat_messages, list_game_constructions,
+    list_game_data_locations, list_game_part_categories, list_game_runtime_part_api_members,
+    list_game_runtime_parts, list_game_screenshots, list_games, list_gearblocks_api_catalog,
     list_gearblocks_construction_files, list_gearblocks_runtime_exports, list_keybinds, list_notes,
     list_planning_conversation_context, list_planning_conversations, list_planning_messages,
     list_projects, list_schedulers, list_smoking_events, list_tasks, list_youtube_references,
@@ -51,6 +53,7 @@ use commands::{
 use db::AppDatabase;
 use serde::{Deserialize, Serialize};
 use tauri::{Manager, WindowEvent};
+use windows::{OverlayWindowConfig, StandaloneWindowConfig, WindowManager};
 
 #[derive(Clone, Serialize)]
 pub struct GameChatOverlaySelection {
@@ -111,11 +114,20 @@ pub fn run() {
             commands::start_gearblocks_runtime_import_monitor(app.handle().clone());
             start_scheduler_worker(app.handle().clone());
 
-            if let Some(window) = app.get_webview_window("main") {
-                window.set_always_on_top(true)?;
-            }
-            if let Some(window) = app.get_webview_window("game-chat") {
-                window.set_always_on_top(true)?;
+            let app_handle = app.handle().clone();
+            let window_manager = WindowManager::new(&app_handle);
+            let main_window_config = OverlayWindowConfig::main();
+            window_manager
+                .configure_runtime(main_window_config.base.kind)
+                .map_err(std::io::Error::other)?;
+            let game_chat_window_config = StandaloneWindowConfig::game_chat();
+            if let Some(window) = window_manager.window(game_chat_window_config.base.kind) {
+                window_manager
+                    .configure_runtime(game_chat_window_config.base.kind)
+                    .map_err(std::io::Error::other)?;
+                window_manager
+                    .set_minimum_size(game_chat_window_config)
+                    .map_err(std::io::Error::other)?;
                 let app_handle = app.handle().clone();
                 window.on_window_event(move |event| {
                     if let WindowEvent::Moved(position) = event {
@@ -137,8 +149,14 @@ pub fn run() {
                     }
                 });
             }
-            if let Some(window) = app.get_webview_window("game-build-guide") {
-                window.set_always_on_top(true)?;
+            let build_guide_window_config = StandaloneWindowConfig::game_build_guide();
+            if let Some(window) = window_manager.window(build_guide_window_config.base.kind) {
+                window_manager
+                    .configure_runtime(build_guide_window_config.base.kind)
+                    .map_err(std::io::Error::other)?;
+                window_manager
+                    .set_minimum_size(build_guide_window_config)
+                    .map_err(std::io::Error::other)?;
                 let app_handle = app.handle().clone();
                 window.on_window_event(move |event| {
                     let state = app_handle.state::<AppState>();
@@ -282,6 +300,7 @@ pub fn run() {
             get_gearblocks_third_party_dependency_status,
             list_gearblocks_runtime_exports,
             list_gearblocks_api_catalog,
+            import_gearblocks_official_api_docs,
             import_gearblocks_runtime_part_index,
             import_gearblocks_catalog_screenshot_images,
             list_game_runtime_parts,

@@ -7,11 +7,12 @@ The active coding workflow is direct Codex chat in VS Code. Repository Markdown 
 ## Current Baseline
 
 ```text
+Current stable app release: 0.9.0
 Milestone 13 - Project Workspace UI Consolidation
 Status: Complete / Passed / Successful
 ```
 
-Milestone 13 is the current stable project baseline. It consolidates Projects around the left navigation hierarchy, focused chat surfaces, Project Edit, and a collapsible right-hand context pane.
+Milestone 13 remains the foundational project baseline. The current stable app release builds on that baseline with functional GearBlocks build guides, chat-to-guide generation, official API indexing, and standalone overlay-window behavior.
 
 ## Core Capabilities
 
@@ -30,6 +31,7 @@ Milestone 13 is the current stable project baseline. It consolidates Projects ar
 - Project-level local Markdown context.
 - Gaming workspace and screenshot capture.
 - GearBlocks save decoding, runtime export import, parts catalog, script tooling, and backlog BepInEx plugin templates.
+- GearBlocks build guide import, chat-generated guide creation, in-game build guide overlay, and active guide chat context.
 - Smoking Cessation module.
 - Scheduler framework.
 - SQLite naming normalization.

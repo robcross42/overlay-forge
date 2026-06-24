@@ -116,9 +116,29 @@ API getter values are not included in default chat prompt context and should req
 
 Mutating operation interfaces remain represented as support descriptors and are not called by the exporter.
 
+## Official API Index
+
+Overlay Forge can import the official GearBlocks Doxygen API documentation into the normalized API catalog.
+
+Use:
+
+```text
+Gaming -> GearBlocks -> API -> Import Official Docs
+```
+
+The importer fetches the official API hierarchy, namespace pages, and type reference pages from:
+
+```text
+https://www.gearblocksgame.com/apidoc/
+```
+
+The import is metadata-only. It indexes documented types, members, parameters, and namespace enum values into SQLite so chat and UI surfaces can reference the available API shape. It does not execute GearBlocks API getters, setters, or mutating methods.
+
+The original hand-maintained Construction API seed remains as a fallback source, especially for known Lua enum aliases and curated notes.
+
 ## Interfaces Covered
 
-Overlay Forge tracks the documented `SmashHammer.GearBlocks.Construction` namespace reference interfaces:
+Overlay Forge seeds and can refresh the documented `SmashHammer.GearBlocks.Construction` namespace reference interfaces:
 
 - `IAttachment`
 - `IAttachmentOperations`
@@ -147,6 +167,7 @@ Backend support structures live in:
 
 ```text
 src-tauri/src/gearblocks_api.rs
+src-tauri/src/gearblocks_api_scraper.rs
 ```
 
 ## Unified Script Window
@@ -174,7 +195,8 @@ Installing the unified script also removes the older `OverlayForgeTools` user sc
 
 If a future GearBlocks version or a specific part exposes bad, missing, or surprising API data, start with:
 
-- `src-tauri/src/gearblocks_api.rs`: interface descriptors, getter names, value type expectations, and method invocation policy.
+- `src-tauri/src/gearblocks_api.rs`: fallback interface descriptors, getter names, value type expectations, and method invocation policy.
+- `src-tauri/src/gearblocks_api_scraper.rs`: official Doxygen import parsing for API types, members, parameters, and enum values.
 - `gearblocks-script-mods/OverlayForgeConstructionExporter/main.lua`: runtime object export, API availability metadata, JSON emission, and guarded failures from GearBlocks' Lua sandbox.
 - `src-tauri/src/commands.rs`: exporter install-time known API index injection, `Player.log` chunk reconstruction, runtime export import, API attribute normalization, and chat-context construction summaries.
 - `src-tauri/src/db.rs`: SQLite persistence for runtime export JSON and runtime part JSON.
@@ -185,5 +207,5 @@ Common patterns:
 - A getter appears in the catalog without a value: expected; catalog API metadata is availability-only by default.
 - A future workflow needs live getter values: add an explicit user-controlled include/snapshot action.
 - Export is slow after an API metadata change: reinstall the exporter so the known API index is regenerated from SQLite, then export again.
-- A GearBlocks update changes an interface name or method name: update `gearblocks_api.rs` first, then mirror the exporter metadata list.
+- A GearBlocks update changes an interface name or method name: run `Import Official Docs`, then update fallback descriptors in `gearblocks_api.rs` only if the curated seed or Lua aliases need adjustment.
 - Import succeeds but chat lacks API details: expected unless a future explicit prompt-inclusion control is enabled.

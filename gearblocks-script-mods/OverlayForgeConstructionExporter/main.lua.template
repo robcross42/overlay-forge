@@ -61,7 +61,7 @@ local sectionSizes = {
     home = { width = 320, height = 328, minWidth = 280, minHeight = 260 },
     scene = { width = 420, height = 300, minWidth = 340, minHeight = 260 },
     names = { width = 420, height = 330, minWidth = 340, minHeight = 290 },
-    builder = { width = 560, height = 520, minWidth = 480, minHeight = 420 },
+    builder = { width = 430, height = 340, minWidth = 390, minHeight = 320 },
     weld = { width = 420, height = 360, minWidth = 340, minHeight = 300 },
     status = { width = 420, height = 360, minWidth = 340, minHeight = 300 }
 }
@@ -146,9 +146,9 @@ pcall(function() win.IsCollapsible = true end)
 centerWindowForSection(win, "home")
 
 local backButton = win.CreateTextButton()
-backButton.SetAlignment( align_LeftEdge, 12, 78 )
-backButton.SetAlignment( align_TopEdge, 12, 30 )
-setText(backButton, "Back")
+backButton.SetAlignment( align_LeftEdge, 12, 30 )
+backButton.SetAlignment( align_TopEdge, 12, 24 )
+setText(backButton, "<")
 
 local homeSceneButton = track("home", win.CreateTextButton())
 homeSceneButton.SetAlignment( align_HorizEdges, 18, 18 )
@@ -243,162 +243,162 @@ builderHeadingLabel.SetAlignment( align_HorizEdges, 14, 14 )
 builderHeadingLabel.SetAlignment( align_TopEdge, 58, 26 )
 builderHeadingLabel.Alignment = textAnc_MiddleLeft
 builderHeadingLabel.FontStyle = fontStyle_Bold
-setText(builderHeadingLabel, "Builder Tool")
-
-local manipulatorOrientationLabel = track("builder", win.CreateLabel())
-manipulatorOrientationLabel.SetAlignment( align_LeftEdge, 14, 180 )
-manipulatorOrientationLabel.SetAlignment( align_TopEdge, 94, 28 )
-manipulatorOrientationLabel.Alignment = textAnc_MiddleLeft
-setText(manipulatorOrientationLabel, "Manipulator Orientation")
-
-local manipulatorOrientationDropdown = track("builder", win.CreateDropdown())
-manipulatorOrientationDropdown.SetAlignment( align_RightEdge, 14, 180 )
-manipulatorOrientationDropdown.SetAlignment( align_TopEdge, 94, 28 )
-manipulatorOrientationDropdown.AddOptions({ "Local", "Global" })
-manipulatorOrientationDropdown.Value = ManipulatorOrientationMode.Value
-
-local stepIntervalLabel = track("builder", win.CreateLabel())
-stepIntervalLabel.SetAlignment( align_LeftEdge, 14, 135 )
-stepIntervalLabel.SetAlignment( align_TopEdge, 132, 28 )
-stepIntervalLabel.Alignment = textAnc_MiddleLeft
-setText(stepIntervalLabel, "Step Interval")
-
-local translationStepNumberField = track("builder", win.CreateNumberField())
-translationStepNumberField.SetAlignment( align_LeftEdge, 155, 92 )
-translationStepNumberField.SetAlignment( align_TopEdge, 132, 28 )
-translationStepNumberField.MaxNumDecimalPlaces = 3
-translationStepNumberField.Value = 0
-
-local rotationStepNumberField = track("builder", win.CreateNumberField())
-rotationStepNumberField.SetAlignment( align_LeftEdge, 255, 92 )
-rotationStepNumberField.SetAlignment( align_TopEdge, 132, 28 )
-rotationStepNumberField.MaxNumDecimalPlaces = 2
-rotationStepNumberField.Value = 0
-
-local stepHintLabel = track("builder", win.CreateLabel())
-stepHintLabel.SetAlignment( align_LeftEdge, 355, 160 )
-stepHintLabel.SetAlignment( align_TopEdge, 132, 28 )
-stepHintLabel.Alignment = textAnc_MiddleLeft
-setText(stepHintLabel, "Pos / Rot")
-
-local pivotPositionLabel = track("builder", win.CreateLabel())
-pivotPositionLabel.SetAlignment( align_LeftEdge, 14, 135 )
-pivotPositionLabel.SetAlignment( align_TopEdge, 170, 28 )
-pivotPositionLabel.Alignment = textAnc_MiddleLeft
-setText(pivotPositionLabel, "Pivot Position")
-
-local pivotPositionXNumberField = track("builder", win.CreateNumberField())
-pivotPositionXNumberField.SetAlignment( align_LeftEdge, 155, 72 )
-pivotPositionXNumberField.SetAlignment( align_TopEdge, 170, 28 )
-pivotPositionXNumberField.MaxNumDecimalPlaces = 3
-
-local pivotPositionYNumberField = track("builder", win.CreateNumberField())
-pivotPositionYNumberField.SetAlignment( align_LeftEdge, 233, 72 )
-pivotPositionYNumberField.SetAlignment( align_TopEdge, 170, 28 )
-pivotPositionYNumberField.MaxNumDecimalPlaces = 3
-
-local pivotPositionZNumberField = track("builder", win.CreateNumberField())
-pivotPositionZNumberField.SetAlignment( align_LeftEdge, 311, 72 )
-pivotPositionZNumberField.SetAlignment( align_TopEdge, 170, 28 )
-pivotPositionZNumberField.MaxNumDecimalPlaces = 3
-
-local snapPivotPositionButton = track("builder", win.CreateTextButton())
-snapPivotPositionButton.SetAlignment( align_RightEdge, 14, 126 )
-snapPivotPositionButton.SetAlignment( align_TopEdge, 170, 28 )
-setText(snapPivotPositionButton, "Snap")
-
-local pivotOrientationLabel = track("builder", win.CreateLabel())
-pivotOrientationLabel.SetAlignment( align_LeftEdge, 14, 135 )
-pivotOrientationLabel.SetAlignment( align_TopEdge, 208, 28 )
-pivotOrientationLabel.Alignment = textAnc_MiddleLeft
-setText(pivotOrientationLabel, "Pivot Rotation")
-
-local pivotOrientationXNumberField = track("builder", win.CreateNumberField())
-pivotOrientationXNumberField.SetAlignment( align_LeftEdge, 155, 72 )
-pivotOrientationXNumberField.SetAlignment( align_TopEdge, 208, 28 )
-pivotOrientationXNumberField.MaxNumDecimalPlaces = 2
-
-local pivotOrientationYNumberField = track("builder", win.CreateNumberField())
-pivotOrientationYNumberField.SetAlignment( align_LeftEdge, 233, 72 )
-pivotOrientationYNumberField.SetAlignment( align_TopEdge, 208, 28 )
-pivotOrientationYNumberField.MaxNumDecimalPlaces = 2
-
-local pivotOrientationZNumberField = track("builder", win.CreateNumberField())
-pivotOrientationZNumberField.SetAlignment( align_LeftEdge, 311, 72 )
-pivotOrientationZNumberField.SetAlignment( align_TopEdge, 208, 28 )
-pivotOrientationZNumberField.MaxNumDecimalPlaces = 2
-
-local snapPivotOrientationButton = track("builder", win.CreateTextButton())
-snapPivotOrientationButton.SetAlignment( align_RightEdge, 14, 126 )
-snapPivotOrientationButton.SetAlignment( align_TopEdge, 208, 28 )
-setText(snapPivotOrientationButton, "Snap")
+setText(builderHeadingLabel, "")
 
 local moveToGroundButton = track("builder", win.CreateTextButton())
-moveToGroundButton.SetAlignment( align_LeftEdge, 14, 170 )
-moveToGroundButton.SetAlignment( align_TopEdge, 246, 30 )
+moveToGroundButton.SetAlignment( align_LeftEdge, 52, 110 )
+moveToGroundButton.SetAlignment( align_TopEdge, 12, 24 )
 setText(moveToGroundButton, "Move to Ground")
 
-local resizeStepOverrideLabel = track("builder", win.CreateLabel())
-resizeStepOverrideLabel.SetAlignment( align_LeftEdge, 14, 135 )
-resizeStepOverrideLabel.SetAlignment( align_TopEdge, 286, 28 )
-resizeStepOverrideLabel.Alignment = textAnc_MiddleLeft
-setText(resizeStepOverrideLabel, "Resize Step")
-
-local resizeStepOverrideNumberField = track("builder", win.CreateNumberField())
-resizeStepOverrideNumberField.SetAlignment( align_LeftEdge, 155, 92 )
-resizeStepOverrideNumberField.SetAlignment( align_TopEdge, 286, 28 )
-resizeStepOverrideNumberField.MaxNumDecimalPlaces = 2
-resizeStepOverrideNumberField.Value = 0
-
-local sizeClampEnabledToggle = track("builder", win.CreateLabelledToggle())
-sizeClampEnabledToggle.SetAlignment( align_LeftEdge, 255, 150 )
-sizeClampEnabledToggle.SetAlignment( align_TopEdge, 286, 28 )
-setText(sizeClampEnabledToggle, "Clamp Resize")
-sizeClampEnabledToggle.Value = SelectionResizeClampEnabled.Value
-
-local pivotPartSizeLabel = track("builder", win.CreateLabel())
-pivotPartSizeLabel.SetAlignment( align_LeftEdge, 14, 135 )
-pivotPartSizeLabel.SetAlignment( align_TopEdge, 324, 28 )
-pivotPartSizeLabel.Alignment = textAnc_MiddleLeft
-setText(pivotPartSizeLabel, "Unit Size")
-
-local pivotPartSizeXNumberField = track("builder", win.CreateNumberField())
-pivotPartSizeXNumberField.SetAlignment( align_LeftEdge, 155, 72 )
-pivotPartSizeXNumberField.SetAlignment( align_TopEdge, 324, 28 )
-pivotPartSizeXNumberField.MaxNumDecimalPlaces = 2
-
-local pivotPartSizeYNumberField = track("builder", win.CreateNumberField())
-pivotPartSizeYNumberField.SetAlignment( align_LeftEdge, 233, 72 )
-pivotPartSizeYNumberField.SetAlignment( align_TopEdge, 324, 28 )
-pivotPartSizeYNumberField.MaxNumDecimalPlaces = 2
-
-local pivotPartSizeZNumberField = track("builder", win.CreateNumberField())
-pivotPartSizeZNumberField.SetAlignment( align_LeftEdge, 311, 72 )
-pivotPartSizeZNumberField.SetAlignment( align_TopEdge, 324, 28 )
-pivotPartSizeZNumberField.MaxNumDecimalPlaces = 2
-
-local snapPivotPartSizeButton = track("builder", win.CreateTextButton())
-snapPivotPartSizeButton.SetAlignment( align_RightEdge, 14, 126 )
-snapPivotPartSizeButton.SetAlignment( align_TopEdge, 324, 28 )
-setText(snapPivotPartSizeButton, "Snap")
+local showAllAttachmentsToggle = track("builder", win.CreateLabelledToggle())
+showAllAttachmentsToggle.SetAlignment( align_LeftEdge, 174, 150 )
+showAllAttachmentsToggle.SetAlignment( align_TopEdge, 12, 24 )
+setText(showAllAttachmentsToggle, "Show all attachments")
+showAllAttachmentsToggle.Value = ShowAllAttachments.Value
 
 local partPenetrationTestToggle = track("builder", win.CreateLabelledToggle())
-partPenetrationTestToggle.SetAlignment( align_LeftEdge, 14, 245 )
-partPenetrationTestToggle.SetAlignment( align_TopEdge, 366, 28 )
+partPenetrationTestToggle.SetAlignment( align_LeftEdge, 14, 176 )
+partPenetrationTestToggle.SetAlignment( align_TopEdge, 42, 24 )
 setText(partPenetrationTestToggle, "Prevent interpenetration")
 partPenetrationTestToggle.Value = PartPenetrationTestEnabled.Value
 
 local attachmentBridgingToggle = track("builder", win.CreateLabelledToggle())
-attachmentBridgingToggle.SetAlignment( align_LeftEdge, 275, 225 )
-attachmentBridgingToggle.SetAlignment( align_TopEdge, 366, 28 )
+attachmentBridgingToggle.SetAlignment( align_LeftEdge, 205, 148 )
+attachmentBridgingToggle.SetAlignment( align_TopEdge, 42, 24 )
 setText(attachmentBridgingToggle, "Attachment bridging")
 attachmentBridgingToggle.Value = AttachmentBridgingEnabled.Value
 
-local showAllAttachmentsToggle = track("builder", win.CreateLabelledToggle())
-showAllAttachmentsToggle.SetAlignment( align_LeftEdge, 14, 320 )
-showAllAttachmentsToggle.SetAlignment( align_TopEdge, 404, 28 )
-setText(showAllAttachmentsToggle, "Show all attachments in targeted construction")
-showAllAttachmentsToggle.Value = ShowAllAttachments.Value
+local manipulatorOrientationLabel = track("builder", win.CreateLabel())
+manipulatorOrientationLabel.SetAlignment( align_LeftEdge, 14, 116 )
+manipulatorOrientationLabel.SetAlignment( align_TopEdge, 76, 24 )
+manipulatorOrientationLabel.Alignment = textAnc_MiddleLeft
+setText(manipulatorOrientationLabel, "Orientation")
+
+local manipulatorOrientationDropdown = track("builder", win.CreateDropdown())
+manipulatorOrientationDropdown.SetAlignment( align_LeftEdge, 140, 130 )
+manipulatorOrientationDropdown.SetAlignment( align_TopEdge, 76, 24 )
+manipulatorOrientationDropdown.AddOptions({ "Local", "Global" })
+manipulatorOrientationDropdown.Value = ManipulatorOrientationMode.Value
+
+local stepIntervalLabel = track("builder", win.CreateLabel())
+stepIntervalLabel.SetAlignment( align_LeftEdge, 14, 116 )
+stepIntervalLabel.SetAlignment( align_TopEdge, 110, 24 )
+stepIntervalLabel.Alignment = textAnc_MiddleLeft
+setText(stepIntervalLabel, "Step")
+
+local translationStepNumberField = track("builder", win.CreateNumberField())
+translationStepNumberField.SetAlignment( align_LeftEdge, 140, 56 )
+translationStepNumberField.SetAlignment( align_TopEdge, 110, 24 )
+translationStepNumberField.MaxNumDecimalPlaces = 3
+translationStepNumberField.Value = 0
+
+local rotationStepNumberField = track("builder", win.CreateNumberField())
+rotationStepNumberField.SetAlignment( align_LeftEdge, 204, 56 )
+rotationStepNumberField.SetAlignment( align_TopEdge, 110, 24 )
+rotationStepNumberField.MaxNumDecimalPlaces = 2
+rotationStepNumberField.Value = 0
+
+local stepHintLabel = track("builder", win.CreateLabel())
+stepHintLabel.SetAlignment( align_LeftEdge, 268, 70 )
+stepHintLabel.SetAlignment( align_TopEdge, 110, 24 )
+stepHintLabel.Alignment = textAnc_MiddleLeft
+setText(stepHintLabel, "Pos / Rot")
+
+local pivotPositionLabel = track("builder", win.CreateLabel())
+pivotPositionLabel.SetAlignment( align_LeftEdge, 14, 116 )
+pivotPositionLabel.SetAlignment( align_TopEdge, 144, 24 )
+pivotPositionLabel.Alignment = textAnc_MiddleLeft
+setText(pivotPositionLabel, "Pivot Pos")
+
+local pivotPositionXNumberField = track("builder", win.CreateNumberField())
+pivotPositionXNumberField.SetAlignment( align_LeftEdge, 140, 56 )
+pivotPositionXNumberField.SetAlignment( align_TopEdge, 144, 24 )
+pivotPositionXNumberField.MaxNumDecimalPlaces = 3
+
+local pivotPositionYNumberField = track("builder", win.CreateNumberField())
+pivotPositionYNumberField.SetAlignment( align_LeftEdge, 204, 56 )
+pivotPositionYNumberField.SetAlignment( align_TopEdge, 144, 24 )
+pivotPositionYNumberField.MaxNumDecimalPlaces = 3
+
+local pivotPositionZNumberField = track("builder", win.CreateNumberField())
+pivotPositionZNumberField.SetAlignment( align_LeftEdge, 268, 56 )
+pivotPositionZNumberField.SetAlignment( align_TopEdge, 144, 24 )
+pivotPositionZNumberField.MaxNumDecimalPlaces = 3
+
+local snapPivotPositionButton = track("builder", win.CreateTextButton())
+snapPivotPositionButton.SetAlignment( align_LeftEdge, 332, 28 )
+snapPivotPositionButton.SetAlignment( align_TopEdge, 144, 24 )
+setText(snapPivotPositionButton, "S")
+
+local pivotOrientationLabel = track("builder", win.CreateLabel())
+pivotOrientationLabel.SetAlignment( align_LeftEdge, 14, 116 )
+pivotOrientationLabel.SetAlignment( align_TopEdge, 178, 24 )
+pivotOrientationLabel.Alignment = textAnc_MiddleLeft
+setText(pivotOrientationLabel, "Pivot Rot")
+
+local pivotOrientationXNumberField = track("builder", win.CreateNumberField())
+pivotOrientationXNumberField.SetAlignment( align_LeftEdge, 140, 56 )
+pivotOrientationXNumberField.SetAlignment( align_TopEdge, 178, 24 )
+pivotOrientationXNumberField.MaxNumDecimalPlaces = 2
+
+local pivotOrientationYNumberField = track("builder", win.CreateNumberField())
+pivotOrientationYNumberField.SetAlignment( align_LeftEdge, 204, 56 )
+pivotOrientationYNumberField.SetAlignment( align_TopEdge, 178, 24 )
+pivotOrientationYNumberField.MaxNumDecimalPlaces = 2
+
+local pivotOrientationZNumberField = track("builder", win.CreateNumberField())
+pivotOrientationZNumberField.SetAlignment( align_LeftEdge, 268, 56 )
+pivotOrientationZNumberField.SetAlignment( align_TopEdge, 178, 24 )
+pivotOrientationZNumberField.MaxNumDecimalPlaces = 2
+
+local snapPivotOrientationButton = track("builder", win.CreateTextButton())
+snapPivotOrientationButton.SetAlignment( align_LeftEdge, 332, 28 )
+snapPivotOrientationButton.SetAlignment( align_TopEdge, 178, 24 )
+setText(snapPivotOrientationButton, "S")
+
+local resizeStepOverrideLabel = track("builder", win.CreateLabel())
+resizeStepOverrideLabel.SetAlignment( align_LeftEdge, 14, 116 )
+resizeStepOverrideLabel.SetAlignment( align_TopEdge, 212, 24 )
+resizeStepOverrideLabel.Alignment = textAnc_MiddleLeft
+setText(resizeStepOverrideLabel, "Resize")
+
+local resizeStepOverrideNumberField = track("builder", win.CreateNumberField())
+resizeStepOverrideNumberField.SetAlignment( align_LeftEdge, 140, 56 )
+resizeStepOverrideNumberField.SetAlignment( align_TopEdge, 212, 24 )
+resizeStepOverrideNumberField.MaxNumDecimalPlaces = 2
+resizeStepOverrideNumberField.Value = 0
+
+local sizeClampEnabledToggle = track("builder", win.CreateLabelledToggle())
+sizeClampEnabledToggle.SetAlignment( align_LeftEdge, 204, 126 )
+sizeClampEnabledToggle.SetAlignment( align_TopEdge, 212, 24 )
+setText(sizeClampEnabledToggle, "Clamp Resize")
+sizeClampEnabledToggle.Value = SelectionResizeClampEnabled.Value
+
+local pivotPartSizeLabel = track("builder", win.CreateLabel())
+pivotPartSizeLabel.SetAlignment( align_LeftEdge, 14, 116 )
+pivotPartSizeLabel.SetAlignment( align_TopEdge, 246, 24 )
+pivotPartSizeLabel.Alignment = textAnc_MiddleLeft
+setText(pivotPartSizeLabel, "Unit Size")
+
+local pivotPartSizeXNumberField = track("builder", win.CreateNumberField())
+pivotPartSizeXNumberField.SetAlignment( align_LeftEdge, 140, 56 )
+pivotPartSizeXNumberField.SetAlignment( align_TopEdge, 246, 24 )
+pivotPartSizeXNumberField.MaxNumDecimalPlaces = 2
+
+local pivotPartSizeYNumberField = track("builder", win.CreateNumberField())
+pivotPartSizeYNumberField.SetAlignment( align_LeftEdge, 204, 56 )
+pivotPartSizeYNumberField.SetAlignment( align_TopEdge, 246, 24 )
+pivotPartSizeYNumberField.MaxNumDecimalPlaces = 2
+
+local pivotPartSizeZNumberField = track("builder", win.CreateNumberField())
+pivotPartSizeZNumberField.SetAlignment( align_LeftEdge, 268, 56 )
+pivotPartSizeZNumberField.SetAlignment( align_TopEdge, 246, 24 )
+pivotPartSizeZNumberField.MaxNumDecimalPlaces = 2
+
+local snapPivotPartSizeButton = track("builder", win.CreateTextButton())
+snapPivotPartSizeButton.SetAlignment( align_LeftEdge, 332, 28 )
+snapPivotPartSizeButton.SetAlignment( align_TopEdge, 246, 24 )
+setText(snapPivotPartSizeButton, "S")
 
 local weldHeadingLabel = track("weld", win.CreateLabel())
 weldHeadingLabel.SetAlignment( align_HorizEdges, 14, 14 )

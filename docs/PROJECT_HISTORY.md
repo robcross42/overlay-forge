@@ -66,21 +66,27 @@ Status: Complete / Passed / Successful.
 
 Overlay Forge indexes documented GearBlocks construction runtime interface/member availability, stores availability metadata from runtime exports, and displays API attribute availability in catalog details. Default chat context excludes API values unless a future explicit include/snapshot control is added.
 
+### GearBlocks Build Guides
+
+Status: Complete / Passed / Successful.
+
+GearBlocks build guides can be imported from Markdown, generated from GearBlocks chat, persisted in SQLite, associated with chat prompt context, and displayed in an independent in-game overlay. Current polish items remain normal follow-up work, but the feature path is functionally validated.
+
 ### Smoking Cessation
 
-Status: Implemented / Pending Validation.
+Status: Complete / Passed / Successful.
 
 Smoking Cessation records cigarette events locally in SQLite, tracks current cigarette inventory, displays the `Nicoderm Step 1` patch marker started at `2026-06-21 15:00:00 EDT`, supports a configurable record-cigarette keybind, and keeps a narrow Markdown export current for external review.
 
 ### Scheduler Framework
 
-Status: Implemented / Pending Validation.
+Status: Complete / Passed / Successful.
 
 Scheduler adds local-first, backend-owned recurring work through explicit Rust handlers, scheduler rows, leases, and run history. Scheduler rows must not execute arbitrary commands or scripts.
 
 ### SQLite Naming Normalization
 
-Status: Implemented / Pending Validation.
+Status: Complete / Passed / Successful.
 
 SQLite persistence now follows:
 

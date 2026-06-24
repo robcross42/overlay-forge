@@ -6,7 +6,7 @@ const OPENAI_RESPONSES_URL: &str = "https://api.openai.com/v1/responses";
 const DEFAULT_MODEL: &str = "gpt-5";
 pub const PLANNING_SYSTEM_INSTRUCTION: &str = "You are helping plan the selected Overlay Forge local project. Keep responses concise, practical, and implementation-oriented. Prefer Codex-ready structure when the user asks for implementation planning. Do not claim repository access unless repository content was explicitly provided to the model request.";
 pub const GAME_SYSTEM_INSTRUCTION: &str = "You are helping plan, analyze, and document the selected game workspace in Overlay Forge. Keep responses concise, practical, and grounded in the provided game context. When discussing visible parts, builds, screenshots, or physics behavior, distinguish observed facts from assumptions.";
-pub const GAME_BUILD_GUIDE_SYSTEM_INSTRUCTION: &str = "You create practical GearBlocks build guides for Overlay Forge. Output only Markdown, with no conversational preface and no fenced code blocks. Use GearBlocks units and centimeters, never imperial units unless explicitly requested. Prefer known GearBlocks catalog part names from the provided context. Keep the guide phased, buildable, and focused on readable in-game assembly guidance.";
+pub const GAME_BUILD_GUIDE_SYSTEM_INSTRUCTION: &str = "You create practical GearBlocks build guides for Overlay Forge. Output only Markdown, with no conversational preface and no fenced code blocks. Use GearBlocks units and centimeters, never imperial units unless explicitly requested. Prefer known GearBlocks catalog part names from the provided context. You may use real-world vehicle terms such as axle tube, skid plate, rail, crossmember, knuckle, hub, and jig, but every such term must be defined in the Glossary with exact GearBlocks parts or a relative mini-assembly. Keep all build directions relative to the first placed reference part or to named subassemblies/jigs; do not use absolute world coordinates.";
 
 #[derive(Serialize)]
 struct ResponsesRequest {
@@ -300,13 +300,15 @@ fn build_game_build_guide_input(
     input.push(ResponsesInputMessage {
         role: "user".to_string(),
         content: text_content(format!(
-            "{}\n\n{}\n\n{}\n{}\n{}\n{}\n{}",
+            "{}\n\n{}\n\n{}\n{}\n{}\n{}\n{}\n{}\n{}",
             "Create an Overlay Forge GearBlocks build guide from this goal:",
             build_goal.trim(),
             "Required Markdown structure:",
             "# <short build guide title>",
-            "## Build Goal\n## Scale Reference\n## Current Chosen Geometry\n## Main Parts List\n### <category>\n| Qty | Part | Purpose |\n| --- | --- | --- |",
+            "## Build Goal\n## Scale Reference\n## Current Chosen Geometry\n## Glossary\n## Main Parts List\n### <category>\n| Qty | Part | Purpose |\n| --- | --- | --- |",
             "## Assembly Instructions\n### 1. <step title>\n## First Test Checklist",
+            "Glossary requirements: define each real-life term used in the guide. If it maps to one GearBlocks part, name that exact part. If it is a subassembly, describe how to build it independently using relative offsets from its first part, then explain where the finished subassembly is used.",
+            "Assembly requirements: avoid exact world coordinates. Use relative placement from a named first reference part, relative offsets in GearBlocks units/cm, and temporary jigs/spacers when useful. Assume the user may build the vehicle in the air for access underneath. If GearBlocks may introduce small angle drift, say to align visually/relatively to the reference part instead of chasing exact 0.0 degree world values.",
             "Output only the Markdown guide. Do not wrap it in triple backticks."
         )),
     });

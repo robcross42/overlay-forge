@@ -1,10 +1,11 @@
 use crate::gearblocks_api;
+use crate::gearblocks_api_scraper::{GearBlocksApiImportResult, GearBlocksApiScrape};
 use rusqlite::{params, Connection, OptionalExtension, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 
 const MARKDOWN_CONTEXT_PER_FILE_LIMIT: usize = 200_000;
 const MARKDOWN_CONTEXT_TOTAL_LIMIT: usize = 650_000;
@@ -673,6 +674,8 @@ pub struct GameBuildGuideRecord {
     pub scale_reference: String,
     #[serde(rename = "geometryNotes")]
     pub geometry_notes: String,
+    #[serde(rename = "glossaryText")]
+    pub glossary_text: String,
     #[serde(rename = "checklistJson")]
     pub checklist_json: String,
     #[serde(rename = "overlayX")]
@@ -1410,6 +1413,7 @@ impl AppDatabase {
                 build_goal TEXT NOT NULL DEFAULT '',
                 scale_reference TEXT NOT NULL DEFAULT '',
                 geometry_notes TEXT NOT NULL DEFAULT '',
+                glossary_text TEXT NOT NULL DEFAULT '',
                 checklist_json TEXT NOT NULL DEFAULT '[]',
                 overlay_x INTEGER,
                 overlay_y INTEGER,
@@ -1662,6 +1666,12 @@ impl AppDatabase {
             "overlay_y",
             "INTEGER",
         )?;
+        Self::ensure_column(
+            &connection,
+            "obj_game_build_guide",
+            "glossary_text",
+            "TEXT NOT NULL DEFAULT ''",
+        )?;
         Self::ensure_schema_metadata_columns(&connection)?;
         Self::ensure_modified_at_triggers(&connection)?;
         Self::refresh_schema_json_metadata(&connection)?;
@@ -1813,6 +1823,12 @@ impl AppDatabase {
 
     pub fn is_ready(&self) -> bool {
         self.ready
+    }
+
+    fn connection(&self) -> Result<MutexGuard<'_, Connection>> {
+        self.connection
+            .lock()
+            .map_err(|_| rusqlite::Error::InvalidQuery)
     }
 
     fn migrate_legacy_table_names(connection: &Connection) -> Result<()> {
@@ -2397,7 +2413,7 @@ impl AppDatabase {
     }
 
     pub fn get_app_setting(&self, key: &str) -> Result<Option<String>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection
             .query_row(
                 "SELECT value FROM obj_setting WHERE key = ?1",
@@ -2408,7 +2424,7 @@ impl AppDatabase {
     }
 
     pub fn save_app_setting(&self, key: &str, value: &str) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             INSERT INTO obj_setting (key, value)
@@ -2423,7 +2439,7 @@ impl AppDatabase {
     }
 
     pub fn delete_app_setting(&self, key: &str) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "DELETE FROM obj_setting WHERE key = ?1",
             params![key.trim()],
@@ -2432,7 +2448,7 @@ impl AppDatabase {
     }
 
     pub fn get_scratchpad(&self) -> Result<String> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.query_row(
             "SELECT content FROM obj_scratchpad WHERE id = 1",
             [],
@@ -2441,7 +2457,7 @@ impl AppDatabase {
     }
 
     pub fn save_scratchpad(&self, content: &str) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             INSERT INTO obj_scratchpad (id, content, updated_at)
@@ -2457,7 +2473,7 @@ impl AppDatabase {
     }
 
     pub fn list_tasks(&self) -> Result<Vec<TaskRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT id, title, body, deadline, is_completed, created_at, updated_at
@@ -2488,7 +2504,7 @@ impl AppDatabase {
     }
 
     pub fn create_task(&self, title: &str, body: &str, deadline: &str) -> Result<TaskRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "INSERT INTO obj_task (title, body, deadline) VALUES (?1, ?2, ?3)",
             params![title.trim(), body, deadline.trim()],
@@ -2505,7 +2521,7 @@ impl AppDatabase {
         deadline: Option<&str>,
         is_completed: Option<bool>,
     ) -> Result<TaskRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
 
         if let Some(next_title) = title {
             connection.execute(
@@ -2543,13 +2559,13 @@ impl AppDatabase {
     }
 
     pub fn delete_task(&self, id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute("DELETE FROM obj_task WHERE id = ?1", params![id])?;
         Ok(())
     }
 
     pub fn list_notes(&self) -> Result<Vec<NoteRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT id, title, body, created_at, updated_at
@@ -2574,7 +2590,7 @@ impl AppDatabase {
     }
 
     pub fn create_note(&self, title: &str, body: &str) -> Result<NoteRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "INSERT INTO obj_note (title, body) VALUES (?1, ?2)",
             params![title.trim(), body],
@@ -2584,7 +2600,7 @@ impl AppDatabase {
     }
 
     pub fn update_note(&self, id: i64, title: &str, body: &str) -> Result<NoteRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             UPDATE obj_note
@@ -2598,13 +2614,13 @@ impl AppDatabase {
     }
 
     pub fn delete_note(&self, id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute("DELETE FROM obj_note WHERE id = ?1", params![id])?;
         Ok(())
     }
 
     pub fn list_calendar_events(&self) -> Result<Vec<CalendarEventRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT id, title, start_date, start_time, end_date, end_time, notes, created_at, updated_at
@@ -2641,7 +2657,7 @@ impl AppDatabase {
         end_time: &str,
         notes: &str,
     ) -> Result<CalendarEventRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             INSERT INTO obj_calendar_event (title, start_date, start_time, end_date, end_time, notes)
@@ -2670,7 +2686,7 @@ impl AppDatabase {
         end_time: &str,
         notes: &str,
     ) -> Result<CalendarEventRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             UPDATE obj_calendar_event
@@ -2698,13 +2714,13 @@ impl AppDatabase {
     }
 
     pub fn delete_calendar_event(&self, id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute("DELETE FROM obj_calendar_event WHERE id = ?1", params![id])?;
         Ok(())
     }
 
     pub fn list_smoking_events(&self) -> Result<Vec<SmokingEventRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT id, smoked_at, source, notes, created_at
@@ -2725,7 +2741,7 @@ impl AppDatabase {
         source: &str,
         notes: &str,
     ) -> Result<SmokingEventRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             INSERT INTO obj_smoking_event (smoked_at, source, notes)
@@ -2751,13 +2767,13 @@ impl AppDatabase {
     }
 
     pub fn delete_smoking_event(&self, id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute("DELETE FROM obj_smoking_event WHERE id = ?1", params![id])?;
         Ok(())
     }
 
     pub fn get_smoking_cessation_settings(&self) -> Result<SmokingCessationSettingsRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_smoking_cessation_settings_for_connection(&connection)
     }
 
@@ -2765,7 +2781,7 @@ impl AppDatabase {
         &self,
         current_cigarette_count: i64,
     ) -> Result<SmokingCessationSettingsRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             UPDATE obj_smoking_cessation_setting
@@ -2779,7 +2795,7 @@ impl AppDatabase {
     }
 
     pub fn list_schedulers(&self) -> Result<Vec<SchedulerRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT
@@ -2813,7 +2829,7 @@ impl AppDatabase {
     }
 
     pub fn list_due_schedulers(&self, limit: i64) -> Result<Vec<SchedulerRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT
@@ -2857,7 +2873,7 @@ impl AppDatabase {
     }
 
     pub fn try_acquire_scheduler(&self, scheduler_id: i64, lease_seconds: i64) -> Result<bool> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let changed = connection.execute(
             "
             UPDATE obj_scheduler
@@ -2876,7 +2892,7 @@ impl AppDatabase {
     }
 
     pub fn start_scheduler_run(&self, scheduler: &SchedulerRecord) -> Result<i64> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             INSERT INTO obj_scheduler_run (
@@ -2900,7 +2916,7 @@ impl AppDatabase {
         status: &str,
         message: &str,
     ) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let next_run_modifier = format!("+{} seconds", scheduler.interval_seconds.max(1));
         connection.execute(
             "
@@ -2935,7 +2951,7 @@ impl AppDatabase {
     }
 
     pub fn list_projects(&self) -> Result<Vec<ProjectRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT id, name, description, status, created_at, updated_at
@@ -2966,7 +2982,7 @@ impl AppDatabase {
         description: &str,
         status: &str,
     ) -> Result<ProjectRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "INSERT INTO obj_project (name, description, status) VALUES (?1, ?2, ?3)",
             params![name.trim(), description, status.trim()],
@@ -2982,7 +2998,7 @@ impl AppDatabase {
         description: &str,
         status: &str,
     ) -> Result<ProjectRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             UPDATE obj_project
@@ -2999,7 +3015,7 @@ impl AppDatabase {
     }
 
     pub fn delete_project(&self, id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "DELETE FROM obj_bridge_file_draft WHERE project_id = ?1",
             params![id],
@@ -3017,7 +3033,7 @@ impl AppDatabase {
     }
 
     pub fn get_project(&self, id: i64) -> Result<ProjectRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_project_by_id(&connection, id)
     }
 
@@ -3025,7 +3041,7 @@ impl AppDatabase {
         &self,
         project_id: i64,
     ) -> Result<Option<ProjectGitHubRepositoryRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_project_by_id(&connection, project_id)?;
         Self::get_project_github_repository_by_project_id(&connection, project_id).optional()
     }
@@ -3035,7 +3051,7 @@ impl AppDatabase {
         project_id: i64,
         repository_full_name: &str,
     ) -> Result<ProjectGitHubRepositoryRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_project_by_id(&connection, project_id)?;
         connection.execute(
             "
@@ -3066,7 +3082,7 @@ impl AppDatabase {
     }
 
     pub fn delete_project_github_repository(&self, project_id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_project_by_id(&connection, project_id)?;
         connection.execute(
             "DELETE FROM obj_project_github_repository WHERE project_id = ?1",
@@ -3084,7 +3100,7 @@ impl AppDatabase {
         visibility: &str,
         last_fetch_status: &str,
     ) -> Result<ProjectGitHubRepositoryRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             UPDATE obj_project_github_repository
@@ -3115,7 +3131,7 @@ impl AppDatabase {
         project_id: i64,
         last_fetch_status: &str,
     ) -> Result<ProjectGitHubRepositoryRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             UPDATE obj_project_github_repository
@@ -3134,7 +3150,7 @@ impl AppDatabase {
         &self,
         project_id: i64,
     ) -> Result<Option<ProjectMarkdownContextRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_project_by_id(&connection, project_id)?;
         Self::get_project_markdown_context_by_project_id(&connection, project_id).optional()
     }
@@ -3145,7 +3161,7 @@ impl AppDatabase {
         root_path: &str,
         readme_path: &str,
     ) -> Result<ProjectMarkdownContextRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_project_by_id(&connection, project_id)?;
         let clean_readme_path = if readme_path.trim().is_empty() {
             "README.md"
@@ -3174,7 +3190,7 @@ impl AppDatabase {
     }
 
     pub fn delete_project_markdown_context(&self, project_id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_project_by_id(&connection, project_id)?;
         connection.execute(
             "DELETE FROM obj_project_markdown_context WHERE project_id = ?1",
@@ -3187,7 +3203,7 @@ impl AppDatabase {
         &self,
         project_id: i64,
     ) -> Result<ProjectMarkdownContextPayload> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_project_by_id(&connection, project_id)?;
         Self::load_project_markdown_context_for_project(&connection, project_id)
     }
@@ -3196,7 +3212,7 @@ impl AppDatabase {
         &self,
         project_id: Option<i64>,
     ) -> Result<Vec<PlanningConversationRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
 
         if let Some(project_id) = project_id {
             let mut statement = connection.prepare(
@@ -3233,7 +3249,7 @@ impl AppDatabase {
         project_id: i64,
         title: &str,
     ) -> Result<PlanningConversationRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_project_by_id(&connection, project_id)?;
         let clean_title = if title.trim().is_empty() {
             "Planning conversation"
@@ -3254,7 +3270,7 @@ impl AppDatabase {
     }
 
     pub fn get_planning_conversation(&self, id: i64) -> Result<PlanningConversationRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_planning_conversation_by_id(&connection, id)
     }
 
@@ -3262,7 +3278,7 @@ impl AppDatabase {
         &self,
         conversation_id: i64,
     ) -> Result<Vec<PlanningMessageRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_planning_conversation_by_id(&connection, conversation_id)?;
         Self::list_planning_messages_for_connection(&connection, conversation_id)
     }
@@ -3272,7 +3288,7 @@ impl AppDatabase {
         conversation_id: i64,
         limit: i64,
     ) -> Result<Vec<PlanningMessageRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT id, conversation_id, role, content, created_at
@@ -3300,7 +3316,7 @@ impl AppDatabase {
         role: &str,
         content: &str,
     ) -> Result<PlanningMessageRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_planning_conversation_by_id(&connection, conversation_id)?;
         connection.execute(
             "
@@ -3323,7 +3339,7 @@ impl AppDatabase {
     }
 
     pub fn delete_planning_conversation(&self, conversation_id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "DELETE FROM obj_bridge_file_draft WHERE conversation_id = ?1",
             params![conversation_id],
@@ -3347,7 +3363,7 @@ impl AppDatabase {
         &self,
         conversation_id: i64,
     ) -> Result<Vec<PlanningConversationContextRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_planning_conversation_by_id(&connection, conversation_id)?;
         Self::list_planning_conversation_context_for_connection(&connection, conversation_id)
     }
@@ -3359,7 +3375,7 @@ impl AppDatabase {
         source_id: Option<i64>,
         label: &str,
     ) -> Result<PlanningConversationContextRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_planning_conversation_by_id(&connection, conversation_id)?;
 
         let normalized_context_type = context_type.trim();
@@ -3398,7 +3414,7 @@ impl AppDatabase {
     }
 
     pub fn remove_planning_conversation_context(&self, id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "DELETE FROM n2n_planning_conversation_context WHERE id = ?1",
             params![id],
@@ -3412,7 +3428,7 @@ impl AppDatabase {
         draft_message: &str,
         system_instruction: &str,
     ) -> Result<PlanningPromptPreviewRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let conversation = Self::get_planning_conversation_by_id(&connection, conversation_id)?;
         let project = Self::get_project_by_id(&connection, conversation.project_id)?;
         let contexts =
@@ -3507,7 +3523,7 @@ impl AppDatabase {
         &self,
         conversation_id: i64,
     ) -> Result<PlanningContextPayload> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let conversation = Self::get_planning_conversation_by_id(&connection, conversation_id)?;
         let project = Self::get_project_by_id(&connection, conversation.project_id)?;
         let contexts =
@@ -3536,7 +3552,7 @@ impl AppDatabase {
     }
 
     pub fn list_bridge_file_drafts(&self, project_id: i64) -> Result<Vec<BridgeFileDraftRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_project_by_id(&connection, project_id)?;
         let mut statement = connection.prepare(
             "
@@ -3555,7 +3571,7 @@ impl AppDatabase {
     }
 
     pub fn get_bridge_file_draft(&self, id: i64) -> Result<BridgeFileDraftRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_bridge_file_draft_by_id(&connection, id)
     }
 
@@ -3563,7 +3579,7 @@ impl AppDatabase {
         &self,
         conversation_id: i64,
     ) -> Result<BridgeFileDraftRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let conversation = Self::get_planning_conversation_by_id(&connection, conversation_id)?;
         let project = Self::get_project_by_id(&connection, conversation.project_id)?;
         let messages = Self::list_planning_messages_for_connection(&connection, conversation_id)?;
@@ -3616,7 +3632,7 @@ impl AppDatabase {
     }
 
     pub fn delete_bridge_file_draft(&self, id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "DELETE FROM obj_bridge_file_draft WHERE id = ?1",
             params![id],
@@ -3625,7 +3641,7 @@ impl AppDatabase {
     }
 
     pub fn list_youtube_references(&self) -> Result<Vec<YouTubeReferenceRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT id, title, url, video_id, channel_name, notes, tags, created_at, updated_at
@@ -3642,7 +3658,7 @@ impl AppDatabase {
     }
 
     pub fn get_youtube_reference(&self, id: i64) -> Result<YouTubeReferenceRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_youtube_reference_by_id(&connection, id)
     }
 
@@ -3655,7 +3671,7 @@ impl AppDatabase {
         notes: &str,
         tags: &str,
     ) -> Result<YouTubeReferenceRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             INSERT INTO obj_youtube_reference (title, url, video_id, channel_name, notes, tags)
@@ -3684,7 +3700,7 @@ impl AppDatabase {
         notes: &str,
         tags: &str,
     ) -> Result<YouTubeReferenceRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             UPDATE obj_youtube_reference
@@ -3712,7 +3728,7 @@ impl AppDatabase {
     }
 
     pub fn delete_youtube_reference(&self, id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "DELETE FROM obj_youtube_reference WHERE id = ?1",
             params![id],
@@ -3721,7 +3737,7 @@ impl AppDatabase {
     }
 
     pub fn list_games(&self) -> Result<Vec<GameRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT id, name, slug, summary, created_at, updated_at
@@ -3738,12 +3754,12 @@ impl AppDatabase {
     }
 
     pub fn get_game(&self, id: i64) -> Result<GameRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, id)
     }
 
     pub fn create_game(&self, name: &str, summary: &str) -> Result<GameRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let trimmed_name = name.trim();
         let slug = game_slug(trimmed_name);
         connection.execute(
@@ -3759,7 +3775,7 @@ impl AppDatabase {
     }
 
     pub fn delete_game(&self, id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             DELETE FROM obj_game_chat_message
@@ -3794,7 +3810,7 @@ impl AppDatabase {
     }
 
     pub fn list_game_data_locations(&self, game_id: i64) -> Result<Vec<GameDataLocationRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let mut statement = connection.prepare(
             "
@@ -3825,7 +3841,7 @@ impl AppDatabase {
         label: &str,
         directory_path: &str,
     ) -> Result<GameDataLocationRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let trimmed_type = location_type.trim();
         connection.execute(
@@ -3844,7 +3860,7 @@ impl AppDatabase {
     }
 
     pub fn delete_game_data_location(&self, game_id: i64, location_type: &str) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "DELETE FROM obj_game_data_location WHERE game_id = ?1 AND location_type = ?2",
@@ -3854,7 +3870,7 @@ impl AppDatabase {
     }
 
     pub fn list_game_catalog_objects(&self, game_id: i64) -> Result<Vec<GameCatalogObjectRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT
@@ -3886,7 +3902,7 @@ impl AppDatabase {
     }
 
     pub fn delete_game_screenshot_catalog_objects(&self, game_id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             DELETE FROM obj_game_catalog_object
@@ -3912,7 +3928,7 @@ impl AppDatabase {
         thumbnail_path: &str,
         source_screenshot_path: &str,
     ) -> Result<GameCatalogObjectRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             INSERT INTO obj_game_catalog_object (
@@ -3960,7 +3976,7 @@ impl AppDatabase {
     }
 
     pub fn list_game_runtime_parts(&self, game_id: i64) -> Result<Vec<GameRuntimePartRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let mut statement = connection.prepare(
             "
@@ -4008,7 +4024,7 @@ impl AppDatabase {
         &self,
         game_id: i64,
     ) -> Result<Vec<GameRuntimePartAliasRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let mut statement = connection.prepare(
             "
@@ -4045,7 +4061,7 @@ impl AppDatabase {
     }
 
     pub fn count_game_runtime_parts(&self, game_id: i64) -> Result<usize> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let count = connection.query_row(
             "SELECT COUNT(*) FROM obj_game_runtime_part WHERE game_id = ?1",
@@ -4056,7 +4072,7 @@ impl AppDatabase {
     }
 
     pub fn list_gearblocks_api_catalog(&self) -> Result<GearBlocksApiCatalogRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut type_statement = connection.prepare(
             "
             SELECT
@@ -4179,12 +4195,213 @@ impl AppDatabase {
         })
     }
 
+    pub fn import_gearblocks_api_catalog(
+        &self,
+        scrape: &GearBlocksApiScrape,
+    ) -> Result<GearBlocksApiImportResult> {
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction()?;
+        let mut imported_member_count = 0usize;
+        let mut imported_parameter_count = 0usize;
+        let mut imported_enum_value_count = 0usize;
+
+        for api_type in &scrape.types {
+            let type_id = Self::seed_gearblocks_api_type(
+                &transaction,
+                &api_type.namespace,
+                &api_type.type_name,
+                &api_type.type_kind,
+                &api_type.docs_url,
+                &scrape.source,
+                &scrape.source_version,
+                &api_type.notes,
+            )?;
+
+            if !api_type.members.is_empty() {
+                transaction.execute(
+                    "
+                    DELETE FROM def_gearblocks_api_member
+                    WHERE type_id = ?1
+                        AND source = ?2
+                    ",
+                    params![type_id, scrape.source],
+                )?;
+            }
+
+            for member in &api_type.members {
+                transaction.execute(
+                    "
+                    INSERT INTO def_gearblocks_api_member (
+                        type_id,
+                        member_key,
+                        member_name,
+                        signature,
+                        member_kind,
+                        return_type,
+                        is_readable,
+                        is_writable,
+                        is_invokable,
+                        is_mutating,
+                        docs_url,
+                        source,
+                        source_version,
+                        notes
+                    )
+                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+                    ON CONFLICT(type_id, member_key) DO UPDATE SET
+                        member_name = excluded.member_name,
+                        signature = excluded.signature,
+                        member_kind = excluded.member_kind,
+                        return_type = excluded.return_type,
+                        is_readable = excluded.is_readable,
+                        is_writable = excluded.is_writable,
+                        is_invokable = excluded.is_invokable,
+                        is_mutating = excluded.is_mutating,
+                        docs_url = excluded.docs_url,
+                        source = excluded.source,
+                        source_version = excluded.source_version,
+                        notes = excluded.notes,
+                        updated_at = CURRENT_TIMESTAMP
+                    ",
+                    params![
+                        type_id,
+                        member.member_key,
+                        member.member_name,
+                        member.signature,
+                        member.member_kind,
+                        member.return_type,
+                        member.is_readable,
+                        member.is_writable,
+                        member.is_invokable,
+                        member.is_mutating,
+                        member.docs_url,
+                        scrape.source,
+                        scrape.source_version,
+                        member.notes,
+                    ],
+                )?;
+                imported_member_count += 1;
+
+                let member_id = transaction.query_row(
+                    "
+                    SELECT id
+                    FROM def_gearblocks_api_member
+                    WHERE type_id = ?1
+                        AND member_key = ?2
+                    ",
+                    params![type_id, member.member_key],
+                    |row| row.get::<_, i64>(0),
+                )?;
+
+                transaction.execute(
+                    "
+                    DELETE FROM def_gearblocks_api_parameter
+                    WHERE member_id = ?1
+                    ",
+                    params![member_id],
+                )?;
+
+                for parameter in &member.parameters {
+                    transaction.execute(
+                        "
+                        INSERT INTO def_gearblocks_api_parameter (
+                            member_id,
+                            position,
+                            parameter_name,
+                            parameter_type,
+                            default_value,
+                            is_optional
+                        )
+                        VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                        ON CONFLICT(member_id, position) DO UPDATE SET
+                            parameter_name = excluded.parameter_name,
+                            parameter_type = excluded.parameter_type,
+                            default_value = excluded.default_value,
+                            is_optional = excluded.is_optional,
+                            updated_at = CURRENT_TIMESTAMP
+                        ",
+                        params![
+                            member_id,
+                            parameter.position,
+                            parameter.parameter_name,
+                            parameter.parameter_type,
+                            parameter.default_value,
+                            parameter.is_optional,
+                        ],
+                    )?;
+                    imported_parameter_count += 1;
+                }
+            }
+
+            if !api_type.enum_values.is_empty() {
+                transaction.execute(
+                    "
+                    DELETE FROM def_gearblocks_api_enum_value
+                    WHERE type_id = ?1
+                        AND source = ?2
+                    ",
+                    params![type_id, scrape.source],
+                )?;
+            }
+
+            for value in &api_type.enum_values {
+                transaction.execute(
+                    "
+                    INSERT INTO def_gearblocks_api_enum_value (
+                        type_id,
+                        position,
+                        value_name,
+                        numeric_value,
+                        lua_name,
+                        description,
+                        source,
+                        source_version
+                    )
+                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                    ON CONFLICT(type_id, value_name) DO UPDATE SET
+                        position = excluded.position,
+                        numeric_value = excluded.numeric_value,
+                        lua_name = excluded.lua_name,
+                        description = excluded.description,
+                        source = excluded.source,
+                        source_version = excluded.source_version,
+                        updated_at = CURRENT_TIMESTAMP
+                    ",
+                    params![
+                        type_id,
+                        value.position,
+                        value.value_name,
+                        value.numeric_value,
+                        value.lua_name,
+                        value.description,
+                        scrape.source,
+                        scrape.source_version,
+                    ],
+                )?;
+                imported_enum_value_count += 1;
+            }
+        }
+
+        transaction.commit()?;
+
+        Ok(GearBlocksApiImportResult {
+            source: scrape.source.clone(),
+            source_version: scrape.source_version.clone(),
+            docs_root: scrape.docs_root.clone(),
+            fetched_pages: scrape.fetched_pages,
+            imported_type_count: scrape.types.len(),
+            imported_member_count,
+            imported_parameter_count,
+            imported_enum_value_count,
+        })
+    }
+
     pub fn list_game_runtime_part_api_members(
         &self,
         game_id: i64,
         part_id: i64,
     ) -> Result<Vec<GameRuntimePartApiMemberRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let part_key = connection
             .query_row(
                 "
@@ -4253,7 +4470,7 @@ impl AppDatabase {
     }
 
     pub fn get_game_runtime_part(&self, id: i64) -> Result<Option<GameRuntimePartRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection
             .query_row(
                 "
@@ -4300,7 +4517,7 @@ impl AppDatabase {
         display_image_path: &str,
         source_image_path: &str,
     ) -> Result<GameRuntimePartRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "
@@ -4328,7 +4545,7 @@ impl AppDatabase {
         game_id: i64,
         category: &str,
     ) -> Result<Vec<GameRuntimePartRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "
@@ -4395,7 +4612,7 @@ impl AppDatabase {
         part_id: i64,
         notes: &str,
     ) -> Result<GameRuntimePartRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "
@@ -4431,7 +4648,7 @@ impl AppDatabase {
         source_construction_id: &str,
         last_seen_at: &str,
     ) -> Result<GameRuntimePartRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let (world_x, world_y, world_z) = match world_position {
             Some((x, y, z)) => (Some(x), Some(y), Some(z)),
@@ -4532,7 +4749,7 @@ impl AppDatabase {
         payload_json: &str,
         last_seen_at: &str,
     ) -> Result<GameRuntimePartAliasRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "
@@ -4636,7 +4853,7 @@ impl AppDatabase {
         source_construction_id: &str,
         seen_at: &str,
     ) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "
@@ -4703,7 +4920,7 @@ impl AppDatabase {
         source_construction_id: &str,
         seen_at: &str,
     ) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let observed_member_name = gearblocks_observed_member_name(attribute_name);
         let mut statement = connection.prepare(
@@ -4783,7 +5000,7 @@ impl AppDatabase {
         source_construction_id: &str,
         seen_at: &str,
     ) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "
@@ -4853,7 +5070,7 @@ impl AppDatabase {
         source_construction_id: &str,
         seen_at: &str,
     ) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "
@@ -4923,7 +5140,7 @@ impl AppDatabase {
         source_construction_id: &str,
         seen_at: &str,
     ) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "
@@ -4981,7 +5198,7 @@ impl AppDatabase {
         &self,
         game_id: i64,
     ) -> Result<Vec<GameRuntimeConstructionExportRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let mut statement = connection.prepare(
             "
@@ -5019,7 +5236,7 @@ impl AppDatabase {
     }
 
     pub fn count_game_runtime_construction_exports(&self, game_id: i64) -> Result<usize> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let count = connection.query_row(
             "SELECT COUNT(*) FROM obj_game_runtime_construction_export WHERE game_id = ?1",
@@ -5033,7 +5250,7 @@ impl AppDatabase {
         &self,
         game_id: i64,
     ) -> Result<Option<GameRuntimeConstructionExportRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         connection
             .query_row(
@@ -5089,7 +5306,7 @@ impl AppDatabase {
         document_json: &str,
         last_indexed_at: &str,
     ) -> Result<GameRuntimeConstructionExportRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "
@@ -5153,7 +5370,7 @@ impl AppDatabase {
     }
 
     pub fn list_game_constructions(&self, game_id: i64) -> Result<Vec<GameConstructionRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let mut statement = connection.prepare(
             "
@@ -5192,7 +5409,7 @@ impl AppDatabase {
     }
 
     pub fn count_game_constructions(&self, game_id: i64) -> Result<usize> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let count = connection.query_row(
             "SELECT COUNT(*) FROM obj_game_construction WHERE game_id = ?1",
@@ -5223,7 +5440,7 @@ impl AppDatabase {
         document_json: &str,
         last_indexed_at: &str,
     ) -> Result<GameConstructionRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "
@@ -5300,7 +5517,7 @@ impl AppDatabase {
         captured_at: &str,
         notes: &str,
     ) -> Result<GameScreenshotCaptureRequestRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             INSERT INTO obj_game_catalog_screenshot (
@@ -5335,7 +5552,7 @@ impl AppDatabase {
         &self,
         game_id: i64,
     ) -> Result<Vec<GameChatConversationRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let mut statement = connection.prepare(
             "
@@ -5354,12 +5571,12 @@ impl AppDatabase {
     }
 
     pub fn list_game_build_guides(&self, game_id: i64) -> Result<Vec<GameBuildGuideRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let mut statement = connection.prepare(
             "
             SELECT id, game_id, title, source_path, raw_markdown, build_goal, scale_reference,
-                geometry_notes, checklist_json, overlay_x, overlay_y, overlay_width,
+                geometry_notes, glossary_text, checklist_json, overlay_x, overlay_y, overlay_width,
                 overlay_height, created_at, updated_at
             FROM obj_game_build_guide
             WHERE game_id = ?1
@@ -5374,13 +5591,13 @@ impl AppDatabase {
     }
 
     pub fn latest_game_build_guide(&self, game_id: i64) -> Result<Option<GameBuildGuideRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         connection
             .query_row(
                 "
                 SELECT id, game_id, title, source_path, raw_markdown, build_goal, scale_reference,
-                    geometry_notes, checklist_json, overlay_x, overlay_y, overlay_width,
+                    geometry_notes, glossary_text, checklist_json, overlay_x, overlay_y, overlay_width,
                     overlay_height, created_at, updated_at
                 FROM obj_game_build_guide
                 WHERE game_id = ?1
@@ -5394,7 +5611,7 @@ impl AppDatabase {
     }
 
     pub fn get_game_build_guide(&self, id: i64) -> Result<GameBuildGuideRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_build_guide_by_id(&connection, id)
     }
 
@@ -5407,9 +5624,10 @@ impl AppDatabase {
         build_goal: &str,
         scale_reference: &str,
         geometry_notes: &str,
+        glossary_text: &str,
         checklist_json: &str,
     ) -> Result<GameBuildGuideRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let clean_title = if title.trim().is_empty() {
             "Build guide"
@@ -5420,9 +5638,9 @@ impl AppDatabase {
             "
             INSERT INTO obj_game_build_guide (
                 game_id, title, source_path, raw_markdown, build_goal, scale_reference,
-                geometry_notes, checklist_json
+                geometry_notes, glossary_text, checklist_json
             )
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
             ",
             params![
                 game_id,
@@ -5432,6 +5650,7 @@ impl AppDatabase {
                 build_goal.trim(),
                 scale_reference.trim(),
                 geometry_notes.trim(),
+                glossary_text.trim(),
                 checklist_json.trim()
             ],
         )?;
@@ -5445,7 +5664,7 @@ impl AppDatabase {
         guide_id: i64,
         parts: &[GameBuildGuidePartDraft],
     ) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_build_guide_by_id(&connection, guide_id)?;
         connection.execute(
             "DELETE FROM obj_game_build_guide_part WHERE guide_id = ?1",
@@ -5481,7 +5700,7 @@ impl AppDatabase {
         guide_id: i64,
         steps: &[GameBuildGuideStepDraft],
     ) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_build_guide_by_id(&connection, guide_id)?;
         connection.execute(
             "DELETE FROM obj_game_build_guide_step WHERE guide_id = ?1",
@@ -5515,7 +5734,7 @@ impl AppDatabase {
         &self,
         guide_id: i64,
     ) -> Result<Vec<GameBuildGuidePartRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_build_guide_by_id(&connection, guide_id)?;
         Self::list_game_build_guide_parts_for_connection(&connection, guide_id)
     }
@@ -5524,7 +5743,7 @@ impl AppDatabase {
         &self,
         guide_id: i64,
     ) -> Result<Vec<GameBuildGuideStepRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_build_guide_by_id(&connection, guide_id)?;
         Self::list_game_build_guide_steps_for_connection(&connection, guide_id)
     }
@@ -5537,7 +5756,7 @@ impl AppDatabase {
         overlay_width: Option<i32>,
         overlay_height: Option<i32>,
     ) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_build_guide_by_id(&connection, guide_id)?;
         connection.execute(
             "
@@ -5565,7 +5784,7 @@ impl AppDatabase {
         game_id: i64,
         title: &str,
     ) -> Result<GameChatConversationRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let clean_title = if title.trim().is_empty() {
             "Game chat"
@@ -5586,7 +5805,7 @@ impl AppDatabase {
     }
 
     pub fn get_game_chat_conversation(&self, id: i64) -> Result<GameChatConversationRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_chat_conversation_by_id(&connection, id)
     }
 
@@ -5596,7 +5815,7 @@ impl AppDatabase {
         overlay_x: i32,
         overlay_y: i32,
     ) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_chat_conversation_by_id(&connection, conversation_id)?;
         connection.execute(
             "
@@ -5613,7 +5832,7 @@ impl AppDatabase {
         &self,
         conversation_id: i64,
     ) -> Result<Vec<GameChatMessageRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_chat_conversation_by_id(&connection, conversation_id)?;
         Self::list_game_chat_messages_for_connection(&connection, conversation_id)
     }
@@ -5623,7 +5842,7 @@ impl AppDatabase {
         conversation_id: i64,
         limit: i64,
     ) -> Result<Vec<GameChatMessageRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT id, conversation_id, role, content, created_at
@@ -5651,7 +5870,7 @@ impl AppDatabase {
         role: &str,
         content: &str,
     ) -> Result<GameChatMessageRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_chat_conversation_by_id(&connection, conversation_id)?;
         connection.execute(
             "
@@ -5674,7 +5893,7 @@ impl AppDatabase {
     }
 
     pub fn delete_game_chat_conversation(&self, conversation_id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "DELETE FROM obj_game_chat_message WHERE conversation_id = ?1",
             params![conversation_id],
@@ -5690,7 +5909,7 @@ impl AppDatabase {
         &self,
         game_id: i64,
     ) -> Result<Vec<GameScreenshotCaptureRequestRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT
@@ -5722,7 +5941,7 @@ impl AppDatabase {
         &self,
         id: i64,
     ) -> Result<Option<GameScreenshotCaptureRequestRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_screenshot_capture_request_by_id(&connection, id).optional()
     }
 
@@ -5732,7 +5951,7 @@ impl AppDatabase {
         file_path: &str,
         request_path: &str,
     ) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             DELETE FROM obj_game_catalog_reference
@@ -5748,7 +5967,7 @@ impl AppDatabase {
     }
 
     pub fn delete_game_screenshot(&self, id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "DELETE FROM obj_game_catalog_screenshot WHERE id = ?1",
             params![id],
@@ -6436,7 +6655,7 @@ impl AppDatabase {
         connection.query_row(
             "
             SELECT id, game_id, title, source_path, raw_markdown, build_goal, scale_reference,
-                geometry_notes, checklist_json, overlay_x, overlay_y, overlay_width,
+                geometry_notes, glossary_text, checklist_json, overlay_x, overlay_y, overlay_width,
                 overlay_height, created_at, updated_at
             FROM obj_game_build_guide
             WHERE id = ?1
@@ -7896,13 +8115,14 @@ fn game_build_guide_from_row(row: &rusqlite::Row<'_>) -> Result<GameBuildGuideRe
         build_goal: row.get(5)?,
         scale_reference: row.get(6)?,
         geometry_notes: row.get(7)?,
-        checklist_json: row.get(8)?,
-        overlay_x: row.get(9)?,
-        overlay_y: row.get(10)?,
-        overlay_width: row.get(11)?,
-        overlay_height: row.get(12)?,
-        created_at: row.get(13)?,
-        updated_at: row.get(14)?,
+        glossary_text: row.get(8)?,
+        checklist_json: row.get(9)?,
+        overlay_x: row.get(10)?,
+        overlay_y: row.get(11)?,
+        overlay_width: row.get(12)?,
+        overlay_height: row.get(13)?,
+        created_at: row.get(14)?,
+        updated_at: row.get(15)?,
     })
 }
 

@@ -25,6 +25,8 @@ import {
   setOverlayWindowOpacity,
   startOverlayDrag
 } from "../services/windowControls";
+import { timestampLabel } from "../utils/datetime";
+import { formatUnknownError as formatError } from "../utils/errors";
 
 export default function GameChatOverlayApp() {
   const [game, setGame] = useState<Game | null>(null);
@@ -160,7 +162,7 @@ export default function GameChatOverlayApp() {
     try {
       const request = await createGameChatScreenshotCapture(
         game.id,
-        screenshotTimestampLabel(new Date())
+        timestampLabel(new Date())
       );
       const attachmentKey = conversation
         ? chatAttachmentKey(game.id, conversation.id)
@@ -344,10 +346,6 @@ export default function GameChatOverlayApp() {
   );
 }
 
-function formatError(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
-
 async function prepareChatOverlayWindow() {
   const window = getCurrentWindow();
   await window.setIgnoreCursorEvents(false).catch(() => {});
@@ -362,21 +360,6 @@ function waitForOverlayRepaint() {
   });
 }
 
-function screenshotTimestampLabel(date: Date) {
-  const year = date.getFullYear();
-  const month = padDatePart(date.getMonth() + 1);
-  const day = padDatePart(date.getDate());
-  const hours = padDatePart(date.getHours());
-  const minutes = padDatePart(date.getMinutes());
-  const seconds = padDatePart(date.getSeconds());
-
-  return `${year}${month}${day}_${hours}${minutes}${seconds}`;
-}
-
 function chatAttachmentKey(gameId: number, conversationId: number) {
   return `${gameId}:${conversationId}`;
-}
-
-function padDatePart(value: number) {
-  return value.toString().padStart(2, "0");
 }

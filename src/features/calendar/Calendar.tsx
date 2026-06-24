@@ -6,6 +6,7 @@ import {
   updateCalendarEvent
 } from "../../services/calendar";
 import type { CalendarEvent, CalendarEventInput } from "../../services/calendar";
+import { formatUnknownError as formatError } from "../../utils/errors";
 
 const emptyEvent: CalendarEventInput = {
   title: "",
@@ -313,8 +314,4 @@ function formatDateInput(date: Date) {
     String(date.getMonth() + 1).padStart(2, "0"),
     String(date.getDate()).padStart(2, "0")
   ].join("-");
-}
-
-function formatError(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
 }

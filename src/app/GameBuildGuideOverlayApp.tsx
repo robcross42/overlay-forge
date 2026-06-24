@@ -15,6 +15,7 @@ import type {
   GameBuildGuidePayload
 } from "../services/gaming";
 import { applyStandaloneOverlayFocusState, startOverlayDrag } from "../services/windowControls";
+import { formatUnknownError as formatError } from "../utils/errors";
 
 const ACTIVE_BUILD_GUIDE_STORAGE_KEY = "overlayForgeActiveBuildGuide";
 const BUILD_GUIDE_FONT_SIZE_STORAGE_KEY = "overlayForgeBuildGuideFontSize";
@@ -165,6 +166,7 @@ export default function GameBuildGuideOverlayApp() {
               <GuideTextSection title="Goal" value={payload.guide.buildGoal} />
               <GuideTextSection title="Scale" value={payload.guide.scaleReference} />
               <GuideTextSection title="Geometry" value={payload.guide.geometryNotes} />
+              <GuideTextSection title="Glossary" value={payload.guide.glossaryText} />
 
               <section className="build-guide-section" aria-label="Parts list">
                 <h2>Parts</h2>
@@ -328,8 +330,4 @@ async function prepareBuildGuideOverlayWindow() {
   const window = getCurrentWindow();
   await window.setIgnoreCursorEvents(false).catch(() => {});
   return applyStandaloneOverlayFocusState(window);
-}
-
-function formatError(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
 }

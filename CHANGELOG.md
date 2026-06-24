@@ -20,6 +20,40 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.9.0 - 2026-06-24
+
+### 2026-06-24
+
+#### Changed
+
+- 19:00:46 EDT - Changed project version metadata to `0.9.0` for the stable build-guide release cut.
+- 18:23:14 EDT - Associated GearBlocks chat context with the active/latest build guide and changed generated build guides to include glossary and relative-placement instructions.
+- 14:52:37 EDT - Tightened the GearBlocks Builder script window with compact numeric fields, small Back/Snap buttons, top-row builder toggles, and a smaller default Builder window size.
+- 13:44:03 EDT - Added an explicit GearBlocks API screen import that indexes the official Doxygen API docs into the local normalized API catalog.
+- 13:05:09 EDT - Changed standalone overlay scrollbars, prompt/message borders, and build-guide section outlines to use the same focus-aware transparency contract as standalone window backgrounds.
+- 12:52:35 EDT - Refactored backend overlay window lifecycle handling into a Rust window domain module with `WindowKind`, composed config structs, and `WindowManager`.
+- 12:52:35 EDT - Changed SQLite connection locking to return a repository error instead of panicking on a poisoned database mutex.
+- 12:52:35 EDT - Centralized repeated frontend unknown-error formatting and screenshot timestamp label helpers under shared utility modules.
+- 12:52:35 EDT - Added root `npm` validation scripts for backend build, backend tests, Clippy, and combined frontend/backend checks.
+
+#### Fixed
+
+- 16:46:30 EDT - Fixed Ctrl+Shift+G build-guide overlay hiding by routing visibility checks and hides through native-aware window manager fallbacks.
+- 16:31:46 EDT - Fixed GearBlocks Builder script button and checkbox text disappearing by removing compact font property writes from script controls.
+- 13:23:54 EDT - Fixed build-guide standalone overlay focus detection by adding the build-guide window to the default Tauri capability scope so it can read its own focused state.
+- 13:21:21 EDT - Fixed standalone overlay focus styling so a build-guide window only becomes opaque when that build-guide window itself has focus, not when chat or the main Overlay Forge window has focus.
+
+#### Documentation
+
+- 13:33:39 EDT - Tightened Codex reasoning preflight rules to explicitly stop before any tool use or context gathering when Low reasoning should escalate to Medium, and documented the observed Low-to-Medium enforcement failure.
+- 12:52:35 EDT - Updated architecture and validation rules with shared utility guidance, high-arity typed-parameter guidance, Clippy review expectations, and large-module cleanup guardrails.
+- 12:52:35 EDT - Added high-arity repository/command refactors and large backend module splitting to deferred architecture cleanup.
+
+#### Validation
+
+- 19:03:00 EDT - Validated the `0.9.0` stable build-guide release cut with `npm run build`, `npm run cargo:build`, `npm run cargo:test`, and `git diff --check`.
+- 12:53:33 EDT - Validated architecture cleanup with `npm run check`, `npm run cargo:test`, `npm run cargo:clippy`, and `git diff --check`; Clippy now reports only documented high-arity refactor warnings.
+
 ## 0.8.0 - 2026-06-24
 
 ### 2026-06-24

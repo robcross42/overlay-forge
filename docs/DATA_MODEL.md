@@ -662,6 +662,7 @@ raw_markdown
 build_goal
 scale_reference
 geometry_notes
+glossary_text
 checklist_json
 overlay_x
 overlay_y
@@ -671,7 +672,7 @@ created_at
 updated_at
 ```
 
-Game-scoped Markdown build guide imports. The raw Markdown is preserved for future parsing improvements while current UI rendering uses structured summary fields plus parsed part and step child rows. Overlay bounds are nullable and restore the independent build-guide overlay position and size.
+Game-scoped Markdown build guide imports. The raw Markdown is preserved for future parsing improvements while current UI rendering uses structured summary fields, parsed glossary text, parsed part rows, parsed assembly steps, and first-test checklist rows. Overlay bounds are nullable and restore the independent build-guide overlay position and size.
 
 ### `obj_game_build_guide_part`
 

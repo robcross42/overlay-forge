@@ -7,8 +7,8 @@ Use validation appropriate to the changed area.
 ```powershell
 npm install
 npm run build
-cd src-tauri
-cargo build
+npm run cargo:build
+npm run cargo:clippy
 npm run tauri:dev
 ```
 
@@ -19,8 +19,8 @@ Do not run broader validation than needed for a small change unless the request 
 | Changed area | Preferred validation |
 | --- | --- |
 | React / TypeScript / frontend UI | `npm run build` |
-| Rust / Tauri backend | `cd src-tauri && cargo build` |
-| Frontend + backend behavior | `npm run build` and `cd src-tauri && cargo build` |
+| Rust / Tauri backend | `npm run cargo:build` |
+| Frontend + backend behavior | `npm run check` |
 | SQLite migrations | both builds plus migration review |
 | OpenAI request path | backend build plus chat-send manual check if possible |
 | GitHub integration | backend build plus missing-token and valid-token behavior review if possible |
@@ -29,6 +29,8 @@ Do not run broader validation than needed for a small change unless the request 
 | BepInEx plugin | plugin build plus install/run check where possible |
 | Scheduler | backend build plus startup/interval/run-history behavior review |
 | Smoking Cessation | frontend/backend builds plus event/keybind/export behavior review |
+
+For broad cleanup and architecture work, run `npm run cargo:clippy` as a review pass. Fix clear no-risk warnings immediately. Record larger warnings as explicit refactor work when they require changing public command shapes, repository APIs, or multiple call sites.
 
 ## Core Manual Regression Checklist
 

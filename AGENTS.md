@@ -30,7 +30,7 @@ Read the smallest relevant set before editing:
 
 ## Reasoning Model Selection
 
-Classify the request before execution.
+Mandatory preflight: classify every user request before doing any substantive work, including answering research/design questions, reading external sources, running commands, editing files, or making plans.
 
 Default to **Medium Reasoning**.
 
@@ -51,7 +51,9 @@ Use **High Reasoning** when the request affects:
 
 Use **Very High Reasoning** when the request affects multiple major subsystems, requires uncertain reverse engineering, or could damage user data.
 
-If the current Codex reasoning setting is lower than the task requires, stop all processing before editing, tell the user which reasoning level to switch to, and wait for the user to resubmit the prompt with the correct reasoning setting.
+If the current Codex reasoning setting is lower than the task requires, stop all processing before reading more context, browsing, running tools, planning, or editing. Tell the user exactly which reasoning level to switch to and wait for the user to resubmit the prompt with the correct reasoning setting.
+
+This includes **Low -> Medium** escalation. If the user is set to Low and the request requires Medium, stop immediately and ask the user to switch to Medium. Do not proceed just because Medium is the default or because the request looks easy to answer.
 
 If the current Codex reasoning setting is **Medium** and the task only requires **Low**, proceed at Medium without stopping.
 
@@ -96,17 +98,25 @@ React components should be function components with hooks. They should render UI
 
 Use TypeScript interfaces or type aliases for plain DTOs. Use TypeScript classes when an object has both data and behavior, especially repeated construction, validation, normalization, serialization, deserialization, comparison, default values, state transitions, command payload shaping, SQLite row mapping, or UI view-model mapping.
 
+Move repeated frontend utility behavior such as unknown-error formatting, timestamp labels, local storage key handling, Markdown cleanup, and command payload normalization into shared utilities or domain helpers instead of redefining it in each component.
+
 ### Rust And Tauri Architecture
 
 Tauri command handlers must stay thin. They may receive input, validate input, call a service, repository, or domain method, and return a typed result. They must not manually construct complex domain objects inline, duplicate default configuration, duplicate SQLite access logic, own business rules, or contain large procedural feature implementations.
 
 Use Rust `struct` plus `impl` for domain behavior, `enum` for finite variants, `trait` for shared behavior or interchangeable implementations, repository structs for SQLite persistence, service structs for business logic, and modules for domain boundaries.
 
+Avoid long argument lists in commands, services, and repositories. When a command or repository method needs many related values, introduce a typed input, draft, options, or parameter struct so validation and mapping stay coherent.
+
+Avoid large dumping-ground modules. When a Rust or TypeScript file accumulates multiple domains, split by feature, service, repository, parser, or platform boundary before adding more unrelated behavior.
+
 ### SQLite Architecture
 
 Do not scatter SQL row mapping across the codebase. Each persisted domain concept should have one canonical mapping path between database rows, domain objects, database insert/update payloads, and frontend DTOs where needed.
 
 Avoid duplicating column names, SQL fragments, and row conversion logic in unrelated files.
+
+Database locks and other recoverable infrastructure failures should return typed errors through the existing result path rather than panicking in normal app operations.
 
 ### Window Architecture
 
@@ -134,6 +144,8 @@ When fixing a bug, first check whether duplicated or inconsistent logic caused i
 For every non-trivial code change, include a short architecture note in the final response covering the domain concept, reusable abstraction added or reused, duplicate logic removed, regression risk reduced, and tests added or updated. If no abstraction was added, explain why.
 
 Avoid copy/pasted object construction, repeated inline validation, repeated SQLite row mapping, repeated Tauri command payload shaping, business logic inside React components or Tauri command handlers, stringly typed command/status/result handling, large dumping-ground utility files, ad hoc Tauri window creation outside `WindowManager`, and duplicated standalone-window setup or default options.
+
+For broad cleanup or architecture work, run `npm run build`, `cargo build`, `cargo clippy --all-targets`, and `git diff --check` when practical. Treat Clippy warnings as review findings: fix clear no-risk warnings immediately, and document larger refactor warnings instead of suppressing them without a specific reason.
 
 ## Coding Rules
 

@@ -15,6 +15,7 @@ import {
   decodeGearBlocksConstructionFile,
   getGearBlocksThirdPartyDependencyStatus,
   importGameBuildGuideMarkdown,
+  importGearBlocksOfficialApiDocs,
   installGearBlocksLuaExporter,
   importGearBlocksCatalogScreenshotImages,
   importGearBlocksRuntimePartIndex,
@@ -64,6 +65,8 @@ import type {
   GamePartCategory,
   GameScreenshotCaptureRequest
 } from "../../services/gaming";
+import { timestampLabel } from "../../utils/datetime";
+import { formatUnknownError as formatError } from "../../utils/errors";
 
 type GamingProps = {
   chatOverlayMode?: boolean;
@@ -232,6 +235,7 @@ export function Gaming({
     null
   );
   const [isLoadingGearBlocksApiCatalog, setIsLoadingGearBlocksApiCatalog] = useState(false);
+  const [isImportingGearBlocksApiDocs, setIsImportingGearBlocksApiDocs] = useState(false);
   const [isImportingRuntimeExports, setIsImportingRuntimeExports] = useState(false);
   const [isImportingCatalogScreenshot, setIsImportingCatalogScreenshot] = useState(false);
   const [isClearingRuntimeCategoryImages, setIsClearingRuntimeCategoryImages] = useState(false);
@@ -654,7 +658,7 @@ export function Gaming({
     try {
       const request = await createGameScreenshotCaptureRequest(
         game.id,
-        screenshotTimestampLabel(new Date())
+        timestampLabel(new Date())
       );
       setScreenshots((current) => [request, ...current.filter((item) => item.id !== request.id)]);
       setChatScreenshotPage(0);
@@ -678,7 +682,7 @@ export function Gaming({
     try {
       const request = await createGameChatScreenshotCapture(
         game.id,
-        screenshotTimestampLabel(new Date())
+        timestampLabel(new Date())
       );
       setScreenshots((current) => [request, ...current.filter((item) => item.id !== request.id)]);
       setSelectedPromptScreenshotIds((current) =>
@@ -1098,6 +1102,21 @@ export function Gaming({
       setStatus(formatError(error));
     } finally {
       setIsLoadingGearBlocksApiCatalog(false);
+    }
+  }
+
+  async function importOfficialGearBlocksApiDocs() {
+    setIsImportingGearBlocksApiDocs(true);
+    try {
+      const result = await importGearBlocksOfficialApiDocs();
+      setStatus(
+        `Imported ${result.importedTypeCount} GearBlocks API types, ${result.importedMemberCount} members, ${result.importedParameterCount} parameters, and ${result.importedEnumValueCount} enum values from ${result.fetchedPages} official docs pages.`
+      );
+      await refreshGearBlocksApiCatalog();
+    } catch (error) {
+      setStatus(formatError(error));
+    } finally {
+      setIsImportingGearBlocksApiDocs(false);
     }
   }
 
@@ -1774,14 +1793,24 @@ export function Gaming({
                   <p>GearBlocks</p>
                   <h3>API Catalog</h3>
                 </div>
-                <button
-                  className="ghost-button"
-                  disabled={isLoadingGearBlocksApiCatalog}
-                  onClick={() => void refreshGearBlocksApiCatalog()}
-                  type="button"
-                >
-                  Refresh
-                </button>
+                <div className="game-view-actions">
+                  <button
+                    className="ghost-button"
+                    disabled={isLoadingGearBlocksApiCatalog || isImportingGearBlocksApiDocs}
+                    onClick={() => void refreshGearBlocksApiCatalog()}
+                    type="button"
+                  >
+                    Refresh
+                  </button>
+                  <button
+                    className="ghost-button"
+                    disabled={isLoadingGearBlocksApiCatalog || isImportingGearBlocksApiDocs}
+                    onClick={() => void importOfficialGearBlocksApiDocs()}
+                    type="button"
+                  >
+                    {isImportingGearBlocksApiDocs ? "Importing" : "Import Official Docs"}
+                  </button>
+                </div>
               </div>
 
               {!gearBlocksApiCatalog ? (
@@ -2722,10 +2751,6 @@ export function Gaming({
   );
 }
 
-function formatError(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
-
 function stripGearBlocksMarkerBlocks(content: string) {
   return content
     .replace(/```overlay-forge-markers\s*[\s\S]*?```/gi, "")
@@ -2795,20 +2820,6 @@ function parseJsonOrFallback(value: string, fallback: unknown) {
   }
 }
 
-function screenshotTimestampLabel(date: Date) {
-  const year = date.getFullYear();
-  const month = padDatePart(date.getMonth() + 1);
-  const day = padDatePart(date.getDate());
-  const hours = padDatePart(date.getHours());
-  const minutes = padDatePart(date.getMinutes());
-  const seconds = padDatePart(date.getSeconds());
-
-  return `${year}${month}${day}_${hours}${minutes}${seconds}`;
-}
-
-function padDatePart(value: number) {
-  return value.toString().padStart(2, "0");
-}
 
 function formatCapturedAt(screenshot: GameScreenshotCaptureRequest) {
   const value = screenshot.capturedAt || screenshot.createdAt;
