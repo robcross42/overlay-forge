@@ -94,7 +94,7 @@ Current data layers:
 
 1. Saved construction decoding from `construction.bytes`.
 2. Runtime scene exports reconstructed from GearBlocks script log output.
-3. Runtime scene deltas imported after a full scene export baseline.
+3. Prompt-time rich full-scene export requests before GearBlocks chat context assembly.
 4. SQLite runtime part, property, attachment, API availability, and catalog indexes.
 5. Backlog direct BepInEx plugin work for user-controlled temporary visual markers.
 

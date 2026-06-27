@@ -20,6 +20,83 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+### 2026-06-26
+
+#### Changed
+
+- 01:49:27 EDT - Changed GearBlocks runtime sync so automatic scene-delta monitoring is disabled and GearBlocks chat submission requests/imports a rich full-scene export before prompt context is assembled.
+- 02:10:56 EDT - Added the Mobalytics Ice Shot Deadeye leveling guide as the currently played Path of Exile 2 build and surfaced it in the POE2 Builds section.
+- 21:56:15 EDT - Changed GearBlocks runtime export storage so successful imports populate normalized part definition and latest scene instance rows instead of retaining raw full-scene export JSON in SQLite.
+- 21:58:50 EDT - Cleaned the local SQLite database by backing up the pre-cleanup file, backfilling latest GearBlocks runtime part instances, clearing historical raw runtime export JSON, checkpointing WAL, and vacuuming the database.
+- 22:07:42 EDT - Added normalized GearBlocks definition and value tables for runtime metadata fields, attachment types, part settings, and output/control channels.
+- 22:23:44 EDT - Changed GearBlocks chat prompt context to use a backend scene-context service that reads normalized SQLite scene rows and definition/value tables before falling back to legacy raw export JSON.
+- 22:51:22 EDT - Changed GearBlocks chat Send / Enter to use the latest normalized SQLite scene context without requesting a runtime export, log import, or scene diff.
+- 22:51:22 EDT - Added a short GearBlocks chat `Diff` action that explicitly refreshes the runtime scene, computes the latest scene diff, and includes that diff in the prompt.
+- 23:20:50 EDT - Changed the GearBlocks chat diff action to include the latest stored scene diff without requesting a new runtime export or parsing logs.
+- 23:20:50 EDT - Changed GearBlocks chat input buttons to compact `G`, `D↑`, and `↑` labels in a shared action strip so controls reserve space instead of overlapping.
+
+#### Fixed
+
+- 00:00:07 EDT - Fixed GearBlocks chat context for repeated structural parts by adding parent construction group summaries and duplicate-safe construction/id/index references to runtime prompt context.
+- 21:23:23 EDT - Fixed GearBlocks chat submission so prompts are persisted before prompt-time scene refresh and scene-refresh failures are passed to chat as context warnings instead of aborting the response.
+- 21:33:47 EDT - Fixed the standalone game chat overlay layout so the message area fills expanded empty space while the screenshot summary and prompt composer stay pinned to the bottom.
+
+#### Documentation
+
+- 00:00:07 EDT - Documented parent construction groups as part of GearBlocks semantic runtime context and troubleshooting for repeated part IDs.
+- 00:59:03 EDT - Documented the user-tested GearBlocks player character height as 20 units / 20 blocks / 200 cm for human-scale build design.
+- 01:49:27 EDT - Documented the GearBlocks prompt-time full-scene export workflow that replaces passive scene-delta monitoring.
+- 02:10:56 EDT - Documented the Path of Exile 2 current-build setting stored in `obj_game_setting`.
+- 21:56:15 EDT - Documented normalized GearBlocks runtime export storage, `def_gearblocks_part`, and latest-scene runtime part instances.
+- 22:07:42 EDT - Documented GearBlocks metadata, attachment, setting, and output/control channel definition tables.
+- 22:23:44 EDT - Documented the GearBlocks DB-backed chat scene-context path and deferred the optional derived scene-facts cache.
+- 22:51:22 EDT - Documented that normal GearBlocks chat sends use DB scene context and the `Diff` action is the explicit scene-refresh/diff path.
+- 23:20:50 EDT - Documented that the `D↑` chat action includes the latest stored scene diff and manual scene refresh is responsible for computing a fresh diff.
+
+#### Validation
+
+- 00:01:27 EDT - Validated GearBlocks parent construction group prompt context with `npm run build`, `npm run cargo:build`, `npm run cargo:test`, and `git diff --check`.
+- 00:59:52 EDT - Validated GearBlocks player-character height prompt context with `npm run build`, `npm run cargo:build`, and `git diff --check`.
+- 01:51:29 EDT - Validated GearBlocks prompt-time rich export sync with `npm run build`, `npm run cargo:build`, `npm run cargo:test`, `git diff --check`, and installed-script delta-monitor checks.
+- 02:15:07 EDT - Validated the Path of Exile 2 current-build setting and Builds display with `npm run build`, `npm run cargo:build`, and `npm run cargo:test`.
+- 21:23:23 EDT - Validated GearBlocks chat submission hardening with `npm run build`, `npm run cargo:build`, and `npm run cargo:test`.
+- 21:33:47 EDT - Validated the standalone game chat overlay layout fix with `npm run build`.
+- 21:56:15 EDT - Validated normalized GearBlocks runtime export storage with `npm run cargo:build`, `npm run build`, `npm run cargo:test`, and `git diff --check`.
+- 21:58:50 EDT - Verified the local SQLite cleanup left zero raw runtime export payload rows, retained 1,465 runtime export manifest rows, backfilled 55 latest runtime part instance rows, and reduced `overlay-forge.sqlite3` to 49,303,552 bytes.
+- 22:07:42 EDT - Validated GearBlocks metadata definition tables with `cargo fmt --manifest-path src-tauri/Cargo.toml`, `npm run build`, `npm run cargo:test`, `npm run cargo:build`, and `git diff --check`.
+- 22:23:44 EDT - Validated GearBlocks DB-backed chat scene context with `cargo fmt --manifest-path src-tauri/Cargo.toml`, `npm run cargo:build`, `npm run build`, `npm run cargo:test`, `npm run cargo:clippy`, and `git diff --check`.
+- 22:51:22 EDT - Validated GearBlocks chat diff gating with `cargo fmt --manifest-path src-tauri/Cargo.toml`, `npm run cargo:build`, `npm run build`, `npm run cargo:test`, and `git diff --check`.
+- 23:20:50 EDT - Validated GearBlocks stored-diff chat sends and compact chat controls with `cargo fmt --manifest-path src-tauri/Cargo.toml`, `npm run cargo:build`, `npm run build`, `npm run cargo:test`, and `git diff --check`.
+- 23:29:13 EDT - Validated all uncommitted Overlay Forge work with `cargo fmt --manifest-path src-tauri\Cargo.toml`, `npm run build`, `npm run cargo:build`, `npm run cargo:test`, `npm run cargo:clippy`, and `git diff --check`.
+
+### 2026-06-25
+
+#### Fixed
+
+- 23:37:43 EDT - Fixed GearBlocks runtime log imports after `Player.log` rotation so completed full-scene exports near the beginning of a replacement log are recovered instead of being skipped by the incremental tail-read limit.
+
+#### Documentation
+
+- 23:37:43 EDT - Documented GearBlocks runtime export recovery behavior for successful in-game exports that were missed after log rotation.
+
+#### Validation
+
+- 23:38:54 EDT - Validated GearBlocks runtime log rotation recovery with `npm run build`, `npm run cargo:build`, `npm run cargo:test`, and `git diff --check`.
+
+### 2026-06-24
+
+#### Changed
+
+- 19:26:50 EDT - Expanded GearBlocks runtime export and chat context so build-guide reasoning can use paint/material details, attachment and link-node types, tweakables, resizable settings, controllable state, engine relationships, and per-part coordinates from the latest export or scene delta.
+
+#### Documentation
+
+- 19:26:50 EDT - Documented the GearBlocks API surfaces that support build-guide context and clarified which live runtime values are included for chat.
+
+#### Validation
+
+- 19:27:56 EDT - Validated GearBlocks build-guide runtime detail exports with `npm run build`, `npm run cargo:build`, `npm run cargo:test`, and `git diff --check`.
+
 ## 0.9.0 - 2026-06-24
 
 ### 2026-06-24

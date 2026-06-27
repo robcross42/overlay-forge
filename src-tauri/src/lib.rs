@@ -2,6 +2,7 @@ mod commands;
 mod db;
 mod gearblocks_api;
 mod gearblocks_api_scraper;
+mod gearblocks_scene_context;
 mod github;
 mod hotkeys;
 mod openai;
@@ -23,7 +24,7 @@ use commands::{
     delete_project_markdown_context, delete_smoking_event, delete_task, delete_youtube_reference,
     export_smoking_cessation_chatgpt_context, fetch_project_github_metadata,
     focus_game_chat_overlay_window, focus_last_game_window, get_active_game_build_guide_overlay,
-    get_active_game_chat_overlay, get_bridge_file_draft, get_game_build_guide,
+    get_active_game_chat_overlay, get_bridge_file_draft, get_game_build_guide, get_game_setting,
     get_gearblocks_third_party_dependency_status, get_milestone_status, get_openai_api_key_status,
     get_overlay_forge_foreground_window_label, get_project_github_repository,
     get_project_markdown_context, get_scratchpad, get_smoking_cessation_settings,
@@ -225,6 +226,7 @@ pub fn run() {
             focus_game_chat_overlay_window,
             toggle_game_chat_overlay_window,
             get_active_game_chat_overlay,
+            get_game_setting,
             list_game_build_guides,
             create_game_build_guide_from_chat,
             import_game_build_guide_markdown,

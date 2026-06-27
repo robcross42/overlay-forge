@@ -187,7 +187,7 @@ button {
   background: var(--standalone-panel-bg);
 }
 
-.standalone-overlay-window .chat-workspace-overlay-mode .chat-input-row .primary-button,
+.standalone-overlay-window .chat-workspace-overlay-mode .chat-input-actions .primary-button,
 .standalone-overlay-window .chat-workspace-overlay-mode .chat-input-extra-action {
   border-color: var(--standalone-border-strong);
 }
@@ -762,6 +762,7 @@ button {
 }
 
 .workspace-chat-overlay-mode {
+  grid-template-rows: minmax(0, 1fr);
   height: 100%;
   max-height: 100%;
   min-height: 0;
@@ -2142,6 +2143,106 @@ select.text-input option:hover {
   line-height: 1.45;
 }
 
+.poe2-current-build-card {
+  display: grid;
+  gap: 12px;
+  max-width: 760px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.poe2-current-build-head,
+.poe2-current-build-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.poe2-current-build-head > div {
+  min-width: 0;
+}
+
+.poe2-current-build-head p,
+.poe2-current-build-head h4,
+.poe2-current-build-card > p {
+  margin: 0;
+}
+
+.poe2-current-build-head p {
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.poe2-current-build-head h4 {
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 1.04rem;
+}
+
+.poe2-current-build-head > span,
+.poe2-current-build-meta span,
+.poe2-current-build-tags span {
+  border: 1px solid rgba(85, 240, 200, 0.18);
+  border-radius: 999px;
+  background: rgba(85, 240, 200, 0.09);
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.poe2-current-build-head > span {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+}
+
+.poe2-current-build-meta,
+.poe2-current-build-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.poe2-current-build-meta span,
+.poe2-current-build-tags span {
+  padding: 4px 7px;
+}
+
+.poe2-current-build-card > p {
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.poe2-current-build-actions {
+  align-items: center;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.poe2-current-build-actions a {
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.poe2-current-build-actions a:hover {
+  color: var(--accent);
+}
+
+.poe2-current-build-actions > span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
 .game-script-tool-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2683,14 +2784,19 @@ select.text-input option:hover {
 }
 
 .chat-workspace-overlay-mode .chat-workspace-main-no-toolbar {
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  height: 100%;
+  max-height: 100%;
   padding: 6px;
   background: transparent;
 }
 
 .chat-workspace-overlay-mode .chat-input-row {
-  position: relative;
-  display: block;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 6px;
+  min-width: 0;
 }
 
 .chat-workspace-overlay-mode .body-input.compact {
@@ -2699,26 +2805,30 @@ select.text-input option:hover {
   max-height: 56px;
   border-color: rgba(255, 255, 255, 0.18);
   background: var(--standalone-input-bg, rgba(6, 8, 11, 0.72));
-  padding: 8px 148px 8px 10px;
+  padding: 8px 10px;
   line-height: 1.35;
 }
 
-.chat-workspace-overlay-mode .chat-input-extra-action {
-  position: absolute;
-  right: 72px;
-  bottom: 8px;
-  min-height: 32px;
-  padding: 0 10px;
+.chat-input-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 0;
 }
 
-.chat-workspace-overlay-mode .chat-input-row .primary-button {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
+.chat-workspace-overlay-mode .chat-input-extra-action {
+  min-width: 34px;
+  min-height: 32px;
+  padding: 0 9px;
+}
+
+.chat-workspace-overlay-mode .chat-input-row .chat-send-button {
   background: rgba(255, 255, 255, 0.18);
   color: #f8fbff;
+  min-width: 34px;
   min-height: 32px;
-  padding: 0 12px;
+  padding: 0 10px;
 }
 
 .chat-workspace-main-empty {
@@ -4693,10 +4803,17 @@ select.text-input option:hover {
 
 .chat-input-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
   gap: 10px;
   min-width: 0;
+}
+
+.chat-input-row .chat-input-extra-action,
+.chat-input-row .chat-send-button {
+  min-width: 36px;
+  padding-inline: 10px;
+  white-space: nowrap;
 }
 
 .attached-context-panel {

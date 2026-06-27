@@ -14,6 +14,17 @@ export type GameInput = {
   summary: string;
 };
 
+export type GameSetting = {
+  id: number;
+  gameId: number;
+  idGame: number;
+  settingKey: string;
+  settingValueJson: string;
+  schemaJson: string;
+  createdAt: string;
+  modifiedAt: string;
+};
+
 export type GameScreenshotCaptureRequest = {
   id: number;
   gameId: number;
@@ -425,6 +436,10 @@ export function createGame(input: GameInput) {
   return invoke<Game>("create_game", input);
 }
 
+export function getGameSetting(gameId: number, settingKey: string) {
+  return invoke<GameSetting | null>("get_game_setting", { gameId, settingKey });
+}
+
 export function deleteGame(id: number) {
   return invoke<void>("delete_game", { id });
 }
@@ -680,12 +695,14 @@ export function listGameChatMessages(conversationId: number) {
 export function sendGameChatMessage(
   conversationId: number,
   content: string,
-  screenshotIds: number[] = []
+  screenshotIds: number[] = [],
+  includeSceneDiff = false
 ) {
   return invoke<GameChatMessage[]>("send_game_chat_message", {
     conversationId,
     content,
-    screenshotIds
+    screenshotIds,
+    includeSceneDiff
   });
 }
 

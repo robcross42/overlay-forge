@@ -195,7 +195,7 @@ export default function GameChatOverlayApp() {
     await focusLastGameWindow().catch(() => false);
   }
 
-  async function sendMessage() {
+  async function sendMessage(includeSceneDiff = false) {
     if (!conversation || !draft.trim() || isSending) {
       return;
     }
@@ -212,13 +212,14 @@ export default function GameChatOverlayApp() {
     setDraft("");
     setIsSending(true);
     setMessages((current) => [...current, pendingMessage]);
-    setStatus("Waiting for OpenAI");
+    setStatus(includeSceneDiff ? "Including scene diff" : "Waiting for OpenAI");
 
     try {
       const nextMessages = await sendGameChatMessage(
         conversation.id,
         content,
-        selectedPromptScreenshotIds
+        selectedPromptScreenshotIds,
+        includeSceneDiff
       );
       setMessages(nextMessages);
       delete pendingScreenshotIdsByChatRef.current[chatAttachmentKey(conversation.gameId, conversation.id)];
@@ -306,14 +307,33 @@ export default function GameChatOverlayApp() {
             inputPlaceholder={game ? `Ask about ${game.name}...` : "Select a game chat..."}
             inputActionSlot={
               game?.slug === "gearblocks" ? (
-                <button
-                  className="ghost-button chat-input-extra-action"
-                  disabled={!conversation || isSending || isGeneratingBuildGuide}
-                  onClick={() => void generateBuildGuide()}
-                  type="button"
-                >
-                  Guide
-                </button>
+                <>
+                  <button
+                    aria-label="Generate build guide"
+                    className="ghost-button chat-input-extra-action"
+                    disabled={!conversation || isSending || isGeneratingBuildGuide}
+                    onClick={() => void generateBuildGuide()}
+                    title="Guide"
+                    type="button"
+                  >
+                    G
+                  </button>
+                  <button
+                    aria-label="Send with latest scene diff"
+                    className="ghost-button chat-input-extra-action"
+                    disabled={
+                      !conversation ||
+                      isSending ||
+                      isGeneratingBuildGuide ||
+                      draft.trim().length === 0
+                    }
+                    onClick={() => void sendMessage(true)}
+                    title="Diff"
+                    type="button"
+                  >
+                    D↑
+                  </button>
+                </>
               ) : null
             }
             isSending={isSending}
@@ -326,7 +346,7 @@ export default function GameChatOverlayApp() {
             onExitChatOverlayMode={() => void closeChatWindow()}
             onNewConversationTitleChange={() => {}}
             onSelectConversation={() => {}}
-            onSendMessage={() => void sendMessage()}
+            onSendMessage={() => void sendMessage(false)}
             promptContextSummary={
               isCapturingPromptScreenshot
                 ? "Capturing screenshot..."

@@ -245,6 +245,13 @@ modified_at
 
 Generic per-game settings. This avoids table-per-game settings growth.
 
+Current Path of Exile 2 seeded setting:
+
+```text
+setting_key = current_build
+setting_value_json = currently played build metadata, source URL, class, ascendancy, tags, and status
+```
+
 ### `obj_game_data_location`
 
 ```text
@@ -373,6 +380,57 @@ updated_at
 
 GearBlocks runtime construction export index populated from Overlay Forge Lua exporter records reconstructed from `Player.log` / `Player-prev.log`.
 
+Successful runtime imports treat the raw export JSON as an ingest artifact. After import, `document_json` is stored as an empty object and the reusable data is read from normalized runtime tables. The manifest row keeps export identity, source log, timestamps, counts, and status fields only.
+
+### `def_gearblocks_part`
+
+```text
+id
+part_key
+asset_guid
+asset_name
+display_name
+full_display_name
+category
+first_seen_at
+last_seen_at
+created_at
+updated_at
+```
+
+Canonical GearBlocks part definitions observed from runtime exports. `part_key` is the stable lookup key used by runtime instance rows.
+
+### `obj_game_runtime_part_instance`
+
+```text
+id
+game_id
+part_definition_id
+source_export_id
+source_construction_id
+part_instance_key
+runtime_part_id
+runtime_part_index
+mass
+world_x
+world_y
+world_z
+local_x
+local_y
+local_z
+world_position_json
+local_position_json
+current_unit_size_json
+link_node_count
+behaviour_names_json
+dynamic_summary_json
+last_seen_at
+created_at
+updated_at
+```
+
+Latest GearBlocks runtime scene part instances. This table preserves repeated physical parts in the current scene and maps each instance back to `def_gearblocks_part` instead of relying on raw full-scene export JSON.
+
 ### `obj_game_runtime_part`
 
 ```text
@@ -405,6 +463,8 @@ updated_at
 ```
 
 GearBlocks runtime part index. `part_key` prefers `AssetGUID`, falls back to `AssetName`, then to category plus display name.
+
+`properties_json` stores the full latest exported runtime part payload, including world/local coordinates, paint/material data, attachment and link-node details, tweakables, behaviours, and engine relationship fields when the GearBlocks runtime API exposes them.
 
 ### `obj_game_runtime_part_alias`
 
@@ -527,6 +587,143 @@ updated_at
 ```
 
 Runtime attachment index populated from direct entries under each part's `attachments` field.
+
+### `def_gearblocks_part_metadata_item`
+
+```text
+id
+source_area
+field_path
+value_type
+first_seen_at
+last_seen_at
+created_at
+updated_at
+```
+
+Reusable GearBlocks metadata field definitions observed from runtime exports. `source_area` separates generic value fields, part properties, and future metadata families while `field_path` stores the stable path.
+
+### `obj_game_runtime_part_metadata_value`
+
+```text
+id
+game_id
+part_key
+metadata_item_id
+value_type
+value_json
+source_export_id
+source_construction_id
+first_seen_at
+last_seen_at
+created_at
+updated_at
+```
+
+Current observed values for GearBlocks metadata definitions mapped back to game runtime parts.
+
+### `def_gearblocks_attachment_type`
+
+```text
+id
+attachment_path
+type_name
+value_type
+first_seen_at
+last_seen_at
+created_at
+updated_at
+```
+
+Reusable GearBlocks attachment type definitions observed from runtime exports.
+
+### `n2n_game_runtime_part_attachment_type`
+
+```text
+id
+game_id
+part_key
+attachment_type_id
+attachment_json
+source_export_id
+source_construction_id
+first_seen_at
+last_seen_at
+created_at
+updated_at
+```
+
+Runtime mapping between observed parts and reusable GearBlocks attachment type definitions.
+
+### `def_gearblocks_part_setting`
+
+```text
+id
+setting_key
+label
+setting_area
+value_type
+first_seen_at
+last_seen_at
+created_at
+updated_at
+```
+
+Reusable GearBlocks tweakable, resizable, and behaviour setting definitions observed from runtime exports.
+
+### `obj_game_runtime_part_setting_value`
+
+```text
+id
+game_id
+part_key
+setting_id
+value_type
+value_json
+source_export_id
+source_construction_id
+first_seen_at
+last_seen_at
+created_at
+updated_at
+```
+
+Runtime setting values mapped to reusable GearBlocks part setting definitions.
+
+### `def_gearblocks_part_output_channel`
+
+```text
+id
+channel_key
+label
+channel_area
+value_type
+first_seen_at
+last_seen_at
+created_at
+updated_at
+```
+
+Reusable GearBlocks output and control channel definitions observed from runtime exports.
+
+### `obj_game_runtime_part_output_channel_value`
+
+```text
+id
+game_id
+part_key
+output_channel_id
+value_type
+value_json
+source_export_id
+source_construction_id
+first_seen_at
+last_seen_at
+created_at
+updated_at
+```
+
+Runtime output/control channel values mapped to reusable GearBlocks output channel definitions.
 
 ### `def_gearblocks_api_type`
 

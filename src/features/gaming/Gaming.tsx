@@ -13,6 +13,7 @@ import {
   createGameChatScreenshotCapture,
   createGameScreenshotCaptureRequest,
   decodeGearBlocksConstructionFile,
+  getGameSetting,
   getGearBlocksThirdPartyDependencyStatus,
   importGameBuildGuideMarkdown,
   importGearBlocksOfficialApiDocs,
@@ -97,6 +98,22 @@ type ScreenshotContextMenu = {
   y: number;
 };
 
+type PathOfExile2CurrentBuild = {
+  title: string;
+  source: string;
+  sourceUrl: string;
+  characterClass: string;
+  ascendancy: string;
+  creator: string;
+  buildRole: string;
+  patch: string;
+  status: string;
+  updatedOn: string;
+  summary: string;
+  tags: string[];
+  activeVariant: string;
+};
+
 type GameView =
   | "home"
   | "chat"
@@ -115,6 +132,7 @@ type GameView =
   | "trade";
 const CHAT_SCREENSHOTS_PER_PAGE = 8;
 const PATH_OF_EXILE_2_SLUG = "path-of-exile-2";
+const PATH_OF_EXILE_2_CURRENT_BUILD_SETTING_KEY = "current_build";
 const ENABLE_GEARBLOCKS_MARKERS = false;
 const ENABLE_GEARBLOCKS_PLUGIN_STATUS = false;
 const PATH_OF_EXILE_2_SECTIONS: Array<{
@@ -254,6 +272,8 @@ export function Gaming({
   const [isImportingBuildGuide, setIsImportingBuildGuide] = useState(false);
   const [isGeneratingBuildGuide, setIsGeneratingBuildGuide] = useState(false);
   const [isOpeningBuildGuide, setIsOpeningBuildGuide] = useState(false);
+  const [pathOfExile2CurrentBuild, setPathOfExile2CurrentBuild] =
+    useState<PathOfExile2CurrentBuild | null>(null);
   const [newChatTitle, setNewChatTitle] = useState("");
   const [chatDraft, setChatDraft] = useState("");
   const [isSendingChat, setIsSendingChat] = useState(false);
@@ -414,6 +434,7 @@ export function Gaming({
       setIsImportingBuildGuide(false);
       setIsGeneratingBuildGuide(false);
       setIsOpeningBuildGuide(false);
+      setPathOfExile2CurrentBuild(null);
       setSelectedPromptScreenshotIds([]);
       setChatScreenshotPage(0);
       setIsChatScreenshotPickerOpen(false);
@@ -457,6 +478,18 @@ export function Gaming({
     listGameBuildGuides(selectedGame.id)
       .then(setBuildGuides)
       .catch((error) => setStatus(formatError(error)));
+    if (selectedGame.slug === PATH_OF_EXILE_2_SLUG) {
+      getGameSetting(selectedGame.id, PATH_OF_EXILE_2_CURRENT_BUILD_SETTING_KEY)
+        .then((setting) => {
+          setPathOfExile2CurrentBuild(parsePathOfExile2CurrentBuild(setting?.settingValueJson));
+        })
+        .catch((error) => {
+          setPathOfExile2CurrentBuild(null);
+          setStatus(formatError(error));
+        });
+    } else {
+      setPathOfExile2CurrentBuild(null);
+    }
     listGameChatConversations(selectedGame.id)
       .then((conversations) => {
         setChatConversations(conversations);
@@ -797,7 +830,7 @@ export function Gaming({
     }
   }
 
-  async function sendGameChat() {
+  async function sendGameChat(includeSceneDiff = false) {
     if (!selectedChatConversationId) {
       setStatus("Create or select a chat first");
       return;
@@ -820,13 +853,14 @@ export function Gaming({
     setChatDraft("");
     setIsSendingChat(true);
     setChatMessages((current) => [...current, pendingMessage]);
-    setStatus("Waiting for OpenAI");
+    setStatus(includeSceneDiff ? "Including scene diff" : "Waiting for OpenAI");
 
     try {
       const nextMessages = await sendGameChatMessage(
         selectedChatConversationId,
         content,
-        selectedPromptScreenshotIds
+        selectedPromptScreenshotIds,
+        includeSceneDiff
       );
       setChatMessages(nextMessages);
       setSelectedPromptScreenshotIds([]);
@@ -2164,18 +2198,37 @@ export function Gaming({
               inputPlaceholder={`Ask about ${selectedGame.name}...`}
               inputActionSlot={
                 selectedGame.slug === "gearblocks" ? (
-                  <button
-                    className="ghost-button chat-input-extra-action"
-                    disabled={
-                      isGeneratingBuildGuide ||
-                      isSendingChat ||
-                      !selectedChatConversationId
-                    }
-                    onClick={() => void generateBuildGuideFromChat()}
-                    type="button"
-                  >
-                    Guide
-                  </button>
+                  <>
+                    <button
+                      aria-label="Generate build guide"
+                      className="ghost-button chat-input-extra-action"
+                      disabled={
+                        isGeneratingBuildGuide ||
+                        isSendingChat ||
+                        !selectedChatConversationId
+                      }
+                      onClick={() => void generateBuildGuideFromChat()}
+                      title="Guide"
+                      type="button"
+                    >
+                      G
+                    </button>
+                    <button
+                      aria-label="Send with latest scene diff"
+                      className="ghost-button chat-input-extra-action"
+                      disabled={
+                        isGeneratingBuildGuide ||
+                        isSendingChat ||
+                        !selectedChatConversationId ||
+                        chatDraft.trim().length === 0
+                      }
+                      onClick={() => void sendGameChat(true)}
+                      title="Diff"
+                      type="button"
+                    >
+                      D↑
+                    </button>
+                  </>
                 ) : null
               }
               isSending={isSendingChat}
@@ -2197,7 +2250,7 @@ export function Gaming({
                 setSelectedPromptScreenshotIds([]);
                 setIsChatScreenshotPickerOpen(false);
               }}
-              onSendMessage={() => void sendGameChat()}
+              onSendMessage={() => void sendGameChat(false)}
               renderMessageContent={(message) => {
                 const content =
                   selectedGame.slug === "gearblocks" && message.role === "assistant"
@@ -2249,7 +2302,11 @@ export function Gaming({
           {selectedGame.slug === PATH_OF_EXILE_2_SLUG &&
             PATH_OF_EXILE_2_SECTIONS.map((section) =>
               gameView === section.view ? (
-                <PathOfExile2SectionScaffold key={section.view} section={section} />
+                <PathOfExile2SectionScaffold
+                  currentBuild={pathOfExile2CurrentBuild}
+                  key={section.view}
+                  section={section}
+                />
               ) : null
             )}
 
@@ -3003,10 +3060,14 @@ function PathOfExile2HomeScaffold() {
 }
 
 function PathOfExile2SectionScaffold({
+  currentBuild,
   section
 }: {
+  currentBuild: PathOfExile2CurrentBuild | null;
   section: (typeof PATH_OF_EXILE_2_SECTIONS)[number];
 }) {
+  const isBuildsSection = section.view === "builds";
+
   return (
     <section className="poe2-section-panel" aria-label={`Path of Exile 2 ${section.label}`}>
       <div className="game-view-head">
@@ -3015,15 +3076,78 @@ function PathOfExile2SectionScaffold({
           <h3>{section.label}</h3>
         </div>
       </div>
-      <article className="poe2-section-card large">
-        <div>
-          <p>Scaffold</p>
-          <h4>{section.label}</h4>
-        </div>
-        <span>{section.description}</span>
-      </article>
+      {isBuildsSection && currentBuild ? (
+        <article className="poe2-current-build-card">
+          <div className="poe2-current-build-head">
+            <div>
+              <p>Currently Playing</p>
+              <h4>{currentBuild.title}</h4>
+            </div>
+            <span>{currentBuild.patch}</span>
+          </div>
+          <div className="poe2-current-build-meta">
+            <span>{currentBuild.characterClass}</span>
+            <span>{currentBuild.ascendancy}</span>
+            <span>{currentBuild.buildRole}</span>
+            <span>By {currentBuild.creator}</span>
+          </div>
+          <p>{currentBuild.summary}</p>
+          {currentBuild.tags.length > 0 && (
+            <div className="poe2-current-build-tags">
+              {currentBuild.tags.map((tag) => (
+                <span key={tag}>{tag}</span>
+              ))}
+            </div>
+          )}
+          <div className="poe2-current-build-actions">
+            <a href={currentBuild.sourceUrl} rel="noreferrer" target="_blank">
+              Open {currentBuild.source}
+            </a>
+            <span>Updated {currentBuild.updatedOn}</span>
+          </div>
+        </article>
+      ) : (
+        <article className="poe2-section-card large">
+          <div>
+            <p>Scaffold</p>
+            <h4>{section.label}</h4>
+          </div>
+          <span>{section.description}</span>
+        </article>
+      )}
     </section>
   );
+}
+
+function parsePathOfExile2CurrentBuild(value: string | undefined): PathOfExile2CurrentBuild | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Partial<PathOfExile2CurrentBuild>;
+    if (!parsed.title || !parsed.sourceUrl) {
+      return null;
+    }
+
+    return {
+      title: parsed.title,
+      source: parsed.source || "Source",
+      sourceUrl: parsed.sourceUrl,
+      characterClass: parsed.characterClass || "Class unknown",
+      ascendancy: parsed.ascendancy || "Ascendancy unknown",
+      creator: parsed.creator || "Unknown creator",
+      buildRole: parsed.buildRole || "Build",
+      patch: parsed.patch || "Patch unknown",
+      status: parsed.status || "currently_playing",
+      updatedOn: parsed.updatedOn || "unknown",
+      summary: parsed.summary || "",
+      tags: Array.isArray(parsed.tags) ? parsed.tags.filter(Boolean) : [],
+      activeVariant: parsed.activeVariant || ""
+    };
+  } catch {
+    return null;
+  }
 }
 
 function GameChatDefaultsPane({

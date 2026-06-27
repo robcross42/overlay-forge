@@ -6,8 +6,6 @@
 local EXPORT_DIR = [[{{EXPORT_DIR}}]]
 local KNOWN_API_INDEX = {{KNOWN_API_INDEX}}
 local LOG_CHUNK_SIZE = 3000
-local SCENE_DELTA_INTERVAL_SECONDS = 1.0
-local SCENE_DELTA_MAX_PARTS = 48
 
 local attachTypes =
 {
@@ -31,11 +29,6 @@ local prevSelectionResizeStepOverride = 0
 local prevPivotPosition = Vector3.Zero
 local prevPivotOrientation = Quaternion.Identity
 local prevPivotPartSize = Vector3.Zero
-local sceneMonitorSnapshot = {}
-local sceneMonitorPrimed = false
-local lastSceneMonitorClock = 0
-local sceneDeltaSequence = 0
-
 local minResizeUnitStep = 0.05
 
 local activeSection = "home"
@@ -881,6 +874,22 @@ local function describeBehaviour(behaviour)
         isActivatable = safeRead(function() return behaviour.IsActivatable end, false),
         isActivated = safeRead(function() return behaviour.IsActivated end, false),
         isControllable = safeRead(function() return behaviour.IsControllable end, false),
+        controlInfo = safeRead(function() return behaviour.ControlInfo end, ""),
+        isControlBound = safeRead(function() return behaviour.IsControlBound end, nil),
+        isControlOverridden = safeRead(function() return behaviour.IsControlOverridden end, nil),
+        onlyControlWhenPlayerLocked = safeRead(function() return behaviour.OnlyControlWhenPlayerLocked end, nil),
+        capacityRemaining = safeRead(function() return behaviour.CapacityRemaining end, nil),
+        capacityUsed = safeRead(function() return behaviour.CapacityUsed end, nil),
+        drivenCrank = runtimeRef(safeRead(function() return behaviour.DrivenCrank end, nil)),
+        linkedCylinders = collectRuntimeRefs(safeRead(function() return behaviour.LinkedCylinders end, nil), 128),
+        numLinkedCylinders = safeRead(function() return behaviour.NumLinkedCylinders end, nil),
+        crankShaft = runtimeRef(safeRead(function() return behaviour.CrankShaft end, nil)),
+        currentRotationSpeed = safeRead(function() return behaviour.CurrentRotationSpeed end, nil),
+        crank = runtimeRef(safeRead(function() return behaviour.Crank end, nil)),
+        crankAngle = safeRead(function() return behaviour.GetCrankAngle() end, nil),
+        head = runtimeRef(safeRead(function() return behaviour.Head end, nil)),
+        cylinder = runtimeRef(safeRead(function() return behaviour.Cylinder end, nil)),
+        timingAngle = safeRead(function() return behaviour.TimingAngle end, nil),
         debugInfo = safeRead(function() return behaviour.DebugInfo end, ""),
         interfaceNames = interfaceNamesFromAttributes(attributes),
         apiAttributes = attributes
@@ -1084,12 +1093,52 @@ local function describeTweakables(tweakables)
     }
 end
 
+local function describeBuildGuidePartDetails(part)
+    local behaviours = {}
+    local behaviourByName = {}
+    local behaviourInstances = safeRead(function() return part.Behaviours end, nil)
+    if behaviourInstances ~= nil then
+        for behaviour in behaviourInstances do
+            local describedBehaviour = describeBehaviour(behaviour)
+            table.insert(behaviours, describedBehaviour)
+            if describedBehaviour.name ~= nil and describedBehaviour.name ~= "" then
+                behaviourByName[describedBehaviour.name] = runtimeRef(safeRead(function() return part.GetBehaviour(describedBehaviour.name) end, nil))
+            end
+        end
+    end
+
+    local linkNodes = {}
+    local linkNodeInstances = safeRead(function() return part.LinkNodes end, nil)
+    if linkNodeInstances ~= nil then
+        for linkNode in linkNodeInstances do
+            table.insert(linkNodes, describeLinkNode(linkNode))
+        end
+    end
+
+    local resizable = describeResizable(safeRead(function() return part end, nil))
+    local tweakables = describeTweakables(safeRead(function() return part.Tweakables end, nil))
+    if tweakables == nil then
+        tweakables = describeTweakables(safeRead(function() return part end, nil))
+    end
+
+    return {
+        properties = describePartProperties(safeRead(function() return part.Properties end, nil)),
+        paint = describePartPaint(safeRead(function() return part.Paint end, nil)),
+        attachments = describePartAttachments(safeRead(function() return part.Attachments end, nil)),
+        bounds = boundsToTable(safeRead(function() return part.Bounds end, nil)),
+        resizable = resizable,
+        tweakables = tweakables,
+        behaviours = behaviours,
+        behaviourByName = behaviourByName,
+        linkNodes = linkNodes
+    }
+end
+
 local function describePart(part)
     local parentConstruction = safeRead(function() return part.ParentConstruction end, nil)
     local knownApiAttributes = cloneApiAttributes(runtimeApiIndex[apiIndexKeyForPart(part)])
     if #knownApiAttributes > 0 then
-        local behaviourRefs = collectRuntimeRefs(safeRead(function() return part.Behaviours end, nil), 128)
-        local linkNodeRefs = collectRuntimeRefs(safeRead(function() return part.LinkNodes end, nil), 128)
+        local details = describeBuildGuidePartDetails(part)
         return {
             id = safeRead(function() return part.ID end, nil),
             index = safeRead(function() return part.Idx end, nil),
@@ -1108,10 +1157,10 @@ local function describePart(part)
             unitVolume = safeRead(function() return part.UnitVolume end, 0),
             isPaintable = safeRead(function() return part.IsPaintable end, false),
             isMaterialSwappable = safeRead(function() return part.IsMaterialSwappable end, false),
-            properties = nil,
-            paint = nil,
-            attachments = nil,
-            bounds = nil,
+            properties = details.properties,
+            paint = details.paint,
+            attachments = details.attachments,
+            bounds = details.bounds,
             isVisible = safeRead(function() return part.IsVisible end, false),
             isSelectable = safeRead(function() return part.IsSelectable end, false),
             isDestroyable = safeRead(function() return part.IsDestroyable end, false),
@@ -1123,11 +1172,11 @@ local function describePart(part)
             localPosition = vectorToTable(safeRead(function() return part.LocalPosition end, nil)),
             localOrientation = quaternionToTable(safeRead(function() return part.LocalOrientation end, nil)),
             currentUnitSize = vectorToTable(safeRead(function() return part.CurrentUnitSize end, nil)),
-            resizable = nil,
-            tweakables = nil,
-            behaviours = behaviourRefs,
-            behaviourByName = {},
-            linkNodes = linkNodeRefs,
+            resizable = details.resizable,
+            tweakables = details.tweakables,
+            behaviours = details.behaviours,
+            behaviourByName = details.behaviourByName,
+            linkNodes = details.linkNodes,
             interfaceNames = interfaceNamesFromAttributes(knownApiAttributes),
             apiAttributes = knownApiAttributes,
             apiAttributeSource = "known-index"
@@ -1163,37 +1212,16 @@ local function describePart(part)
     addAttribute(attributes, "IPart", "Strength", function() return part.Strength end)
     addAttribute(attributes, "IPart", "UnitVolume", function() return part.UnitVolume end)
 
-    local behaviours = {}
-    local behaviourByName = {}
-    local behaviourInstances = safeRead(function() return part.Behaviours end, nil)
-    if behaviourInstances ~= nil then
-        for behaviour in behaviourInstances do
-            local describedBehaviour = describeBehaviour(behaviour)
-            table.insert(behaviours, describedBehaviour)
-            if describedBehaviour.name ~= nil and describedBehaviour.name ~= "" then
-                behaviourByName[describedBehaviour.name] = runtimeRef(safeRead(function() return part.GetBehaviour(describedBehaviour.name) end, nil))
-                table.insert(attributes, {
-                    interface = "IPart",
-                    name = "GetBehaviour(\"" .. tostring(describedBehaviour.name) .. "\")",
-                    valueType = "available",
-                    availability = "declared"
-                })
-            end
+    local details = describeBuildGuidePartDetails(part)
+    for _, describedBehaviour in ipairs(details.behaviours or {}) do
+        if describedBehaviour.name ~= nil and describedBehaviour.name ~= "" then
+            table.insert(attributes, {
+                interface = "IPart",
+                name = "GetBehaviour(\"" .. tostring(describedBehaviour.name) .. "\")",
+                valueType = "available",
+                availability = "declared"
+            })
         end
-    end
-
-    local linkNodes = {}
-    local linkNodeInstances = safeRead(function() return part.LinkNodes end, nil)
-    if linkNodeInstances ~= nil then
-        for linkNode in linkNodeInstances do
-            table.insert(linkNodes, describeLinkNode(linkNode))
-        end
-    end
-
-    local resizable = describeResizable(safeRead(function() return part end, nil))
-    local tweakables = describeTweakables(safeRead(function() return part.Tweakables end, nil))
-    if tweakables == nil then
-        tweakables = describeTweakables(safeRead(function() return part end, nil))
     end
 
     local describedPart = {
@@ -1214,10 +1242,10 @@ local function describePart(part)
         unitVolume = safeRead(function() return part.UnitVolume end, 0),
         isPaintable = safeRead(function() return part.IsPaintable end, false),
         isMaterialSwappable = safeRead(function() return part.IsMaterialSwappable end, false),
-        properties = describePartProperties(safeRead(function() return part.Properties end, nil)),
-        paint = describePartPaint(safeRead(function() return part.Paint end, nil)),
-        attachments = describePartAttachments(safeRead(function() return part.Attachments end, nil)),
-        bounds = boundsToTable(safeRead(function() return part.Bounds end, nil)),
+        properties = details.properties,
+        paint = details.paint,
+        attachments = details.attachments,
+        bounds = details.bounds,
         isVisible = safeRead(function() return part.IsVisible end, false),
         isSelectable = safeRead(function() return part.IsSelectable end, false),
         isDestroyable = safeRead(function() return part.IsDestroyable end, false),
@@ -1229,11 +1257,11 @@ local function describePart(part)
         localPosition = vectorToTable(safeRead(function() return part.LocalPosition end, nil)),
         localOrientation = quaternionToTable(safeRead(function() return part.LocalOrientation end, nil)),
         currentUnitSize = vectorToTable(safeRead(function() return part.CurrentUnitSize end, nil)),
-        resizable = resizable,
-        tweakables = tweakables,
-        behaviours = behaviours,
-        behaviourByName = behaviourByName,
-        linkNodes = linkNodes,
+        resizable = details.resizable,
+        tweakables = details.tweakables,
+        behaviours = details.behaviours,
+        behaviourByName = details.behaviourByName,
+        linkNodes = details.linkNodes,
         interfaceNames = interfaceNamesFromAttributes(attributes),
         apiAttributes = attributes,
         apiAttributeSource = "runtime-probe"
@@ -1276,80 +1304,6 @@ local function runtimePartInstanceKey(part)
     return "part:" .. tostring(part)
 end
 
-local function vectorSignature(value)
-    if value == nil then
-        return "nil"
-    end
-    return tostring(value.x or value.X or 0) .. "," .. tostring(value.y or value.Y or 0) .. "," .. tostring(value.z or value.Z or 0)
-end
-
-local function quaternionSignature(value)
-    if value == nil then
-        return "nil"
-    end
-    return tostring(value.x or value.X or 0) .. "," .. tostring(value.y or value.Y or 0) .. "," .. tostring(value.z or value.Z or 0) .. "," .. tostring(value.w or value.W or 0)
-end
-
-local function isSceneMonitorPart(part)
-    local parentConstruction = safeRead(function() return part.ParentConstruction end, nil)
-    if safeRead(function() return parentConstruction.IsPlayerCharacter end, false) then
-        return false
-    end
-    return true
-end
-
-local function partMonitorSignature(part)
-    local parentConstruction = safeRead(function() return part.ParentConstruction end, nil)
-    return table.concat({
-        tostring(safeRead(function() return parentConstruction.ID end, "")),
-        tostring(safeRead(function() return part.AssetGUID end, "")),
-        tostring(safeRead(function() return part.AssetName end, "")),
-        tostring(safeRead(function() return part.FullDisplayName end, "")),
-        vectorSignature(safeRead(function() return part.LocalPosition end, nil)),
-        quaternionSignature(safeRead(function() return part.LocalOrientation end, nil)),
-        vectorSignature(safeRead(function() return part.CurrentUnitSize end, nil))
-    }, "|")
-end
-
-local function describePartDelta(part)
-    local parentConstruction = safeRead(function() return part.ParentConstruction end, nil)
-    return {
-        key = runtimePartInstanceKey(part),
-        id = safeRead(function() return part.ID end, nil),
-        index = safeRead(function() return part.Idx end, nil),
-        parentConstructionId = safeRead(function() return parentConstruction.ID end, nil),
-        parentConstructionIsPlayerCharacter = safeRead(function() return parentConstruction.IsPlayerCharacter end, false),
-        parentConstructionIsAtomic = safeRead(function() return parentConstruction.IsAtomic end, false),
-        assetGuid = tostring(safeRead(function() return part.AssetGUID end, "")),
-        assetName = safeRead(function() return part.AssetName end, ""),
-        category = safeRead(function() return part.Category end, ""),
-        displayName = safeRead(function() return part.DisplayName end, ""),
-        fullDisplayName = safeRead(function() return part.FullDisplayName end, ""),
-        isDeprecated = safeRead(function() return part.IsDeprecated end, false),
-        isResizable = safeRead(function() return part.IsResizable end, false),
-        mass = safeRead(function() return part.Mass end, 0),
-        strength = safeRead(function() return part.Strength end, 0),
-        unitVolume = safeRead(function() return part.UnitVolume end, 0),
-        isPaintable = safeRead(function() return part.IsPaintable end, false),
-        isMaterialSwappable = safeRead(function() return part.IsMaterialSwappable end, false),
-        isVisible = safeRead(function() return part.IsVisible end, false),
-        isSelectable = safeRead(function() return part.IsSelectable end, false),
-        isDestroyable = safeRead(function() return part.IsDestroyable end, false),
-        isCollidable = safeRead(function() return part.IsCollidable end, false),
-        isEnabled = safeRead(function() return part.IsEnabled end, false),
-        stageIndex = safeRead(function() return part.StageIdx end, nil),
-        position = vectorToTable(safeRead(function() return part.Position end, nil)),
-        orientation = quaternionToTable(safeRead(function() return part.Orientation end, nil)),
-        localPosition = vectorToTable(safeRead(function() return part.LocalPosition end, nil)),
-        localOrientation = quaternionToTable(safeRead(function() return part.LocalOrientation end, nil)),
-        currentUnitSize = vectorToTable(safeRead(function() return part.CurrentUnitSize end, nil)),
-        behaviours = {},
-        linkNodes = {},
-        apiAttributes = {},
-        apiAttributeSource = "scene-delta"
-    }
-end
-
 local function describePartAlias(part, friendlyName)
     local parentConstruction = safeRead(function() return part.ParentConstruction end, nil)
     return {
@@ -1389,82 +1343,6 @@ local function emitPartAlias(part, friendlyName)
     local payload = describePartAlias(part, name)
     print("[OverlayForgePartAlias]" .. encodeJson(payload))
     setStatus("Saved friendly name '" .. name .. "' for " .. tostring(payload.fullDisplayName or payload.displayName or payload.assetName or "part") .. ".")
-end
-
-local function emitSceneDelta(added, updated, removed, totalParts)
-    if #added == 0 and #updated == 0 and #removed == 0 then
-        return
-    end
-    sceneDeltaSequence = sceneDeltaSequence + 1
-    local emittedAt = safeUtcDate("!%Y-%m-%dT%H:%M:%SZ")
-    print("[OverlayForgeSceneDelta]" .. encodeJson({
-        id = "scene_delta_" .. safeUtcDate("!%Y%m%d_%H%M%S") .. "_" .. tostring(sceneDeltaSequence),
-        emittedAt = emittedAt,
-        exporter = "OverlayForgeConstructionExporter",
-        exportKind = "sceneDelta",
-        totalParts = totalParts,
-        added = added,
-        updated = updated,
-        removed = removed
-    }))
-end
-
-local function monitorSceneDeltas(forcePrime)
-    if Parts == nil then
-        return
-    end
-    local now = 0
-    if os ~= nil and os.clock ~= nil then
-        now = os.clock()
-    end
-    if not forcePrime and sceneMonitorPrimed and now - lastSceneMonitorClock < SCENE_DELTA_INTERVAL_SECONDS then
-        return
-    end
-    lastSceneMonitorClock = now
-
-    local partInstances = safeRead(function() return Parts.Instances end, nil)
-    if partInstances == nil then
-        return
-    end
-
-    local nextSnapshot = {}
-    local added = {}
-    local updated = {}
-    local totalParts = 0
-    for part in partInstances do
-        if isSceneMonitorPart(part) then
-            totalParts = totalParts + 1
-            local key = runtimePartInstanceKey(part)
-            local signature = partMonitorSignature(part)
-            nextSnapshot[key] = signature
-            if sceneMonitorPrimed then
-                if sceneMonitorSnapshot[key] == nil then
-                    if #added < SCENE_DELTA_MAX_PARTS then
-                        table.insert(added, describePartDelta(part))
-                    end
-                elseif sceneMonitorSnapshot[key] ~= signature then
-                    if #updated < SCENE_DELTA_MAX_PARTS then
-                        table.insert(updated, describePartDelta(part))
-                    end
-                end
-            end
-        end
-    end
-
-    local removed = {}
-    if sceneMonitorPrimed then
-        for key, _ in pairs(sceneMonitorSnapshot) do
-            if nextSnapshot[key] == nil and #removed < SCENE_DELTA_MAX_PARTS then
-                table.insert(removed, { key = key })
-            end
-        end
-    end
-
-    sceneMonitorSnapshot = nextSnapshot
-    if sceneMonitorPrimed then
-        emitSceneDelta(added, updated, removed, totalParts)
-    end
-    sceneMonitorPrimed = true
 end
 
 local function describeConstructionAttributes(construction, parts)
@@ -1699,11 +1577,7 @@ local function exportAllSceneParts()
         return true
     end
 
-    local exported = exportPayload(describeSceneParts(parts), "scene_parts")
-    if exported then
-        monitorSceneDeltas(true)
-    end
-    return exported
+    return exportPayload(describeSceneParts(parts), "scene_parts")
 end
 
 local function exportAllConstructions()
@@ -1981,8 +1855,6 @@ showSection("home")
 setStatus("Overlay Forge loaded. Output: " .. EXPORT_DIR)
 
 function Update()
-    monitorSceneDeltas(false)
-
     local localPlayer = LocalPlayer.Value
     if localPlayer then
         partSelection = localPlayer.Toolbox.PartSelection

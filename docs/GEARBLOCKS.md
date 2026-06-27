@@ -39,7 +39,7 @@ OverlayForgePlugin
 
 When preparing GearBlocks reasoning context, prefer sources in this order:
 
-1. Latest imported runtime scene export or scene-delta snapshot.
+1. Latest imported runtime scene export.
 2. Latest decoded saved construction file.
 3. Runtime part index and part notes.
 4. Validated GearBlocks parts catalog vocabulary.
@@ -58,6 +58,14 @@ Use centimeters and/or GearBlocks units for spacing, dimensions, alignment, move
 
 Scale exceptions: the player character, wheels, and some other parts are slightly oversized for gameplay clearance. Treat those parts as gameplay-clearance exceptions rather than strict real-world scale references.
 
+User-tested player character reference:
+
+```text
+player character height = 20 GearBlocks units = 20 blocks = 200 cm
+```
+
+Use this player-character height when sizing cabins, seats, roll cages, cockpit clearance, doors, standing clearance, ladders, steps, and human-scale build features.
+
 ## Saved Construction Context
 
 GearBlocks saved construction folders contain `construction.bytes` files. Overlay Forge decodes those files as raw DEFLATE-compressed BSON and stores compact summaries plus decoded JSON in SQLite.
@@ -72,13 +80,18 @@ Runtime scene context comes from the Overlay Forge GearBlocks script mod. The sc
 
 Overlay Forge imports those log chunks into SQLite and derives a semantic construction understanding model from the latest indexed export.
 
+Runtime imports normalize successful exports into reusable definition and latest-scene instance rows. Raw full-scene export JSON is treated as a transient ingest artifact and is not retained in SQLite after a successful import.
+
+GearBlocks chat reads the current scene through a backend scene-context service that queries normalized SQLite rows instead of depending on raw export payloads. The service exposes compact scene facts, part references, aliases, coordinates, construction groups, and observed metadata/settings/output details for prompt context.
+
 The intended iterative workflow:
 
 1. Load the current build in GearBlocks.
 2. Run a full scene export once.
 3. Keep the Overlay Forge script loaded while building.
-4. Let scene-delta records capture additions, moves, resizes, and removals when available.
-5. Import new log additions before prompt assembly.
+4. Use normal GearBlocks chat Send / Enter for fast responses against the latest normalized SQLite scene context.
+5. Use the chat `D↑` action when you want to include the latest already-computed scene diff in the prompt.
+6. Use manual scene refresh when you want Overlay Forge to request a fresh full scene export, import it, and compute a new latest-vs-previous scene diff.
 
 Normal chat navigation must not synchronously parse full-scene runtime logs.
 
@@ -122,6 +135,8 @@ The derived model should include:
 - Aggregated structural frame and connector inventories.
 - Functional systems classified as suspension, steering, drivetrain, engine, brakes/clutches, wheels/tires, controls/data, bodywork, or unknown.
 - Functional parts with inferred purpose, behaviours, link-node counts, local position, world position, and current unit size where available.
+- Build-guide-relevant API details from the latest full runtime export, including paint target colour, material, attachment type names, attachment lock/joint/interior flags, link-node types, tweakable values, control state, resize settings, and engine crank/cylinder/head relationships.
+- Parent construction groups for disambiguating repeated part IDs and repeated identical parts that are attached into the same GearBlocks construction.
 - First-class world and local coordinate columns for runtime-indexed parts.
 - Coarse local chassis envelope bounds.
 - Compact latest-vs-previous runtime scene diff where available.
@@ -147,6 +162,8 @@ Runtime API imports remain the source of truth for the user's current scene and 
 The GearBlocks API screen can import the official Doxygen documentation from `https://www.gearblocksgame.com/apidoc/` into SQLite.
 
 This index is for documented metadata only: type names, members, parameters, enum values, source URLs, and summaries. Overlay Forge must not execute documented API getters or mutating methods from this import unless a future explicit user-controlled runtime action is added.
+
+Build guide chat context uses the documented API shape to explain which exported runtime surfaces matter for building: `IPart`, `IPartPaint`, `IPartProperties`, `IPartAttachments`, `IAttachment`, `ILinkNode`, `ILink`, `ITweakables`, `IResizable`, `IControllablePartBehaviour`, and combustion-engine interfaces. Actual current values still come from the latest full runtime export.
 
 ## External Dependency Boundary
 

@@ -251,6 +251,25 @@ pub struct GameRecord {
 }
 
 #[derive(Clone, Serialize)]
+pub struct GameSettingRecord {
+    pub id: i64,
+    #[serde(rename = "gameId")]
+    pub game_id: i64,
+    #[serde(rename = "idGame")]
+    pub id_game: i64,
+    #[serde(rename = "settingKey")]
+    pub setting_key: String,
+    #[serde(rename = "settingValueJson")]
+    pub setting_value_json: String,
+    #[serde(rename = "schemaJson")]
+    pub schema_json: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "modifiedAt")]
+    pub modified_at: String,
+}
+
+#[derive(Clone, Serialize)]
 pub struct GameDataLocationRecord {
     pub id: i64,
     #[serde(rename = "gameId")]
@@ -344,6 +363,64 @@ pub struct GameRuntimePartRecord {
     pub updated_at: String,
 }
 
+pub struct GameRuntimePartInstanceDraft {
+    pub part_key: String,
+    pub asset_guid: String,
+    pub asset_name: String,
+    pub display_name: String,
+    pub full_display_name: String,
+    pub category: String,
+    pub source_export_id: String,
+    pub source_construction_id: String,
+    pub part_instance_key: String,
+    pub runtime_part_id: i64,
+    pub runtime_part_index: i64,
+    pub mass: f64,
+    pub world_position: Option<(f64, f64, f64)>,
+    pub local_position: Option<(f64, f64, f64)>,
+    pub world_position_json: String,
+    pub local_position_json: String,
+    pub current_unit_size_json: String,
+    pub link_node_count: i64,
+    pub behaviour_names_json: String,
+    pub dynamic_summary_json: String,
+    pub last_seen_at: String,
+}
+
+#[derive(Clone)]
+pub struct GameRuntimePartInstanceRecord {
+    pub id: i64,
+    pub game_id: i64,
+    pub part_definition_id: i64,
+    pub part_key: String,
+    pub asset_guid: String,
+    pub asset_name: String,
+    pub display_name: String,
+    pub full_display_name: String,
+    pub category: String,
+    pub source_export_id: String,
+    pub source_construction_id: String,
+    pub part_instance_key: String,
+    pub runtime_part_id: i64,
+    pub runtime_part_index: i64,
+    pub mass: f64,
+    pub world_x: Option<f64>,
+    pub world_y: Option<f64>,
+    pub world_z: Option<f64>,
+    pub local_x: Option<f64>,
+    pub local_y: Option<f64>,
+    pub local_z: Option<f64>,
+    pub world_position_json: String,
+    pub local_position_json: String,
+    pub current_unit_size_json: String,
+    pub link_node_count: i64,
+    pub behaviour_names_json: String,
+    pub dynamic_summary_json: String,
+    pub last_seen_at: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 #[derive(Clone, Serialize)]
 pub struct GameRuntimePartAliasRecord {
     pub id: i64,
@@ -380,6 +457,56 @@ pub struct GameRuntimePartAliasRecord {
     pub created_at: String,
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
+}
+
+#[derive(Clone)]
+pub struct GameRuntimePartMetadataValueRecord {
+    pub part_key: String,
+    pub source_area: String,
+    pub field_path: String,
+    pub value_type: String,
+    pub value_json: String,
+    pub source_export_id: String,
+    pub source_construction_id: String,
+    pub last_seen_at: String,
+}
+
+#[derive(Clone)]
+pub struct GameRuntimePartAttachmentTypeRecord {
+    pub part_key: String,
+    pub attachment_path: String,
+    pub type_name: String,
+    pub value_type: String,
+    pub attachment_json: String,
+    pub source_export_id: String,
+    pub source_construction_id: String,
+    pub last_seen_at: String,
+}
+
+#[derive(Clone)]
+pub struct GameRuntimePartSettingValueRecord {
+    pub part_key: String,
+    pub setting_key: String,
+    pub label: String,
+    pub setting_area: String,
+    pub value_type: String,
+    pub value_json: String,
+    pub source_export_id: String,
+    pub source_construction_id: String,
+    pub last_seen_at: String,
+}
+
+#[derive(Clone)]
+pub struct GameRuntimePartOutputChannelValueRecord {
+    pub part_key: String,
+    pub channel_key: String,
+    pub label: String,
+    pub channel_area: String,
+    pub value_type: String,
+    pub value_json: String,
+    pub source_export_id: String,
+    pub source_construction_id: String,
+    pub last_seen_at: String,
 }
 
 #[derive(Clone, Serialize)]
@@ -1166,6 +1293,50 @@ impl AppDatabase {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS def_gearblocks_part (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                part_key TEXT NOT NULL UNIQUE,
+                asset_guid TEXT NOT NULL DEFAULT '',
+                asset_name TEXT NOT NULL DEFAULT '',
+                display_name TEXT NOT NULL DEFAULT '',
+                full_display_name TEXT NOT NULL DEFAULT '',
+                category TEXT NOT NULL DEFAULT '',
+                first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_game_runtime_part_instance (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                part_definition_id INTEGER NOT NULL,
+                source_export_id TEXT NOT NULL DEFAULT '',
+                source_construction_id TEXT NOT NULL DEFAULT '',
+                part_instance_key TEXT NOT NULL DEFAULT '',
+                runtime_part_id INTEGER NOT NULL DEFAULT 0,
+                runtime_part_index INTEGER NOT NULL DEFAULT 0,
+                mass REAL NOT NULL DEFAULT 0,
+                world_x REAL,
+                world_y REAL,
+                world_z REAL,
+                local_x REAL,
+                local_y REAL,
+                local_z REAL,
+                world_position_json TEXT NOT NULL DEFAULT '{}',
+                local_position_json TEXT NOT NULL DEFAULT '{}',
+                current_unit_size_json TEXT NOT NULL DEFAULT '{}',
+                link_node_count INTEGER NOT NULL DEFAULT 0,
+                behaviour_names_json TEXT NOT NULL DEFAULT '[]',
+                dynamic_summary_json TEXT NOT NULL DEFAULT '{}',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (game_id) REFERENCES obj_game(id) ON DELETE CASCADE,
+                FOREIGN KEY (part_definition_id) REFERENCES def_gearblocks_part(id) ON DELETE RESTRICT,
+                UNIQUE(game_id, part_instance_key)
+            );
+
             CREATE TABLE IF NOT EXISTS obj_game_runtime_part_alias (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
@@ -1266,6 +1437,125 @@ impl AppDatabase {
                 last_seen_at TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS def_gearblocks_part_metadata_item (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_area TEXT NOT NULL DEFAULT '',
+                field_path TEXT NOT NULL DEFAULT '',
+                value_type TEXT NOT NULL DEFAULT '',
+                first_seen_at TEXT NOT NULL DEFAULT '',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(source_area, field_path)
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_game_runtime_part_metadata_value (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                part_key TEXT NOT NULL,
+                metadata_item_id INTEGER NOT NULL,
+                value_type TEXT NOT NULL DEFAULT '',
+                value_json TEXT NOT NULL DEFAULT 'null',
+                source_export_id TEXT NOT NULL DEFAULT '',
+                source_construction_id TEXT NOT NULL DEFAULT '',
+                first_seen_at TEXT NOT NULL DEFAULT '',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (game_id) REFERENCES obj_game(id) ON DELETE CASCADE,
+                FOREIGN KEY (metadata_item_id) REFERENCES def_gearblocks_part_metadata_item(id) ON DELETE RESTRICT,
+                UNIQUE(game_id, part_key, metadata_item_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS def_gearblocks_attachment_type (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                attachment_path TEXT NOT NULL DEFAULT '',
+                type_name TEXT NOT NULL DEFAULT '',
+                value_type TEXT NOT NULL DEFAULT '',
+                first_seen_at TEXT NOT NULL DEFAULT '',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(attachment_path, type_name)
+            );
+
+            CREATE TABLE IF NOT EXISTS n2n_game_runtime_part_attachment_type (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                part_key TEXT NOT NULL,
+                attachment_type_id INTEGER NOT NULL,
+                attachment_json TEXT NOT NULL DEFAULT 'null',
+                source_export_id TEXT NOT NULL DEFAULT '',
+                source_construction_id TEXT NOT NULL DEFAULT '',
+                first_seen_at TEXT NOT NULL DEFAULT '',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (game_id) REFERENCES obj_game(id) ON DELETE CASCADE,
+                FOREIGN KEY (attachment_type_id) REFERENCES def_gearblocks_attachment_type(id) ON DELETE RESTRICT,
+                UNIQUE(game_id, part_key, attachment_type_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS def_gearblocks_part_setting (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                setting_key TEXT NOT NULL UNIQUE,
+                label TEXT NOT NULL DEFAULT '',
+                setting_area TEXT NOT NULL DEFAULT '',
+                value_type TEXT NOT NULL DEFAULT '',
+                first_seen_at TEXT NOT NULL DEFAULT '',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_game_runtime_part_setting_value (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                part_key TEXT NOT NULL,
+                setting_id INTEGER NOT NULL,
+                value_type TEXT NOT NULL DEFAULT '',
+                value_json TEXT NOT NULL DEFAULT 'null',
+                source_export_id TEXT NOT NULL DEFAULT '',
+                source_construction_id TEXT NOT NULL DEFAULT '',
+                first_seen_at TEXT NOT NULL DEFAULT '',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (game_id) REFERENCES obj_game(id) ON DELETE CASCADE,
+                FOREIGN KEY (setting_id) REFERENCES def_gearblocks_part_setting(id) ON DELETE RESTRICT,
+                UNIQUE(game_id, part_key, setting_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS def_gearblocks_part_output_channel (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                channel_key TEXT NOT NULL UNIQUE,
+                label TEXT NOT NULL DEFAULT '',
+                channel_area TEXT NOT NULL DEFAULT '',
+                value_type TEXT NOT NULL DEFAULT '',
+                first_seen_at TEXT NOT NULL DEFAULT '',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_game_runtime_part_output_channel_value (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                part_key TEXT NOT NULL,
+                output_channel_id INTEGER NOT NULL,
+                value_type TEXT NOT NULL DEFAULT '',
+                value_json TEXT NOT NULL DEFAULT 'null',
+                source_export_id TEXT NOT NULL DEFAULT '',
+                source_construction_id TEXT NOT NULL DEFAULT '',
+                first_seen_at TEXT NOT NULL DEFAULT '',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (game_id) REFERENCES obj_game(id) ON DELETE CASCADE,
+                FOREIGN KEY (output_channel_id) REFERENCES def_gearblocks_part_output_channel(id) ON DELETE RESTRICT,
+                UNIQUE(game_id, part_key, output_channel_id)
             );
 
             CREATE TABLE IF NOT EXISTS def_gearblocks_api_type (
@@ -1472,6 +1762,12 @@ impl AppDatabase {
                 ON obj_game_build_guide_step (guide_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_parts_game_id
                 ON obj_game_runtime_part (game_id);
+            CREATE INDEX IF NOT EXISTS idx_gearblocks_parts_part_key
+                ON def_gearblocks_part (part_key);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_part_instances_game_export
+                ON obj_game_runtime_part_instance (game_id, source_export_id);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_part_instances_definition
+                ON obj_game_runtime_part_instance (part_definition_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_part_aliases_game_id
                 ON obj_game_runtime_part_alias (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_part_api_attributes_game_id
@@ -1490,6 +1786,22 @@ impl AppDatabase {
                 ON obj_game_runtime_part_attachment (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_part_attachments_attachment_path
                 ON obj_game_runtime_part_attachment (game_id, attachment_path);
+            CREATE INDEX IF NOT EXISTS idx_gearblocks_part_metadata_items_path
+                ON def_gearblocks_part_metadata_item (source_area, field_path);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_part_metadata_values_game_id
+                ON obj_game_runtime_part_metadata_value (game_id);
+            CREATE INDEX IF NOT EXISTS idx_gearblocks_attachment_types_path
+                ON def_gearblocks_attachment_type (attachment_path, type_name);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_part_attachment_types_game_id
+                ON n2n_game_runtime_part_attachment_type (game_id);
+            CREATE INDEX IF NOT EXISTS idx_gearblocks_part_settings_key
+                ON def_gearblocks_part_setting (setting_key);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_part_setting_values_game_id
+                ON obj_game_runtime_part_setting_value (game_id);
+            CREATE INDEX IF NOT EXISTS idx_gearblocks_part_output_channels_key
+                ON def_gearblocks_part_output_channel (channel_key);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_part_output_channel_values_game_id
+                ON obj_game_runtime_part_output_channel_value (game_id);
             CREATE INDEX IF NOT EXISTS idx_gearblocks_api_types_namespace
                 ON def_gearblocks_api_type (namespace, type_name);
             CREATE INDEX IF NOT EXISTS idx_gearblocks_api_members_type_id
@@ -1693,6 +2005,45 @@ impl AppDatabase {
             "
             CREATE UNIQUE INDEX IF NOT EXISTS idx_obj_game_setting_game_key_unique
                 ON obj_game_setting (game_id, setting_key)
+            ",
+            [],
+        )?;
+        connection.execute(
+            "
+            INSERT INTO obj_game_setting (
+                game_id,
+                id_game,
+                setting_key,
+                setting_value_json,
+                schema_json
+            )
+            SELECT
+                id,
+                id_game,
+                'current_build',
+                '{
+                    \"title\": \"0.5 Ice Shot Deadeye Leveling Guide\",
+                    \"source\": \"Mobalytics\",
+                    \"sourceUrl\": \"https://mobalytics.gg/poe-2/builds/ice-shot-deadeye-leveling-guide#739a0a0f-6bd0-4807-8096-eee5ae1617ec-passive-tree-0\",
+                    \"characterClass\": \"Ranger\",
+                    \"ascendancy\": \"Deadeye\",
+                    \"creator\": \"Fubgun\",
+                    \"buildRole\": \"Speed Leveling\",
+                    \"patch\": \"0.5 RotA\",
+                    \"status\": \"currently_playing\",
+                    \"updatedOn\": \"2026-06-06\",
+                    \"summary\": \"Ice Shot Deadeye leveling build. Starts with Lightning Arrow and Lightning Rod because Ice Shot unlocks at level 31, then transitions toward the Ice Shot Deadeye endgame guide after campaign.\",
+                    \"tags\": [\"Starter\", \"Leveling\", \"Bow\", \"Ice Shot\", \"Lightning Arrow\", \"Lightning Rod\"],
+                    \"activeVariant\": \"passive-tree-0\"
+                }',
+                '{\"fields\":{\"title\":\"visible build title\",\"source\":\"build source site\",\"sourceUrl\":\"canonical external build URL\",\"characterClass\":\"base class\",\"ascendancy\":\"ascendancy\",\"creator\":\"guide creator\",\"buildRole\":\"guide role or archetype\",\"patch\":\"guide patch/league label\",\"status\":\"current play status\",\"updatedOn\":\"source update date\",\"summary\":\"short source-grounded summary\",\"tags\":\"string labels\",\"activeVariant\":\"selected source variant anchor\"}}'
+            FROM obj_game
+            WHERE slug = 'path-of-exile-2'
+            ON CONFLICT(game_id, setting_key) DO UPDATE SET
+                id_game = excluded.id_game,
+                setting_value_json = excluded.setting_value_json,
+                schema_json = excluded.schema_json,
+                modified_at = CURRENT_TIMESTAMP
             ",
             [],
         )?;
@@ -2053,6 +2404,14 @@ impl AppDatabase {
             ("obj_game_runtime_part_value", "id"),
             ("obj_game_runtime_part_property", "id"),
             ("obj_game_runtime_part_attachment", "id"),
+            ("def_gearblocks_part_metadata_item", "id"),
+            ("obj_game_runtime_part_metadata_value", "id"),
+            ("def_gearblocks_attachment_type", "id"),
+            ("n2n_game_runtime_part_attachment_type", "id"),
+            ("def_gearblocks_part_setting", "id"),
+            ("obj_game_runtime_part_setting_value", "id"),
+            ("def_gearblocks_part_output_channel", "id"),
+            ("obj_game_runtime_part_output_channel_value", "id"),
             ("def_gearblocks_api_type", "id"),
             ("def_gearblocks_api_member", "id"),
             ("def_gearblocks_api_parameter", "id"),
@@ -2104,7 +2463,20 @@ impl AppDatabase {
         Ok(())
     }
 
-    fn normalized_schema_tables() -> [&'static str; 43] {
+    fn clear_runtime_export_raw_documents(connection: &Connection, game_id: i64) -> Result<()> {
+        connection.execute(
+            "
+            UPDATE obj_game_runtime_construction_export
+            SET document_json = '{}'
+            WHERE game_id = ?1
+                AND document_json <> '{}'
+            ",
+            params![game_id],
+        )?;
+        Ok(())
+    }
+
+    fn normalized_schema_tables() -> [&'static str; 53] {
         [
             "obj_scratchpad",
             "obj_setting",
@@ -2131,12 +2503,22 @@ impl AppDatabase {
             "obj_game_catalog_reference",
             "obj_game_data_location",
             "obj_game_catalog_screenshot",
+            "def_gearblocks_part",
             "obj_game_runtime_part",
+            "obj_game_runtime_part_instance",
             "obj_game_runtime_part_alias",
             "obj_game_runtime_part_api_attribute",
             "obj_game_runtime_part_value",
             "obj_game_runtime_part_property",
             "obj_game_runtime_part_attachment",
+            "def_gearblocks_part_metadata_item",
+            "obj_game_runtime_part_metadata_value",
+            "def_gearblocks_attachment_type",
+            "n2n_game_runtime_part_attachment_type",
+            "def_gearblocks_part_setting",
+            "obj_game_runtime_part_setting_value",
+            "def_gearblocks_part_output_channel",
+            "obj_game_runtime_part_output_channel_value",
             "def_gearblocks_api_type",
             "def_gearblocks_api_member",
             "def_gearblocks_api_parameter",
@@ -3758,6 +4140,28 @@ impl AppDatabase {
         Self::get_game_by_id(&connection, id)
     }
 
+    pub fn get_game_setting(
+        &self,
+        game_id: i64,
+        setting_key: &str,
+    ) -> Result<Option<GameSettingRecord>> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        connection
+            .query_row(
+                "
+                SELECT id, game_id, id_game, setting_key, setting_value_json, schema_json,
+                    created_at, modified_at
+                FROM obj_game_setting
+                WHERE game_id = ?1 AND setting_key = ?2
+                LIMIT 1
+                ",
+                params![game_id, setting_key.trim()],
+                game_setting_from_row,
+            )
+            .optional()
+    }
+
     pub fn create_game(&self, name: &str, summary: &str) -> Result<GameRecord> {
         let connection = self.connection()?;
         let trimmed_name = name.trim();
@@ -3791,6 +4195,10 @@ impl AppDatabase {
         )?;
         connection.execute(
             "DELETE FROM obj_game_catalog_screenshot WHERE game_id = ?1",
+            params![id],
+        )?;
+        connection.execute(
+            "DELETE FROM obj_game_setting WHERE game_id = ?1",
             params![id],
         )?;
         connection.execute(
@@ -4020,6 +4428,146 @@ impl AppDatabase {
         Ok(parts)
     }
 
+    pub fn list_game_runtime_part_instances(
+        &self,
+        game_id: i64,
+    ) -> Result<Vec<GameRuntimePartInstanceRecord>> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                instances.id,
+                instances.game_id,
+                instances.part_definition_id,
+                parts.part_key,
+                parts.asset_guid,
+                parts.asset_name,
+                parts.display_name,
+                parts.full_display_name,
+                parts.category,
+                instances.source_export_id,
+                instances.source_construction_id,
+                instances.part_instance_key,
+                instances.runtime_part_id,
+                instances.runtime_part_index,
+                instances.mass,
+                instances.world_x,
+                instances.world_y,
+                instances.world_z,
+                instances.local_x,
+                instances.local_y,
+                instances.local_z,
+                instances.world_position_json,
+                instances.local_position_json,
+                instances.current_unit_size_json,
+                instances.link_node_count,
+                instances.behaviour_names_json,
+                instances.dynamic_summary_json,
+                instances.last_seen_at,
+                instances.created_at,
+                instances.updated_at
+            FROM obj_game_runtime_part_instance instances
+            INNER JOIN def_gearblocks_part parts
+                ON parts.id = instances.part_definition_id
+            WHERE instances.game_id = ?1
+            ORDER BY instances.runtime_part_index ASC, instances.runtime_part_id ASC, parts.display_name COLLATE NOCASE ASC
+            ",
+        )?;
+
+        let parts = statement
+            .query_map(params![game_id], game_runtime_part_instance_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(parts)
+    }
+
+    pub fn replace_game_runtime_part_instances(
+        &self,
+        game_id: i64,
+        parts: &[GameRuntimePartInstanceDraft],
+    ) -> Result<()> {
+        let mut connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        let transaction = connection.transaction()?;
+        transaction.execute(
+            "DELETE FROM obj_game_runtime_part_instance WHERE game_id = ?1",
+            params![game_id],
+        )?;
+
+        for part in parts {
+            let part_definition_id = Self::upsert_gearblocks_part_definition(&transaction, part)?;
+            let (world_x, world_y, world_z) = part
+                .world_position
+                .map(|(x, y, z)| (Some(x), Some(y), Some(z)))
+                .unwrap_or((None, None, None));
+            let (local_x, local_y, local_z) = part
+                .local_position
+                .map(|(x, y, z)| (Some(x), Some(y), Some(z)))
+                .unwrap_or((None, None, None));
+
+            transaction.execute(
+                "
+                INSERT INTO obj_game_runtime_part_instance (
+                    game_id,
+                    part_definition_id,
+                    source_export_id,
+                    source_construction_id,
+                    part_instance_key,
+                    runtime_part_id,
+                    runtime_part_index,
+                    mass,
+                    world_x,
+                    world_y,
+                    world_z,
+                    local_x,
+                    local_y,
+                    local_z,
+                    world_position_json,
+                    local_position_json,
+                    current_unit_size_json,
+                    link_node_count,
+                    behaviour_names_json,
+                    dynamic_summary_json,
+                    last_seen_at
+                )
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)
+                ",
+                params![
+                    game_id,
+                    part_definition_id,
+                    part.source_export_id.trim(),
+                    part.source_construction_id.trim(),
+                    part.part_instance_key.trim(),
+                    part.runtime_part_id,
+                    part.runtime_part_index,
+                    part.mass,
+                    world_x,
+                    world_y,
+                    world_z,
+                    local_x,
+                    local_y,
+                    local_z,
+                    part.world_position_json.trim(),
+                    part.local_position_json.trim(),
+                    part.current_unit_size_json.trim(),
+                    part.link_node_count,
+                    part.behaviour_names_json.trim(),
+                    part.dynamic_summary_json.trim(),
+                    part.last_seen_at.trim()
+                ],
+            )?;
+        }
+
+        transaction.commit()
+    }
+
+    pub fn clear_game_runtime_export_documents(&self, game_id: i64) -> Result<()> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        Self::clear_runtime_export_raw_documents(&connection, game_id)
+    }
+
     pub fn list_game_runtime_part_aliases(
         &self,
         game_id: i64,
@@ -4058,6 +4606,143 @@ impl AppDatabase {
             .collect::<Result<Vec<_>>>()?;
 
         Ok(aliases)
+    }
+
+    pub fn list_game_runtime_part_metadata_values(
+        &self,
+        game_id: i64,
+    ) -> Result<Vec<GameRuntimePartMetadataValueRecord>> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                values_rows.part_key,
+                definitions.source_area,
+                definitions.field_path,
+                values_rows.value_type,
+                values_rows.value_json,
+                values_rows.source_export_id,
+                values_rows.source_construction_id,
+                values_rows.last_seen_at
+            FROM obj_game_runtime_part_metadata_value values_rows
+            INNER JOIN def_gearblocks_part_metadata_item definitions
+                ON definitions.id = values_rows.metadata_item_id
+            WHERE values_rows.game_id = ?1
+            ORDER BY
+                values_rows.part_key COLLATE NOCASE ASC,
+                definitions.source_area COLLATE NOCASE ASC,
+                definitions.field_path COLLATE NOCASE ASC
+            ",
+        )?;
+        let values = statement
+            .query_map(params![game_id], game_runtime_part_metadata_value_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(values)
+    }
+
+    pub fn list_game_runtime_part_attachment_types(
+        &self,
+        game_id: i64,
+    ) -> Result<Vec<GameRuntimePartAttachmentTypeRecord>> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                mapping.part_key,
+                definitions.attachment_path,
+                definitions.type_name,
+                definitions.value_type,
+                mapping.attachment_json,
+                mapping.source_export_id,
+                mapping.source_construction_id,
+                mapping.last_seen_at
+            FROM n2n_game_runtime_part_attachment_type mapping
+            INNER JOIN def_gearblocks_attachment_type definitions
+                ON definitions.id = mapping.attachment_type_id
+            WHERE mapping.game_id = ?1
+            ORDER BY
+                mapping.part_key COLLATE NOCASE ASC,
+                definitions.attachment_path COLLATE NOCASE ASC,
+                definitions.type_name COLLATE NOCASE ASC
+            ",
+        )?;
+        let values = statement
+            .query_map(params![game_id], game_runtime_part_attachment_type_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(values)
+    }
+
+    pub fn list_game_runtime_part_setting_values(
+        &self,
+        game_id: i64,
+    ) -> Result<Vec<GameRuntimePartSettingValueRecord>> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                values_rows.part_key,
+                definitions.setting_key,
+                definitions.label,
+                definitions.setting_area,
+                values_rows.value_type,
+                values_rows.value_json,
+                values_rows.source_export_id,
+                values_rows.source_construction_id,
+                values_rows.last_seen_at
+            FROM obj_game_runtime_part_setting_value values_rows
+            INNER JOIN def_gearblocks_part_setting definitions
+                ON definitions.id = values_rows.setting_id
+            WHERE values_rows.game_id = ?1
+            ORDER BY
+                values_rows.part_key COLLATE NOCASE ASC,
+                definitions.setting_area COLLATE NOCASE ASC,
+                definitions.setting_key COLLATE NOCASE ASC
+            ",
+        )?;
+        let values = statement
+            .query_map(params![game_id], game_runtime_part_setting_value_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(values)
+    }
+
+    pub fn list_game_runtime_part_output_channel_values(
+        &self,
+        game_id: i64,
+    ) -> Result<Vec<GameRuntimePartOutputChannelValueRecord>> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                values_rows.part_key,
+                definitions.channel_key,
+                definitions.label,
+                definitions.channel_area,
+                values_rows.value_type,
+                values_rows.value_json,
+                values_rows.source_export_id,
+                values_rows.source_construction_id,
+                values_rows.last_seen_at
+            FROM obj_game_runtime_part_output_channel_value values_rows
+            INNER JOIN def_gearblocks_part_output_channel definitions
+                ON definitions.id = values_rows.output_channel_id
+            WHERE values_rows.game_id = ?1
+            ORDER BY
+                values_rows.part_key COLLATE NOCASE ASC,
+                definitions.channel_area COLLATE NOCASE ASC,
+                definitions.channel_key COLLATE NOCASE ASC
+            ",
+        )?;
+        let values = statement
+            .query_map(
+                params![game_id],
+                game_runtime_part_output_channel_value_from_row,
+            )?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(values)
     }
 
     pub fn count_game_runtime_parts(&self, game_id: i64) -> Result<usize> {
@@ -5191,6 +5876,235 @@ impl AppDatabase {
             ],
         )?;
 
+        Ok(())
+    }
+
+    pub fn upsert_game_runtime_part_metadata_value(
+        &self,
+        game_id: i64,
+        part_key: &str,
+        source_area: &str,
+        field_path: &str,
+        value_type: &str,
+        value_json: &str,
+        source_export_id: &str,
+        source_construction_id: &str,
+        seen_at: &str,
+    ) -> Result<()> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        let metadata_item_id = Self::upsert_gearblocks_metadata_item(
+            &connection,
+            source_area,
+            field_path,
+            value_type,
+            seen_at,
+        )?;
+        connection.execute(
+            "
+            INSERT INTO obj_game_runtime_part_metadata_value (
+                game_id,
+                part_key,
+                metadata_item_id,
+                value_type,
+                value_json,
+                source_export_id,
+                source_construction_id,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)
+            ON CONFLICT(game_id, part_key, metadata_item_id) DO UPDATE SET
+                value_type = excluded.value_type,
+                value_json = excluded.value_json,
+                source_export_id = excluded.source_export_id,
+                source_construction_id = excluded.source_construction_id,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                game_id,
+                part_key.trim(),
+                metadata_item_id,
+                value_type.trim(),
+                value_json,
+                source_export_id.trim(),
+                source_construction_id.trim(),
+                seen_at.trim(),
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn upsert_game_runtime_part_attachment_type(
+        &self,
+        game_id: i64,
+        part_key: &str,
+        attachment_path: &str,
+        type_name: &str,
+        value_type: &str,
+        attachment_json: &str,
+        source_export_id: &str,
+        source_construction_id: &str,
+        seen_at: &str,
+    ) -> Result<()> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        let attachment_type_id = Self::upsert_gearblocks_attachment_type(
+            &connection,
+            attachment_path,
+            type_name,
+            value_type,
+            seen_at,
+        )?;
+        connection.execute(
+            "
+            INSERT INTO n2n_game_runtime_part_attachment_type (
+                game_id,
+                part_key,
+                attachment_type_id,
+                attachment_json,
+                source_export_id,
+                source_construction_id,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)
+            ON CONFLICT(game_id, part_key, attachment_type_id) DO UPDATE SET
+                attachment_json = excluded.attachment_json,
+                source_export_id = excluded.source_export_id,
+                source_construction_id = excluded.source_construction_id,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                game_id,
+                part_key.trim(),
+                attachment_type_id,
+                attachment_json,
+                source_export_id.trim(),
+                source_construction_id.trim(),
+                seen_at.trim(),
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn upsert_game_runtime_part_setting_value(
+        &self,
+        game_id: i64,
+        part_key: &str,
+        setting_key: &str,
+        label: &str,
+        setting_area: &str,
+        value_type: &str,
+        value_json: &str,
+        source_export_id: &str,
+        source_construction_id: &str,
+        seen_at: &str,
+    ) -> Result<()> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        let setting_id = Self::upsert_gearblocks_part_setting(
+            &connection,
+            setting_key,
+            label,
+            setting_area,
+            value_type,
+            seen_at,
+        )?;
+        connection.execute(
+            "
+            INSERT INTO obj_game_runtime_part_setting_value (
+                game_id,
+                part_key,
+                setting_id,
+                value_type,
+                value_json,
+                source_export_id,
+                source_construction_id,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)
+            ON CONFLICT(game_id, part_key, setting_id) DO UPDATE SET
+                value_type = excluded.value_type,
+                value_json = excluded.value_json,
+                source_export_id = excluded.source_export_id,
+                source_construction_id = excluded.source_construction_id,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                game_id,
+                part_key.trim(),
+                setting_id,
+                value_type.trim(),
+                value_json,
+                source_export_id.trim(),
+                source_construction_id.trim(),
+                seen_at.trim(),
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn upsert_game_runtime_part_output_channel_value(
+        &self,
+        game_id: i64,
+        part_key: &str,
+        channel_key: &str,
+        label: &str,
+        channel_area: &str,
+        value_type: &str,
+        value_json: &str,
+        source_export_id: &str,
+        source_construction_id: &str,
+        seen_at: &str,
+    ) -> Result<()> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        let output_channel_id = Self::upsert_gearblocks_part_output_channel(
+            &connection,
+            channel_key,
+            label,
+            channel_area,
+            value_type,
+            seen_at,
+        )?;
+        connection.execute(
+            "
+            INSERT INTO obj_game_runtime_part_output_channel_value (
+                game_id,
+                part_key,
+                output_channel_id,
+                value_type,
+                value_json,
+                source_export_id,
+                source_construction_id,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)
+            ON CONFLICT(game_id, part_key, output_channel_id) DO UPDATE SET
+                value_type = excluded.value_type,
+                value_json = excluded.value_json,
+                source_export_id = excluded.source_export_id,
+                source_construction_id = excluded.source_construction_id,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                game_id,
+                part_key.trim(),
+                output_channel_id,
+                value_type.trim(),
+                value_json,
+                source_export_id.trim(),
+                source_construction_id.trim(),
+                seen_at.trim(),
+            ],
+        )?;
         Ok(())
     }
 
@@ -6489,6 +7403,213 @@ impl AppDatabase {
             ",
             params![game_id, part_key.trim()],
             game_runtime_part_from_row,
+        )
+    }
+
+    fn upsert_gearblocks_part_definition(
+        connection: &Connection,
+        part: &GameRuntimePartInstanceDraft,
+    ) -> Result<i64> {
+        connection.execute(
+            "
+            INSERT INTO def_gearblocks_part (
+                part_key,
+                asset_guid,
+                asset_name,
+                display_name,
+                full_display_name,
+                category,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)
+            ON CONFLICT(part_key) DO UPDATE SET
+                asset_guid = excluded.asset_guid,
+                asset_name = excluded.asset_name,
+                display_name = excluded.display_name,
+                full_display_name = excluded.full_display_name,
+                category = excluded.category,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                part.part_key.trim(),
+                part.asset_guid.trim(),
+                part.asset_name.trim(),
+                part.display_name.trim(),
+                part.full_display_name.trim(),
+                part.category.trim(),
+                part.last_seen_at.trim()
+            ],
+        )?;
+        connection.query_row(
+            "SELECT id FROM def_gearblocks_part WHERE part_key = ?1",
+            params![part.part_key.trim()],
+            |row| row.get(0),
+        )
+    }
+
+    fn upsert_gearblocks_metadata_item(
+        connection: &Connection,
+        source_area: &str,
+        field_path: &str,
+        value_type: &str,
+        seen_at: &str,
+    ) -> Result<i64> {
+        connection.execute(
+            "
+            INSERT INTO def_gearblocks_part_metadata_item (
+                source_area,
+                field_path,
+                value_type,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?4)
+            ON CONFLICT(source_area, field_path) DO UPDATE SET
+                value_type = excluded.value_type,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                source_area.trim(),
+                field_path.trim(),
+                value_type.trim(),
+                seen_at.trim()
+            ],
+        )?;
+        connection.query_row(
+            "
+            SELECT id
+            FROM def_gearblocks_part_metadata_item
+            WHERE source_area = ?1
+                AND field_path = ?2
+            ",
+            params![source_area.trim(), field_path.trim()],
+            |row| row.get(0),
+        )
+    }
+
+    fn upsert_gearblocks_attachment_type(
+        connection: &Connection,
+        attachment_path: &str,
+        type_name: &str,
+        value_type: &str,
+        seen_at: &str,
+    ) -> Result<i64> {
+        connection.execute(
+            "
+            INSERT INTO def_gearblocks_attachment_type (
+                attachment_path,
+                type_name,
+                value_type,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?4)
+            ON CONFLICT(attachment_path, type_name) DO UPDATE SET
+                value_type = excluded.value_type,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                attachment_path.trim(),
+                type_name.trim(),
+                value_type.trim(),
+                seen_at.trim()
+            ],
+        )?;
+        connection.query_row(
+            "
+            SELECT id
+            FROM def_gearblocks_attachment_type
+            WHERE attachment_path = ?1
+                AND type_name = ?2
+            ",
+            params![attachment_path.trim(), type_name.trim()],
+            |row| row.get(0),
+        )
+    }
+
+    fn upsert_gearblocks_part_setting(
+        connection: &Connection,
+        setting_key: &str,
+        label: &str,
+        setting_area: &str,
+        value_type: &str,
+        seen_at: &str,
+    ) -> Result<i64> {
+        connection.execute(
+            "
+            INSERT INTO def_gearblocks_part_setting (
+                setting_key,
+                label,
+                setting_area,
+                value_type,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?5)
+            ON CONFLICT(setting_key) DO UPDATE SET
+                label = excluded.label,
+                setting_area = excluded.setting_area,
+                value_type = excluded.value_type,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                setting_key.trim(),
+                label.trim(),
+                setting_area.trim(),
+                value_type.trim(),
+                seen_at.trim()
+            ],
+        )?;
+        connection.query_row(
+            "SELECT id FROM def_gearblocks_part_setting WHERE setting_key = ?1",
+            params![setting_key.trim()],
+            |row| row.get(0),
+        )
+    }
+
+    fn upsert_gearblocks_part_output_channel(
+        connection: &Connection,
+        channel_key: &str,
+        label: &str,
+        channel_area: &str,
+        value_type: &str,
+        seen_at: &str,
+    ) -> Result<i64> {
+        connection.execute(
+            "
+            INSERT INTO def_gearblocks_part_output_channel (
+                channel_key,
+                label,
+                channel_area,
+                value_type,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?5)
+            ON CONFLICT(channel_key) DO UPDATE SET
+                label = excluded.label,
+                channel_area = excluded.channel_area,
+                value_type = excluded.value_type,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                channel_key.trim(),
+                label.trim(),
+                channel_area.trim(),
+                value_type.trim(),
+                seen_at.trim()
+            ],
+        )?;
+        connection.query_row(
+            "SELECT id FROM def_gearblocks_part_output_channel WHERE channel_key = ?1",
+            params![channel_key.trim()],
+            |row| row.get(0),
         )
     }
 
@@ -7814,6 +8935,19 @@ fn game_from_row(row: &rusqlite::Row<'_>) -> Result<GameRecord> {
     })
 }
 
+fn game_setting_from_row(row: &rusqlite::Row<'_>) -> Result<GameSettingRecord> {
+    Ok(GameSettingRecord {
+        id: row.get(0)?,
+        game_id: row.get(1)?,
+        id_game: row.get(2)?,
+        setting_key: row.get(3)?,
+        setting_value_json: row.get(4)?,
+        schema_json: row.get(5)?,
+        created_at: row.get(6)?,
+        modified_at: row.get(7)?,
+    })
+}
+
 fn game_data_location_from_row(row: &rusqlite::Row<'_>) -> Result<GameDataLocationRecord> {
     Ok(GameDataLocationRecord {
         id: row.get(0)?,
@@ -7989,6 +9123,43 @@ fn game_runtime_part_from_row(row: &rusqlite::Row<'_>) -> Result<GameRuntimePart
     })
 }
 
+fn game_runtime_part_instance_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<GameRuntimePartInstanceRecord> {
+    Ok(GameRuntimePartInstanceRecord {
+        id: row.get(0)?,
+        game_id: row.get(1)?,
+        part_definition_id: row.get(2)?,
+        part_key: row.get(3)?,
+        asset_guid: row.get(4)?,
+        asset_name: row.get(5)?,
+        display_name: row.get(6)?,
+        full_display_name: row.get(7)?,
+        category: row.get(8)?,
+        source_export_id: row.get(9)?,
+        source_construction_id: row.get(10)?,
+        part_instance_key: row.get(11)?,
+        runtime_part_id: row.get(12)?,
+        runtime_part_index: row.get(13)?,
+        mass: row.get(14)?,
+        world_x: row.get(15)?,
+        world_y: row.get(16)?,
+        world_z: row.get(17)?,
+        local_x: row.get(18)?,
+        local_y: row.get(19)?,
+        local_z: row.get(20)?,
+        world_position_json: row.get(21)?,
+        local_position_json: row.get(22)?,
+        current_unit_size_json: row.get(23)?,
+        link_node_count: row.get(24)?,
+        behaviour_names_json: row.get(25)?,
+        dynamic_summary_json: row.get(26)?,
+        last_seen_at: row.get(27)?,
+        created_at: row.get(28)?,
+        updated_at: row.get(29)?,
+    })
+}
+
 fn game_runtime_part_alias_from_row(row: &rusqlite::Row<'_>) -> Result<GameRuntimePartAliasRecord> {
     Ok(GameRuntimePartAliasRecord {
         id: row.get(0)?,
@@ -8009,6 +9180,68 @@ fn game_runtime_part_alias_from_row(row: &rusqlite::Row<'_>) -> Result<GameRunti
         last_seen_at: row.get(15)?,
         created_at: row.get(16)?,
         updated_at: row.get(17)?,
+    })
+}
+
+fn game_runtime_part_metadata_value_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<GameRuntimePartMetadataValueRecord> {
+    Ok(GameRuntimePartMetadataValueRecord {
+        part_key: row.get(0)?,
+        source_area: row.get(1)?,
+        field_path: row.get(2)?,
+        value_type: row.get(3)?,
+        value_json: row.get(4)?,
+        source_export_id: row.get(5)?,
+        source_construction_id: row.get(6)?,
+        last_seen_at: row.get(7)?,
+    })
+}
+
+fn game_runtime_part_attachment_type_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<GameRuntimePartAttachmentTypeRecord> {
+    Ok(GameRuntimePartAttachmentTypeRecord {
+        part_key: row.get(0)?,
+        attachment_path: row.get(1)?,
+        type_name: row.get(2)?,
+        value_type: row.get(3)?,
+        attachment_json: row.get(4)?,
+        source_export_id: row.get(5)?,
+        source_construction_id: row.get(6)?,
+        last_seen_at: row.get(7)?,
+    })
+}
+
+fn game_runtime_part_setting_value_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<GameRuntimePartSettingValueRecord> {
+    Ok(GameRuntimePartSettingValueRecord {
+        part_key: row.get(0)?,
+        setting_key: row.get(1)?,
+        label: row.get(2)?,
+        setting_area: row.get(3)?,
+        value_type: row.get(4)?,
+        value_json: row.get(5)?,
+        source_export_id: row.get(6)?,
+        source_construction_id: row.get(7)?,
+        last_seen_at: row.get(8)?,
+    })
+}
+
+fn game_runtime_part_output_channel_value_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<GameRuntimePartOutputChannelValueRecord> {
+    Ok(GameRuntimePartOutputChannelValueRecord {
+        part_key: row.get(0)?,
+        channel_key: row.get(1)?,
+        label: row.get(2)?,
+        channel_area: row.get(3)?,
+        value_type: row.get(4)?,
+        value_json: row.get(5)?,
+        source_export_id: row.get(6)?,
+        source_construction_id: row.get(7)?,
+        last_seen_at: row.get(8)?,
     })
 }
 

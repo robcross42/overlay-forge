@@ -96,3 +96,7 @@ This file centralizes deferred work. Items listed here are not approved scope un
 - Generate a GearBlocks construction file from a build guide that contains all required parts as loose, unconnected parts.
 - Load the generated construction into the world as a parts staging set so the needed parts are available before manual assembly.
 - Keep placement, alignment, and connection work manual for the foreseeable future; this is not automated construction.
+
+## GearBlocks Runtime Scene Context
+
+- Add a derived `obj_game_runtime_scene_summary` or similar scene-facts cache after normalized runtime imports if prompt assembly becomes expensive.
