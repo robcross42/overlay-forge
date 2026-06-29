@@ -13,9 +13,11 @@ import {
   createGameChatScreenshotCapture,
   createGameScreenshotCaptureRequest,
   decodeGearBlocksConstructionFile,
+  deleteGameBuildGuide,
   getGameSetting,
   getGearBlocksThirdPartyDependencyStatus,
   importGameBuildGuideMarkdown,
+  importGameBuildGuideUrl,
   importGearBlocksOfficialApiDocs,
   installGearBlocksLuaExporter,
   importGearBlocksCatalogScreenshotImages,
@@ -270,8 +272,10 @@ export function Gaming({
   const [chatMessages, setChatMessages] = useState<GameChatMessage[]>([]);
   const [buildGuides, setBuildGuides] = useState<GameBuildGuide[]>([]);
   const [isImportingBuildGuide, setIsImportingBuildGuide] = useState(false);
+  const [isImportingBuildGuideUrl, setIsImportingBuildGuideUrl] = useState(false);
   const [isGeneratingBuildGuide, setIsGeneratingBuildGuide] = useState(false);
   const [isOpeningBuildGuide, setIsOpeningBuildGuide] = useState(false);
+  const [deletingBuildGuideId, setDeletingBuildGuideId] = useState<number | null>(null);
   const [pathOfExile2CurrentBuild, setPathOfExile2CurrentBuild] =
     useState<PathOfExile2CurrentBuild | null>(null);
   const [newChatTitle, setNewChatTitle] = useState("");
@@ -432,8 +436,10 @@ export function Gaming({
       setChatMessages([]);
       setBuildGuides([]);
       setIsImportingBuildGuide(false);
+      setIsImportingBuildGuideUrl(false);
       setIsGeneratingBuildGuide(false);
       setIsOpeningBuildGuide(false);
+      setDeletingBuildGuideId(null);
       setPathOfExile2CurrentBuild(null);
       setSelectedPromptScreenshotIds([]);
       setChatScreenshotPage(0);
@@ -1078,6 +1084,31 @@ export function Gaming({
     }
   }
 
+  async function importBuildGuideFromUrl(game: Game) {
+    const guideUrl = window.prompt("Steam build guide URL");
+    if (!guideUrl?.trim()) {
+      setStatus("Build guide URL import cancelled");
+      return;
+    }
+
+    setIsImportingBuildGuideUrl(true);
+    setStatus("Importing build guide URL");
+    try {
+      const imported = await importGameBuildGuideUrl(game.id, guideUrl.trim());
+      const guides = await listGameBuildGuides(game.id);
+      setBuildGuides(guides);
+      setStatus(
+        `Imported URL guide "${imported.guide.title}" with ${imported.parts.length} part row(s), ${imported.steps.length} step(s), and ${imported.imageReferenceCount} image reference(s)`
+      );
+      showToast("Successful");
+    } catch (error) {
+      setStatus(formatError(error));
+      window.alert(formatError(error));
+    } finally {
+      setIsImportingBuildGuideUrl(false);
+    }
+  }
+
   async function openBuildGuideOverlay(game: Game, guide: GameBuildGuide) {
     setIsOpeningBuildGuide(true);
     try {
@@ -1096,6 +1127,25 @@ export function Gaming({
       window.alert(formatError(error));
     } finally {
       setIsOpeningBuildGuide(false);
+    }
+  }
+
+  async function removeBuildGuide(guide: GameBuildGuide) {
+    if (!window.confirm(`Delete build guide "${guide.title}"?`)) {
+      return;
+    }
+
+    setDeletingBuildGuideId(guide.id);
+    try {
+      await deleteGameBuildGuide(guide.id);
+      setBuildGuides((current) => current.filter((item) => item.id !== guide.id));
+      clearStoredBuildGuideSelection(guide.id);
+      setStatus("Build guide deleted");
+    } catch (error) {
+      setStatus(formatError(error));
+      window.alert(formatError(error));
+    } finally {
+      setDeletingBuildGuideId(null);
     }
   }
 
@@ -2005,14 +2055,24 @@ export function Gaming({
                   <p>GearBlocks</p>
                   <h3>Build Guides</h3>
                 </div>
-                <button
-                  className="primary-button"
-                  disabled={isImportingBuildGuide}
-                  onClick={() => void importBuildGuide(selectedGame)}
-                  type="button"
-                >
-                  Import Markdown
-                </button>
+                <div className="game-build-guide-header-actions">
+                  <button
+                    className="primary-button"
+                    disabled={isImportingBuildGuide || isImportingBuildGuideUrl}
+                    onClick={() => void importBuildGuideFromUrl(selectedGame)}
+                    type="button"
+                  >
+                    Import URL
+                  </button>
+                  <button
+                    className="primary-button"
+                    disabled={isImportingBuildGuide || isImportingBuildGuideUrl}
+                    onClick={() => void importBuildGuide(selectedGame)}
+                    type="button"
+                  >
+                    Import Markdown
+                  </button>
+                </div>
               </div>
 
               <p>
@@ -2035,14 +2095,25 @@ export function Gaming({
                         <span>{guide.buildGoal || "No build goal summary found."}</span>
                         <code>{guide.sourcePath || "Imported Markdown"}</code>
                       </div>
-                      <button
-                        className="primary-button"
-                        disabled={isOpeningBuildGuide}
-                        onClick={() => void openBuildGuideOverlay(selectedGame, guide)}
-                        type="button"
-                      >
-                        Open
-                      </button>
+                      <div className="game-build-guide-actions">
+                        <button
+                          className="primary-button"
+                          disabled={isOpeningBuildGuide || deletingBuildGuideId === guide.id}
+                          onClick={() => void openBuildGuideOverlay(selectedGame, guide)}
+                          type="button"
+                        >
+                          Open
+                        </button>
+                        <button
+                          aria-label={`Delete ${guide.title}`}
+                          className="primary-button"
+                          disabled={deletingBuildGuideId === guide.id}
+                          onClick={() => void removeBuildGuide(guide)}
+                          type="button"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </article>
                   ))}
                 </div>
@@ -3147,6 +3218,21 @@ function parsePathOfExile2CurrentBuild(value: string | undefined): PathOfExile2C
     };
   } catch {
     return null;
+  }
+}
+
+function clearStoredBuildGuideSelection(deletedGuideId: number) {
+  try {
+    const value = window.localStorage.getItem("overlayForgeActiveBuildGuide");
+    if (!value) {
+      return;
+    }
+    const parsed = JSON.parse(value) as { guideId?: unknown };
+    if (parsed.guideId === deletedGuideId) {
+      window.localStorage.removeItem("overlayForgeActiveBuildGuide");
+    }
+  } catch {
+    window.localStorage.removeItem("overlayForgeActiveBuildGuide");
   }
 }
 

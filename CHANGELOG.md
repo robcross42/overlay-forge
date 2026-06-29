@@ -20,6 +20,31 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+### 2026-06-28
+
+#### Changed
+
+- 11:28:32 EDT - Changed the GearBlocks build-guide overlay into a step-focused view with a static Overlay Forge-generated isometric placement diagram, step navigation, current-step instructions, and related placement parts.
+- 12:48:56 EDT - Changed the GearBlocks build-guide overlay to separate Build Info from Build Steps, with Build Steps showing generated isometric diagrams and detailed placement/attachment captions only.
+- 21:04:32 EDT - Changed GearBlocks build-guide diagrams to use semi-realistic procedural catalog profiles for combustion-engine parts, including a composite cylinder-and-axle rendering for `Engine Rear (Driven) Crank x2 & Axle`.
+
+#### Fixed
+
+- 12:24:13 EDT - Fixed Tauri shutdown lifecycle handling so background GearBlocks import, scheduler, and mouse-shortcut worker loops stop before continuing to access app state during process exit.
+
+#### Documentation
+
+- 11:28:32 EDT - Documented that GearBlocks build-guide visuals are rendered in Overlay Forge from parsed guide steps and part rows without requiring GearBlocks script windows, BepInEx, or a persisted visual-step table.
+- 12:48:56 EDT - Documented the Build Info and Build Steps view split for GearBlocks build-guide overlays.
+- 21:04:32 EDT - Documented GearBlocks build-guide procedural part profiles for catalog parts whose dimensions should not be interpreted as generic boxes.
+
+#### Validation
+
+- 11:31:38 EDT - Validated the GearBlocks static isometric build-step overlay with `npm run build` and `git diff --check`.
+- 12:24:13 EDT - Validated the Tauri shutdown lifecycle fix with `npm run cargo:build`.
+- 12:48:56 EDT - Validated the GearBlocks build-guide view split with `npm run build`.
+- 21:04:32 EDT - Validated GearBlocks build-guide procedural part profiles with `npm run build`.
+
 ### 2026-06-26
 
 #### Changed

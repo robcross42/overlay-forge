@@ -1,23 +1,30 @@
 use crate::db::{
-    BridgeFileDraftRecord, CalendarEventRecord, GameBuildGuidePartDraft, GameBuildGuidePartRecord,
-    GameBuildGuideRecord, GameBuildGuideStepDraft, GameBuildGuideStepRecord,
-    GameCatalogObjectRecord, GameChatConversationRecord, GameChatMessageRecord,
-    GameConstructionRecord, GameDataLocationRecord, GameRecord,
-    GameRuntimeConstructionExportRecord, GameRuntimePartAliasRecord,
-    GameRuntimePartApiMemberRecord, GameRuntimePartInstanceDraft, GameRuntimePartInstanceRecord,
-    GameRuntimePartRecord, GameScreenshotCaptureRequestRecord, GameSettingRecord,
-    GearBlocksApiCatalogRecord, NoteRecord, PlanningConversationContextRecord,
-    PlanningConversationRecord, PlanningMessageRecord, PlanningPromptPreviewRecord,
-    ProjectGitHubRepositoryRecord, ProjectMarkdownContextPayload, ProjectMarkdownContextRecord,
-    ProjectRecord, SchedulerRecord, SmokingCessationSettingsRecord, SmokingEventRecord, TaskRecord,
-    YouTubeReferenceRecord,
+    BridgeFileDraftRecord, CalendarEventRecord, CalendarEventUpdateDraft, GameBuildGuideDraft,
+    GameBuildGuidePartDraft, GameBuildGuidePartRecord, GameBuildGuideRecord,
+    GameBuildGuideStepDraft, GameBuildGuideStepRecord, GameCatalogObjectDraft,
+    GameCatalogObjectRecord, GameCatalogReferenceDraft, GameChatConversationRecord,
+    GameChatMessageRecord, GameConstructionDraft, GameConstructionRecord, GameDataLocationRecord,
+    GameRecord, GameRuntimeConstructionExportDraft, GameRuntimeConstructionExportRecord,
+    GameRuntimePartAliasDraft, GameRuntimePartAliasRecord, GameRuntimePartApiAttributeObservation,
+    GameRuntimePartApiMemberObservation, GameRuntimePartApiMemberRecord,
+    GameRuntimePartAttachmentObservation, GameRuntimePartAttachmentTypeDraft, GameRuntimePartDraft,
+    GameRuntimePartIdentity, GameRuntimePartInstanceDraft, GameRuntimePartInstanceRecord,
+    GameRuntimePartMetadataValueDraft, GameRuntimePartOutputChannelValueDraft,
+    GameRuntimePartPropertyObservation, GameRuntimePartRecord, GameRuntimePartSettingValueDraft,
+    GameRuntimePartSource, GameRuntimePartValueObservation, GameScreenshotCaptureRequestDraft,
+    GameScreenshotCaptureRequestRecord, GameSettingRecord, GearBlocksApiCatalogRecord, NoteRecord,
+    PlanningConversationContextRecord, PlanningConversationRecord, PlanningMessageRecord,
+    PlanningPromptPreviewRecord, ProjectGitHubRepositoryRecord, ProjectMarkdownContextPayload,
+    ProjectMarkdownContextRecord, ProjectRecord, SchedulerRecord, SmokingCessationSettingsRecord,
+    SmokingEventRecord, TaskRecord, YouTubeReferenceRecord, YouTubeReferenceUpdateDraft,
 };
 use crate::gearblocks_api_scraper::{scrape_official_gearblocks_api, GearBlocksApiImportResult};
 use crate::gearblocks_scene_context::GearBlocksSceneContextService;
 use crate::github;
 use crate::hotkeys;
+use crate::lifecycle;
 use crate::openai;
-use crate::windows::{self, WindowKind, WindowManager};
+use crate::windows::{self, StandaloneWindowConfig, WindowKind, WindowManager};
 use crate::{AppState, GameBuildGuideOverlaySelection, GameChatOverlaySelection};
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
@@ -40,6 +47,10 @@ static SCHEDULER_WORKER_ACTIVE: AtomicBool = AtomicBool::new(false);
 const ACTIVE_GAME_BUILD_GUIDE_OVERLAY_SETTING: &str = "active_game_build_guide_overlay_v1";
 const GEARBLOCKS_RUNTIME_INITIAL_TAIL_BYTES: u64 = 2 * 1024 * 1024;
 const GEARBLOCKS_RUNTIME_INCREMENTAL_READ_LIMIT_BYTES: u64 = 2 * 1024 * 1024;
+const BUILD_GUIDE_SOURCE_HTML_MAX_BYTES: u64 = 4 * 1024 * 1024;
+const BUILD_GUIDE_SOURCE_TEXT_MAX_CHARS: usize = 60_000;
+const BUILD_GUIDE_SOURCE_IMAGE_MAX_COUNT: usize = 24;
+const BUILD_GUIDE_SOURCE_IMAGE_MAX_BYTES: u64 = 10 * 1024 * 1024;
 
 #[derive(Serialize)]
 pub struct MilestoneStatus {
@@ -69,12 +80,26 @@ pub struct KeybindRecord {
     pub keys: Vec<String>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CalendarEventUpdateInput {
+    pub id: i64,
+    pub title: String,
+    pub start_date: String,
+    pub start_time: String,
+    pub end_date: String,
+    pub end_time: String,
+    pub notes: String,
+}
+
 #[derive(Serialize)]
 pub struct GameBuildGuidePayload {
     pub guide: GameBuildGuideRecord,
     pub parts: Vec<GameBuildGuidePartRecord>,
     pub steps: Vec<GameBuildGuideStepRecord>,
     pub checklist: Vec<String>,
+    #[serde(rename = "imageReferenceCount")]
+    pub image_reference_count: usize,
 }
 
 #[derive(Serialize)]
@@ -172,6 +197,19 @@ struct GearBlocksPartAliasLogRecord {
     emitted_at: String,
     source_log_path: String,
     document: serde_json::Value,
+}
+
+struct BuildGuideSourceDocument {
+    url: String,
+    title: String,
+    text: String,
+    images: Vec<BuildGuideSourceImage>,
+}
+
+#[derive(Clone)]
+struct BuildGuideSourceImage {
+    url: String,
+    title: String,
 }
 
 #[derive(Serialize)]
@@ -369,6 +407,7 @@ pub fn list_schedulers(state: State<'_, AppState>) -> Result<Vec<SchedulerRecord
 
 #[tauri::command]
 pub fn shutdown_app(app: AppHandle) {
+    lifecycle::request_shutdown();
     app.exit(0);
 }
 
@@ -402,17 +441,25 @@ pub fn start_gearblocks_runtime_import_monitor(app: AppHandle) {
         return;
     }
 
-    thread::spawn(move || loop {
-        thread::sleep(Duration::from_millis(2500));
-        let state = app.state::<AppState>();
-        let games = state.database.list_games().unwrap_or_default();
-        for game in games.iter().filter(|game| game.slug == "gearblocks") {
-            if let Err(error) =
-                import_latest_gearblocks_runtime_exports_for_monitor(&state, game.id)
-            {
-                eprintln!("GearBlocks runtime import monitor failed: {error}");
+    thread::spawn(move || {
+        loop {
+            if lifecycle::sleep_until_shutdown(Duration::from_millis(2500)) {
+                break;
+            }
+            let state = app.state::<AppState>();
+            let games = state.database.list_games().unwrap_or_default();
+            for game in games.iter().filter(|game| game.slug == "gearblocks") {
+                if lifecycle::is_shutdown_requested() {
+                    break;
+                }
+                if let Err(error) =
+                    import_latest_gearblocks_runtime_exports_for_monitor(&state, game.id)
+                {
+                    eprintln!("GearBlocks runtime import monitor failed: {error}");
+                }
             }
         }
+        GEARBLOCKS_RUNTIME_IMPORT_MONITOR_ACTIVE.store(false, Ordering::SeqCst);
     });
 }
 
@@ -421,15 +468,23 @@ pub fn start_scheduler_worker(app: AppHandle) {
         return;
     }
 
-    thread::spawn(move || loop {
-        thread::sleep(Duration::from_secs(15));
-        let state = app.state::<AppState>();
-        let schedulers = state.database.list_due_schedulers(5).unwrap_or_default();
-        for scheduler in schedulers {
-            if let Err(error) = run_scheduler(&app, state.inner(), scheduler) {
-                eprintln!("Overlay Forge scheduler failed: {error}");
+    thread::spawn(move || {
+        loop {
+            if lifecycle::sleep_until_shutdown(Duration::from_secs(15)) {
+                break;
+            }
+            let state = app.state::<AppState>();
+            let schedulers = state.database.list_due_schedulers(5).unwrap_or_default();
+            for scheduler in schedulers {
+                if lifecycle::is_shutdown_requested() {
+                    break;
+                }
+                if let Err(error) = run_scheduler(&app, state.inner(), scheduler) {
+                    eprintln!("Overlay Forge scheduler failed: {error}");
+                }
             }
         }
+        SCHEDULER_WORKER_ACTIVE.store(false, Ordering::SeqCst);
     });
 }
 
@@ -666,6 +721,51 @@ pub fn import_game_build_guide_markdown(
 }
 
 #[tauri::command]
+pub async fn import_game_build_guide_url(
+    game_id: i64,
+    guide_url: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<GameBuildGuidePayload, String> {
+    require_text(&guide_url, "Build guide URL")?;
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    if game.slug != "gearblocks" {
+        return Err(
+            "URL build-guide import is currently available for GearBlocks only.".to_string(),
+        );
+    }
+
+    let source = fetch_build_guide_source_document(&guide_url).await?;
+    import_latest_gearblocks_runtime_exports(state.inner(), game.id)?;
+    let custom_context = gearblocks_build_guide_import_prompt_context(&state, game.id)?;
+    let api_key = configured_openai_api_key(&state)?;
+    let generated_markdown = openai::create_game_build_guide_from_source_response(
+        &api_key,
+        &game,
+        &custom_context,
+        &source.url,
+        &source.title,
+        &source.text,
+    )
+    .await?;
+    let clean_markdown = clean_generated_build_guide_markdown(&generated_markdown);
+    let mut payload = save_and_import_generated_game_build_guide(
+        &app,
+        state.inner(),
+        &game,
+        &source.title,
+        &clean_markdown,
+    )?;
+    payload.image_reference_count =
+        import_build_guide_source_images(state.inner(), &game, &payload.guide, &source).await?;
+    let _ = app.emit("game-build-guides-changed", payload.guide.clone());
+    Ok(payload)
+}
+
+#[tauri::command]
 pub async fn create_game_build_guide_from_chat(
     conversation_id: i64,
     build_goal: String,
@@ -703,9 +803,27 @@ pub async fn create_game_build_guide_from_chat(
     )
     .await?;
     let clean_markdown = clean_generated_build_guide_markdown(&generated_markdown);
-    let parsed = parse_game_build_guide_markdown(&clean_markdown);
+    let payload = save_and_import_generated_game_build_guide(
+        &app,
+        state.inner(),
+        &game,
+        "GearBlocks build guide",
+        &clean_markdown,
+    )?;
+    let _ = app.emit("game-build-guides-changed", payload.guide.clone());
+    Ok(payload)
+}
+
+fn save_and_import_generated_game_build_guide(
+    app: &AppHandle,
+    state: &AppState,
+    game: &GameRecord,
+    fallback_title: &str,
+    clean_markdown: &str,
+) -> Result<GameBuildGuidePayload, String> {
+    let parsed = parse_game_build_guide_markdown(clean_markdown);
     let title = if parsed.title.trim().is_empty() {
-        "GearBlocks build guide"
+        fallback_title.trim()
     } else {
         parsed.title.trim()
     };
@@ -722,17 +840,15 @@ pub async fn create_game_build_guide_from_chat(
         unix_timestamp_label(),
         safe_filename_part(title)
     ));
-    fs::write(&guide_path, &clean_markdown)
+    fs::write(&guide_path, clean_markdown)
         .map_err(|error| format!("Could not save generated build guide: {error}"))?;
 
-    let payload = import_game_build_guide_markdown_content(
-        state.inner(),
+    import_game_build_guide_markdown_content(
+        state,
         game.id,
         &guide_path.to_string_lossy(),
-        &clean_markdown,
-    )?;
-    let _ = app.emit("game-build-guides-changed", payload.guide.clone());
-    Ok(payload)
+        clean_markdown,
+    )
 }
 
 fn import_game_build_guide_markdown_content(
@@ -750,17 +866,17 @@ fn import_game_build_guide_markdown_content(
         serde_json::to_string(&parsed.checklist).map_err(|error| error.to_string())?;
     let guide = state
         .database
-        .create_game_build_guide(
-            game.id,
-            &parsed.title,
+        .create_game_build_guide(GameBuildGuideDraft {
+            game_id: game.id,
+            title: &parsed.title,
             source_path,
             raw_markdown,
-            &parsed.build_goal,
-            &parsed.scale_reference,
-            &parsed.geometry_notes,
-            &parsed.glossary_text,
-            &checklist_json,
-        )
+            build_goal: &parsed.build_goal,
+            scale_reference: &parsed.scale_reference,
+            geometry_notes: &parsed.geometry_notes,
+            glossary_text: &parsed.glossary_text,
+            checklist_json: &checklist_json,
+        })
         .map_err(|error| error.to_string())?;
     let selection = GameBuildGuideOverlaySelection {
         game_id: game.id,
@@ -790,6 +906,57 @@ pub fn get_game_build_guide(
     get_game_build_guide_payload_from_state(state.inner(), guide_id)
 }
 
+#[tauri::command]
+pub fn delete_game_build_guide(
+    guide_id: i64,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let guide = state
+        .database
+        .get_game_build_guide(guide_id)
+        .map_err(|error| error.to_string())?;
+    let stored_selection = stored_build_guide_overlay_selection(state.inner());
+    state
+        .database
+        .delete_game_build_guide(guide_id)
+        .map_err(|error| error.to_string())?;
+
+    let deleted_active_guide = {
+        let mut active_selection = state
+            .active_game_build_guide_overlay
+            .lock()
+            .map_err(|_| "Build guide overlay state is unavailable.".to_string())?;
+        if active_selection
+            .as_ref()
+            .map(|selection| selection.guide_id == guide.id)
+            .unwrap_or(false)
+        {
+            active_selection.take();
+            true
+        } else {
+            false
+        }
+    };
+
+    let deleted_stored_guide = stored_selection
+        .map(|selection| selection.guide_id == guide.id)
+        .unwrap_or(false);
+    if deleted_active_guide || deleted_stored_guide {
+        state
+            .database
+            .delete_app_setting(ACTIVE_GAME_BUILD_GUIDE_OVERLAY_SETTING)
+            .map_err(|error| error.to_string())?;
+        let app_for_window = app.clone();
+        app.run_on_main_thread(move || {
+            let _ = WindowManager::new(&app_for_window).hide(WindowKind::GameBuildGuide);
+        })
+        .map_err(|error| error.to_string())?;
+    }
+
+    Ok(())
+}
+
 fn get_game_build_guide_payload_from_state(
     state: &AppState,
     guide_id: i64,
@@ -813,6 +980,7 @@ fn get_game_build_guide_payload_from_state(
         parts,
         steps,
         checklist,
+        image_reference_count: 0,
     })
 }
 
@@ -875,10 +1043,11 @@ fn show_game_build_guide_overlay_window(
         if let (Some(overlay_width), Some(overlay_height)) =
             (guide.overlay_width, guide.overlay_height)
         {
+            let config = StandaloneWindowConfig::game_build_guide();
             let _ = window_manager.set_size(
                 WindowKind::GameBuildGuide,
-                overlay_width.max(300) as u32,
-                overlay_height.max(360) as u32,
+                overlay_width.max(config.min_width as i32) as u32,
+                overlay_height.max(config.min_height as i32) as u32,
             );
         }
     }
@@ -1003,6 +1172,444 @@ fn stored_build_guide_overlay_selection(
     Some(selection)
 }
 
+async fn fetch_build_guide_source_document(
+    guide_url: &str,
+) -> Result<BuildGuideSourceDocument, String> {
+    let url = validate_build_guide_source_url(guide_url)?;
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(20))
+        .user_agent("OverlayForge/0.9 GearBlocksBuildGuideImporter")
+        .build()
+        .map_err(|error| format!("Could not create URL import client: {error}"))?;
+    let response = client
+        .get(url.clone())
+        .send()
+        .await
+        .map_err(|error| format!("Could not fetch build guide URL: {error}"))?;
+    let status = response.status();
+    if !status.is_success() {
+        return Err(format!("Build guide URL returned status {status}."));
+    }
+    if response
+        .content_length()
+        .map(|length| length > BUILD_GUIDE_SOURCE_HTML_MAX_BYTES)
+        .unwrap_or(false)
+    {
+        return Err("Build guide page is too large to import.".to_string());
+    }
+
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|error| format!("Could not read build guide URL response: {error}"))?;
+    if bytes.len() as u64 > BUILD_GUIDE_SOURCE_HTML_MAX_BYTES {
+        return Err("Build guide page is too large to import.".to_string());
+    }
+
+    let html = String::from_utf8_lossy(&bytes);
+    let (title, text, images) = extract_steam_guide_source_text(&html, &url)?;
+    Ok(BuildGuideSourceDocument {
+        url: url.to_string(),
+        title,
+        text: truncate_to_char_limit(&text, BUILD_GUIDE_SOURCE_TEXT_MAX_CHARS),
+        images,
+    })
+}
+
+fn validate_build_guide_source_url(value: &str) -> Result<reqwest::Url, String> {
+    let url = reqwest::Url::parse(value.trim())
+        .map_err(|_| "Build guide URL must be a valid absolute URL.".to_string())?;
+    if url.scheme() != "https" {
+        return Err("Build guide URL must use https.".to_string());
+    }
+    let host = url
+        .host_str()
+        .map(|host| host.to_ascii_lowercase())
+        .unwrap_or_default();
+    if host != "steamcommunity.com" && host != "www.steamcommunity.com" {
+        return Err(
+            "Build guide URL import currently supports Steam Community sharedfiles URLs."
+                .to_string(),
+        );
+    }
+    if url.path().trim_end_matches('/') != "/sharedfiles/filedetails" {
+        return Err(
+            "Steam build guide URL must use /sharedfiles/filedetails with an id query parameter."
+                .to_string(),
+        );
+    }
+    let has_numeric_id = url.query_pairs().any(|(key, value)| {
+        key == "id" && !value.is_empty() && value.chars().all(|c| c.is_ascii_digit())
+    });
+    if !has_numeric_id {
+        return Err("Steam build guide URL must include a numeric id query parameter.".to_string());
+    }
+    Ok(url)
+}
+
+fn extract_steam_guide_source_text(
+    html: &str,
+    page_url: &reqwest::Url,
+) -> Result<(String, String, Vec<BuildGuideSourceImage>), String> {
+    let title = extract_steam_guide_title(html).unwrap_or_else(|| "Steam build guide".to_string());
+    let summary = extract_div_text_near_marker(html, "guideTopDescription").unwrap_or_default();
+    let body_markup = extract_between(
+        html,
+        "<div class=\"guide subSections\">",
+        "commentthread_area",
+    )
+    .ok_or_else(|| "Could not find Steam guide body in the fetched page.".to_string())?;
+    let images = extract_steam_guide_images(body_markup, page_url);
+    let body_markup = body_markup
+        .replace("<div class=\"subSectionTitle\">", "\n\n## ")
+        .replace("<div class=\"subSectionDesc\">", "\n");
+    let body_text = html_fragment_to_text(&body_markup);
+    if body_text.chars().count() < 120 {
+        return Err("Fetched Steam guide did not contain enough readable text.".to_string());
+    }
+
+    let mut sections = vec![format!("# {title}")];
+    if !summary.trim().is_empty() {
+        sections.push(format!("## Overview\n{}", summary.trim()));
+    }
+    sections.push(body_text);
+    Ok((title, sections.join("\n\n"), images))
+}
+
+fn extract_steam_guide_images(html: &str, page_url: &reqwest::Url) -> Vec<BuildGuideSourceImage> {
+    let mut images = Vec::new();
+    let mut remaining = html;
+    while let Some(start) = remaining.find("<img") {
+        remaining = &remaining[start + 4..];
+        let Some(end) = remaining.find('>') else {
+            break;
+        };
+        let tag = &remaining[..end];
+        remaining = &remaining[end + 1..];
+
+        let Some(source) = html_attribute(tag, "src") else {
+            continue;
+        };
+        let Ok(url) = page_url.join(&decode_html_entities(&source)) else {
+            continue;
+        };
+        if !is_allowed_guide_image_url(&url) {
+            continue;
+        }
+        let url_text = url.to_string();
+        if images
+            .iter()
+            .any(|image: &BuildGuideSourceImage| image.url == url_text)
+        {
+            continue;
+        }
+        let title = html_attribute(tag, "title")
+            .or_else(|| html_attribute(tag, "alt"))
+            .map(|value| decode_html_entities(&value))
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| format!("Guide image {}", images.len() + 1));
+        images.push(BuildGuideSourceImage {
+            url: url_text,
+            title,
+        });
+        if images.len() >= BUILD_GUIDE_SOURCE_IMAGE_MAX_COUNT {
+            break;
+        }
+    }
+    images
+}
+
+fn html_attribute(tag: &str, name: &str) -> Option<String> {
+    let prefix = format!("{name}=");
+    let start = tag.find(&prefix)? + prefix.len();
+    let quote = tag[start..].chars().next()?;
+    if quote != '"' && quote != '\'' {
+        return None;
+    }
+    let value_start = start + quote.len_utf8();
+    let value_end = tag[value_start..].find(quote)? + value_start;
+    Some(tag[value_start..value_end].to_string())
+}
+
+fn is_allowed_guide_image_url(url: &reqwest::Url) -> bool {
+    if url.scheme() != "https" {
+        return false;
+    }
+    let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
+    host == "images.steamusercontent.com"
+        || host.ends_with(".steamusercontent.com")
+        || host.ends_with(".steamstatic.com")
+        || host.ends_with(".akamaihd.net")
+}
+
+async fn import_build_guide_source_images(
+    state: &AppState,
+    game: &GameRecord,
+    guide: &GameBuildGuideRecord,
+    source: &BuildGuideSourceDocument,
+) -> Result<usize, String> {
+    if source.images.is_empty() {
+        return Ok(0);
+    }
+
+    let image_dir = overlay_workspace_root()?
+        .join("game-screenshots")
+        .join(&game.slug)
+        .join("build-guide-images")
+        .join(guide.id.to_string());
+    fs::create_dir_all(&image_dir)
+        .map_err(|error| format!("Could not create build guide image directory: {error}"))?;
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .user_agent("OverlayForge/0.9 GearBlocksBuildGuideImageImporter")
+        .build()
+        .map_err(|error| format!("Could not create image import client: {error}"))?;
+    let mut imported_count = 0;
+
+    for (index, image) in source
+        .images
+        .iter()
+        .take(BUILD_GUIDE_SOURCE_IMAGE_MAX_COUNT)
+        .enumerate()
+    {
+        match download_build_guide_source_image(&client, image, &image_dir, index + 1).await {
+            Ok(local_path) => {
+                let local_path_text = path_text(&local_path);
+                let title = format!("{} image {}", guide.title, index + 1);
+                let notes = format!(
+                    "Imported from build guide {} for guide id {}. Source image title: {}",
+                    source.url, guide.id, image.title
+                );
+                let tags = format!("gearblocks,build-guide,guide:{},guide-image", guide.id);
+                state
+                    .database
+                    .create_game_catalog_reference(GameCatalogReferenceDraft {
+                        game_id: game.id,
+                        object_id: None,
+                        title: &title,
+                        reference_type: "build_guide_image",
+                        url: &image.url,
+                        local_path: &local_path_text,
+                        notes: &notes,
+                        tags: &tags,
+                    })
+                    .map_err(|error| error.to_string())?;
+                imported_count += 1;
+            }
+            Err(error) => {
+                eprintln!("Could not import build guide image {}: {error}", image.url);
+            }
+        }
+    }
+
+    Ok(imported_count)
+}
+
+async fn download_build_guide_source_image(
+    client: &reqwest::Client,
+    image: &BuildGuideSourceImage,
+    image_dir: &Path,
+    index: usize,
+) -> Result<PathBuf, String> {
+    let url =
+        reqwest::Url::parse(&image.url).map_err(|_| "Guide image URL was invalid.".to_string())?;
+    if !is_allowed_guide_image_url(&url) {
+        return Err("Guide image URL is not from an allowed Steam image host.".to_string());
+    }
+
+    let response = client
+        .get(url)
+        .send()
+        .await
+        .map_err(|error| format!("Could not fetch guide image: {error}"))?;
+    let status = response.status();
+    if !status.is_success() {
+        return Err(format!("Guide image returned status {status}."));
+    }
+    if response
+        .content_length()
+        .map(|length| length > BUILD_GUIDE_SOURCE_IMAGE_MAX_BYTES)
+        .unwrap_or(false)
+    {
+        return Err("Guide image is too large to import.".to_string());
+    }
+
+    let content_type = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|error| format!("Could not read guide image response: {error}"))?;
+    if bytes.len() as u64 > BUILD_GUIDE_SOURCE_IMAGE_MAX_BYTES {
+        return Err("Guide image is too large to import.".to_string());
+    }
+    let extension = guide_image_extension(&content_type, bytes.as_ref())
+        .ok_or_else(|| "Guide image is not a supported image type.".to_string())?;
+    let filename_title = safe_filename_part(&image.title);
+    let filename_stem = if filename_title.is_empty() {
+        format!("guide_image_{index:02}")
+    } else {
+        format!("{index:02}_{filename_title}")
+    };
+    let local_path = image_dir.join(format!("{filename_stem}.{extension}"));
+    fs::write(&local_path, &bytes)
+        .map_err(|error| format!("Could not save guide image: {error}"))?;
+    Ok(local_path)
+}
+
+fn guide_image_extension(content_type: &str, bytes: &[u8]) -> Option<&'static str> {
+    match content_type.split(';').next().unwrap_or_default().trim() {
+        "image/png" => Some("png"),
+        "image/jpeg" | "image/jpg" => Some("jpg"),
+        "image/webp" => Some("webp"),
+        "image/gif" => Some("gif"),
+        _ if bytes.starts_with(b"\x89PNG\r\n\x1a\n") => Some("png"),
+        _ if bytes.starts_with(&[0xff, 0xd8, 0xff]) => Some("jpg"),
+        _ if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") => Some("gif"),
+        _ if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP" => {
+            Some("webp")
+        }
+        _ => None,
+    }
+}
+
+fn extract_steam_guide_title(html: &str) -> Option<String> {
+    extract_div_text_near_marker(html, "workshopItemTitle")
+        .or_else(|| {
+            extract_between(html, "<title>", "</title>").map(|title| {
+                html_fragment_to_text(title)
+                    .replace("Steam Community :: Guide ::", "")
+                    .trim()
+                    .to_string()
+            })
+        })
+        .filter(|title| !title.trim().is_empty())
+}
+
+fn extract_div_text_near_marker(html: &str, marker: &str) -> Option<String> {
+    let marker_index = html.find(marker)?;
+    let div_start = html[..marker_index].rfind("<div")?;
+    let open_end = html[marker_index..].find('>')? + marker_index;
+    if open_end < div_start {
+        return None;
+    }
+    let close = html[open_end + 1..].find("</div>")? + open_end + 1;
+    Some(html_fragment_to_text(&html[open_end + 1..close]))
+}
+
+fn extract_between<'a>(value: &'a str, start_marker: &str, end_marker: &str) -> Option<&'a str> {
+    let start = value.find(start_marker)? + start_marker.len();
+    let end = value[start..].find(end_marker)? + start;
+    Some(&value[start..end])
+}
+
+fn html_fragment_to_text(value: &str) -> String {
+    let mut output = String::new();
+    let mut chars = value.chars().peekable();
+    while let Some(character) = chars.next() {
+        if character != '<' {
+            output.push(character);
+            continue;
+        }
+
+        let mut tag = String::new();
+        for tag_character in chars.by_ref() {
+            if tag_character == '>' {
+                break;
+            }
+            tag.push(tag_character);
+        }
+        let tag_name = tag
+            .trim()
+            .trim_start_matches('/')
+            .split_whitespace()
+            .next()
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        if matches!(
+            tag_name.as_str(),
+            "br" | "div" | "p" | "li" | "ul" | "ol" | "hr" | "blockquote" | "h1" | "h2" | "h3"
+        ) {
+            output.push('\n');
+        } else {
+            output.push(' ');
+        }
+    }
+
+    decode_html_entities(&output)
+        .lines()
+        .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
+        .filter(|line| !line.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn decode_html_entities(value: &str) -> String {
+    let mut output = String::new();
+    let mut chars = value.chars().peekable();
+    while let Some(character) = chars.next() {
+        if character != '&' {
+            output.push(character);
+            continue;
+        }
+
+        let mut entity = String::new();
+        while let Some(next) = chars.peek().copied() {
+            if next == ';' || entity.len() > 12 {
+                break;
+            }
+            entity.push(next);
+            chars.next();
+        }
+        if chars.peek() == Some(&';') {
+            chars.next();
+        }
+
+        match decode_html_entity(&entity) {
+            Some(decoded) => output.push(decoded),
+            None => {
+                output.push('&');
+                output.push_str(&entity);
+                output.push(';');
+            }
+        }
+    }
+    output
+}
+
+fn decode_html_entity(entity: &str) -> Option<char> {
+    match entity {
+        "amp" => Some('&'),
+        "lt" => Some('<'),
+        "gt" => Some('>'),
+        "quot" => Some('"'),
+        "apos" | "#39" => Some('\''),
+        "nbsp" => Some(' '),
+        _ if entity.starts_with("#x") || entity.starts_with("#X") => {
+            u32::from_str_radix(&entity[2..], 16)
+                .ok()
+                .and_then(char::from_u32)
+        }
+        _ if entity.starts_with('#') => entity[1..].parse::<u32>().ok().and_then(char::from_u32),
+        _ => None,
+    }
+}
+
+fn truncate_to_char_limit(value: &str, limit: usize) -> String {
+    if value.chars().count() <= limit {
+        return value.to_string();
+    }
+    let mut truncated = value.chars().take(limit).collect::<String>();
+    truncated.push_str("\n\n[Source text truncated for prompt size.]");
+    truncated
+}
+
 struct ParsedGameBuildGuide {
     title: String,
     build_goal: String,
@@ -1015,6 +1622,8 @@ struct ParsedGameBuildGuide {
 }
 
 fn parse_game_build_guide_markdown(markdown: &str) -> ParsedGameBuildGuide {
+    let parts = markdown_parts_tables(markdown);
+    let steps = markdown_assembly_steps(markdown, &parts);
     ParsedGameBuildGuide {
         title: first_markdown_heading(markdown).unwrap_or_else(|| "Build guide".to_string()),
         build_goal: markdown_section_text(markdown, "Build Goal"),
@@ -1022,8 +1631,8 @@ fn parse_game_build_guide_markdown(markdown: &str) -> ParsedGameBuildGuide {
         geometry_notes: markdown_section_text(markdown, "Current Chosen Geometry"),
         glossary_text: markdown_section_text(markdown, "Glossary"),
         checklist: markdown_bullets_in_section(markdown, "First Test Checklist"),
-        parts: markdown_parts_tables(markdown),
-        steps: markdown_assembly_steps(markdown),
+        parts,
+        steps,
     }
 }
 
@@ -1156,7 +1765,10 @@ fn markdown_parts_tables(markdown: &str) -> Vec<GameBuildGuidePartDraft> {
     parts
 }
 
-fn markdown_assembly_steps(markdown: &str) -> Vec<GameBuildGuideStepDraft> {
+fn markdown_assembly_steps(
+    markdown: &str,
+    parts: &[GameBuildGuidePartDraft],
+) -> Vec<GameBuildGuideStepDraft> {
     let lines = collect_markdown_section(markdown, "Assembly Instructions");
     let mut steps = Vec::new();
     let mut current_number = 0_i64;
@@ -1173,6 +1785,7 @@ fn markdown_assembly_steps(markdown: &str) -> Vec<GameBuildGuideStepDraft> {
                 current_number,
                 &current_title,
                 &current_body,
+                parts,
             );
             current_body.clear();
             let (number, title) = split_numbered_heading(heading);
@@ -1193,6 +1806,7 @@ fn markdown_assembly_steps(markdown: &str) -> Vec<GameBuildGuideStepDraft> {
         current_number,
         &current_title,
         &current_body,
+        parts,
     );
     steps
 }
@@ -1231,24 +1845,99 @@ fn is_markdown_table_separator(value: &str) -> bool {
 fn push_build_guide_step(
     steps: &mut Vec<GameBuildGuideStepDraft>,
     row_order: &mut i64,
-    step_number: i64,
+    _step_number: i64,
     title: &str,
     body: &[String],
+    parts: &[GameBuildGuidePartDraft],
 ) {
     if title.trim().is_empty() && body.is_empty() {
         return;
     }
+    let body_text = body.join("\n").trim().to_string();
+    let mentioned_parts = build_guide_step_part_instance_labels(title, &body_text, parts);
+    if mentioned_parts.len() > 3 {
+        let connection_type = build_guide_step_connection_type(title, &body_text);
+        for chunk in mentioned_parts.chunks(3) {
+            *row_order += 1;
+            let part_text = chunk.join(", ");
+            let step_title = if title.trim().is_empty() {
+                part_text.clone()
+            } else {
+                format!("{} - {}", title.trim(), part_text)
+            };
+            steps.push(GameBuildGuideStepDraft {
+                step_number: *row_order,
+                title: step_title,
+                body: format!(
+                    "Place {part_text}.\nConnection: connect these parts using {connection_type}."
+                ),
+                row_order: *row_order,
+            });
+        }
+        return;
+    }
     *row_order += 1;
     steps.push(GameBuildGuideStepDraft {
-        step_number: if step_number > 0 {
-            step_number
-        } else {
-            *row_order
-        },
+        step_number: *row_order,
         title: title.trim().to_string(),
-        body: body.join("\n").trim().to_string(),
+        body: body_text,
         row_order: *row_order,
     });
+}
+
+fn build_guide_step_part_instance_labels(
+    title: &str,
+    body: &str,
+    parts: &[GameBuildGuidePartDraft],
+) -> Vec<String> {
+    let step_text = format!("{title}\n{body}").to_ascii_lowercase();
+    let mut labels = Vec::new();
+    for part in parts {
+        let part_name = part.part_name.trim();
+        if part_name.is_empty() {
+            continue;
+        }
+        if !step_text.contains(&part_name.to_ascii_lowercase()) {
+            continue;
+        }
+        for _ in 0..build_guide_part_quantity_count(&part.quantity) {
+            labels.push(part_name.to_string());
+        }
+    }
+    labels
+}
+
+fn build_guide_part_quantity_count(quantity: &str) -> usize {
+    let Some(start) = quantity.find(|character: char| character.is_ascii_digit()) else {
+        return 1;
+    };
+    let digits = quantity[start..]
+        .chars()
+        .take_while(|character| character.is_ascii_digit())
+        .collect::<String>();
+    digits
+        .parse::<usize>()
+        .ok()
+        .filter(|count| *count > 0)
+        .unwrap_or(1)
+}
+
+fn build_guide_step_connection_type(title: &str, body: &str) -> &'static str {
+    let text = format!("{title} {body}").to_ascii_lowercase();
+    if has_any_text(&text, &["crank", "axle", "shaft", "gear", "wheel", "hub", "drivetrain"]) {
+        return "rotary connections";
+    }
+    if has_any_text(&text, &["steering", "suspension", "spring", "damper", "knuckle", "pivot"]) {
+        return "pivot/rotary connections";
+    }
+    if has_any_text(&text, &["align", "jig", "reference"]) {
+        return "aligned reference connections";
+    }
+    "static connections"
+}
+
+fn has_any_text(text: &str, values: &[&str]) -> bool {
+    values.iter().any(|value| text.contains(value))
 }
 
 fn split_numbered_heading(heading: &str) -> (Option<i64>, String) {
@@ -1419,27 +2108,27 @@ pub fn create_calendar_event(
 
 #[tauri::command]
 pub fn update_calendar_event(
-    id: i64,
-    title: String,
-    start_date: String,
-    start_time: String,
-    end_date: String,
-    end_time: String,
-    notes: String,
+    input: CalendarEventUpdateInput,
     state: State<'_, AppState>,
 ) -> Result<CalendarEventRecord, String> {
-    validate_calendar_event(&title, &start_date, &start_time, &end_date, &end_time)?;
+    validate_calendar_event(
+        &input.title,
+        &input.start_date,
+        &input.start_time,
+        &input.end_date,
+        &input.end_time,
+    )?;
     state
         .database
-        .update_calendar_event(
-            id,
-            &title,
-            &start_date,
-            &start_time,
-            &end_date,
-            &end_time,
-            &notes,
-        )
+        .update_calendar_event(CalendarEventUpdateDraft {
+            id: input.id,
+            title: &input.title,
+            start_date: &input.start_date,
+            start_time: &input.start_time,
+            end_date: &input.end_date,
+            end_time: &input.end_time,
+            notes: &input.notes,
+        })
         .map_err(|error| error.to_string())
 }
 
@@ -2060,7 +2749,15 @@ pub fn update_youtube_reference(
     let video_id = extract_youtube_video_id(&url)?;
     state
         .database
-        .update_youtube_reference(id, &title, &url, &video_id, &channel_name, &notes, &tags)
+        .update_youtube_reference(YouTubeReferenceUpdateDraft {
+            id,
+            title: &title,
+            url: &url,
+            video_id: &video_id,
+            channel_name: &channel_name,
+            notes: &notes,
+            tags: &tags,
+        })
         .map_err(|error| error.to_string())
 }
 
@@ -2456,25 +3153,25 @@ fn index_decoded_gearblocks_construction(
         serde_json::to_string_pretty(&decoded.document).map_err(|error| error.to_string())?;
     state
         .database
-        .upsert_game_construction(
+        .upsert_game_construction(GameConstructionDraft {
             game_id,
-            &decoded.name,
-            &decoded.folder_path,
-            &decoded.construction_path,
-            decoded.byte_size as i64,
-            decoded.decoded_byte_size as i64,
-            decoded.summary.composite_count as i64,
-            decoded.summary.part_count as i64,
-            decoded.summary.unique_asset_guid_count as i64,
-            decoded.summary.attachment_count as i64,
-            decoded.summary.link_count as i64,
-            decoded.summary.intersection_count as i64,
-            decoded.summary.is_frozen,
-            decoded.summary.is_invulnerable,
-            &summary_json,
-            &document_json,
-            indexed_at,
-        )
+            name: &decoded.name,
+            folder_path: &decoded.folder_path,
+            construction_path: &decoded.construction_path,
+            byte_size: decoded.byte_size as i64,
+            decoded_byte_size: decoded.decoded_byte_size as i64,
+            composite_count: decoded.summary.composite_count as i64,
+            part_count: decoded.summary.part_count as i64,
+            unique_asset_guid_count: decoded.summary.unique_asset_guid_count as i64,
+            attachment_count: decoded.summary.attachment_count as i64,
+            link_count: decoded.summary.link_count as i64,
+            intersection_count: decoded.summary.intersection_count as i64,
+            is_frozen: decoded.summary.is_frozen,
+            is_invulnerable: decoded.summary.is_invulnerable,
+            summary_json: &summary_json,
+            document_json: &document_json,
+            last_indexed_at: indexed_at,
+        })
         .map_err(|error| error.to_string())
 }
 
@@ -3311,19 +4008,19 @@ pub fn catalog_game_parts_from_screenshots(
 
         state
             .database
-            .upsert_game_catalog_object(
-                game.id,
-                seed.name,
-                "part",
-                seed.category,
-                resolved_category.category_icon,
-                &resolved_category.category_icon_path,
-                &description,
-                &notes,
-                &tags,
-                &resolved_category.source_path_text,
-                &resolved_category.source_path_text,
-            )
+            .upsert_game_catalog_object(GameCatalogObjectDraft {
+                game_id: game.id,
+                name: seed.name,
+                object_type: "part",
+                category: seed.category,
+                category_icon: resolved_category.category_icon,
+                category_icon_path: &resolved_category.category_icon_path,
+                description: &description,
+                notes: &notes,
+                tags: &tags,
+                thumbnail_path: &resolved_category.source_path_text,
+                source_screenshot_path: &resolved_category.source_path_text,
+            })
             .map_err(|error| error.to_string())?;
     }
 
@@ -3390,14 +4087,16 @@ pub fn create_game_screenshot_capture_request(
         app,
         window,
         state,
-        "visible-game-display",
-        "windows-gdi-bitblt-foreground-window",
-        "hide Overlay Forge before capture, then restore it",
-        "captured_windows_gdi",
-        "Captured through Windows GDI BitBlt from the foreground window after hiding Overlay Forge. Alpha was forced to 255 before PNG encoding.",
-        true,
-        false,
-        capture_foreground_window_to_png,
+        GameScreenshotCaptureOptions {
+            capture_scope: "visible-game-display",
+            method_source: "windows-gdi-bitblt-foreground-window",
+            overlay_handling: "hide Overlay Forge before capture, then restore it",
+            capture_status: "captured_windows_gdi",
+            notes: "Captured through Windows GDI BitBlt from the foreground window after hiding Overlay Forge. Alpha was forced to 255 before PNG encoding.",
+            restore_overlay: true,
+            restore_chat_overlay: false,
+            capture: capture_foreground_window_to_png,
+        },
     )
 }
 
@@ -3415,15 +4114,28 @@ pub fn create_game_chat_screenshot_capture(
         app,
         window,
         state,
-        "visible-game-display",
-        "windows-gdi-bitblt-foreground-window",
-        "hide Overlay Forge before capture and leave focus with the game",
-        "captured_windows_gdi_chat",
-        "Captured through Windows GDI BitBlt from the foreground window after hiding Overlay Forge. Alpha was forced to 255 before PNG encoding and the screenshot was attached to the current Gaming chat prompt.",
-        false,
-        true,
-        capture_foreground_window_to_png,
+        GameScreenshotCaptureOptions {
+            capture_scope: "visible-game-display",
+            method_source: "windows-gdi-bitblt-foreground-window",
+            overlay_handling: "hide Overlay Forge before capture and leave focus with the game",
+            capture_status: "captured_windows_gdi_chat",
+            notes: "Captured through Windows GDI BitBlt from the foreground window after hiding Overlay Forge. Alpha was forced to 255 before PNG encoding and the screenshot was attached to the current Gaming chat prompt.",
+            restore_overlay: false,
+            restore_chat_overlay: true,
+            capture: capture_foreground_window_to_png,
+        },
     )
+}
+
+struct GameScreenshotCaptureOptions {
+    capture_scope: &'static str,
+    method_source: &'static str,
+    overlay_handling: &'static str,
+    capture_status: &'static str,
+    notes: &'static str,
+    restore_overlay: bool,
+    restore_chat_overlay: bool,
+    capture: fn(&std::path::Path) -> Result<(), String>,
 }
 
 fn create_game_screenshot_capture(
@@ -3432,14 +4144,7 @@ fn create_game_screenshot_capture(
     app: AppHandle,
     window: WebviewWindow,
     state: State<'_, AppState>,
-    capture_scope: &str,
-    method_source: &str,
-    overlay_handling: &str,
-    capture_status: &str,
-    notes: &str,
-    restore_overlay: bool,
-    restore_chat_overlay: bool,
-    capture: fn(&std::path::Path) -> Result<(), String>,
+    options: GameScreenshotCaptureOptions,
 ) -> Result<GameScreenshotCaptureRequestRecord, String> {
     let game = state
         .database
@@ -3466,16 +4171,16 @@ fn create_game_screenshot_capture(
         "gameId": game.id,
         "gameName": game.name,
         "gameSlug": game.slug,
-        "captureScope": capture_scope,
+        "captureScope": options.capture_scope,
         "includeOverlay": false,
         "targetFilePath": target_file_path_text,
         "method": {
-            "source": method_source,
+            "source": options.method_source,
             "format": "png",
             "colorSpace": "sRGB",
             "forceAlpha": 255,
             "filenamePattern": "GameName_YYYYMMDD_HHMMSS_unique.png",
-            "overlayHandling": overlay_handling,
+            "overlayHandling": options.overlay_handling,
             "knownRisk": "GDI capture may still fail or produce black frames for some hardware-accelerated or protected game surfaces."
         }
     });
@@ -3487,9 +4192,9 @@ fn create_game_screenshot_capture(
     let hidden_overlay_windows = hide_overlay_windows_for_capture(&app)?;
     thread::sleep(Duration::from_millis(350));
 
-    let capture_result = capture(&target_file_path);
+    let capture_result = (options.capture)(&target_file_path);
 
-    if restore_overlay || capture_result.is_err() {
+    if options.restore_overlay || capture_result.is_err() {
         let _ = window.show();
         let _ = window.set_focus();
     }
@@ -3497,22 +4202,22 @@ fn create_game_screenshot_capture(
 
     capture_result?;
 
-    if restore_chat_overlay {
+    if options.restore_chat_overlay {
         restore_game_chat_overlay_after_capture(&app, &state)?;
     }
 
     state
         .database
-        .create_game_screenshot_capture_request(
-            game.id,
-            &title,
-            &target_file_path_text,
-            &request_id,
-            &request_file_path_text,
-            capture_status,
-            &timestamp_label,
-            notes,
-        )
+        .create_game_screenshot_capture_request(GameScreenshotCaptureRequestDraft {
+            game_id: game.id,
+            title: &title,
+            file_path: &target_file_path_text,
+            request_id: &request_id,
+            request_path: &request_file_path_text,
+            capture_status: options.capture_status,
+            captured_at: &timestamp_label,
+            notes: options.notes,
+        })
         .map_err(|error| error.to_string())
 }
 
@@ -3698,6 +4403,25 @@ fn gearblocks_prompt_context(
     }
     if let Some(runtime_context) =
         gearblocks_latest_runtime_understanding_context(state, game_id, include_scene_diff)?
+    {
+        sections.push(runtime_context);
+    }
+    Ok(sections.join("\n\n---\n\n"))
+}
+
+fn gearblocks_build_guide_import_prompt_context(
+    state: &State<'_, AppState>,
+    game_id: i64,
+) -> Result<String, String> {
+    let mut sections = vec![
+        gearblocks_units_prompt_context(),
+        gearblocks_parts_catalog_prompt_context()?,
+    ];
+    if let Some(saved_context) = gearblocks_latest_saved_construction_context(state, game_id)? {
+        sections.push(saved_context);
+    }
+    if let Some(runtime_context) =
+        gearblocks_latest_runtime_understanding_context(state, game_id, false)?
     {
         sections.push(runtime_context);
     }
@@ -5240,32 +5964,32 @@ fn persist_runtime_export(
 ) -> Result<GameRuntimeConstructionExportRecord, String> {
     state
         .database
-        .upsert_game_runtime_construction_export(
+        .upsert_game_runtime_construction_export(GameRuntimeConstructionExportDraft {
             game_id,
-            &export.id,
-            &export.name,
-            &json_string(export.document.get("exportKind")),
-            &export.intended_path,
-            &export.source_log_path,
-            export.byte_size as i64,
-            &export
+            export_id: &export.id,
+            name: &export.name,
+            export_kind: &json_string(export.document.get("exportKind")),
+            intended_path: &export.intended_path,
+            source_log_path: &export.source_log_path,
+            byte_size: export.byte_size as i64,
+            construction_id: &export
                 .document
                 .get("id")
                 .map(json_value_to_string)
                 .unwrap_or_default(),
-            export
+            exported_at: export
                 .document
                 .get("exportedAt")
                 .and_then(|value| value.as_str())
                 .unwrap_or_default(),
-            json_i64(export.document.get("numParts")),
-            json_f64(export.document.get("mass")),
-            json_optional_bool(export.document.get("isFrozen")),
-            json_optional_bool(export.document.get("isInvulnerable")),
-            json_optional_bool(export.document.get("isPlayerCharacter")),
-            "{}",
-            indexed_at,
-        )
+            part_count: json_i64(export.document.get("numParts")),
+            mass: json_f64(export.document.get("mass")),
+            is_frozen: json_optional_bool(export.document.get("isFrozen")),
+            is_invulnerable: json_optional_bool(export.document.get("isInvulnerable")),
+            is_player_character: json_optional_bool(export.document.get("isPlayerCharacter")),
+            document_json: "{}",
+            last_indexed_at: indexed_at,
+        })
         .map_err(|error| error.to_string())
 }
 
@@ -5330,24 +6054,28 @@ fn import_runtime_export_parts(
             serde_json::to_string_pretty(&part).map_err(|error| error.to_string())?;
         state
             .database
-            .upsert_game_runtime_part(
-                game_id,
-                &part_key,
-                &asset_guid,
-                &asset_name,
-                &display_name,
-                &full_display_name,
-                &category,
-                json_f64(part.get("mass")),
+            .upsert_game_runtime_part(GameRuntimePartDraft {
+                identity: GameRuntimePartIdentity {
+                    game_id,
+                    part_key: &part_key,
+                    asset_guid: &asset_guid,
+                    asset_name: &asset_name,
+                    display_name: &display_name,
+                    full_display_name: &full_display_name,
+                    category: &category,
+                },
+                mass: json_f64(part.get("mass")),
                 world_position,
                 local_position,
-                &world_position_json,
-                &local_position_json,
-                &properties_json,
-                &export.id,
-                &part_source_construction_id,
-                &last_seen_at,
-            )
+                world_position_json: &world_position_json,
+                local_position_json: &local_position_json,
+                properties_json: &properties_json,
+                source: GameRuntimePartSource {
+                    source_export_id: &export.id,
+                    source_construction_id: &part_source_construction_id,
+                    seen_at: &last_seen_at,
+                },
+            })
             .map_err(|error| error.to_string())?;
         instance_drafts.push(GameRuntimePartInstanceDraft {
             part_key: part_key.clone(),
@@ -5413,6 +6141,28 @@ struct RuntimePartIndexContext {
     seen_at: String,
 }
 
+impl RuntimePartIndexContext {
+    fn identity(&self) -> GameRuntimePartIdentity<'_> {
+        GameRuntimePartIdentity {
+            game_id: self.game_id,
+            part_key: &self.part_key,
+            asset_guid: &self.asset_guid,
+            asset_name: &self.asset_name,
+            display_name: &self.display_name,
+            full_display_name: &self.full_display_name,
+            category: &self.category,
+        }
+    }
+
+    fn source(&self) -> GameRuntimePartSource<'_> {
+        GameRuntimePartSource {
+            source_export_id: &self.source_export_id,
+            source_construction_id: &self.source_construction_id,
+            seen_at: &self.seen_at,
+        }
+    }
+}
+
 fn index_runtime_part_discovery(
     state: &AppState,
     context: &RuntimePartIndexContext,
@@ -5430,35 +6180,25 @@ fn index_runtime_part_discovery(
             }
             state
                 .database
-                .upsert_game_runtime_part_api_attribute(
-                    context.game_id,
-                    &context.part_key,
-                    &context.asset_guid,
-                    &context.asset_name,
-                    &context.display_name,
-                    &context.full_display_name,
-                    &context.category,
-                    &interface_name,
-                    &attribute_name,
-                    &json_string(attribute.get("valueType")),
-                    &json_string(attribute.get("availability")),
-                    &context.source_export_id,
-                    &context.source_construction_id,
-                    &context.seen_at,
-                )
+                .upsert_game_runtime_part_api_attribute(GameRuntimePartApiAttributeObservation {
+                    identity: context.identity(),
+                    interface_name: &interface_name,
+                    attribute_name: &attribute_name,
+                    value_type: &json_string(attribute.get("valueType")),
+                    availability: &json_string(attribute.get("availability")),
+                    source: context.source(),
+                })
                 .map_err(|error| error.to_string())?;
             state
                 .database
-                .upsert_game_runtime_part_api_member(
-                    context.game_id,
-                    &context.part_key,
-                    &interface_name,
-                    &attribute_name,
-                    &json_string(attribute.get("availability")),
-                    &context.source_export_id,
-                    &context.source_construction_id,
-                    &context.seen_at,
-                )
+                .upsert_game_runtime_part_api_member(GameRuntimePartApiMemberObservation {
+                    game_id: context.game_id,
+                    part_key: &context.part_key,
+                    interface_name: &interface_name,
+                    attribute_name: &attribute_name,
+                    availability: &json_string(attribute.get("availability")),
+                    source: context.source(),
+                })
                 .map_err(|error| error.to_string())?;
         }
     }
@@ -5468,35 +6208,25 @@ fn index_runtime_part_discovery(
     for (field_path, value) in value_fields {
         state
             .database
-            .upsert_game_runtime_part_metadata_value(
-                context.game_id,
-                &context.part_key,
-                "value",
-                &field_path,
-                json_type_label(value),
-                &value.to_string(),
-                &context.source_export_id,
-                &context.source_construction_id,
-                &context.seen_at,
-            )
+            .upsert_game_runtime_part_metadata_value(GameRuntimePartMetadataValueDraft {
+                game_id: context.game_id,
+                part_key: &context.part_key,
+                source_area: "value",
+                field_path: &field_path,
+                value_type: json_type_label(value),
+                value_json: &value.to_string(),
+                source: context.source(),
+            })
             .map_err(|error| error.to_string())?;
         state
             .database
-            .upsert_game_runtime_part_value(
-                context.game_id,
-                &context.part_key,
-                &context.asset_guid,
-                &context.asset_name,
-                &context.display_name,
-                &context.full_display_name,
-                &context.category,
-                &field_path,
-                json_type_label(value),
-                &value.to_string(),
-                &context.source_export_id,
-                &context.source_construction_id,
-                &context.seen_at,
-            )
+            .upsert_game_runtime_part_value(GameRuntimePartValueObservation {
+                identity: context.identity(),
+                field_path: &field_path,
+                value_type: json_type_label(value),
+                value_json: &value.to_string(),
+                source: context.source(),
+            })
             .map_err(|error| error.to_string())?;
     }
 
@@ -5509,35 +6239,25 @@ fn index_runtime_part_discovery(
         for (property_path, value) in property_values {
             state
                 .database
-                .upsert_game_runtime_part_metadata_value(
-                    context.game_id,
-                    &context.part_key,
-                    "property",
-                    &property_path,
-                    json_type_label(value),
-                    &value.to_string(),
-                    &context.source_export_id,
-                    &context.source_construction_id,
-                    &context.seen_at,
-                )
+                .upsert_game_runtime_part_metadata_value(GameRuntimePartMetadataValueDraft {
+                    game_id: context.game_id,
+                    part_key: &context.part_key,
+                    source_area: "property",
+                    field_path: &property_path,
+                    value_type: json_type_label(value),
+                    value_json: &value.to_string(),
+                    source: context.source(),
+                })
                 .map_err(|error| error.to_string())?;
             state
                 .database
-                .upsert_game_runtime_part_property(
-                    context.game_id,
-                    &context.part_key,
-                    &context.asset_guid,
-                    &context.asset_name,
-                    &context.display_name,
-                    &context.full_display_name,
-                    &context.category,
-                    &property_path,
-                    json_type_label(value),
-                    &value.to_string(),
-                    &context.source_export_id,
-                    &context.source_construction_id,
-                    &context.seen_at,
-                )
+                .upsert_game_runtime_part_property(GameRuntimePartPropertyObservation {
+                    identity: context.identity(),
+                    property_path: &property_path,
+                    value_type: json_type_label(value),
+                    value_json: &value.to_string(),
+                    source: context.source(),
+                })
                 .map_err(|error| error.to_string())?;
         }
     }
@@ -5548,35 +6268,25 @@ fn index_runtime_part_discovery(
         for (attachment_path, value) in attachment_values {
             state
                 .database
-                .upsert_game_runtime_part_attachment_type(
-                    context.game_id,
-                    &context.part_key,
-                    &attachment_path,
-                    &gearblocks_attachment_type_name(&attachment_path, value),
-                    json_type_label(value),
-                    &value.to_string(),
-                    &context.source_export_id,
-                    &context.source_construction_id,
-                    &context.seen_at,
-                )
+                .upsert_game_runtime_part_attachment_type(GameRuntimePartAttachmentTypeDraft {
+                    game_id: context.game_id,
+                    part_key: &context.part_key,
+                    attachment_path: &attachment_path,
+                    type_name: &gearblocks_attachment_type_name(&attachment_path, value),
+                    value_type: json_type_label(value),
+                    attachment_json: &value.to_string(),
+                    source: context.source(),
+                })
                 .map_err(|error| error.to_string())?;
             state
                 .database
-                .upsert_game_runtime_part_attachment(
-                    context.game_id,
-                    &context.part_key,
-                    &context.asset_guid,
-                    &context.asset_name,
-                    &context.display_name,
-                    &context.full_display_name,
-                    &context.category,
-                    &attachment_path,
-                    json_type_label(value),
-                    &value.to_string(),
-                    &context.source_export_id,
-                    &context.source_construction_id,
-                    &context.seen_at,
-                )
+                .upsert_game_runtime_part_attachment(GameRuntimePartAttachmentObservation {
+                    identity: context.identity(),
+                    attachment_path: &attachment_path,
+                    value_type: json_type_label(value),
+                    attachment_json: &value.to_string(),
+                    source: context.source(),
+                })
                 .map_err(|error| error.to_string())?;
         }
     }
@@ -5584,36 +6294,32 @@ fn index_runtime_part_discovery(
     for setting in gearblocks_part_setting_values(part) {
         state
             .database
-            .upsert_game_runtime_part_setting_value(
-                context.game_id,
-                &context.part_key,
-                &setting.key,
-                &setting.label,
-                &setting.area,
-                json_type_label(setting.value),
-                &setting.value.to_string(),
-                &context.source_export_id,
-                &context.source_construction_id,
-                &context.seen_at,
-            )
+            .upsert_game_runtime_part_setting_value(GameRuntimePartSettingValueDraft {
+                game_id: context.game_id,
+                part_key: &context.part_key,
+                setting_key: &setting.key,
+                label: &setting.label,
+                setting_area: &setting.area,
+                value_type: json_type_label(setting.value),
+                value_json: &setting.value.to_string(),
+                source: context.source(),
+            })
             .map_err(|error| error.to_string())?;
     }
 
     for channel in gearblocks_part_output_channel_values(part) {
         state
             .database
-            .upsert_game_runtime_part_output_channel_value(
-                context.game_id,
-                &context.part_key,
-                &channel.key,
-                &channel.label,
-                &channel.area,
-                json_type_label(channel.value),
-                &channel.value.to_string(),
-                &context.source_export_id,
-                &context.source_construction_id,
-                &context.seen_at,
-            )
+            .upsert_game_runtime_part_output_channel_value(GameRuntimePartOutputChannelValueDraft {
+                game_id: context.game_id,
+                part_key: &context.part_key,
+                channel_key: &channel.key,
+                label: &channel.label,
+                channel_area: &channel.area,
+                value_type: json_type_label(channel.value),
+                value_json: &channel.value.to_string(),
+                source: context.source(),
+            })
             .map_err(|error| error.to_string())?;
     }
 
@@ -6200,23 +6906,23 @@ fn persist_gearblocks_part_aliases(
             serde_json::to_string_pretty(&alias.document).map_err(|error| error.to_string())?;
         state
             .database
-            .upsert_game_runtime_part_alias(
+            .upsert_game_runtime_part_alias(GameRuntimePartAliasDraft {
                 game_id,
-                &alias.part_instance_key,
-                &alias.friendly_name,
-                &json_string(alias.document.get("assetGuid")),
-                &json_string(alias.document.get("assetName")),
-                &json_string(alias.document.get("displayName")),
-                &json_string(alias.document.get("fullDisplayName")),
-                &json_string(alias.document.get("category")),
-                &alias.source_log_path,
-                &source_construction_id,
-                &world_position_json,
-                &local_position_json,
-                &current_unit_size_json,
-                &payload_json,
-                &alias.emitted_at,
-            )
+                part_instance_key: &alias.part_instance_key,
+                friendly_name: &alias.friendly_name,
+                asset_guid: &json_string(alias.document.get("assetGuid")),
+                asset_name: &json_string(alias.document.get("assetName")),
+                display_name: &json_string(alias.document.get("displayName")),
+                full_display_name: &json_string(alias.document.get("fullDisplayName")),
+                category: &json_string(alias.document.get("category")),
+                source_log_path: &alias.source_log_path,
+                source_construction_id: &source_construction_id,
+                world_position_json: &world_position_json,
+                local_position_json: &local_position_json,
+                current_unit_size_json: &current_unit_size_json,
+                payload_json: &payload_json,
+                last_seen_at: &alias.emitted_at,
+            })
             .map_err(|error| error.to_string())?;
         imported_count += 1;
     }

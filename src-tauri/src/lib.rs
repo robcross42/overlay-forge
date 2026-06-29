@@ -5,6 +5,7 @@ mod gearblocks_api_scraper;
 mod gearblocks_scene_context;
 mod github;
 mod hotkeys;
+mod lifecycle;
 mod openai;
 mod windows;
 
@@ -19,23 +20,24 @@ use commands::{
     create_game_screenshot_capture_request, create_note, create_planning_conversation,
     create_project, create_task, create_youtube_reference, decode_gearblocks_construction_file,
     decode_gearblocks_construction_folder, delete_bridge_file_draft, delete_calendar_event,
-    delete_game, delete_game_chat_conversation, delete_game_data_location, delete_game_screenshot,
-    delete_note, delete_planning_conversation, delete_project, delete_project_github_repository,
-    delete_project_markdown_context, delete_smoking_event, delete_task, delete_youtube_reference,
-    export_smoking_cessation_chatgpt_context, fetch_project_github_metadata,
-    focus_game_chat_overlay_window, focus_last_game_window, get_active_game_build_guide_overlay,
-    get_active_game_chat_overlay, get_bridge_file_draft, get_game_build_guide, get_game_setting,
-    get_gearblocks_third_party_dependency_status, get_milestone_status, get_openai_api_key_status,
-    get_overlay_forge_foreground_window_label, get_project_github_repository,
-    get_project_markdown_context, get_scratchpad, get_smoking_cessation_settings,
-    get_youtube_reference, import_game_build_guide_markdown,
-    import_gearblocks_catalog_screenshot_images, import_gearblocks_official_api_docs,
-    import_gearblocks_runtime_context, import_gearblocks_runtime_part_index,
-    install_gearblocks_lua_exporter, is_overlay_forge_foreground, list_bridge_file_drafts,
-    list_calendar_events, list_game_build_guides, list_game_catalog_objects,
-    list_game_chat_conversations, list_game_chat_messages, list_game_constructions,
-    list_game_data_locations, list_game_part_categories, list_game_runtime_part_api_members,
-    list_game_runtime_parts, list_game_screenshots, list_games, list_gearblocks_api_catalog,
+    delete_game, delete_game_build_guide, delete_game_chat_conversation, delete_game_data_location,
+    delete_game_screenshot, delete_note, delete_planning_conversation, delete_project,
+    delete_project_github_repository, delete_project_markdown_context, delete_smoking_event,
+    delete_task, delete_youtube_reference, export_smoking_cessation_chatgpt_context,
+    fetch_project_github_metadata, focus_game_chat_overlay_window, focus_last_game_window,
+    get_active_game_build_guide_overlay, get_active_game_chat_overlay, get_bridge_file_draft,
+    get_game_build_guide, get_game_setting, get_gearblocks_third_party_dependency_status,
+    get_milestone_status, get_openai_api_key_status, get_overlay_forge_foreground_window_label,
+    get_project_github_repository, get_project_markdown_context, get_scratchpad,
+    get_smoking_cessation_settings, get_youtube_reference, import_game_build_guide_markdown,
+    import_game_build_guide_url, import_gearblocks_catalog_screenshot_images,
+    import_gearblocks_official_api_docs, import_gearblocks_runtime_context,
+    import_gearblocks_runtime_part_index, install_gearblocks_lua_exporter,
+    is_overlay_forge_foreground, list_bridge_file_drafts, list_calendar_events,
+    list_game_build_guides, list_game_catalog_objects, list_game_chat_conversations,
+    list_game_chat_messages, list_game_constructions, list_game_data_locations,
+    list_game_part_categories, list_game_runtime_part_api_members, list_game_runtime_parts,
+    list_game_screenshots, list_games, list_gearblocks_api_catalog,
     list_gearblocks_construction_files, list_gearblocks_runtime_exports, list_keybinds, list_notes,
     list_planning_conversation_context, list_planning_conversations, list_planning_messages,
     list_projects, list_schedulers, list_smoking_events, list_tasks, list_youtube_references,
@@ -53,7 +55,7 @@ use commands::{
 };
 use db::AppDatabase;
 use serde::{Deserialize, Serialize};
-use tauri::{Manager, WindowEvent};
+use tauri::{Manager, RunEvent, WindowEvent};
 use windows::{OverlayWindowConfig, StandaloneWindowConfig, WindowManager};
 
 #[derive(Clone, Serialize)]
@@ -81,7 +83,9 @@ pub struct AppState {
 }
 
 pub fn run() {
-    tauri::Builder::default()
+    lifecycle::reset_shutdown();
+
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             if let Err(error) = terminate_existing_overlay_forge_instances() {
@@ -230,7 +234,9 @@ pub fn run() {
             list_game_build_guides,
             create_game_build_guide_from_chat,
             import_game_build_guide_markdown,
+            import_game_build_guide_url,
             get_game_build_guide,
+            delete_game_build_guide,
             open_game_build_guide_overlay_window,
             toggle_game_build_guide_overlay_window,
             get_active_game_build_guide_overlay,
@@ -323,8 +329,13 @@ pub fn run() {
             send_game_chat_message,
             delete_game_chat_conversation
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Overlay Forge");
+        .build(tauri::generate_context!())
+        .expect("error while building Overlay Forge");
+
+    app.run(|_app_handle, event| match event {
+        RunEvent::ExitRequested { .. } | RunEvent::Exit => lifecycle::request_shutdown(),
+        _ => {}
+    });
 }
 
 #[cfg(target_os = "windows")]

@@ -83,8 +83,8 @@ impl StandaloneWindowConfig {
     pub const fn game_build_guide() -> Self {
         Self {
             base: WindowKind::GameBuildGuide.runtime_config(),
-            min_width: 300,
-            min_height: 360,
+            min_width: 700,
+            min_height: 520,
         }
     }
 }

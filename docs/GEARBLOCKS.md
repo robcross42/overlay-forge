@@ -97,19 +97,25 @@ Normal chat navigation must not synchronously parse full-scene runtime logs.
 
 ## Build Guide Overlay
 
-GearBlocks build guides are imported from Markdown handoffs and stored locally in SQLite. Overlay Forge keeps the raw Markdown, parsed part rows, parsed assembly steps, and first-test checklist so the guide can be displayed in-game without involving chat.
+GearBlocks build guides are imported from Markdown handoffs or supported Steam Community guide URLs and stored locally in SQLite. Overlay Forge keeps the raw Markdown, parsed part rows, parsed assembly steps, and first-test checklist so the guide can be displayed in-game without involving chat.
+
+Steam guide URL imports also download supported guide images into `game-screenshots/<game-slug>/build-guide-images/<guide-id>/` and create local game catalog reference rows for those files. Image bytes are not stored in SQLite.
 
 GearBlocks chat can also generate a build guide directly. Use the Guide action in a GearBlocks chat after typing a build goal, or after a recent user message already describes the intended build. Overlay Forge sends the goal and current GearBlocks context to the backend OpenAI path, saves the generated Markdown under app data, imports it into SQLite, and refreshes the Build Guides list during the same session.
+
+The Build Guides list can delete individual stored guides, including their parsed part and step rows. Deleting the active guide clears the remembered build-guide overlay selection.
 
 The active or latest GearBlocks build guide is included in GearBlocks chat prompt context. A newly imported or generated guide becomes the current guide for chat until another guide is imported, generated, or selected.
 
 Generated build guides include a Glossary section. The glossary maps real-world vehicle terms to exact GearBlocks part names when one part is enough, or to relative mini-assembly instructions when multiple GearBlocks parts are needed. Chat may use real-world terms such as axle tube, skid plate, rail, crossmember, hub, or jig, but those terms should remain grounded in the glossary.
 
-Generated assembly guidance should use relative placement from the first reference part, named subassemblies, or temporary jigs. Avoid absolute world coordinates because the user may build in the air and GearBlocks may introduce small angle drift.
+Generated assembly guidance should use relative placement from the first reference part, named subassemblies, or temporary jigs. Numbered assembly steps should place at most three parts or blocks each, name those exact parts, and briefly state the connection type such as static, rotary, pivot, or aligned reference. Steps should not explain a whole subsystem or mention unrelated future parts. When imported or generated Markdown still names more than three part instances in one assembly step, the import parser splits that oversized step into smaller stored steps. Avoid absolute world coordinates because the user may build in the air and GearBlocks may introduce small angle drift.
 
-The build-guide overlay is independent from the main Overlay Forge window and the game chat overlay. It is translucent, resizable, movable, always-on-top, and remembers its last position and size per guide.
+The build-guide overlay is independent from the main Overlay Forge window and the game chat overlay. It is translucent, resizable, movable, always-on-top, and remembers its last position and size per guide. The overlay minimum size preserves the fixed build-step image size instead of allowing the image to shrink.
 
-The overlay is optimized for a side-of-screen layout. Parts are rendered as compact stacked rows instead of wide tables so the window can stay pinned to roughly one quarter to one third of the screen while building.
+The overlay is optimized for a side-of-screen layout. It has a Build Info view for guide-level context such as goal, scale, geometry, glossary, checklist, part count, step count, and readiness, plus a Build Steps view for static Overlay Forge-generated isometric diagrams and diagram captions. The first visual iteration derives diagrams and captions from parsed step text and part rows at render time; it does not require GearBlocks script windows, BepInEx, or a persisted visual-step table.
+
+The static diagrams highlight up to three new placement parts in a contrasting color, show already-placed reference parts in muted colors, use white labels and leader arrows for new placement callouts, and use magenta arrows and lines for connection or attachment links. Step 1 starts from the first three real guide parts only, with no already-placed references or synthesized future parts; step 2 is the first step that may render prior parts as references. The translucent diagram grid represents 10x10 cm squares and expands to cover the current step's part bounds. When no already-placed reference part exists, the grid plane is the placement anchor and new parts sit on the grid. Rendered parts use parsed guide dimensions when available, with GearBlocks size suffixes such as `Beam x3` mapped to block-grid footprints such as 1x3 squares. Known catalog parts can also use procedural part profiles when a generic box would be misleading; for example, `Engine Rear (Driven) Crank x2 & Axle` renders as a 2x2x1 crank cylinder plus a 0.5x0.5x2 axle in one 2x2x3 placement envelope. Captions stay brief by listing the active part names, connection type, and already-placed references. Current heuristic templates cover common build-guide systems such as differentials, steering, drivetrains, crankshafts, suspension corners, wheel/hub placements, frames, and generic part attachments.
 
 Automated construction, live scene validation against guide steps, and GearBlocks API execution are deferred.
 

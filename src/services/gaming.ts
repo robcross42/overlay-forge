@@ -421,6 +421,7 @@ export type GameBuildGuidePayload = {
   parts: GameBuildGuidePart[];
   steps: GameBuildGuideStep[];
   checklist: string[];
+  imageReferenceCount: number;
 };
 
 export type GameBuildGuideOverlaySelection = {
@@ -651,6 +652,13 @@ export function importGameBuildGuideMarkdown(gameId: number, markdownPath: strin
   });
 }
 
+export function importGameBuildGuideUrl(gameId: number, guideUrl: string) {
+  return invoke<GameBuildGuidePayload>("import_game_build_guide_url", {
+    gameId,
+    guideUrl
+  });
+}
+
 export function createGameBuildGuideFromChat(conversationId: number, buildGoal: string) {
   return invoke<GameBuildGuidePayload>("create_game_build_guide_from_chat", {
     conversationId,
@@ -660,6 +668,10 @@ export function createGameBuildGuideFromChat(conversationId: number, buildGoal: 
 
 export function getGameBuildGuide(guideId: number) {
   return invoke<GameBuildGuidePayload>("get_game_build_guide", { guideId });
+}
+
+export function deleteGameBuildGuide(guideId: number) {
+  return invoke<void>("delete_game_build_guide", { guideId });
 }
 
 export function openGameBuildGuideOverlayWindow(gameId: number, guideId: number) {

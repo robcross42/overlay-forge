@@ -54,6 +54,16 @@ pub struct CalendarEventRecord {
     pub updated_at: String,
 }
 
+pub struct CalendarEventUpdateDraft<'a> {
+    pub id: i64,
+    pub title: &'a str,
+    pub start_date: &'a str,
+    pub start_time: &'a str,
+    pub end_date: &'a str,
+    pub end_time: &'a str,
+    pub notes: &'a str,
+}
+
 #[derive(Clone, Serialize)]
 pub struct SmokingEventRecord {
     pub id: i64,
@@ -238,6 +248,16 @@ pub struct YouTubeReferenceRecord {
     pub updated_at: String,
 }
 
+pub struct YouTubeReferenceUpdateDraft<'a> {
+    pub id: i64,
+    pub title: &'a str,
+    pub url: &'a str,
+    pub video_id: &'a str,
+    pub channel_name: &'a str,
+    pub notes: &'a str,
+    pub tags: &'a str,
+}
+
 #[derive(Clone, Serialize)]
 pub struct GameRecord {
     pub id: i64,
@@ -311,6 +331,31 @@ pub struct GameCatalogObjectRecord {
     pub updated_at: String,
 }
 
+pub struct GameCatalogObjectDraft<'a> {
+    pub game_id: i64,
+    pub name: &'a str,
+    pub object_type: &'a str,
+    pub category: &'a str,
+    pub category_icon: &'a str,
+    pub category_icon_path: &'a str,
+    pub description: &'a str,
+    pub notes: &'a str,
+    pub tags: &'a str,
+    pub thumbnail_path: &'a str,
+    pub source_screenshot_path: &'a str,
+}
+
+pub struct GameCatalogReferenceDraft<'a> {
+    pub game_id: i64,
+    pub object_id: Option<i64>,
+    pub title: &'a str,
+    pub reference_type: &'a str,
+    pub url: &'a str,
+    pub local_path: &'a str,
+    pub notes: &'a str,
+    pub tags: &'a str,
+}
+
 #[derive(Clone, Serialize)]
 pub struct GameRuntimePartRecord {
     pub id: i64,
@@ -361,6 +406,33 @@ pub struct GameRuntimePartRecord {
     pub created_at: String,
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
+}
+
+pub struct GameRuntimePartIdentity<'a> {
+    pub game_id: i64,
+    pub part_key: &'a str,
+    pub asset_guid: &'a str,
+    pub asset_name: &'a str,
+    pub display_name: &'a str,
+    pub full_display_name: &'a str,
+    pub category: &'a str,
+}
+
+pub struct GameRuntimePartSource<'a> {
+    pub source_export_id: &'a str,
+    pub source_construction_id: &'a str,
+    pub seen_at: &'a str,
+}
+
+pub struct GameRuntimePartDraft<'a> {
+    pub identity: GameRuntimePartIdentity<'a>,
+    pub mass: f64,
+    pub world_position: Option<(f64, f64, f64)>,
+    pub local_position: Option<(f64, f64, f64)>,
+    pub world_position_json: &'a str,
+    pub local_position_json: &'a str,
+    pub properties_json: &'a str,
+    pub source: GameRuntimePartSource<'a>,
 }
 
 pub struct GameRuntimePartInstanceDraft {
@@ -459,6 +531,108 @@ pub struct GameRuntimePartAliasRecord {
     pub updated_at: String,
 }
 
+pub struct GameRuntimePartAliasDraft<'a> {
+    pub game_id: i64,
+    pub part_instance_key: &'a str,
+    pub friendly_name: &'a str,
+    pub asset_guid: &'a str,
+    pub asset_name: &'a str,
+    pub display_name: &'a str,
+    pub full_display_name: &'a str,
+    pub category: &'a str,
+    pub source_log_path: &'a str,
+    pub source_construction_id: &'a str,
+    pub world_position_json: &'a str,
+    pub local_position_json: &'a str,
+    pub current_unit_size_json: &'a str,
+    pub payload_json: &'a str,
+    pub last_seen_at: &'a str,
+}
+
+pub struct GameRuntimePartApiAttributeObservation<'a> {
+    pub identity: GameRuntimePartIdentity<'a>,
+    pub interface_name: &'a str,
+    pub attribute_name: &'a str,
+    pub value_type: &'a str,
+    pub availability: &'a str,
+    pub source: GameRuntimePartSource<'a>,
+}
+
+pub struct GameRuntimePartApiMemberObservation<'a> {
+    pub game_id: i64,
+    pub part_key: &'a str,
+    pub interface_name: &'a str,
+    pub attribute_name: &'a str,
+    pub availability: &'a str,
+    pub source: GameRuntimePartSource<'a>,
+}
+
+pub struct GameRuntimePartValueObservation<'a> {
+    pub identity: GameRuntimePartIdentity<'a>,
+    pub field_path: &'a str,
+    pub value_type: &'a str,
+    pub value_json: &'a str,
+    pub source: GameRuntimePartSource<'a>,
+}
+
+pub struct GameRuntimePartPropertyObservation<'a> {
+    pub identity: GameRuntimePartIdentity<'a>,
+    pub property_path: &'a str,
+    pub value_type: &'a str,
+    pub value_json: &'a str,
+    pub source: GameRuntimePartSource<'a>,
+}
+
+pub struct GameRuntimePartAttachmentObservation<'a> {
+    pub identity: GameRuntimePartIdentity<'a>,
+    pub attachment_path: &'a str,
+    pub value_type: &'a str,
+    pub attachment_json: &'a str,
+    pub source: GameRuntimePartSource<'a>,
+}
+
+pub struct GameRuntimePartMetadataValueDraft<'a> {
+    pub game_id: i64,
+    pub part_key: &'a str,
+    pub source_area: &'a str,
+    pub field_path: &'a str,
+    pub value_type: &'a str,
+    pub value_json: &'a str,
+    pub source: GameRuntimePartSource<'a>,
+}
+
+pub struct GameRuntimePartAttachmentTypeDraft<'a> {
+    pub game_id: i64,
+    pub part_key: &'a str,
+    pub attachment_path: &'a str,
+    pub type_name: &'a str,
+    pub value_type: &'a str,
+    pub attachment_json: &'a str,
+    pub source: GameRuntimePartSource<'a>,
+}
+
+pub struct GameRuntimePartSettingValueDraft<'a> {
+    pub game_id: i64,
+    pub part_key: &'a str,
+    pub setting_key: &'a str,
+    pub label: &'a str,
+    pub setting_area: &'a str,
+    pub value_type: &'a str,
+    pub value_json: &'a str,
+    pub source: GameRuntimePartSource<'a>,
+}
+
+pub struct GameRuntimePartOutputChannelValueDraft<'a> {
+    pub game_id: i64,
+    pub part_key: &'a str,
+    pub channel_key: &'a str,
+    pub label: &'a str,
+    pub channel_area: &'a str,
+    pub value_type: &'a str,
+    pub value_json: &'a str,
+    pub source: GameRuntimePartSource<'a>,
+}
+
 #[derive(Clone)]
 pub struct GameRuntimePartMetadataValueRecord {
     pub part_key: String,
@@ -548,6 +722,25 @@ pub struct GameRuntimeConstructionExportRecord {
     pub updated_at: String,
 }
 
+pub struct GameRuntimeConstructionExportDraft<'a> {
+    pub game_id: i64,
+    pub export_id: &'a str,
+    pub name: &'a str,
+    pub export_kind: &'a str,
+    pub intended_path: &'a str,
+    pub source_log_path: &'a str,
+    pub byte_size: i64,
+    pub construction_id: &'a str,
+    pub exported_at: &'a str,
+    pub part_count: i64,
+    pub mass: f64,
+    pub is_frozen: Option<bool>,
+    pub is_invulnerable: Option<bool>,
+    pub is_player_character: Option<bool>,
+    pub document_json: &'a str,
+    pub last_indexed_at: &'a str,
+}
+
 #[derive(Clone, Serialize)]
 pub struct GearBlocksApiTypeRecord {
     pub id: i64,
@@ -570,6 +763,16 @@ pub struct GearBlocksApiTypeRecord {
     pub created_at: String,
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
+}
+
+struct GearBlocksApiTypeSeed<'a> {
+    namespace: &'a str,
+    type_name: &'a str,
+    type_kind: &'a str,
+    docs_url: &'a str,
+    source: &'a str,
+    source_version: &'a str,
+    notes: &'a str,
 }
 
 #[derive(Clone, Serialize)]
@@ -747,6 +950,26 @@ pub struct GameConstructionRecord {
     pub updated_at: String,
 }
 
+pub struct GameConstructionDraft<'a> {
+    pub game_id: i64,
+    pub name: &'a str,
+    pub folder_path: &'a str,
+    pub construction_path: &'a str,
+    pub byte_size: i64,
+    pub decoded_byte_size: i64,
+    pub composite_count: i64,
+    pub part_count: i64,
+    pub unique_asset_guid_count: i64,
+    pub attachment_count: i64,
+    pub link_count: i64,
+    pub intersection_count: i64,
+    pub is_frozen: Option<bool>,
+    pub is_invulnerable: Option<bool>,
+    pub summary_json: &'a str,
+    pub document_json: &'a str,
+    pub last_indexed_at: &'a str,
+}
+
 #[derive(Serialize)]
 pub struct GameScreenshotCaptureRequestRecord {
     pub id: i64,
@@ -767,6 +990,17 @@ pub struct GameScreenshotCaptureRequestRecord {
     pub created_at: String,
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
+}
+
+pub struct GameScreenshotCaptureRequestDraft<'a> {
+    pub game_id: i64,
+    pub title: &'a str,
+    pub file_path: &'a str,
+    pub request_id: &'a str,
+    pub request_path: &'a str,
+    pub capture_status: &'a str,
+    pub captured_at: &'a str,
+    pub notes: &'a str,
 }
 
 #[derive(Serialize)]
@@ -817,6 +1051,18 @@ pub struct GameBuildGuideRecord {
     pub created_at: String,
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
+}
+
+pub struct GameBuildGuideDraft<'a> {
+    pub game_id: i64,
+    pub title: &'a str,
+    pub source_path: &'a str,
+    pub raw_markdown: &'a str,
+    pub build_goal: &'a str,
+    pub scale_reference: &'a str,
+    pub geometry_notes: &'a str,
+    pub glossary_text: &'a str,
+    pub checklist_json: &'a str,
 }
 
 #[derive(Clone, Serialize)]
@@ -2559,13 +2805,15 @@ impl AppDatabase {
         for definition in gearblocks_api::CONSTRUCTION_CLASS_DEFINITIONS {
             Self::seed_gearblocks_api_type(
                 connection,
-                namespace,
-                definition.name,
-                definition.type_kind,
-                definition.docs_url,
-                "docs",
-                "0.8.96622",
-                definition.summary,
+                GearBlocksApiTypeSeed {
+                    namespace,
+                    type_name: definition.name,
+                    type_kind: definition.type_kind,
+                    docs_url: definition.docs_url,
+                    source: "docs",
+                    source_version: "0.8.96622",
+                    notes: definition.summary,
+                },
             )?;
         }
 
@@ -2573,13 +2821,15 @@ impl AppDatabase {
             let docs_url = gearblocks_api_docs_url(definition.docs_url);
             let type_id = Self::seed_gearblocks_api_type(
                 connection,
-                namespace,
-                definition.name,
-                "interface",
-                &docs_url,
-                "docs",
-                "0.8.96622",
-                "",
+                GearBlocksApiTypeSeed {
+                    namespace,
+                    type_name: definition.name,
+                    type_kind: "interface",
+                    docs_url: &docs_url,
+                    source: "docs",
+                    source_version: "0.8.96622",
+                    notes: "",
+                },
             )?;
 
             for raw_member in definition.members {
@@ -2681,18 +2931,21 @@ impl AppDatabase {
         }
 
         for definition in gearblocks_api::CONSTRUCTION_ENUM_DEFINITIONS {
+            let notes = format!(
+                "{} Underlying type: {}.",
+                definition.summary, definition.underlying_type
+            );
             let type_id = Self::seed_gearblocks_api_type(
                 connection,
-                namespace,
-                definition.name,
-                "enum",
-                definition.docs_url,
-                "docs",
-                "0.8.96622",
-                &format!(
-                    "{} Underlying type: {}.",
-                    definition.summary, definition.underlying_type
-                ),
+                GearBlocksApiTypeSeed {
+                    namespace,
+                    type_name: definition.name,
+                    type_kind: "enum",
+                    docs_url: definition.docs_url,
+                    source: "docs",
+                    source_version: "0.8.96622",
+                    notes: &notes,
+                },
             )?;
 
             connection.execute(
@@ -2743,13 +2996,7 @@ impl AppDatabase {
 
     fn seed_gearblocks_api_type(
         connection: &Connection,
-        namespace: &str,
-        type_name: &str,
-        type_kind: &str,
-        docs_url: &str,
-        source: &str,
-        source_version: &str,
-        notes: &str,
+        seed: GearBlocksApiTypeSeed<'_>,
     ) -> Result<i64> {
         connection.execute(
             "
@@ -2772,13 +3019,13 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                namespace.trim(),
-                type_name.trim(),
-                type_kind.trim(),
-                gearblocks_api_docs_url(docs_url),
-                source.trim(),
-                source_version.trim(),
-                notes.trim(),
+                seed.namespace.trim(),
+                seed.type_name.trim(),
+                seed.type_kind.trim(),
+                gearblocks_api_docs_url(seed.docs_url),
+                seed.source.trim(),
+                seed.source_version.trim(),
+                seed.notes.trim(),
             ],
         )?;
 
@@ -2789,7 +3036,7 @@ impl AppDatabase {
             WHERE namespace = ?1
                 AND type_name = ?2
             ",
-            params![namespace.trim(), type_name.trim()],
+            params![seed.namespace.trim(), seed.type_name.trim()],
             |row| row.get::<_, i64>(0),
         )
     }
@@ -3060,13 +3307,7 @@ impl AppDatabase {
 
     pub fn update_calendar_event(
         &self,
-        id: i64,
-        title: &str,
-        start_date: &str,
-        start_time: &str,
-        end_date: &str,
-        end_time: &str,
-        notes: &str,
+        draft: CalendarEventUpdateDraft<'_>,
     ) -> Result<CalendarEventRecord> {
         let connection = self.connection()?;
         connection.execute(
@@ -3082,17 +3323,17 @@ impl AppDatabase {
             WHERE id = ?7
             ",
             params![
-                title.trim(),
-                start_date.trim(),
-                start_time.trim(),
-                end_date.trim(),
-                end_time.trim(),
-                notes,
-                id
+                draft.title.trim(),
+                draft.start_date.trim(),
+                draft.start_time.trim(),
+                draft.end_date.trim(),
+                draft.end_time.trim(),
+                draft.notes,
+                draft.id
             ],
         )?;
 
-        Self::get_calendar_event_by_id(&connection, id)
+        Self::get_calendar_event_by_id(&connection, draft.id)
     }
 
     pub fn delete_calendar_event(&self, id: i64) -> Result<()> {
@@ -4074,13 +4315,7 @@ impl AppDatabase {
 
     pub fn update_youtube_reference(
         &self,
-        id: i64,
-        title: &str,
-        url: &str,
-        video_id: &str,
-        channel_name: &str,
-        notes: &str,
-        tags: &str,
+        draft: YouTubeReferenceUpdateDraft<'_>,
     ) -> Result<YouTubeReferenceRecord> {
         let connection = self.connection()?;
         connection.execute(
@@ -4096,17 +4331,17 @@ impl AppDatabase {
             WHERE id = ?7
             ",
             params![
-                title.trim(),
-                url.trim(),
-                video_id.trim(),
-                channel_name.trim(),
-                notes,
-                tags.trim(),
-                id
+                draft.title.trim(),
+                draft.url.trim(),
+                draft.video_id.trim(),
+                draft.channel_name.trim(),
+                draft.notes,
+                draft.tags.trim(),
+                draft.id
             ],
         )?;
 
-        Self::get_youtube_reference_by_id(&connection, id)
+        Self::get_youtube_reference_by_id(&connection, draft.id)
     }
 
     pub fn delete_youtube_reference(&self, id: i64) -> Result<()> {
@@ -4324,17 +4559,7 @@ impl AppDatabase {
 
     pub fn upsert_game_catalog_object(
         &self,
-        game_id: i64,
-        name: &str,
-        object_type: &str,
-        category: &str,
-        category_icon: &str,
-        category_icon_path: &str,
-        description: &str,
-        notes: &str,
-        tags: &str,
-        thumbnail_path: &str,
-        source_screenshot_path: &str,
+        draft: GameCatalogObjectDraft<'_>,
     ) -> Result<GameCatalogObjectRecord> {
         let connection = self.connection()?;
         connection.execute(
@@ -4366,21 +4591,21 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                game_id,
-                name.trim(),
-                object_type.trim(),
-                category.trim(),
-                category_icon.trim(),
-                category_icon_path.trim(),
-                description.trim(),
-                notes.trim(),
-                tags.trim(),
-                thumbnail_path.trim(),
-                source_screenshot_path.trim()
+                draft.game_id,
+                draft.name.trim(),
+                draft.object_type.trim(),
+                draft.category.trim(),
+                draft.category_icon.trim(),
+                draft.category_icon_path.trim(),
+                draft.description.trim(),
+                draft.notes.trim(),
+                draft.tags.trim(),
+                draft.thumbnail_path.trim(),
+                draft.source_screenshot_path.trim()
             ],
         )?;
 
-        Self::get_game_catalog_object_by_name(&connection, game_id, name)
+        Self::get_game_catalog_object_by_name(&connection, draft.game_id, draft.name)
     }
 
     pub fn list_game_runtime_parts(&self, game_id: i64) -> Result<Vec<GameRuntimePartRecord>> {
@@ -4893,13 +5118,15 @@ impl AppDatabase {
         for api_type in &scrape.types {
             let type_id = Self::seed_gearblocks_api_type(
                 &transaction,
-                &api_type.namespace,
-                &api_type.type_name,
-                &api_type.type_kind,
-                &api_type.docs_url,
-                &scrape.source,
-                &scrape.source_version,
-                &api_type.notes,
+                GearBlocksApiTypeSeed {
+                    namespace: &api_type.namespace,
+                    type_name: &api_type.type_name,
+                    type_kind: &api_type.type_kind,
+                    docs_url: &api_type.docs_url,
+                    source: &scrape.source,
+                    source_version: &scrape.source_version,
+                    notes: &api_type.notes,
+                },
             )?;
 
             if !api_type.members.is_empty() {
@@ -5316,30 +5543,15 @@ impl AppDatabase {
 
     pub fn upsert_game_runtime_part(
         &self,
-        game_id: i64,
-        part_key: &str,
-        asset_guid: &str,
-        asset_name: &str,
-        display_name: &str,
-        full_display_name: &str,
-        category: &str,
-        mass: f64,
-        world_position: Option<(f64, f64, f64)>,
-        local_position: Option<(f64, f64, f64)>,
-        world_position_json: &str,
-        local_position_json: &str,
-        properties_json: &str,
-        source_export_id: &str,
-        source_construction_id: &str,
-        last_seen_at: &str,
+        draft: GameRuntimePartDraft<'_>,
     ) -> Result<GameRuntimePartRecord> {
         let connection = self.connection()?;
-        Self::get_game_by_id(&connection, game_id)?;
-        let (world_x, world_y, world_z) = match world_position {
+        Self::get_game_by_id(&connection, draft.identity.game_id)?;
+        let (world_x, world_y, world_z) = match draft.world_position {
             Some((x, y, z)) => (Some(x), Some(y), Some(z)),
             None => (None, None, None),
         };
-        let (local_x, local_y, local_z) = match local_position {
+        let (local_x, local_y, local_z) = match draft.local_position {
             Some((x, y, z)) => (Some(x), Some(y), Some(z)),
             None => (None, None, None),
         };
@@ -5390,52 +5602,42 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                game_id,
-                part_key.trim(),
-                asset_guid.trim(),
-                asset_name.trim(),
-                display_name.trim(),
-                full_display_name.trim(),
-                category.trim(),
-                mass,
+                draft.identity.game_id,
+                draft.identity.part_key.trim(),
+                draft.identity.asset_guid.trim(),
+                draft.identity.asset_name.trim(),
+                draft.identity.display_name.trim(),
+                draft.identity.full_display_name.trim(),
+                draft.identity.category.trim(),
+                draft.mass,
                 world_x,
                 world_y,
                 world_z,
                 local_x,
                 local_y,
                 local_z,
-                world_position_json.trim(),
-                local_position_json.trim(),
-                properties_json,
-                source_export_id.trim(),
-                source_construction_id.trim(),
-                last_seen_at.trim()
+                draft.world_position_json.trim(),
+                draft.local_position_json.trim(),
+                draft.properties_json,
+                draft.source.source_export_id.trim(),
+                draft.source.source_construction_id.trim(),
+                draft.source.seen_at.trim()
             ],
         )?;
 
-        Self::get_game_runtime_part_by_key(&connection, game_id, part_key)
+        Self::get_game_runtime_part_by_key(
+            &connection,
+            draft.identity.game_id,
+            draft.identity.part_key,
+        )
     }
 
     pub fn upsert_game_runtime_part_alias(
         &self,
-        game_id: i64,
-        part_instance_key: &str,
-        friendly_name: &str,
-        asset_guid: &str,
-        asset_name: &str,
-        display_name: &str,
-        full_display_name: &str,
-        category: &str,
-        source_log_path: &str,
-        source_construction_id: &str,
-        world_position_json: &str,
-        local_position_json: &str,
-        current_unit_size_json: &str,
-        payload_json: &str,
-        last_seen_at: &str,
+        draft: GameRuntimePartAliasDraft<'_>,
     ) -> Result<GameRuntimePartAliasRecord> {
         let connection = self.connection()?;
-        Self::get_game_by_id(&connection, game_id)?;
+        Self::get_game_by_id(&connection, draft.game_id)?;
         connection.execute(
             "
             INSERT INTO obj_game_runtime_part_alias (
@@ -5473,21 +5675,21 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                game_id,
-                part_instance_key.trim(),
-                friendly_name.trim(),
-                asset_guid.trim(),
-                asset_name.trim(),
-                display_name.trim(),
-                full_display_name.trim(),
-                category.trim(),
-                source_log_path.trim(),
-                source_construction_id.trim(),
-                world_position_json.trim(),
-                local_position_json.trim(),
-                current_unit_size_json.trim(),
-                payload_json.trim(),
-                last_seen_at.trim()
+                draft.game_id,
+                draft.part_instance_key.trim(),
+                draft.friendly_name.trim(),
+                draft.asset_guid.trim(),
+                draft.asset_name.trim(),
+                draft.display_name.trim(),
+                draft.full_display_name.trim(),
+                draft.category.trim(),
+                draft.source_log_path.trim(),
+                draft.source_construction_id.trim(),
+                draft.world_position_json.trim(),
+                draft.local_position_json.trim(),
+                draft.current_unit_size_json.trim(),
+                draft.payload_json.trim(),
+                draft.last_seen_at.trim()
             ],
         )?;
 
@@ -5516,30 +5718,17 @@ impl AppDatabase {
             WHERE game_id = ?1
                 AND part_instance_key = ?2
             ",
-            params![game_id, part_instance_key.trim()],
+            params![draft.game_id, draft.part_instance_key.trim()],
             game_runtime_part_alias_from_row,
         )
     }
 
     pub fn upsert_game_runtime_part_api_attribute(
         &self,
-        game_id: i64,
-        part_key: &str,
-        asset_guid: &str,
-        asset_name: &str,
-        display_name: &str,
-        full_display_name: &str,
-        category: &str,
-        interface_name: &str,
-        attribute_name: &str,
-        value_type: &str,
-        availability: &str,
-        source_export_id: &str,
-        source_construction_id: &str,
-        seen_at: &str,
+        observation: GameRuntimePartApiAttributeObservation<'_>,
     ) -> Result<()> {
         let connection = self.connection()?;
-        Self::get_game_by_id(&connection, game_id)?;
+        Self::get_game_by_id(&connection, observation.identity.game_id)?;
         connection.execute(
             "
             INSERT INTO obj_game_runtime_part_api_attribute (
@@ -5574,20 +5763,20 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                game_id,
-                part_key.trim(),
-                asset_guid.trim(),
-                asset_name.trim(),
-                display_name.trim(),
-                full_display_name.trim(),
-                category.trim(),
-                interface_name.trim(),
-                attribute_name.trim(),
-                value_type.trim(),
-                availability.trim(),
-                source_export_id.trim(),
-                source_construction_id.trim(),
-                seen_at.trim(),
+                observation.identity.game_id,
+                observation.identity.part_key.trim(),
+                observation.identity.asset_guid.trim(),
+                observation.identity.asset_name.trim(),
+                observation.identity.display_name.trim(),
+                observation.identity.full_display_name.trim(),
+                observation.identity.category.trim(),
+                observation.interface_name.trim(),
+                observation.attribute_name.trim(),
+                observation.value_type.trim(),
+                observation.availability.trim(),
+                observation.source.source_export_id.trim(),
+                observation.source.source_construction_id.trim(),
+                observation.source.seen_at.trim(),
             ],
         )?;
 
@@ -5596,18 +5785,11 @@ impl AppDatabase {
 
     pub fn upsert_game_runtime_part_api_member(
         &self,
-        game_id: i64,
-        part_key: &str,
-        interface_name: &str,
-        attribute_name: &str,
-        availability: &str,
-        source_export_id: &str,
-        source_construction_id: &str,
-        seen_at: &str,
+        observation: GameRuntimePartApiMemberObservation<'_>,
     ) -> Result<()> {
         let connection = self.connection()?;
-        Self::get_game_by_id(&connection, game_id)?;
-        let observed_member_name = gearblocks_observed_member_name(attribute_name);
+        Self::get_game_by_id(&connection, observation.game_id)?;
+        let observed_member_name = gearblocks_observed_member_name(observation.attribute_name);
         let mut statement = connection.prepare(
             "
                 SELECT DISTINCT members.id
@@ -5625,8 +5807,8 @@ impl AppDatabase {
         let api_member_ids = statement
             .query_map(
                 params![
-                    interface_name.trim(),
-                    attribute_name.trim(),
+                    observation.interface_name.trim(),
+                    observation.attribute_name.trim(),
                     observed_member_name
                 ],
                 |row| row.get::<_, i64>(0),
@@ -5655,13 +5837,13 @@ impl AppDatabase {
                     updated_at = CURRENT_TIMESTAMP
                 ",
                 params![
-                    game_id,
-                    part_key.trim(),
+                    observation.game_id,
+                    observation.part_key.trim(),
                     api_member_id,
-                    availability.trim(),
-                    source_export_id.trim(),
-                    source_construction_id.trim(),
-                    seen_at.trim(),
+                    observation.availability.trim(),
+                    observation.source.source_export_id.trim(),
+                    observation.source.source_construction_id.trim(),
+                    observation.source.seen_at.trim(),
                 ],
             )?;
         }
@@ -5671,22 +5853,10 @@ impl AppDatabase {
 
     pub fn upsert_game_runtime_part_value(
         &self,
-        game_id: i64,
-        part_key: &str,
-        asset_guid: &str,
-        asset_name: &str,
-        display_name: &str,
-        full_display_name: &str,
-        category: &str,
-        field_path: &str,
-        value_type: &str,
-        value_json: &str,
-        source_export_id: &str,
-        source_construction_id: &str,
-        seen_at: &str,
+        observation: GameRuntimePartValueObservation<'_>,
     ) -> Result<()> {
         let connection = self.connection()?;
-        Self::get_game_by_id(&connection, game_id)?;
+        Self::get_game_by_id(&connection, observation.identity.game_id)?;
         connection.execute(
             "
             INSERT INTO obj_game_runtime_part_value (
@@ -5720,19 +5890,19 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                game_id,
-                part_key.trim(),
-                asset_guid.trim(),
-                asset_name.trim(),
-                display_name.trim(),
-                full_display_name.trim(),
-                category.trim(),
-                field_path.trim(),
-                value_type.trim(),
-                value_json,
-                source_export_id.trim(),
-                source_construction_id.trim(),
-                seen_at.trim(),
+                observation.identity.game_id,
+                observation.identity.part_key.trim(),
+                observation.identity.asset_guid.trim(),
+                observation.identity.asset_name.trim(),
+                observation.identity.display_name.trim(),
+                observation.identity.full_display_name.trim(),
+                observation.identity.category.trim(),
+                observation.field_path.trim(),
+                observation.value_type.trim(),
+                observation.value_json,
+                observation.source.source_export_id.trim(),
+                observation.source.source_construction_id.trim(),
+                observation.source.seen_at.trim(),
             ],
         )?;
 
@@ -5741,22 +5911,10 @@ impl AppDatabase {
 
     pub fn upsert_game_runtime_part_property(
         &self,
-        game_id: i64,
-        part_key: &str,
-        asset_guid: &str,
-        asset_name: &str,
-        display_name: &str,
-        full_display_name: &str,
-        category: &str,
-        property_path: &str,
-        value_type: &str,
-        value_json: &str,
-        source_export_id: &str,
-        source_construction_id: &str,
-        seen_at: &str,
+        observation: GameRuntimePartPropertyObservation<'_>,
     ) -> Result<()> {
         let connection = self.connection()?;
-        Self::get_game_by_id(&connection, game_id)?;
+        Self::get_game_by_id(&connection, observation.identity.game_id)?;
         connection.execute(
             "
             INSERT INTO obj_game_runtime_part_property (
@@ -5790,19 +5948,19 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                game_id,
-                part_key.trim(),
-                asset_guid.trim(),
-                asset_name.trim(),
-                display_name.trim(),
-                full_display_name.trim(),
-                category.trim(),
-                property_path.trim(),
-                value_type.trim(),
-                value_json,
-                source_export_id.trim(),
-                source_construction_id.trim(),
-                seen_at.trim(),
+                observation.identity.game_id,
+                observation.identity.part_key.trim(),
+                observation.identity.asset_guid.trim(),
+                observation.identity.asset_name.trim(),
+                observation.identity.display_name.trim(),
+                observation.identity.full_display_name.trim(),
+                observation.identity.category.trim(),
+                observation.property_path.trim(),
+                observation.value_type.trim(),
+                observation.value_json,
+                observation.source.source_export_id.trim(),
+                observation.source.source_construction_id.trim(),
+                observation.source.seen_at.trim(),
             ],
         )?;
 
@@ -5811,22 +5969,10 @@ impl AppDatabase {
 
     pub fn upsert_game_runtime_part_attachment(
         &self,
-        game_id: i64,
-        part_key: &str,
-        asset_guid: &str,
-        asset_name: &str,
-        display_name: &str,
-        full_display_name: &str,
-        category: &str,
-        attachment_path: &str,
-        value_type: &str,
-        attachment_json: &str,
-        source_export_id: &str,
-        source_construction_id: &str,
-        seen_at: &str,
+        observation: GameRuntimePartAttachmentObservation<'_>,
     ) -> Result<()> {
         let connection = self.connection()?;
-        Self::get_game_by_id(&connection, game_id)?;
+        Self::get_game_by_id(&connection, observation.identity.game_id)?;
         connection.execute(
             "
             INSERT INTO obj_game_runtime_part_attachment (
@@ -5860,19 +6006,19 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                game_id,
-                part_key.trim(),
-                asset_guid.trim(),
-                asset_name.trim(),
-                display_name.trim(),
-                full_display_name.trim(),
-                category.trim(),
-                attachment_path.trim(),
-                value_type.trim(),
-                attachment_json,
-                source_export_id.trim(),
-                source_construction_id.trim(),
-                seen_at.trim(),
+                observation.identity.game_id,
+                observation.identity.part_key.trim(),
+                observation.identity.asset_guid.trim(),
+                observation.identity.asset_name.trim(),
+                observation.identity.display_name.trim(),
+                observation.identity.full_display_name.trim(),
+                observation.identity.category.trim(),
+                observation.attachment_path.trim(),
+                observation.value_type.trim(),
+                observation.attachment_json,
+                observation.source.source_export_id.trim(),
+                observation.source.source_construction_id.trim(),
+                observation.source.seen_at.trim(),
             ],
         )?;
 
@@ -5881,24 +6027,16 @@ impl AppDatabase {
 
     pub fn upsert_game_runtime_part_metadata_value(
         &self,
-        game_id: i64,
-        part_key: &str,
-        source_area: &str,
-        field_path: &str,
-        value_type: &str,
-        value_json: &str,
-        source_export_id: &str,
-        source_construction_id: &str,
-        seen_at: &str,
+        draft: GameRuntimePartMetadataValueDraft<'_>,
     ) -> Result<()> {
         let connection = self.connection()?;
-        Self::get_game_by_id(&connection, game_id)?;
+        Self::get_game_by_id(&connection, draft.game_id)?;
         let metadata_item_id = Self::upsert_gearblocks_metadata_item(
             &connection,
-            source_area,
-            field_path,
-            value_type,
-            seen_at,
+            draft.source_area,
+            draft.field_path,
+            draft.value_type,
+            draft.source.seen_at,
         )?;
         connection.execute(
             "
@@ -5923,14 +6061,14 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                game_id,
-                part_key.trim(),
+                draft.game_id,
+                draft.part_key.trim(),
                 metadata_item_id,
-                value_type.trim(),
-                value_json,
-                source_export_id.trim(),
-                source_construction_id.trim(),
-                seen_at.trim(),
+                draft.value_type.trim(),
+                draft.value_json,
+                draft.source.source_export_id.trim(),
+                draft.source.source_construction_id.trim(),
+                draft.source.seen_at.trim(),
             ],
         )?;
         Ok(())
@@ -5938,24 +6076,16 @@ impl AppDatabase {
 
     pub fn upsert_game_runtime_part_attachment_type(
         &self,
-        game_id: i64,
-        part_key: &str,
-        attachment_path: &str,
-        type_name: &str,
-        value_type: &str,
-        attachment_json: &str,
-        source_export_id: &str,
-        source_construction_id: &str,
-        seen_at: &str,
+        draft: GameRuntimePartAttachmentTypeDraft<'_>,
     ) -> Result<()> {
         let connection = self.connection()?;
-        Self::get_game_by_id(&connection, game_id)?;
+        Self::get_game_by_id(&connection, draft.game_id)?;
         let attachment_type_id = Self::upsert_gearblocks_attachment_type(
             &connection,
-            attachment_path,
-            type_name,
-            value_type,
-            seen_at,
+            draft.attachment_path,
+            draft.type_name,
+            draft.value_type,
+            draft.source.seen_at,
         )?;
         connection.execute(
             "
@@ -5978,13 +6108,13 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                game_id,
-                part_key.trim(),
+                draft.game_id,
+                draft.part_key.trim(),
                 attachment_type_id,
-                attachment_json,
-                source_export_id.trim(),
-                source_construction_id.trim(),
-                seen_at.trim(),
+                draft.attachment_json,
+                draft.source.source_export_id.trim(),
+                draft.source.source_construction_id.trim(),
+                draft.source.seen_at.trim(),
             ],
         )?;
         Ok(())
@@ -5992,26 +6122,17 @@ impl AppDatabase {
 
     pub fn upsert_game_runtime_part_setting_value(
         &self,
-        game_id: i64,
-        part_key: &str,
-        setting_key: &str,
-        label: &str,
-        setting_area: &str,
-        value_type: &str,
-        value_json: &str,
-        source_export_id: &str,
-        source_construction_id: &str,
-        seen_at: &str,
+        draft: GameRuntimePartSettingValueDraft<'_>,
     ) -> Result<()> {
         let connection = self.connection()?;
-        Self::get_game_by_id(&connection, game_id)?;
+        Self::get_game_by_id(&connection, draft.game_id)?;
         let setting_id = Self::upsert_gearblocks_part_setting(
             &connection,
-            setting_key,
-            label,
-            setting_area,
-            value_type,
-            seen_at,
+            draft.setting_key,
+            draft.label,
+            draft.setting_area,
+            draft.value_type,
+            draft.source.seen_at,
         )?;
         connection.execute(
             "
@@ -6036,14 +6157,14 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                game_id,
-                part_key.trim(),
+                draft.game_id,
+                draft.part_key.trim(),
                 setting_id,
-                value_type.trim(),
-                value_json,
-                source_export_id.trim(),
-                source_construction_id.trim(),
-                seen_at.trim(),
+                draft.value_type.trim(),
+                draft.value_json,
+                draft.source.source_export_id.trim(),
+                draft.source.source_construction_id.trim(),
+                draft.source.seen_at.trim(),
             ],
         )?;
         Ok(())
@@ -6051,26 +6172,17 @@ impl AppDatabase {
 
     pub fn upsert_game_runtime_part_output_channel_value(
         &self,
-        game_id: i64,
-        part_key: &str,
-        channel_key: &str,
-        label: &str,
-        channel_area: &str,
-        value_type: &str,
-        value_json: &str,
-        source_export_id: &str,
-        source_construction_id: &str,
-        seen_at: &str,
+        draft: GameRuntimePartOutputChannelValueDraft<'_>,
     ) -> Result<()> {
         let connection = self.connection()?;
-        Self::get_game_by_id(&connection, game_id)?;
+        Self::get_game_by_id(&connection, draft.game_id)?;
         let output_channel_id = Self::upsert_gearblocks_part_output_channel(
             &connection,
-            channel_key,
-            label,
-            channel_area,
-            value_type,
-            seen_at,
+            draft.channel_key,
+            draft.label,
+            draft.channel_area,
+            draft.value_type,
+            draft.source.seen_at,
         )?;
         connection.execute(
             "
@@ -6095,14 +6207,14 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                game_id,
-                part_key.trim(),
+                draft.game_id,
+                draft.part_key.trim(),
                 output_channel_id,
-                value_type.trim(),
-                value_json,
-                source_export_id.trim(),
-                source_construction_id.trim(),
-                seen_at.trim(),
+                draft.value_type.trim(),
+                draft.value_json,
+                draft.source.source_export_id.trim(),
+                draft.source.source_construction_id.trim(),
+                draft.source.seen_at.trim(),
             ],
         )?;
         Ok(())
@@ -6200,28 +6312,12 @@ impl AppDatabase {
             .optional()
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn upsert_game_runtime_construction_export(
         &self,
-        game_id: i64,
-        export_id: &str,
-        name: &str,
-        export_kind: &str,
-        intended_path: &str,
-        source_log_path: &str,
-        byte_size: i64,
-        construction_id: &str,
-        exported_at: &str,
-        part_count: i64,
-        mass: f64,
-        is_frozen: Option<bool>,
-        is_invulnerable: Option<bool>,
-        is_player_character: Option<bool>,
-        document_json: &str,
-        last_indexed_at: &str,
+        draft: GameRuntimeConstructionExportDraft<'_>,
     ) -> Result<GameRuntimeConstructionExportRecord> {
         let connection = self.connection()?;
-        Self::get_game_by_id(&connection, game_id)?;
+        Self::get_game_by_id(&connection, draft.game_id)?;
         connection.execute(
             "
             INSERT INTO obj_game_runtime_construction_export (
@@ -6261,26 +6357,30 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                game_id,
-                export_id.trim(),
-                name.trim(),
-                export_kind.trim(),
-                intended_path.trim(),
-                source_log_path.trim(),
-                byte_size,
-                construction_id.trim(),
-                exported_at.trim(),
-                part_count,
-                mass,
-                is_frozen.map(i64::from),
-                is_invulnerable.map(i64::from),
-                is_player_character.map(i64::from),
-                document_json,
-                last_indexed_at.trim()
+                draft.game_id,
+                draft.export_id.trim(),
+                draft.name.trim(),
+                draft.export_kind.trim(),
+                draft.intended_path.trim(),
+                draft.source_log_path.trim(),
+                draft.byte_size,
+                draft.construction_id.trim(),
+                draft.exported_at.trim(),
+                draft.part_count,
+                draft.mass,
+                draft.is_frozen.map(i64::from),
+                draft.is_invulnerable.map(i64::from),
+                draft.is_player_character.map(i64::from),
+                draft.document_json,
+                draft.last_indexed_at.trim()
             ],
         )?;
 
-        Self::get_game_runtime_construction_export_by_export_id(&connection, game_id, export_id)
+        Self::get_game_runtime_construction_export_by_export_id(
+            &connection,
+            draft.game_id,
+            draft.export_id,
+        )
     }
 
     pub fn list_game_constructions(&self, game_id: i64) -> Result<Vec<GameConstructionRecord>> {
@@ -6333,29 +6433,12 @@ impl AppDatabase {
         Ok(count.max(0) as usize)
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn upsert_game_construction(
         &self,
-        game_id: i64,
-        name: &str,
-        folder_path: &str,
-        construction_path: &str,
-        byte_size: i64,
-        decoded_byte_size: i64,
-        composite_count: i64,
-        part_count: i64,
-        unique_asset_guid_count: i64,
-        attachment_count: i64,
-        link_count: i64,
-        intersection_count: i64,
-        is_frozen: Option<bool>,
-        is_invulnerable: Option<bool>,
-        summary_json: &str,
-        document_json: &str,
-        last_indexed_at: &str,
+        draft: GameConstructionDraft<'_>,
     ) -> Result<GameConstructionRecord> {
         let connection = self.connection()?;
-        Self::get_game_by_id(&connection, game_id)?;
+        Self::get_game_by_id(&connection, draft.game_id)?;
         connection.execute(
             "
             INSERT INTO obj_game_construction (
@@ -6397,39 +6480,32 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                game_id,
-                name.trim(),
-                folder_path.trim(),
-                construction_path.trim(),
-                byte_size,
-                decoded_byte_size,
-                composite_count,
-                part_count,
-                unique_asset_guid_count,
-                attachment_count,
-                link_count,
-                intersection_count,
-                is_frozen.map(i64::from),
-                is_invulnerable.map(i64::from),
-                summary_json,
-                document_json,
-                last_indexed_at.trim(),
+                draft.game_id,
+                draft.name.trim(),
+                draft.folder_path.trim(),
+                draft.construction_path.trim(),
+                draft.byte_size,
+                draft.decoded_byte_size,
+                draft.composite_count,
+                draft.part_count,
+                draft.unique_asset_guid_count,
+                draft.attachment_count,
+                draft.link_count,
+                draft.intersection_count,
+                draft.is_frozen.map(i64::from),
+                draft.is_invulnerable.map(i64::from),
+                draft.summary_json,
+                draft.document_json,
+                draft.last_indexed_at.trim(),
             ],
         )?;
 
-        Self::get_game_construction_by_path(&connection, game_id, construction_path)
+        Self::get_game_construction_by_path(&connection, draft.game_id, draft.construction_path)
     }
 
     pub fn create_game_screenshot_capture_request(
         &self,
-        game_id: i64,
-        title: &str,
-        file_path: &str,
-        request_id: &str,
-        request_path: &str,
-        capture_status: &str,
-        captured_at: &str,
-        notes: &str,
+        draft: GameScreenshotCaptureRequestDraft<'_>,
     ) -> Result<GameScreenshotCaptureRequestRecord> {
         let connection = self.connection()?;
         connection.execute(
@@ -6447,19 +6523,46 @@ impl AppDatabase {
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
             ",
             params![
-                game_id,
-                title.trim(),
-                file_path.trim(),
-                request_id.trim(),
-                request_path.trim(),
-                capture_status.trim(),
-                captured_at.trim(),
-                notes
+                draft.game_id,
+                draft.title.trim(),
+                draft.file_path.trim(),
+                draft.request_id.trim(),
+                draft.request_path.trim(),
+                draft.capture_status.trim(),
+                draft.captured_at.trim(),
+                draft.notes
             ],
         )?;
 
         let id = connection.last_insert_rowid();
         Self::get_game_screenshot_capture_request_by_id(&connection, id)
+    }
+
+    pub fn create_game_catalog_reference(
+        &self,
+        draft: GameCatalogReferenceDraft<'_>,
+    ) -> Result<i64> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, draft.game_id)?;
+        connection.execute(
+            "
+            INSERT INTO obj_game_catalog_reference (
+                game_id, object_id, title, reference_type, url, local_path, notes, tags
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            ",
+            params![
+                draft.game_id,
+                draft.object_id,
+                draft.title.trim(),
+                draft.reference_type.trim(),
+                draft.url.trim(),
+                draft.local_path.trim(),
+                draft.notes.trim(),
+                draft.tags.trim(),
+            ],
+        )?;
+        Ok(connection.last_insert_rowid())
     }
 
     pub fn list_game_chat_conversations(
@@ -6529,24 +6632,34 @@ impl AppDatabase {
         Self::get_game_build_guide_by_id(&connection, id)
     }
 
+    pub fn delete_game_build_guide(&self, guide_id: i64) -> Result<()> {
+        let connection = self.connection()?;
+        Self::get_game_build_guide_by_id(&connection, guide_id)?;
+        connection.execute(
+            "DELETE FROM obj_game_build_guide_part WHERE guide_id = ?1",
+            params![guide_id],
+        )?;
+        connection.execute(
+            "DELETE FROM obj_game_build_guide_step WHERE guide_id = ?1",
+            params![guide_id],
+        )?;
+        connection.execute(
+            "DELETE FROM obj_game_build_guide WHERE id = ?1",
+            params![guide_id],
+        )?;
+        Ok(())
+    }
+
     pub fn create_game_build_guide(
         &self,
-        game_id: i64,
-        title: &str,
-        source_path: &str,
-        raw_markdown: &str,
-        build_goal: &str,
-        scale_reference: &str,
-        geometry_notes: &str,
-        glossary_text: &str,
-        checklist_json: &str,
+        draft: GameBuildGuideDraft<'_>,
     ) -> Result<GameBuildGuideRecord> {
         let connection = self.connection()?;
-        Self::get_game_by_id(&connection, game_id)?;
-        let clean_title = if title.trim().is_empty() {
+        Self::get_game_by_id(&connection, draft.game_id)?;
+        let clean_title = if draft.title.trim().is_empty() {
             "Build guide"
         } else {
-            title.trim()
+            draft.title.trim()
         };
         connection.execute(
             "
@@ -6557,15 +6670,15 @@ impl AppDatabase {
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
             ",
             params![
-                game_id,
+                draft.game_id,
                 clean_title,
-                source_path.trim(),
-                raw_markdown,
-                build_goal.trim(),
-                scale_reference.trim(),
-                geometry_notes.trim(),
-                glossary_text.trim(),
-                checklist_json.trim()
+                draft.source_path.trim(),
+                draft.raw_markdown,
+                draft.build_goal.trim(),
+                draft.scale_reference.trim(),
+                draft.geometry_notes.trim(),
+                draft.glossary_text.trim(),
+                draft.checklist_json.trim()
             ],
         )?;
 

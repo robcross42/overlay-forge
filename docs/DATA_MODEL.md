@@ -305,6 +305,8 @@ updated_at
 
 Game-scoped reference records. `object_id` is optional so references can belong to a whole game or a specific catalog object.
 
+GearBlocks Steam guide image imports use `reference_type = build_guide_image`, store the original image URL in `url`, and store the downloaded local file path in `local_path`. The image bytes remain outside SQLite.
+
 ### `obj_game_catalog_screenshot`
 
 ```text

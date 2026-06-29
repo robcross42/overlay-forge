@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::windows::{WindowKind, WindowManager};
-use crate::{commands, AppState};
+use crate::{commands, lifecycle, AppState};
 use serde::{Deserialize, Serialize};
 use tauri::{App, Emitter, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
@@ -237,6 +237,9 @@ fn start_mouse_shortcut_monitor(app: tauri::AppHandle) {
         let mut active_shortcuts = HashSet::<String>::new();
 
         loop {
+            if lifecycle::is_shutdown_requested() {
+                break;
+            }
             if last_refresh.elapsed() >= Duration::from_millis(500) {
                 cached_keybinds = load_keybinds(&app).unwrap_or_default();
                 last_refresh = Instant::now();
@@ -258,7 +261,9 @@ fn start_mouse_shortcut_monitor(app: tauri::AppHandle) {
             }
 
             active_shortcuts = currently_pressed;
-            std::thread::sleep(Duration::from_millis(25));
+            if lifecycle::sleep_until_shutdown(Duration::from_millis(25)) {
+                break;
+            }
         }
     });
 }
