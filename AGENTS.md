@@ -27,6 +27,7 @@ Read the smallest relevant set before editing:
 | Gaming screenshots | `docs/GAMING_SCREENSHOTS.md` |
 | GearBlocks feature work | `docs/GEARBLOCKS.md`, then the focused GearBlocks docs |
 | Smoking Cessation | `docs/SMOKING_CESSATION.md` |
+| Repair Resell | `docs/REPAIR_RESELL.md` |
 
 ## Reasoning Model Selection
 
@@ -160,11 +161,17 @@ For broad cleanup or architecture work, run `npm run build`, `cargo build`, `car
 - Do not introduce arbitrary command execution through SQLite, scheduler rows, Lua payloads, or user-editable config.
 - Keep generated local files, screenshots, plugin binaries, third-party DLLs, and machine-specific outputs out of git unless documentation explicitly says otherwise.
 
+## Local Dev HTML Review Rules
+
+- When editing a local dev/review HTML file outside the repository, such as an exported build-guide step review file in Downloads, automatically open it in the default browser after the edit is complete so the latest saved version is visible for review.
+- Prefer `Start-Process -FilePath <html-path>` on Windows for this browser refresh/open step.
+- Do not add these generated review HTML files to git unless the user explicitly asks to convert one into a committed fixture.
+
 ## Documentation Rules
 
 - Update docs when behavior, scope, validation, or persistence changes.
 - Keep active documentation compact and task-facing.
-- Put historical milestone details in `docs/PROJECT_HISTORY.md`, not one file per milestone.
+- Put historical release/checkpoint details in `docs/PROJECT_HISTORY.md`, not separate active tracker files.
 - Put deferred items in `docs/DEFERRED_ITEMS.md`.
 - Use current terminology from these docs when naming UI, docs, and future features.
 - Do not reintroduce retired external-transfer terminology into new documentation or UI.
@@ -199,7 +206,7 @@ If validation cannot be run, state that clearly and explain what was not validat
 
 ## Commit Rules
 
-When the user asks for a commit or milestone completion:
+When the user asks for a commit or release/checkpoint completion:
 
 1. Run appropriate validation.
 2. Review `git status`.

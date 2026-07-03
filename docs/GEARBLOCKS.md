@@ -56,6 +56,14 @@ GearBlocks developer guidance on Steam confirms:
 
 Use centimeters and/or GearBlocks units for spacing, dimensions, alignment, movement, and vehicle scale.
 
+GearBlocks coordinate axes:
+
+- X-Axis: Controls the horizontal plane (Width). Moving a piece along this axis shifts it Left (-X) and Right (+X).
+- Y-Axis: Controls the vertical plane (Height). Moving along this axis shifts it Down (-Y) and Up (+Y).
+- Z-Axis: Controls the depth (Forward and Backward). In the game's building manipulators, moving along this axis shifts it Backward (-Z) and Forward (+Z).
+
+Standard vehicle orientation: for cars and car-like vehicles, always use the Z-axis for vehicle length. The front of the car points toward +Z, the rear points toward -Z, vehicle width runs on -X/+X, and vehicle height runs on -Y/+Y.
+
 Scale exceptions: the player character, wheels, and some other parts are slightly oversized for gameplay clearance. Treat those parts as gameplay-clearance exceptions rather than strict real-world scale references.
 
 User-tested player character reference:
@@ -97,7 +105,7 @@ Normal chat navigation must not synchronously parse full-scene runtime logs.
 
 ## Build Guide Overlay
 
-GearBlocks build guides are imported from Markdown handoffs or supported Steam Community guide URLs and stored locally in SQLite. Overlay Forge keeps the raw Markdown, parsed part rows, parsed assembly steps, and first-test checklist so the guide can be displayed in-game without involving chat.
+GearBlocks build guides are imported from Markdown handoffs or supported Steam Community guide URLs and stored locally in SQLite. Overlay Forge keeps the raw Markdown, parsed part rows, parsed assembly steps, and first-test checklist so the guide can be displayed in-game without involving chat. Imports preserve all parsed assembly step rows so the guide can produce a complete staging manifest for the overall build.
 
 Steam guide URL imports also download supported guide images into `game-screenshots/<game-slug>/build-guide-images/<guide-id>/` and create local game catalog reference rows for those files. Image bytes are not stored in SQLite.
 
@@ -113,9 +121,44 @@ Generated assembly guidance should use relative placement from the first referen
 
 The build-guide overlay is independent from the main Overlay Forge window and the game chat overlay. It is translucent, resizable, movable, always-on-top, and remembers its last position and size per guide. The overlay minimum size preserves the fixed build-step image size instead of allowing the image to shrink.
 
-The overlay is optimized for a side-of-screen layout. It has a Build Info view for guide-level context such as goal, scale, geometry, glossary, checklist, part count, step count, and readiness, plus a Build Steps view for static Overlay Forge-generated isometric diagrams and diagram captions. The first visual iteration derives diagrams and captions from parsed step text and part rows at render time; it does not require GearBlocks script windows, BepInEx, or a persisted visual-step table.
+The overlay is optimized for a side-of-screen layout. It has a Build Info view for guide-level context such as goal, checklist, a full staging manifest, the latest in-guide Export All results, and the glossary at the bottom. The Build Steps view shows static Overlay Forge-generated isometric diagrams and diagram captions. The first visual iteration derives diagrams and captions from parsed step text and part rows at render time; it does not require GearBlocks script windows, BepInEx, or a persisted visual-step table.
 
-The static diagrams highlight up to three new placement parts in a contrasting color, show already-placed reference parts in muted colors, use white labels and leader arrows for new placement callouts, and use magenta arrows and lines for connection or attachment links. Step 1 starts from the first three real guide parts only, with no already-placed references or synthesized future parts; step 2 is the first step that may render prior parts as references. The translucent diagram grid represents 10x10 cm squares and expands to cover the current step's part bounds. When no already-placed reference part exists, the grid plane is the placement anchor and new parts sit on the grid. Rendered parts use parsed guide dimensions when available, with GearBlocks size suffixes such as `Beam x3` mapped to block-grid footprints such as 1x3 squares. Known catalog parts can also use procedural part profiles when a generic box would be misleading; for example, `Engine Rear (Driven) Crank x2 & Axle` renders as a 2x2x1 crank cylinder plus a 0.5x0.5x2 axle in one 2x2x3 placement envelope. Captions stay brief by listing the active part names, connection type, and already-placed references. Current heuristic templates cover common build-guide systems such as differentials, steering, drivetrains, crankshafts, suspension corners, wheel/hub placements, frames, and generic part attachments.
+The staging manifest is derived from parsed guide parts and steps, then expanded into exact staged part instances where Overlay Forge has a known build pattern. The first expansion target is the combustion-engine starter guide: high-level guide rows are expanded into a test stand, frame beams, engine core, starter drive, pulleys/fan references, optional intake pipes, and optional power/fuel support rows. Combustion-engine manifests may use parts from any relevant GearBlocks category, including Blocks, Connectors, Gears, Motors, Pipes, Fuel, and Power; they are not limited to the Combustion Engines category. Generic guides still fall back to quantity and comma-list expansion, and slash-separated catalog names such as `Straight Pipe / Corner 90 Pipe / Tee 90 Pipe` are split into individual part rows. Manifest rows are ordered for staging: duplicated paintable parts first by duplicate count descending, solo paintable parts next, duplicated unpaintable parts next, and solo unpaintable parts last. Paint slot numbers restart for each duplicated part type, so different part types can reuse slot 1 instead of consuming a global color sequence.
+
+Default GearBlocks paint slots are the 32 in-game palette colors shown in the paint UI. Use these slot names as practical build-guide labels; they are approximate visual names from the default palette, not calibrated RGB values.
+
+| Slot | Approximate color | Slot | Approximate color |
+| --- | --- | --- | --- |
+| 1 | Black | 17 | Very dark charcoal |
+| 2 | Dark gray | 18 | Light gray |
+| 3 | Red | 19 | Dark red |
+| 4 | Orange brown | 20 | Brown |
+| 5 | Yellow olive | 21 | Dark olive |
+| 6 | Lime green | 22 | Olive green |
+| 7 | Green | 23 | Dark green |
+| 8 | Bright green | 24 | Forest green |
+| 9 | Teal green | 25 | Dark teal |
+| 10 | Cyan | 26 | Deep teal |
+| 11 | Blue | 27 | Dark blue |
+| 12 | Deep blue | 28 | Navy blue |
+| 13 | Royal blue | 29 | Indigo |
+| 14 | Violet | 30 | Purple |
+| 15 | Magenta | 31 | Plum |
+| 16 | Burgundy | 32 | Maroon |
+
+The current two-phase build-guide workflow is:
+
+1. Generate or import the build guide and use the Build Info staging manifest to place all required parts in GearBlocks for render capture. The displayed staging list shows only the render-staging details needed during placement: part type, instance name, paint slot, and rotation. Apply paint slots only for duplicated paintable parts. When a part needs an initial attachment target, attach it to a temporary white jig block. White jig blocks are placement aids only: do not count them as build parts, include them in final design guidance, or require them in generated build steps.
+2. Click `Export All` in the build-guide overlay. Overlay Forge requests a fresh GearBlocks full-scene export, imports that new export/log data, and then shows the Latest Export section for this guide session.
+3. Click `Generate Steps/Images` in the build-guide overlay. Overlay Forge uses the current in-guide export results and switches to the Build Steps view.
+
+For the local build coordinate convention, treat north as +Z, south as -Z, east as +X, west as -X, up as +Y, and down as -Y. The first anchor part in a future matched guide should define local `0,0,0`; exported runtime coordinates remain the source for actual placed positions.
+
+Observed `Beam x3` staging rotations use GearBlocks' in-game rotation fields directly: `0,0,0` spans north/south when facing north, `0,90,0` turns the beam into an east/west horizontal crossmember, `0,0,90` keeps the same apparent orientation as `0,0,0`, and `90,0,0` stands the beam upright. Use `90,0,0` for vertical `Beam x3` uprights in staging manifests.
+
+The static diagrams highlight up to three new placement parts in a contrasting color, show already-placed reference parts in muted colors, use numbered white labels and leader arrows for placement callouts, and use magenta arrows and lines for connection or attachment links. Step 1 promotes the first named structural anchor from the step text, such as `Beam x3`, before other parts because later parts attach back to that anchor directly or indirectly; step 2 is the first step that may render prior parts as references. The translucent diagram grid represents 10x10 cm squares and expands to cover the current step's part bounds. The diagram grid marks X, Y, and Z axes using the GearBlocks coordinate convention: X is width left/right, Y is height down/up, and Z is depth backward/forward. Axis markers originate from the far-left rendered grid corner, such as `xMin, 0, zMax`, and show only one direction for each axis so they do not run through the build area. When no already-placed reference part exists, the grid plane is the placement anchor and new parts sit on the grid. Rendered parts use parsed guide dimensions when available, with GearBlocks size suffixes such as `Beam x3` mapped to block-grid footprints such as 1x3 squares. Known catalog parts can also use procedural part profiles when a generic box would be misleading; for example, `Engine Rear (Driven) Crank x2 & Axle` renders as a 2x2x1 crank cylinder plus a 0.5x0.5x2 axle in one 2x2x3 placement envelope. Captions stay brief by listing the active part names, connection type, and already-placed references. Current heuristic templates cover common build-guide systems such as differentials, steering, drivetrains, crankshafts, suspension corners, wheel/hub placements, frames, and generic part attachments.
+
+Build-guide display text strips redundant size-class parentheticals from labels, captions, placement cues, and review snapshots when the GearBlocks part name already carries the useful size signal, such as `Beam x3`. Functional descriptors such as `(Driven)` or tooth counts such as `(24T)` remain visible.
 
 Automated construction, live scene validation against guide steps, and GearBlocks API execution are deferred.
 
@@ -147,13 +190,21 @@ The derived model should include:
 - Coarse local chassis envelope bounds.
 - Compact latest-vs-previous runtime scene diff where available.
 
-## Visual Marker Backlog
+## BepInEx Runtime Plugin
 
-In-game visual markers are currently disabled.
+The direct Overlay Forge GearBlocks BepInEx plugin is active for Unity-side runtime experiments that are not practical through Lua alone. The current active plugin path includes a file-backed `capture_center_part_preview` command that raycasts from the active camera center, clones the hit object's Unity renderers into an isolated preview layer, optionally rotates the cloned part/object around the captured preview center on X, Y, and Z, renders only the object on a neutral background with thin dark crease/boundary edges for face readability, and writes a PNG plus status JSON under `OverlayForgePlugin`. Preview selection filters out huge environment renderers such as the boundary indicator, and edge extraction skips non-readable Unity meshes while still rendering the part material.
 
-GearBlocks chat should not emit `overlay-forge-markers` blocks, request marker placement, or rely on BepInEx marker support while this feature is paused.
+During part-preview iteration, the Mouse5 shortcut writes a new `capture_center_part_preview` command with an incrementing test id such as `test-part-preview-1`. This temporarily replaces Mouse5 screenshot capture; normal Gaming screenshot capture remains available through the app UI.
 
-The marker implementation and direct BepInEx plugin templates remain in the repository for future work. Treat markers, BepInEx plugin status, and GearLib-related plugin work as backlog items until the user explicitly resumes that feature.
+Validated part-preview captures can be saved as GearBlocks part render profiles in SQLite. A render profile stores a stable profile key, optional part key, canonical zero rotation, preview camera preset, selected Unity source/renderers, bounds metadata, edge metadata, latest status JSON, and latest PNG cache path. Build-guide rendering should treat the profile as the reusable definition and use explicit X/Y/Z transforms for requested placement rotations rather than storing every possible rotated image up front.
+
+The shared GearBlocks rotation snap set is `0`, `40`, `45`, `60`, `72`, `90`, `120`, `135`, `150`, and `157.5` degrees. Build-guide rotation composition should use quaternion transforms so angled assemblies, such as 60-degree V engines, can pass parent rotation down to attached child parts without flattening the orientation into a single axis.
+
+In-game visual markers are still disabled.
+
+GearBlocks chat should not emit `overlay-forge-markers` blocks, request marker placement, or rely on marker support while marker rendering remains paused.
+
+GearLib-related plugin work remains backlog. The direct Overlay Forge BepInEx plugin does not depend on GearLib.
 
 ## Part Catalog
 
@@ -173,6 +224,6 @@ Build guide chat context uses the documented API shape to explain which exported
 
 ## External Dependency Boundary
 
-BepInEx and GearLib are third-party dependencies for backlog plugin work. Overlay Forge may document setup, but must not bundle, redistribute, install, or modify them unless a future explicit license/permission review allows it.
+BepInEx and GearLib are third-party dependencies. Overlay Forge may document setup, but must not bundle, redistribute, install, or modify them unless a future explicit license/permission review allows it.
 
 The direct Overlay Forge BepInEx plugin does not depend on GearLib.

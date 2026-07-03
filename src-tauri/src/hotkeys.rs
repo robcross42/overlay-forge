@@ -15,7 +15,7 @@ const TOGGLE_OVERLAY_WAS_VISIBLE_ACTION: &str = "toggle_overlay_was_visible";
 const TOGGLE_OVERLAY_WAS_HIDDEN_ACTION: &str = "toggle_overlay_was_hidden";
 const GAME_CHAT_OVERLAY_ACTION: &str = "game_chat_overlay";
 const GAME_CHAT_OVERLAY_WAS_HIDDEN_ACTION: &str = "game_chat_overlay_was_hidden";
-const GAME_CHAT_SCREENSHOT_CAPTURE_ACTION: &str = "game_chat_region_capture";
+const GAME_PART_PREVIEW_CAPTURE_ACTION: &str = "game_chat_region_capture";
 const GAME_BUILD_GUIDE_OVERLAY_ACTION: &str = "game_build_guide_overlay";
 const RECORD_SMOKING_EVENT_ACTION: &str = "record_smoking_event";
 
@@ -53,13 +53,8 @@ pub fn register_toggle_hotkey(app: &mut App) -> Result<(), Box<dyn Error>> {
                             GAME_CHAT_OVERLAY_ACTION => {
                                 trigger_game_chat_overlay_shortcut(app);
                             }
-                            GAME_CHAT_SCREENSHOT_CAPTURE_ACTION => {
-                                WindowManager::new(app).remember_foreground_window_as_game();
-                                set_pending_shortcut_action(
-                                    app,
-                                    GAME_CHAT_SCREENSHOT_CAPTURE_ACTION,
-                                );
-                                let _ = app.emit("game-chat-screenshot-capture-requested", ());
+                            GAME_PART_PREVIEW_CAPTURE_ACTION => {
+                                trigger_gearblocks_part_preview_shortcut(app);
                             }
                             GAME_BUILD_GUIDE_OVERLAY_ACTION => {
                                 trigger_game_build_guide_overlay_shortcut(app);
@@ -92,8 +87,8 @@ pub fn default_keybinds() -> Vec<KeybindConfig> {
             keys: vec!["Ctrl".to_string(), "Shift".to_string(), "C".to_string()],
         },
         KeybindConfig {
-            action: GAME_CHAT_SCREENSHOT_CAPTURE_ACTION.to_string(),
-            label: "Capture Screenshot For Gaming Chat".to_string(),
+            action: GAME_PART_PREVIEW_CAPTURE_ACTION.to_string(),
+            label: "Capture GearBlocks Test Part Preview".to_string(),
             keys: Vec::new(),
         },
         KeybindConfig {
@@ -275,14 +270,25 @@ fn trigger_shortcut_action(app: &tauri::AppHandle, action: &str) {
     match action {
         TOGGLE_OVERLAY_ACTION => toggle_overlay_window(app),
         GAME_CHAT_OVERLAY_ACTION => trigger_game_chat_overlay_shortcut(app),
-        GAME_CHAT_SCREENSHOT_CAPTURE_ACTION => {
-            WindowManager::new(app).remember_foreground_window_as_game();
-            set_pending_shortcut_action(app, GAME_CHAT_SCREENSHOT_CAPTURE_ACTION);
-            let _ = app.emit("game-chat-screenshot-capture-requested", ());
-        }
+        GAME_PART_PREVIEW_CAPTURE_ACTION => trigger_gearblocks_part_preview_shortcut(app),
         GAME_BUILD_GUIDE_OVERLAY_ACTION => trigger_game_build_guide_overlay_shortcut(app),
         RECORD_SMOKING_EVENT_ACTION => record_smoking_event_from_shortcut(app),
         _ => {}
+    }
+}
+
+fn trigger_gearblocks_part_preview_shortcut(app: &tauri::AppHandle) {
+    WindowManager::new(app).remember_foreground_window_as_game();
+    match commands::create_gearblocks_test_part_preview_command() {
+        Ok(path) => {
+            eprintln!(
+                "GearBlocks test part preview command written: {}",
+                path.to_string_lossy()
+            );
+        }
+        Err(error) => {
+            eprintln!("Could not write GearBlocks test part preview command: {error}");
+        }
     }
 }
 
@@ -414,7 +420,7 @@ fn validate_keybinds(keybinds: &[KeybindConfig]) -> Result<(), String> {
         if ![
             TOGGLE_OVERLAY_ACTION,
             GAME_CHAT_OVERLAY_ACTION,
-            GAME_CHAT_SCREENSHOT_CAPTURE_ACTION,
+            GAME_PART_PREVIEW_CAPTURE_ACTION,
             GAME_BUILD_GUIDE_OVERLAY_ACTION,
             RECORD_SMOKING_EVENT_ACTION,
         ]

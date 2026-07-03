@@ -70,7 +70,9 @@ updated_at
 
 Simple local event list. Recurrence, invites, and external calendar sync are deferred.
 
-## Project Tables
+## Legacy Project Tables
+
+The former Projects module has been removed from active code. These tables are retained so existing local databases remain readable and no user data is destroyed. Future work must explicitly decide whether to restore, migrate, export, or delete these records.
 
 ### `obj_project`
 
@@ -243,14 +245,44 @@ created_at
 modified_at
 ```
 
-Generic per-game settings. This avoids table-per-game settings growth.
+Generic per-game settings. This avoids table-per-game settings growth for loose preferences and compatibility values.
 
-Current Path of Exile 2 seeded setting:
+Legacy Path of Exile 2 seeded setting:
 
 ```text
 setting_key = current_build
 setting_value_json = currently played build metadata, source URL, class, ascendancy, tags, and status
 ```
+
+Path of Exile 2 character builds now use `obj_game_character_build` for editable build records. The `current_build` setting remains compatibility data from the earlier scaffold.
+
+### `obj_game_character_build`
+
+```text
+id
+game_id
+id_game
+title
+character_class
+ascendancy
+build_role
+status
+source_label
+source_url
+patch
+summary
+tags
+notes
+is_active
+created_at
+updated_at
+```
+
+Game-scoped local character build records. This table is intentionally generic so Path of Exile 2 build planning can add passive tree snapshots, items, gems, and calculated values without creating a table-per-game settings model.
+
+Only one build per game should have `is_active = 1`. Current status values are `planned`, `currently_playing`, `active`, and `archived`.
+
+Path of Exile 2 seeds the original Mobalytics Ice Shot Deadeye leveling guide as an active build record when no POE2 build records exist.
 
 ### `obj_game_data_location`
 
@@ -401,6 +433,33 @@ updated_at
 ```
 
 Canonical GearBlocks part definitions observed from runtime exports. `part_key` is the stable lookup key used by runtime instance rows.
+
+### `obj_gearblocks_part_render_profile`
+
+```text
+id
+game_id
+profile_key
+part_key
+part_name
+source_object_name
+renderer_names_json
+canonical_rotation_json
+camera_preset_json
+bounds_center_json
+bounds_size_json
+edge_settings_json
+latest_render_path
+latest_capture_id
+latest_status_json
+render_version
+is_validated
+notes
+created_at
+updated_at
+```
+
+Validated GearBlocks part-preview render profiles. A profile records the canonical zero orientation, selected Unity source/renderers, framing metadata, edge metadata, latest preview status JSON, and latest rendered PNG path for a part. The PNG remains a cache/output artifact outside SQLite; the profile is the reusable persisted definition used for future rotated preview requests.
 
 ### `obj_game_runtime_part_instance`
 
@@ -871,7 +930,7 @@ created_at
 updated_at
 ```
 
-Game-scoped Markdown build guide imports. The raw Markdown is preserved for future parsing improvements while current UI rendering uses structured summary fields, parsed glossary text, parsed part rows, parsed assembly steps, and first-test checklist rows. Overlay bounds are nullable and restore the independent build-guide overlay position and size.
+Game-scoped Markdown build guide imports. The raw Markdown is preserved for future parsing improvements while current UI rendering uses structured summary fields, parsed glossary text, parsed part rows, parsed assembly steps, and first-test checklist rows. GearBlocks imports preserve all parsed assembly step rows so the overlay can produce a complete staging manifest and full step review. Overlay bounds are nullable and restore the independent build-guide overlay position and size.
 
 ### `obj_game_build_guide_part`
 
@@ -902,7 +961,7 @@ created_at
 updated_at
 ```
 
-Parsed numbered assembly instructions for in-game reference. Automated construction, validation against live scene state, and direct GearBlocks API execution are deferred.
+Parsed numbered assembly instructions for in-game reference. The current GearBlocks two-phase workflow imports the latest runtime export before rendering the step view, but persisted step-to-runtime-instance matching remains future work. Automated construction and direct GearBlocks API execution are deferred.
 
 ## Smoking Cessation Tables
 
@@ -999,6 +1058,63 @@ modified_at
 ```
 
 Run history for scheduled events.
+
+## Repair Resell Tables
+
+Repair Resell tables use table-specific text primary keys named `id_<tablename>` and include `created_at` plus `modified_at`.
+
+### Definition Tables
+
+```text
+def_resell_source_kind
+def_resell_category
+def_resell_keyword_flag
+```
+
+These seed source kinds, item categories, and deterministic keyword flag rules for opportunity, risk, and interest-brand detection.
+
+### Source And Search Tables
+
+```text
+obj_resell_source
+obj_resell_search_profile
+n2n_resell_source_search_profile
+obj_resell_scrape_run
+```
+
+Sources are allowlisted local records with `scrape_mode` values of `public_http`, `manual_import`, or `disabled`. Refresh runs are manually triggered and record success, skipped, or failed outcomes.
+
+### Listing Tables
+
+```text
+obj_resell_listing
+obj_resell_listing_snapshot
+obj_resell_listing_image
+n2n_resell_listing_category
+n2n_resell_listing_keyword_flag
+obj_resell_watchlist_entry
+```
+
+Listings are canonical rows keyed by source/external id or canonical URL. Snapshots preserve price/status/content history for each import or refresh. Images are metadata rows only; image bytes should stay outside SQLite if image download support is added later.
+
+### Estimate Tables
+
+```text
+obj_resell_travel_profile
+obj_resell_deal_estimate
+```
+
+Travel profiles store fuel/distance assumptions. Deal estimates are manual MVP records with deterministic max-safe-bid and net-profit calculations stored alongside user-entered costs and resale assumptions.
+
+### Future Repair Resell Data Direction
+
+Future Repair Resell schema work should preserve room for:
+
+- Multi-item pickup plans that group listings/lots by source, region, pickup window, route, vehicle, trailer, and total load economics.
+- Donor/parts-harvesting relationships between purchased machines, repaired items, part-out inventory, and remaining resale parts.
+- Repair knowledge records for symptoms, diagnosis, root cause, parts, cost, time, photos, manuals, videos, lessons learned, and final outcome.
+- Model/brand/engine-family/failure-mode history that can be matched back to future listings.
+- Learning progression and skill-area history from bicycles and small engines toward larger machines, engine rebuilding, and vehicle restoration.
 
 ## Migration Notes
 

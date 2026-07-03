@@ -2,20 +2,20 @@
 
 ## Product Direction
 
-Overlay Forge is a personal desktop command hub built as a local-first Tauri overlay. It floats above the user's workflow and organizes project planning, notes, tasks, references, game context, and focused utility modules.
+Overlay Forge is a personal desktop command hub built as a local-first Tauri overlay. It floats above the user's workflow and organizes planning, calendar items, references, game context, and focused utility modules.
 
 The active coding workflow is direct Codex chat in VS Code. Repository Markdown files provide local project context and implementation rules.
 
-## Current Baseline
+## Current Project Shape
 
-Current stable project baseline:
+Current stable project status:
 
 ```text
-Milestone 13 - Project Workspace UI Consolidation
-Status: Complete / Passed / Successful
+Overlay Forge 0.9.0
+Status: Active local-first desktop command hub
 ```
 
-Milestone 13 consolidates Projects around the left navigation hierarchy and focused chat surfaces. Project and conversation selection live in the navigation tree. Project details, GitHub configuration, and Markdown context settings live in Project Edit.
+Overlay Forge organizes calendar items, references, game context, and focused utility modules inside a local-first desktop shell. The retired Projects module is no longer part of the active shell or command surface.
 
 ## Major Completed Areas
 
@@ -23,22 +23,17 @@ Milestone 13 consolidates Projects around the left navigation hierarchy and focu
 - React + TypeScript frontend.
 - Rust/Tauri backend command layer.
 - SQLite local persistence.
-- Scratchpad, Tasks, Notes, Calendar.
-- Local Projects.
-- Project-scoped chat.
-- GitHub repository metadata linkage.
+- Calendar as the visible main-shell organizer surface.
+- Scratchpad, Tasks, and Notes code/data retained for later organizer consolidation review.
 - User-curated YouTube references.
-- Manual conversation context attachments.
-- Prompt Preview.
-- Local Markdown implementation request drafts.
-- Project-level Markdown context.
-- Consolidated Projects navigation tree and focused chat UI.
 - Gaming workspace with screenshot capture.
 - GearBlocks save decoding, runtime export import, parts catalog, and in-game script tooling.
 - Smoking Cessation module.
+- Repair Resell module for local buy-repair-resell listing tracking, source registry, watchlist, deterministic keyword flags, and manual estimates.
 - Scheduler framework.
 - SQLite naming normalization.
-- Path of Exile 2 game module scaffold.
+- Path of Exile 2 game module scaffold and local build records.
+- Former Projects module removed from active code while legacy project/planning SQLite data remains preserved.
 
 ## Active Documentation Structure
 
@@ -48,8 +43,8 @@ Milestone 13 consolidates Projects around the left navigation hierarchy and focu
 | `AGENTS.md` | Codex instructions and repo rules. |
 | `CHANGELOG.md` | Date/time-stamped change history. |
 | `.vscode/CODEX_INSTRUCTIONS.md` | VS Code quick reference. |
-| `docs/PROJECT_OVERVIEW.md` | Current project direction and baseline. |
-| `docs/PROJECT_HISTORY.md` | Condensed milestone history. |
+| `docs/PROJECT_OVERVIEW.md` | Current project direction and active shape. |
+| `docs/PROJECT_HISTORY.md` | Archived early project history. |
 | `docs/ARCHITECTURE.md` | Frontend/backend/module architecture. |
 | `docs/DATA_MODEL.md` | SQLite schema and naming conventions. |
 | `docs/FEATURE_SCOPE.md` | Scope boundaries and guardrails. |
@@ -62,6 +57,7 @@ Milestone 13 consolidates Projects around the left navigation hierarchy and focu
 | `docs/GEARBLOCKS_PLUGIN.md` | BepInEx, GearLib, and marker plugin boundaries. |
 | `docs/GEARBLOCKS_PARTS_CATALOG.md` | Validated GearBlocks parts vocabulary. |
 | `docs/SMOKING_CESSATION.md` | Smoking Cessation module scope. |
+| `docs/REPAIR_RESELL.md` | Repair Resell restoration, pickup, and learning-path vision. |
 
 ## Terminology
 
@@ -69,10 +65,6 @@ Use current names in new work:
 
 | Current term | Meaning |
 | --- | --- |
-| Project Chat | Project-scoped OpenAI chat inside Overlay Forge. |
-| Project Markdown Context | Project-level local Markdown files loaded from a configured root. |
-| Conversation Context Attachments | Conversation-scoped links to local app records. |
-| Implementation Request Draft | Local Markdown draft generated from project/chat/context data for user review. |
 | GearBlocks Runtime Export | Runtime scene data reconstructed from GearBlocks script output. |
 
 Do not reintroduce retired external-transfer terminology.

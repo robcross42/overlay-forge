@@ -20,6 +20,121 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+### 2026-07-02
+
+#### Added
+
+- 04:18:02 EDT - Added the Repair Resell module with SQLite-backed sources, search profiles, listing imports, snapshots, deterministic keyword/category flags, watchlist toggles, conservative manual source refresh, and manual deal estimates.
+
+#### Changed
+
+- 05:04:12 EDT - Collapsed the Repair Resell tab to a button-only UI shell while leaving the underlying data model and stored records untouched.
+- 05:05:49 EDT - Changed the main overlay shell so the left navigation pane starts collapsed by default on app launch.
+- 05:09:31 EDT - Unwired Scratchpad, Tasks, and Notes from the main shell navigation/render path while keeping their existing code and data paths intact.
+- 05:13:33 EDT - Removed the former Projects module from the active shell, frontend feature/service layer, project chat UI, project-scoped GitHub helper, and registered Tauri command surface while preserving legacy SQLite data.
+
+#### Documentation
+
+- 04:18:02 EDT - Documented the Repair Resell local-first boundary, scraper safety limits, SQLite table family, and deferred LLM/inventory/repair/sales work.
+- 04:34:15 EDT - Documented the Repair Resell future vision around restoration-funded learning, multi-item auction pickups, pickup economics, parts harvesting, trailer-enabled hauling, return-load opportunities, and repair knowledge-base history.
+- 04:44:22 EDT - Archived the legacy numbered progress model into project history, removed it from active documentation surfaces, and replaced app status wording with neutral current-state language.
+- 05:09:31 EDT - Marked Scratchpad, Tasks, Notes, and Calendar for later organizer consolidation review.
+- 05:13:33 EDT - Documented the retired Projects module boundary and added future review items for restore, replacement, migration, export, or deletion decisions.
+
+### 2026-06-29
+
+#### Changed
+
+- 00:59:10 EDT - Changed generated build-guide diagram backgrounds to use barely visible gray transparency.
+- 13:53:41 EDT - Removed the standalone build-guide overlay titlebar so guide content uses the full window height.
+- 13:57:19 EDT - Changed the standalone build-guide overlay so empty guide space, including the toolbar gap left of the zoom buttons, can drag the window.
+- 14:04:33 EDT - Added explicit GearBlocks X/Y/Z coordinate rules and visible X, Y, and Z axis markers to generated build-guide diagrams.
+- 14:06:56 EDT - Defined the standard GearBlocks car orientation as length on the Z-axis, front toward +Z, rear toward -Z, width on X, and height on Y.
+- 14:19:04 EDT - Added a build-guide overlay action that saves a Step 1 review HTML snapshot with the rendered diagram, caption text, step body, placement cues, and related parts.
+- 14:21:35 EDT - Added visible build-guide toolbar feedback for Step 1 review snapshot export success and failure states.
+- 14:26:11 EDT - Changed Step 1 review HTML snapshots to override captured app overflow styles so exported review files can scroll.
+- 14:38:07 EDT - Moved build-guide diagram axis markers to the far-left grid corner and reduced them to one displayed direction per axis.
+- 14:39:31 EDT - Added a Codex workflow rule to reopen edited local dev/review HTML files in the default browser after changes.
+- 14:56:24 EDT - Changed build-guide Step 1 visuals to promote a named structural anchor such as `Beam x3` before other parts and number each rendered part label by placement order.
+- 15:00:35 EDT - Limited GearBlocks build-guide imports to the first three parsed assembly steps for the current Step 1 review loop while preserving full raw Markdown.
+- 15:08:01 EDT - Changed GearBlocks build-guide import buttons to show animated `Importing.`, `Importing..`, and `Importing...` labels on the active import action.
+- 15:09:39 EDT - Changed the build-guide review export action to save a 3-step HTML review containing diagrams, captions, bodies, placement cues, and related parts for each imported step.
+- 15:24:34 EDT - Changed GearBlocks build-guide display text to strip redundant size-class parentheticals from visual labels, captions, placement cues, and 3-step review snapshots while preserving functional descriptors and tooth counts.
+- 16:02:07 EDT - Added a direct GearBlocks BepInEx Unity part-preview renderer command that captures the camera-center hit object into an isolated PNG under `OverlayForgePlugin\renders`.
+- 16:39:30 EDT - Changed the configured Mouse5 preview-loop shortcut to write incrementing GearBlocks BepInEx `capture_center_part_preview` test commands such as `test-part-preview-1` instead of triggering screenshot capture.
+- 16:43:38 EDT - Changed GearBlocks BepInEx part-preview captures to add dark crease and boundary edges so white or low-contrast part faces remain readable.
+- 16:59:59 EDT - Changed GearBlocks BepInEx part-preview edge rendering to use thinner adaptive edge lines and a stricter crease threshold.
+- 17:08:22 EDT - Added explicit GearBlocks BepInEx part-preview object rotation fields for X, Y, and Z degree sweeps while keeping camera yaw and pitch separate.
+- 17:30:43 EDT - Added persisted GearBlocks part render profiles, rotation snap-angle constants, Tauri commands for saving profiles from BepInEx preview status captures, and frontend quaternion transform helpers for build-guide rotation composition.
+- 18:44:12 EDT - Removed the temporary GearBlocks build-guide three-step import cap and added a build-guide overlay phase-2 workflow with a full staging manifest, latest-export import trigger, runtime instance count, and full build-review snapshot export.
+- 19:03:47 EDT - Added a GearBlocks build-guide manifest expansion helper that turns high-level combustion-engine guide rows into exact staged part instances with paint slots, relative placement hints, rotation hints, and size/config notes.
+- 19:23:50 EDT - Changed GearBlocks build-guide staging manifests so paint slots are assigned only to duplicated paintable parts; unique paintable parts now show no paint needed.
+- 19:31:41 EDT - Changed GearBlocks build-guide staging manifests to list duplicated paintable parts first by duplicate count, then solo paintable parts, duplicated unpaintable parts, and solo unpaintable parts.
+- 19:43:42 EDT - Changed the GearBlocks build-guide overlay to start without stale Latest Export data, add an in-guide Export All action, remove compact summary/status pills, remove scale and geometry panels, and move Glossary to the bottom.
+- 20:03:39 EDT - Changed GearBlocks build-guide staging manifests so paint slot numbers restart at slot 1 for each duplicated part type.
+- 20:17:17 EDT - Changed GearBlocks build-guide staging manifests to split slash-separated part names and include Corner 90 Pipe in the combustion-engine intake-manifold expansion.
+- 20:52:29 EDT - Changed GearBlocks build-guide staging instructions to allow temporary white jig blocks for initial attachment while excluding them from final build design.
+- 21:27:55 EDT - Changed GearBlocks combustion-engine staging manifest `Beam x3` uprights to use `90,0,0` rotation instead of `0,0,90`.
+- 21:43:38 EDT - Changed the GearBlocks build-guide staging manifest display to show only render-placement fields: Type, Name, Paint, and Rotation.
+
+#### Fixed
+
+- 16:13:15 EDT - Fixed the GearBlocks BepInEx part-preview renderer to fall back from non-renderable physics composite hit roots to the nearest enabled Unity renderer at the raycast hit point.
+- 16:17:53 EDT - Fixed the GearBlocks BepInEx part-preview renderer fallback to always use the nearest enabled Unity renderer when collider hierarchy lookup fails, with selection diagnostics in the status JSON.
+- 16:23:32 EDT - Fixed the GearBlocks BepInEx part-preview renderer discovery to scan all loaded Unity renderers and remove the strict MeshRenderer/SkinnedMeshRenderer filter that excluded GearBlocks visual meshes.
+- 16:31:54 EDT - Changed GearBlocks BepInEx part-preview captures to render only the isolated part/object on a neutral background, leaving grid and axis composition to build-step images.
+- 16:59:59 EDT - Fixed GearBlocks BepInEx part-preview fallback selection so huge environment renderers such as the boundary indicator are ignored, crank sub-renderer hits can promote to a reasonable parent part group, and non-readable Unity meshes skip edge extraction without mesh-access errors.
+- 21:33:58 EDT - Fixed the GearBlocks build-guide overlay so unfocused-window translucency applies to gray backgrounds instead of reducing guide text readability.
+
+#### Documentation
+
+- 19:43:42 EDT - Documented the GearBlocks build-guide Export All workflow and the simplified Build Info view.
+- 20:10:03 EDT - Documented the 32 default GearBlocks paint palette slots for build-guide staging references.
+- 20:17:17 EDT - Documented that combustion-engine staging manifests can use parts from multiple GearBlocks categories, including Pipes.
+- 20:52:29 EDT - Documented that temporary white jig blocks are placement aids only and must not be counted as build-guide parts.
+- 21:27:55 EDT - Documented observed GearBlocks `Beam x3` rotation behavior for build-guide staging.
+- 21:43:38 EDT - Documented that the build-guide staging list is for render capture and shows only part type, instance name, paint slot, and rotation.
+
+#### Validation
+
+- 00:59:10 EDT - Validated the generated diagram background transparency update with `npm run build` and `git diff --check`.
+- 13:53:41 EDT - Validated the build-guide overlay titlebar removal with `npm run build` and `git diff --check`.
+- 13:57:19 EDT - Validated the build-guide empty-space drag behavior with `npm run build` and `git diff --check`.
+- 14:04:33 EDT - Validated GearBlocks coordinate-axis rules and build-guide diagram axis markers with `cargo fmt --manifest-path src-tauri\Cargo.toml`, `npm run build`, `npm run cargo:build`, and `git diff --check`.
+- 14:06:56 EDT - Validated the GearBlocks standard car-orientation rule with `npm run cargo:build` and `git diff --check`.
+- 14:19:04 EDT - Validated the Step 1 review snapshot export with `npm run build` and `git diff --check`.
+- 14:21:35 EDT - Validated Step 1 review snapshot toolbar feedback with `npm run build` and `git diff --check`.
+- 14:26:11 EDT - Validated scrollable Step 1 review snapshot exports with `npm run build` and `git diff --check`.
+- 14:38:07 EDT - Validated far-corner single-direction build-guide axis markers with `npm run build` and `git diff --check`.
+- 14:39:31 EDT - Validated the local dev HTML browser-refresh workflow rule with `git diff --check`.
+- 14:56:24 EDT - Validated Step 1 structural-anchor promotion and numbered part labels with `npm run build` and `git diff --check`.
+- 15:00:35 EDT - Validated the GearBlocks three-step import cap with `npm run cargo:test`, `npm run cargo:build`, `npm run build`, and `git diff --check`.
+- 15:08:01 EDT - Validated GearBlocks build-guide import button progress labels with `npm run build` and `git diff --check`.
+- 15:09:39 EDT - Validated the 3-step build-guide review HTML export with `npm run build` and `git diff --check`.
+- 15:24:34 EDT - Validated GearBlocks build-guide size-parenthetical display cleanup with `npm run build`, a cleaned local 3-step review HTML text check, and `git diff --check`.
+- 16:02:07 EDT - Validated the direct GearBlocks BepInEx part-preview renderer with `dotnet build gearblocks-bepinex-workspace\OverlayForgeGearBlocksPlugin\OverlayForgeGearBlocksPlugin.csproj` and `git diff --check`; install/run validation was skipped because GearBlocks was running.
+- 16:13:15 EDT - Validated the GearBlocks BepInEx non-renderable hit-root fallback with `dotnet build gearblocks-bepinex-workspace\OverlayForgeGearBlocksPlugin\OverlayForgeGearBlocksPlugin.csproj`.
+- 16:17:53 EDT - Validated the GearBlocks BepInEx nearest-renderer preview fallback with `dotnet build gearblocks-bepinex-workspace\OverlayForgeGearBlocksPlugin\OverlayForgeGearBlocksPlugin.csproj`.
+- 16:23:32 EDT - Validated the GearBlocks BepInEx all-loaded-renderers preview discovery with `dotnet build gearblocks-bepinex-workspace\OverlayForgeGearBlocksPlugin\OverlayForgeGearBlocksPlugin.csproj`.
+- 16:31:54 EDT - Validated the GearBlocks BepInEx neutral-background part-only preview change with `dotnet build gearblocks-bepinex-workspace\OverlayForgeGearBlocksPlugin\OverlayForgeGearBlocksPlugin.csproj`.
+- 16:39:30 EDT - Validated the Mouse5 GearBlocks part-preview command shortcut with `cargo fmt --manifest-path src-tauri\Cargo.toml`, `npm run cargo:build`, and `git diff --check`.
+- 16:43:38 EDT - Validated the GearBlocks BepInEx part-preview edge overlay with `dotnet build gearblocks-bepinex-workspace\OverlayForgeGearBlocksPlugin\OverlayForgeGearBlocksPlugin.csproj`, installed the rebuilt DLL into the local GearBlocks BepInEx plugin folder while GearBlocks was closed, and ran `git diff --check`.
+- 16:59:59 EDT - Validated the GearBlocks BepInEx part-preview selection and edge-safety fixes with `dotnet build gearblocks-bepinex-workspace\OverlayForgeGearBlocksPlugin\OverlayForgeGearBlocksPlugin.csproj`; install/run validation was skipped because GearBlocks process `9380` was running.
+- 17:08:22 EDT - Validated GearBlocks BepInEx part-preview rotation command support with `dotnet build gearblocks-bepinex-workspace\OverlayForgeGearBlocksPlugin\OverlayForgeGearBlocksPlugin.csproj`, `cargo fmt --manifest-path src-tauri\Cargo.toml`, and `npm run cargo:build`, then installed the rebuilt DLL into the local GearBlocks BepInEx plugin folder while GearBlocks was closed.
+- 17:31:38 EDT - Validated GearBlocks part render profiles and rotation transform helpers with `cargo fmt --manifest-path src-tauri\Cargo.toml`, `npm run cargo:build`, `npm run cargo:test`, `npm run build`, and `git diff --check`.
+- 18:45:15 EDT - Validated the full GearBlocks build-guide import and phase-2 latest-export workflow with `cargo fmt --manifest-path src-tauri\Cargo.toml`, `npm run cargo:build`, `npm run cargo:test`, `npm run build`, and `git diff --check`.
+- 19:04:30 EDT - Validated GearBlocks build-guide manifest expansion with `npm run build` and `git diff --check`.
+- 19:23:50 EDT - Validated duplicate-only GearBlocks staging-manifest paint slots with `npm run build` and `git diff --check`.
+- 19:31:41 EDT - Validated GearBlocks staging-manifest list ordering with `npm run build` and `git diff --check`.
+- 19:45:20 EDT - Validated the GearBlocks build-guide Export All and simplified info view changes with `cargo fmt --manifest-path src-tauri\Cargo.toml`, `npm run build`, `npm run cargo:build`, and `git diff --check`.
+- 20:04:06 EDT - Validated per-part-type GearBlocks staging-manifest paint slots with `npm run build` and `git diff --check`.
+- 20:10:03 EDT - Validated GearBlocks default paint palette documentation with `git diff --check`.
+- 20:17:17 EDT - Validated GearBlocks slash-separated pipe staging manifest parsing with `npm run build` and `git diff --check`.
+- 20:52:29 EDT - Validated temporary white jig block staging guidance with `npm run build` and `git diff --check`.
+- 21:28:14 EDT - Validated GearBlocks `Beam x3` upright rotation correction with `npm run build` and `git diff --check`.
+- 21:34:18 EDT - Validated GearBlocks build-guide unfocused background translucency styling with `npm run build` and `git diff --check`.
+- 21:44:00 EDT - Validated GearBlocks render-focused staging manifest columns with `npm run build` and `git diff --check`.
+
 ### 2026-06-28
 
 #### Changed
@@ -27,6 +142,7 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 - 11:28:32 EDT - Changed the GearBlocks build-guide overlay into a step-focused view with a static Overlay Forge-generated isometric placement diagram, step navigation, current-step instructions, and related placement parts.
 - 12:48:56 EDT - Changed the GearBlocks build-guide overlay to separate Build Info from Build Steps, with Build Steps showing generated isometric diagrams and detailed placement/attachment captions only.
 - 21:04:32 EDT - Changed GearBlocks build-guide diagrams to use semi-realistic procedural catalog profiles for combustion-engine parts, including a composite cylinder-and-axle rendering for `Engine Rear (Driven) Crank x2 & Axle`.
+- 22:58:17 EDT - Added generic local game character build records and changed the Path of Exile 2 Builds section to list, edit, activate, and delete POE2 build records from SQLite.
 
 #### Fixed
 
@@ -37,6 +153,7 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 - 11:28:32 EDT - Documented that GearBlocks build-guide visuals are rendered in Overlay Forge from parsed guide steps and part rows without requiring GearBlocks script windows, BepInEx, or a persisted visual-step table.
 - 12:48:56 EDT - Documented the Build Info and Build Steps view split for GearBlocks build-guide overlays.
 - 21:04:32 EDT - Documented GearBlocks build-guide procedural part profiles for catalog parts whose dimensions should not be interpreted as generic boxes.
+- 22:58:17 EDT - Documented the Path of Exile 2 build-planner foundation, `obj_game_character_build`, and the boundary that passive tree, item, gem, and calculation layers remain future work.
 
 #### Validation
 
@@ -44,6 +161,7 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 - 12:24:13 EDT - Validated the Tauri shutdown lifecycle fix with `npm run cargo:build`.
 - 12:48:56 EDT - Validated the GearBlocks build-guide view split with `npm run build`.
 - 21:04:32 EDT - Validated GearBlocks build-guide procedural part profiles with `npm run build`.
+- 22:59:10 EDT - Validated the Path of Exile 2 local build-record foundation with `cargo fmt --manifest-path src-tauri\Cargo.toml`, `npm run build`, `npm run cargo:build`, `npm run cargo:test`, `npm run cargo:clippy`, and `git diff --check`.
 
 ### 2026-06-26
 

@@ -1,6 +1,8 @@
 # Overlay Forge Project History
 
-This file keeps milestone history in one compact reference. It replaces separate active `MILESTONE_*.md` files.
+This file archives the retired numbered milestone sequence in one compact reference. It replaces separate active `MILESTONE_*.md` files.
+
+Active planning and UI copy no longer use numbered milestones. Treat this file as historical reference only unless the user explicitly reintroduces milestone tracking.
 
 Historical milestone notes may mention old table names or old UI names. For current implementation work, prefer:
 
@@ -30,9 +32,9 @@ Historical milestone notes may mention old table names or old UI names. For curr
 | 12 - Project Markdown Context | Complete / Passed / Successful | Added project-level Markdown context loading from configured local roots. |
 | 13 - Project Workspace UI Consolidation | Complete / Passed / Successful | Consolidated Projects around the left navigation tree, focused chat surface, Project Edit, and right-hand context pane. |
 
-## Current Baseline Detail
+## Archived Baseline Detail
 
-Milestone 13 is the active stable baseline.
+The archived numbered sequence ended at Milestone 13.
 
 Current project behavior:
 
@@ -99,9 +101,11 @@ n2n_ = many-to-many mappings
 
 ### Path of Exile 2 Game Module
 
-Status: Scaffolded / Pending Capability Buildout.
+Status: Build Planner Foundation Added / Pending Tree, Items, Gems, and Calculations.
 
-Path of Exile 2 is seeded as a Gaming module with frontend section targets for Home, Chats, Builds, Skill Tree, Items, Skill Gems, Support Gems, Loot Filter, and Trade. Add persistence only when a concrete capability requires it.
+Path of Exile 2 is seeded as a Gaming module with frontend section targets for Home, Chats, Builds, Skill Tree, Items, Skill Gems, Support Gems, Loot Filter, and Trade.
+
+The Builds section now uses generic local character build records in `obj_game_character_build` instead of relying on the earlier single JSON `current_build` setting. This is the first persistence foundation for replacing external Path of Building usage inside Overlay Forge. Passive tree snapshots, indexed items, gem links, and calculated values remain future capability layers.
 
 ## Historical Validation Pattern
 

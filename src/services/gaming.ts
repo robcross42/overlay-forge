@@ -25,6 +25,42 @@ export type GameSetting = {
   modifiedAt: string;
 };
 
+export type GameCharacterBuild = {
+  id: number;
+  gameId: number;
+  idGame: number;
+  title: string;
+  characterClass: string;
+  ascendancy: string;
+  buildRole: string;
+  status: string;
+  sourceLabel: string;
+  sourceUrl: string;
+  patch: string;
+  summary: string;
+  tags: string;
+  notes: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GameCharacterBuildInput = {
+  gameId: number;
+  title: string;
+  characterClass: string;
+  ascendancy: string;
+  buildRole: string;
+  status: string;
+  sourceLabel: string;
+  sourceUrl: string;
+  patch: string;
+  summary: string;
+  tags: string;
+  notes: string;
+  isActive: boolean;
+};
+
 export type GameScreenshotCaptureRequest = {
   id: number;
   gameId: number;
@@ -164,6 +200,42 @@ export type GameRuntimeConstructionExport = {
   lastIndexedAt: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type GearBlocksPartRenderProfile = {
+  id: number;
+  gameId: number;
+  profileKey: string;
+  partKey: string;
+  partName: string;
+  sourceObjectName: string;
+  rendererNamesJson: string;
+  canonicalRotationJson: string;
+  cameraPresetJson: string;
+  boundsCenterJson: string;
+  boundsSizeJson: string;
+  edgeSettingsJson: string;
+  latestRenderPath: string;
+  latestCaptureId: string;
+  latestStatusJson: string;
+  renderVersion: number;
+  isValidated: boolean;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GearBlocksPartRenderProfileInput = {
+  gameId: number;
+  captureId: string;
+  profileKey: string;
+  partName: string;
+  partKey?: string;
+  canonicalRotationXDegrees?: number;
+  canonicalRotationYDegrees?: number;
+  canonicalRotationZDegrees?: number;
+  isValidated?: boolean;
+  notes?: string;
 };
 
 export type GearBlocksApiType = {
@@ -325,6 +397,39 @@ export type GameRuntimePart = {
   updatedAt: string;
 };
 
+export type GameRuntimePartInstance = {
+  id: number;
+  gameId: number;
+  partDefinitionId: number;
+  partKey: string;
+  assetGuid: string;
+  assetName: string;
+  displayName: string;
+  fullDisplayName: string;
+  category: string;
+  sourceExportId: string;
+  sourceConstructionId: string;
+  partInstanceKey: string;
+  runtimePartId: number;
+  runtimePartIndex: number;
+  mass: number;
+  worldX: number | null;
+  worldY: number | null;
+  worldZ: number | null;
+  localX: number | null;
+  localY: number | null;
+  localZ: number | null;
+  worldPositionJson: string;
+  localPositionJson: string;
+  currentUnitSizeJson: string;
+  linkNodeCount: number;
+  behaviourNamesJson: string;
+  dynamicSummaryJson: string;
+  lastSeenAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type GameCatalogObject = {
   id: number;
   gameId: number;
@@ -441,6 +546,26 @@ export function getGameSetting(gameId: number, settingKey: string) {
   return invoke<GameSetting | null>("get_game_setting", { gameId, settingKey });
 }
 
+export function listGameCharacterBuilds(gameId: number) {
+  return invoke<GameCharacterBuild[]>("list_game_character_builds", { gameId });
+}
+
+export function createGameCharacterBuild(input: GameCharacterBuildInput) {
+  return invoke<GameCharacterBuild>("create_game_character_build", { input });
+}
+
+export function updateGameCharacterBuild(id: number, input: GameCharacterBuildInput) {
+  return invoke<GameCharacterBuild>("update_game_character_build", { id, input });
+}
+
+export function setActiveGameCharacterBuild(id: number) {
+  return invoke<GameCharacterBuild>("set_active_game_character_build", { id });
+}
+
+export function deleteGameCharacterBuild(id: number) {
+  return invoke<void>("delete_game_character_build", { id });
+}
+
 export function deleteGame(id: number) {
   return invoke<void>("delete_game", { id });
 }
@@ -554,11 +679,34 @@ export function listGameRuntimeParts(gameId: number) {
   return invoke<GameRuntimePart[]>("list_game_runtime_parts", { gameId });
 }
 
+export function listGameRuntimePartInstances(gameId: number) {
+  return invoke<GameRuntimePartInstance[]>("list_game_runtime_part_instances", { gameId });
+}
+
 export function listGameRuntimePartApiMembers(gameId: number, partId: number) {
   return invoke<GameRuntimePartApiMember[]>("list_game_runtime_part_api_members", {
     gameId,
     partId
   });
+}
+
+export function listGearBlocksRotationSnapAngles() {
+  return invoke<number[]>("list_gearblocks_rotation_snap_angles");
+}
+
+export function listGearBlocksPartRenderProfiles(gameId: number) {
+  return invoke<GearBlocksPartRenderProfile[]>("list_gearblocks_part_render_profiles", {
+    gameId
+  });
+}
+
+export function saveGearBlocksPartRenderProfileFromCapture(
+  input: GearBlocksPartRenderProfileInput
+) {
+  return invoke<GearBlocksPartRenderProfile>(
+    "save_gearblocks_part_render_profile_from_capture",
+    { input }
+  );
 }
 
 export function setGameRuntimePartDisplayImage(

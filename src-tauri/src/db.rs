@@ -5,7 +5,13 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Mutex, MutexGuard,
+};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+static REPAIR_RESELL_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 const MARKDOWN_CONTEXT_PER_FILE_LIMIT: usize = 200_000;
 const MARKDOWN_CONTEXT_TOTAL_LIMIT: usize = 650_000;
@@ -90,6 +96,244 @@ pub struct SmokingCessationSettingsRecord {
     pub created_at: String,
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct RepairResellSourceRecord {
+    pub id: String,
+    #[serde(rename = "kindKey")]
+    pub kind_key: String,
+    #[serde(rename = "kindLabel")]
+    pub kind_label: String,
+    #[serde(rename = "sourceKey")]
+    pub source_key: String,
+    pub name: String,
+    #[serde(rename = "baseUrl")]
+    pub base_url: String,
+    #[serde(rename = "regionLabel")]
+    pub region_label: String,
+    #[serde(rename = "scrapeMode")]
+    pub scrape_mode: String,
+    #[serde(rename = "adapterKey")]
+    pub adapter_key: String,
+    pub enabled: bool,
+    pub priority: i64,
+    #[serde(rename = "rateLimitSeconds")]
+    pub rate_limit_seconds: i64,
+    pub notes: String,
+    #[serde(rename = "lastScrapedAt")]
+    pub last_scraped_at: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "modifiedAt")]
+    pub modified_at: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct RepairResellCategoryRecord {
+    pub id: String,
+    pub key: String,
+    pub label: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct RepairResellKeywordFlagRecord {
+    pub id: String,
+    pub key: String,
+    pub label: String,
+    #[serde(rename = "flagType")]
+    pub flag_type: String,
+    pub pattern: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct RepairResellListingRecord {
+    pub id: String,
+    #[serde(rename = "sourceId")]
+    pub source_id: String,
+    #[serde(rename = "sourceName")]
+    pub source_name: String,
+    #[serde(rename = "sourceKey")]
+    pub source_key: String,
+    #[serde(rename = "externalId")]
+    pub external_id: String,
+    #[serde(rename = "canonicalUrl")]
+    pub canonical_url: String,
+    pub title: String,
+    #[serde(rename = "normalizedTitle")]
+    pub normalized_title: String,
+    #[serde(rename = "descriptionText")]
+    pub description_text: String,
+    #[serde(rename = "sourceCategoryText")]
+    pub source_category_text: String,
+    pub make: String,
+    pub model: String,
+    #[serde(rename = "modelYear")]
+    pub model_year: Option<i64>,
+    #[serde(rename = "lotNumber")]
+    pub lot_number: String,
+    #[serde(rename = "conditionText")]
+    pub condition_text: String,
+    #[serde(rename = "locationText")]
+    pub location_text: String,
+    #[serde(rename = "currencyCode")]
+    pub currency_code: String,
+    #[serde(rename = "currentPriceCents")]
+    pub current_price_cents: Option<i64>,
+    #[serde(rename = "bidCount")]
+    pub bid_count: Option<i64>,
+    #[serde(rename = "closingAt")]
+    pub closing_at: String,
+    #[serde(rename = "postedAt")]
+    pub posted_at: String,
+    #[serde(rename = "lastSeenAt")]
+    pub last_seen_at: String,
+    #[serde(rename = "listingStatus")]
+    pub listing_status: String,
+    #[serde(rename = "pickupText")]
+    pub pickup_text: String,
+    #[serde(rename = "inspectionText")]
+    pub inspection_text: String,
+    #[serde(rename = "isWatchlisted")]
+    pub is_watchlisted: bool,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "modifiedAt")]
+    pub modified_at: String,
+    pub flags: Vec<RepairResellKeywordFlagRecord>,
+    pub categories: Vec<RepairResellCategoryRecord>,
+}
+
+#[derive(Clone, Serialize)]
+pub struct RepairResellScrapeRunRecord {
+    pub id: String,
+    #[serde(rename = "sourceId")]
+    pub source_id: String,
+    #[serde(rename = "startedAt")]
+    pub started_at: String,
+    #[serde(rename = "finishedAt")]
+    pub finished_at: String,
+    pub status: String,
+    #[serde(rename = "listingCount")]
+    pub listing_count: i64,
+    #[serde(rename = "newListingCount")]
+    pub new_listing_count: i64,
+    #[serde(rename = "updatedListingCount")]
+    pub updated_listing_count: i64,
+    #[serde(rename = "skippedCount")]
+    pub skipped_count: i64,
+    #[serde(rename = "errorText")]
+    pub error_text: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "modifiedAt")]
+    pub modified_at: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct RepairResellTravelProfileRecord {
+    pub id: String,
+    pub name: String,
+    #[serde(rename = "homeLocationLabel")]
+    pub home_location_label: String,
+    #[serde(rename = "vehicleLabel")]
+    pub vehicle_label: String,
+    #[serde(rename = "fuelLPer100Km")]
+    pub fuel_l_per_100km: Option<f64>,
+    #[serde(rename = "fuelPriceCentsPerLitre")]
+    pub fuel_price_cents_per_litre: Option<i64>,
+    #[serde(rename = "defaultRoundTripKm")]
+    pub default_round_trip_km: Option<f64>,
+    pub notes: String,
+    #[serde(rename = "isDefault")]
+    pub is_default: bool,
+}
+
+#[derive(Clone, Serialize)]
+pub struct RepairResellDealEstimateRecord {
+    pub id: String,
+    #[serde(rename = "listingId")]
+    pub listing_id: String,
+    #[serde(rename = "travelProfileId")]
+    pub travel_profile_id: String,
+    #[serde(rename = "estimateLabel")]
+    pub estimate_label: String,
+    #[serde(rename = "acquisitionPriceCents")]
+    pub acquisition_price_cents: Option<i64>,
+    #[serde(rename = "buyerPremiumCents")]
+    pub buyer_premium_cents: Option<i64>,
+    #[serde(rename = "taxCents")]
+    pub tax_cents: Option<i64>,
+    #[serde(rename = "travelKm")]
+    pub travel_km: Option<f64>,
+    #[serde(rename = "fuelCostCents")]
+    pub fuel_cost_cents: Option<i64>,
+    #[serde(rename = "partsCostCents")]
+    pub parts_cost_cents: Option<i64>,
+    #[serde(rename = "otherCostCents")]
+    pub other_cost_cents: Option<i64>,
+    #[serde(rename = "expectedResaleLowCents")]
+    pub expected_resale_low_cents: Option<i64>,
+    #[serde(rename = "expectedResaleHighCents")]
+    pub expected_resale_high_cents: Option<i64>,
+    #[serde(rename = "expectedResaleTargetCents")]
+    pub expected_resale_target_cents: Option<i64>,
+    #[serde(rename = "desiredProfitCents")]
+    pub desired_profit_cents: Option<i64>,
+    #[serde(rename = "riskBufferCents")]
+    pub risk_buffer_cents: Option<i64>,
+    #[serde(rename = "maxSafeBidCents")]
+    pub max_safe_bid_cents: Option<i64>,
+    #[serde(rename = "netProfitLowCents")]
+    pub net_profit_low_cents: Option<i64>,
+    #[serde(rename = "netProfitTargetCents")]
+    pub net_profit_target_cents: Option<i64>,
+    #[serde(rename = "estimateMethod")]
+    pub estimate_method: String,
+    pub confidence: String,
+    pub notes: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "modifiedAt")]
+    pub modified_at: String,
+}
+
+pub struct RepairResellListingDraft {
+    pub source_id: String,
+    pub external_id: Option<String>,
+    pub canonical_url: String,
+    pub title: String,
+    pub description_text: String,
+    pub source_category_text: String,
+    pub condition_text: String,
+    pub location_text: String,
+    pub current_price_cents: Option<i64>,
+    pub closing_at: String,
+    pub pickup_text: String,
+    pub inspection_text: String,
+    pub listing_status: String,
+    pub content_hash: String,
+    pub structured_json: String,
+}
+
+pub struct RepairResellDealEstimateDraft {
+    pub listing_id: String,
+    pub travel_profile_id: Option<String>,
+    pub estimate_label: String,
+    pub acquisition_price_cents: Option<i64>,
+    pub buyer_premium_cents: Option<i64>,
+    pub tax_cents: Option<i64>,
+    pub travel_km: Option<f64>,
+    pub fuel_cost_cents: Option<i64>,
+    pub parts_cost_cents: Option<i64>,
+    pub other_cost_cents: Option<i64>,
+    pub expected_resale_low_cents: Option<i64>,
+    pub expected_resale_high_cents: Option<i64>,
+    pub expected_resale_target_cents: Option<i64>,
+    pub desired_profit_cents: Option<i64>,
+    pub risk_buffer_cents: Option<i64>,
+    pub confidence: String,
+    pub notes: String,
 }
 
 #[derive(Clone, Serialize)]
@@ -290,6 +534,68 @@ pub struct GameSettingRecord {
 }
 
 #[derive(Clone, Serialize)]
+pub struct GameCharacterBuildRecord {
+    pub id: i64,
+    #[serde(rename = "gameId")]
+    pub game_id: i64,
+    #[serde(rename = "idGame")]
+    pub id_game: i64,
+    pub title: String,
+    #[serde(rename = "characterClass")]
+    pub character_class: String,
+    pub ascendancy: String,
+    #[serde(rename = "buildRole")]
+    pub build_role: String,
+    pub status: String,
+    #[serde(rename = "sourceLabel")]
+    pub source_label: String,
+    #[serde(rename = "sourceUrl")]
+    pub source_url: String,
+    pub patch: String,
+    pub summary: String,
+    pub tags: String,
+    pub notes: String,
+    #[serde(rename = "isActive")]
+    pub is_active: bool,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+pub struct GameCharacterBuildDraft<'a> {
+    pub game_id: i64,
+    pub title: &'a str,
+    pub character_class: &'a str,
+    pub ascendancy: &'a str,
+    pub build_role: &'a str,
+    pub status: &'a str,
+    pub source_label: &'a str,
+    pub source_url: &'a str,
+    pub patch: &'a str,
+    pub summary: &'a str,
+    pub tags: &'a str,
+    pub notes: &'a str,
+    pub is_active: bool,
+}
+
+pub struct GameCharacterBuildUpdateDraft<'a> {
+    pub id: i64,
+    pub title: &'a str,
+    pub character_class: &'a str,
+    pub ascendancy: &'a str,
+    pub build_role: &'a str,
+    pub status: &'a str,
+    pub source_label: &'a str,
+    pub source_url: &'a str,
+    pub patch: &'a str,
+    pub summary: &'a str,
+    pub tags: &'a str,
+    pub notes: &'a str,
+    pub is_active: bool,
+}
+
+#[derive(Clone, Serialize)]
 pub struct GameDataLocationRecord {
     pub id: i64,
     #[serde(rename = "gameId")]
@@ -435,6 +741,68 @@ pub struct GameRuntimePartDraft<'a> {
     pub source: GameRuntimePartSource<'a>,
 }
 
+#[derive(Clone, Serialize)]
+pub struct GearBlocksPartRenderProfileRecord {
+    pub id: i64,
+    #[serde(rename = "gameId")]
+    pub game_id: i64,
+    #[serde(rename = "profileKey")]
+    pub profile_key: String,
+    #[serde(rename = "partKey")]
+    pub part_key: String,
+    #[serde(rename = "partName")]
+    pub part_name: String,
+    #[serde(rename = "sourceObjectName")]
+    pub source_object_name: String,
+    #[serde(rename = "rendererNamesJson")]
+    pub renderer_names_json: String,
+    #[serde(rename = "canonicalRotationJson")]
+    pub canonical_rotation_json: String,
+    #[serde(rename = "cameraPresetJson")]
+    pub camera_preset_json: String,
+    #[serde(rename = "boundsCenterJson")]
+    pub bounds_center_json: String,
+    #[serde(rename = "boundsSizeJson")]
+    pub bounds_size_json: String,
+    #[serde(rename = "edgeSettingsJson")]
+    pub edge_settings_json: String,
+    #[serde(rename = "latestRenderPath")]
+    pub latest_render_path: String,
+    #[serde(rename = "latestCaptureId")]
+    pub latest_capture_id: String,
+    #[serde(rename = "latestStatusJson")]
+    pub latest_status_json: String,
+    #[serde(rename = "renderVersion")]
+    pub render_version: i64,
+    #[serde(rename = "isValidated")]
+    pub is_validated: bool,
+    pub notes: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+pub struct GearBlocksPartRenderProfileDraft<'a> {
+    pub game_id: i64,
+    pub profile_key: &'a str,
+    pub part_key: &'a str,
+    pub part_name: &'a str,
+    pub source_object_name: &'a str,
+    pub renderer_names_json: &'a str,
+    pub canonical_rotation_json: &'a str,
+    pub camera_preset_json: &'a str,
+    pub bounds_center_json: &'a str,
+    pub bounds_size_json: &'a str,
+    pub edge_settings_json: &'a str,
+    pub latest_render_path: &'a str,
+    pub latest_capture_id: &'a str,
+    pub latest_status_json: &'a str,
+    pub render_version: i64,
+    pub is_validated: bool,
+    pub notes: &'a str,
+}
+
 pub struct GameRuntimePartInstanceDraft {
     pub part_key: String,
     pub asset_guid: String,
@@ -459,37 +827,64 @@ pub struct GameRuntimePartInstanceDraft {
     pub last_seen_at: String,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct GameRuntimePartInstanceRecord {
     pub id: i64,
+    #[serde(rename = "gameId")]
     pub game_id: i64,
+    #[serde(rename = "partDefinitionId")]
     pub part_definition_id: i64,
+    #[serde(rename = "partKey")]
     pub part_key: String,
+    #[serde(rename = "assetGuid")]
     pub asset_guid: String,
+    #[serde(rename = "assetName")]
     pub asset_name: String,
+    #[serde(rename = "displayName")]
     pub display_name: String,
+    #[serde(rename = "fullDisplayName")]
     pub full_display_name: String,
     pub category: String,
+    #[serde(rename = "sourceExportId")]
     pub source_export_id: String,
+    #[serde(rename = "sourceConstructionId")]
     pub source_construction_id: String,
+    #[serde(rename = "partInstanceKey")]
     pub part_instance_key: String,
+    #[serde(rename = "runtimePartId")]
     pub runtime_part_id: i64,
+    #[serde(rename = "runtimePartIndex")]
     pub runtime_part_index: i64,
     pub mass: f64,
+    #[serde(rename = "worldX")]
     pub world_x: Option<f64>,
+    #[serde(rename = "worldY")]
     pub world_y: Option<f64>,
+    #[serde(rename = "worldZ")]
     pub world_z: Option<f64>,
+    #[serde(rename = "localX")]
     pub local_x: Option<f64>,
+    #[serde(rename = "localY")]
     pub local_y: Option<f64>,
+    #[serde(rename = "localZ")]
     pub local_z: Option<f64>,
+    #[serde(rename = "worldPositionJson")]
     pub world_position_json: String,
+    #[serde(rename = "localPositionJson")]
     pub local_position_json: String,
+    #[serde(rename = "currentUnitSizeJson")]
     pub current_unit_size_json: String,
+    #[serde(rename = "linkNodeCount")]
     pub link_node_count: i64,
+    #[serde(rename = "behaviourNamesJson")]
     pub behaviour_names_json: String,
+    #[serde(rename = "dynamicSummaryJson")]
     pub dynamic_summary_json: String,
+    #[serde(rename = "lastSeenAt")]
     pub last_seen_at: String,
+    #[serde(rename = "createdAt")]
     pub created_at: String,
+    #[serde(rename = "updatedAt")]
     pub updated_at: String,
 }
 
@@ -1457,6 +1852,28 @@ impl AppDatabase {
                 FOREIGN KEY (id_game) REFERENCES def_game(id_game)
             );
 
+            CREATE TABLE IF NOT EXISTS obj_game_character_build (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                id_game INTEGER NOT NULL DEFAULT 1,
+                title TEXT NOT NULL DEFAULT '',
+                character_class TEXT NOT NULL DEFAULT '',
+                ascendancy TEXT NOT NULL DEFAULT '',
+                build_role TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'planned',
+                source_label TEXT NOT NULL DEFAULT '',
+                source_url TEXT NOT NULL DEFAULT '',
+                patch TEXT NOT NULL DEFAULT '',
+                summary TEXT NOT NULL DEFAULT '',
+                tags TEXT NOT NULL DEFAULT '',
+                notes TEXT NOT NULL DEFAULT '',
+                is_active INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (game_id) REFERENCES obj_game(id),
+                FOREIGN KEY (id_game) REFERENCES def_game(id_game)
+            );
+
             CREATE TABLE IF NOT EXISTS obj_game_catalog_object (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
@@ -1551,6 +1968,30 @@ impl AppDatabase {
                 last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_gearblocks_part_render_profile (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                profile_key TEXT NOT NULL COLLATE NOCASE,
+                part_key TEXT NOT NULL DEFAULT '',
+                part_name TEXT NOT NULL DEFAULT '',
+                source_object_name TEXT NOT NULL DEFAULT '',
+                renderer_names_json TEXT NOT NULL DEFAULT '[]',
+                canonical_rotation_json TEXT NOT NULL DEFAULT '{}',
+                camera_preset_json TEXT NOT NULL DEFAULT '{}',
+                bounds_center_json TEXT NOT NULL DEFAULT '{}',
+                bounds_size_json TEXT NOT NULL DEFAULT '{}',
+                edge_settings_json TEXT NOT NULL DEFAULT '{}',
+                latest_render_path TEXT NOT NULL DEFAULT '',
+                latest_capture_id TEXT NOT NULL DEFAULT '',
+                latest_status_json TEXT NOT NULL DEFAULT '{}',
+                render_version INTEGER NOT NULL DEFAULT 1,
+                is_validated INTEGER NOT NULL DEFAULT 0,
+                notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (game_id) REFERENCES obj_game(id) ON DELETE CASCADE
             );
 
             CREATE TABLE IF NOT EXISTS obj_game_runtime_part_instance (
@@ -1992,6 +2433,10 @@ impl AppDatabase {
                 ON obj_game_catalog_reference (object_id);
             CREATE INDEX IF NOT EXISTS idx_game_data_locations_game_id
                 ON obj_game_data_location (game_id);
+            CREATE INDEX IF NOT EXISTS idx_game_character_builds_game_id
+                ON obj_game_character_build (game_id);
+            CREATE INDEX IF NOT EXISTS idx_game_character_builds_active
+                ON obj_game_character_build (game_id, is_active);
             CREATE INDEX IF NOT EXISTS idx_game_catalog_screenshots_game_id
                 ON obj_game_catalog_screenshot (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_catalog_screenshots_object_id
@@ -2010,6 +2455,10 @@ impl AppDatabase {
                 ON obj_game_runtime_part (game_id);
             CREATE INDEX IF NOT EXISTS idx_gearblocks_parts_part_key
                 ON def_gearblocks_part (part_key);
+            CREATE INDEX IF NOT EXISTS idx_gearblocks_part_render_profiles_game_id
+                ON obj_gearblocks_part_render_profile (game_id);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_gearblocks_part_render_profiles_unique
+                ON obj_gearblocks_part_render_profile (game_id, profile_key);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_part_instances_game_export
                 ON obj_game_runtime_part_instance (game_id, source_export_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_part_instances_definition
@@ -2110,6 +2559,7 @@ impl AppDatabase {
             );
             ",
         )?;
+        Self::ensure_repair_resell_schema(&connection)?;
         Self::ensure_column(&connection, "obj_task", "body", "TEXT NOT NULL DEFAULT ''")?;
         Self::ensure_column(
             &connection,
@@ -2290,6 +2740,49 @@ impl AppDatabase {
                 setting_value_json = excluded.setting_value_json,
                 schema_json = excluded.schema_json,
                 modified_at = CURRENT_TIMESTAMP
+            ",
+            [],
+        )?;
+        connection.execute(
+            "
+            INSERT INTO obj_game_character_build (
+                game_id,
+                id_game,
+                title,
+                character_class,
+                ascendancy,
+                build_role,
+                status,
+                source_label,
+                source_url,
+                patch,
+                summary,
+                tags,
+                notes,
+                is_active
+            )
+            SELECT
+                id,
+                id_game,
+                '0.5 Ice Shot Deadeye Leveling Guide',
+                'Ranger',
+                'Deadeye',
+                'Speed Leveling',
+                'currently_playing',
+                'Mobalytics',
+                'https://mobalytics.gg/poe-2/builds/ice-shot-deadeye-leveling-guide#739a0a0f-6bd0-4807-8096-eee5ae1617ec-passive-tree-0',
+                '0.5 RotA',
+                'Ice Shot Deadeye leveling build. Starts with Lightning Arrow and Lightning Rod because Ice Shot unlocks at level 31, then transitions toward the Ice Shot Deadeye endgame guide after campaign.',
+                'Starter, Leveling, Bow, Ice Shot, Lightning Arrow, Lightning Rod',
+                'Seeded from the original Path of Exile 2 current-build setting.',
+                1
+            FROM obj_game
+            WHERE slug = 'path-of-exile-2'
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM obj_game_character_build
+                    WHERE game_id = obj_game.id
+                )
             ",
             [],
         )?;
@@ -2589,6 +3082,605 @@ impl AppDatabase {
         Ok(columns)
     }
 
+    fn ensure_repair_resell_schema(connection: &Connection) -> Result<()> {
+        connection.execute_batch(
+            "
+            CREATE TABLE IF NOT EXISTS def_resell_source_kind (
+                id_def_resell_source_kind TEXT PRIMARY KEY NOT NULL,
+                key TEXT NOT NULL UNIQUE,
+                label TEXT NOT NULL,
+                description TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS def_resell_category (
+                id_def_resell_category TEXT PRIMARY KEY NOT NULL,
+                parent_id_def_resell_category TEXT,
+                key TEXT NOT NULL UNIQUE,
+                label TEXT NOT NULL,
+                description TEXT,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (parent_id_def_resell_category)
+                    REFERENCES def_resell_category(id_def_resell_category)
+            );
+
+            CREATE TABLE IF NOT EXISTS def_resell_keyword_flag (
+                id_def_resell_keyword_flag TEXT PRIMARY KEY NOT NULL,
+                key TEXT NOT NULL UNIQUE,
+                label TEXT NOT NULL,
+                flag_type TEXT NOT NULL,
+                pattern TEXT NOT NULL,
+                description TEXT,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK (flag_type IN ('opportunity', 'risk', 'info'))
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_resell_source (
+                id_obj_resell_source TEXT PRIMARY KEY NOT NULL,
+                id_def_resell_source_kind TEXT NOT NULL,
+                source_key TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL,
+                base_url TEXT NOT NULL,
+                region_label TEXT,
+                scrape_mode TEXT NOT NULL,
+                adapter_key TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                priority INTEGER NOT NULL DEFAULT 100,
+                rate_limit_seconds INTEGER NOT NULL DEFAULT 60,
+                notes TEXT,
+                last_scraped_at TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK (scrape_mode IN ('public_http', 'manual_import', 'disabled')),
+                FOREIGN KEY (id_def_resell_source_kind)
+                    REFERENCES def_resell_source_kind(id_def_resell_source_kind)
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_resell_search_profile (
+                id_obj_resell_search_profile TEXT PRIMARY KEY NOT NULL,
+                name TEXT NOT NULL,
+                home_location_label TEXT,
+                home_latitude REAL,
+                home_longitude REAL,
+                max_distance_km REAL,
+                query_text TEXT,
+                positive_terms_json TEXT,
+                negative_terms_json TEXT,
+                category_filter_json TEXT,
+                min_price_cents INTEGER,
+                max_price_cents INTEGER,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS n2n_resell_source_search_profile (
+                id_n2n_resell_source_search_profile TEXT PRIMARY KEY NOT NULL,
+                id_obj_resell_source TEXT NOT NULL,
+                id_obj_resell_search_profile TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (id_obj_resell_source, id_obj_resell_search_profile),
+                FOREIGN KEY (id_obj_resell_source)
+                    REFERENCES obj_resell_source(id_obj_resell_source),
+                FOREIGN KEY (id_obj_resell_search_profile)
+                    REFERENCES obj_resell_search_profile(id_obj_resell_search_profile)
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_resell_scrape_run (
+                id_obj_resell_scrape_run TEXT PRIMARY KEY NOT NULL,
+                id_obj_resell_source TEXT NOT NULL,
+                id_obj_resell_search_profile TEXT,
+                started_at TEXT NOT NULL,
+                finished_at TEXT,
+                status TEXT NOT NULL,
+                listing_count INTEGER NOT NULL DEFAULT 0,
+                new_listing_count INTEGER NOT NULL DEFAULT 0,
+                updated_listing_count INTEGER NOT NULL DEFAULT 0,
+                skipped_count INTEGER NOT NULL DEFAULT 0,
+                error_text TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK (status IN ('queued', 'running', 'succeeded', 'partial', 'failed', 'skipped')),
+                FOREIGN KEY (id_obj_resell_source)
+                    REFERENCES obj_resell_source(id_obj_resell_source),
+                FOREIGN KEY (id_obj_resell_search_profile)
+                    REFERENCES obj_resell_search_profile(id_obj_resell_search_profile)
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_resell_listing (
+                id_obj_resell_listing TEXT PRIMARY KEY NOT NULL,
+                id_obj_resell_source TEXT NOT NULL,
+                external_id TEXT,
+                canonical_url TEXT NOT NULL,
+                title TEXT NOT NULL,
+                normalized_title TEXT,
+                description_text TEXT,
+                source_category_text TEXT,
+                make TEXT,
+                model TEXT,
+                model_year INTEGER,
+                serial_number TEXT,
+                lot_number TEXT,
+                condition_text TEXT,
+                location_text TEXT,
+                latitude REAL,
+                longitude REAL,
+                distance_km_manual REAL,
+                currency_code TEXT NOT NULL DEFAULT 'CAD',
+                current_price_cents INTEGER,
+                minimum_bid_cents INTEGER,
+                buy_now_price_cents INTEGER,
+                buyer_premium_text TEXT,
+                tax_text TEXT,
+                bid_count INTEGER,
+                closing_at TEXT,
+                posted_at TEXT,
+                last_seen_at TEXT,
+                listing_status TEXT NOT NULL DEFAULT 'unknown',
+                pickup_text TEXT,
+                inspection_text TEXT,
+                q_and_a_text TEXT,
+                is_watchlisted INTEGER NOT NULL DEFAULT 0,
+                content_hash TEXT,
+                structured_json TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK (listing_status IN ('active', 'closed', 'sold', 'removed', 'unknown')),
+                FOREIGN KEY (id_obj_resell_source)
+                    REFERENCES obj_resell_source(id_obj_resell_source)
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_resell_listing_snapshot (
+                id_obj_resell_listing_snapshot TEXT PRIMARY KEY NOT NULL,
+                id_obj_resell_listing TEXT NOT NULL,
+                id_obj_resell_scrape_run TEXT,
+                snapshot_at TEXT NOT NULL,
+                current_price_cents INTEGER,
+                bid_count INTEGER,
+                listing_status TEXT,
+                title TEXT,
+                description_text TEXT,
+                condition_text TEXT,
+                location_text TEXT,
+                closing_at TEXT,
+                content_hash TEXT,
+                structured_json TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (id_obj_resell_listing)
+                    REFERENCES obj_resell_listing(id_obj_resell_listing),
+                FOREIGN KEY (id_obj_resell_scrape_run)
+                    REFERENCES obj_resell_scrape_run(id_obj_resell_scrape_run)
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_resell_listing_image (
+                id_obj_resell_listing_image TEXT PRIMARY KEY NOT NULL,
+                id_obj_resell_listing TEXT NOT NULL,
+                source_image_url TEXT,
+                local_path TEXT,
+                image_sha256 TEXT,
+                width_px INTEGER,
+                height_px INTEGER,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                caption TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (id_obj_resell_listing)
+                    REFERENCES obj_resell_listing(id_obj_resell_listing)
+            );
+
+            CREATE TABLE IF NOT EXISTS n2n_resell_listing_category (
+                id_n2n_resell_listing_category TEXT PRIMARY KEY NOT NULL,
+                id_obj_resell_listing TEXT NOT NULL,
+                id_def_resell_category TEXT NOT NULL,
+                confidence REAL,
+                assigned_by TEXT NOT NULL DEFAULT 'rule',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK (assigned_by IN ('rule', 'manual', 'llm')),
+                UNIQUE (id_obj_resell_listing, id_def_resell_category),
+                FOREIGN KEY (id_obj_resell_listing)
+                    REFERENCES obj_resell_listing(id_obj_resell_listing),
+                FOREIGN KEY (id_def_resell_category)
+                    REFERENCES def_resell_category(id_def_resell_category)
+            );
+
+            CREATE TABLE IF NOT EXISTS n2n_resell_listing_keyword_flag (
+                id_n2n_resell_listing_keyword_flag TEXT PRIMARY KEY NOT NULL,
+                id_obj_resell_listing TEXT NOT NULL,
+                id_def_resell_keyword_flag TEXT NOT NULL,
+                match_text TEXT,
+                assigned_by TEXT NOT NULL DEFAULT 'rule',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK (assigned_by IN ('rule', 'manual', 'llm')),
+                UNIQUE (id_obj_resell_listing, id_def_resell_keyword_flag, match_text),
+                FOREIGN KEY (id_obj_resell_listing)
+                    REFERENCES obj_resell_listing(id_obj_resell_listing),
+                FOREIGN KEY (id_def_resell_keyword_flag)
+                    REFERENCES def_resell_keyword_flag(id_def_resell_keyword_flag)
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_resell_watchlist_entry (
+                id_obj_resell_watchlist_entry TEXT PRIMARY KEY NOT NULL,
+                id_obj_resell_listing TEXT NOT NULL UNIQUE,
+                watch_status TEXT NOT NULL DEFAULT 'watching',
+                user_priority INTEGER NOT NULL DEFAULT 3,
+                max_bid_cents INTEGER,
+                notes TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK (watch_status IN ('watching', 'interested', 'bid_planned', 'bid_placed', 'won', 'lost', 'ignored')),
+                FOREIGN KEY (id_obj_resell_listing)
+                    REFERENCES obj_resell_listing(id_obj_resell_listing)
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_resell_travel_profile (
+                id_obj_resell_travel_profile TEXT PRIMARY KEY NOT NULL,
+                name TEXT NOT NULL,
+                home_location_label TEXT,
+                vehicle_label TEXT,
+                fuel_l_per_100km REAL,
+                fuel_price_cents_per_litre INTEGER,
+                default_round_trip_km REAL,
+                notes TEXT,
+                is_default INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_resell_deal_estimate (
+                id_obj_resell_deal_estimate TEXT PRIMARY KEY NOT NULL,
+                id_obj_resell_listing TEXT NOT NULL,
+                id_obj_resell_travel_profile TEXT,
+                estimate_label TEXT NOT NULL,
+                acquisition_price_cents INTEGER,
+                buyer_premium_cents INTEGER,
+                tax_cents INTEGER,
+                travel_km REAL,
+                fuel_cost_cents INTEGER,
+                parts_cost_cents INTEGER,
+                other_cost_cents INTEGER,
+                expected_resale_low_cents INTEGER,
+                expected_resale_high_cents INTEGER,
+                expected_resale_target_cents INTEGER,
+                desired_profit_cents INTEGER,
+                risk_buffer_cents INTEGER,
+                max_safe_bid_cents INTEGER,
+                net_profit_low_cents INTEGER,
+                net_profit_target_cents INTEGER,
+                estimate_method TEXT NOT NULL DEFAULT 'manual',
+                confidence TEXT NOT NULL DEFAULT 'low',
+                notes TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK (estimate_method IN ('manual', 'rule', 'llm')),
+                CHECK (confidence IN ('low', 'medium', 'high')),
+                FOREIGN KEY (id_obj_resell_listing)
+                    REFERENCES obj_resell_listing(id_obj_resell_listing),
+                FOREIGN KEY (id_obj_resell_travel_profile)
+                    REFERENCES obj_resell_travel_profile(id_obj_resell_travel_profile)
+            );
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_obj_resell_listing_source_external
+                ON obj_resell_listing(id_obj_resell_source, external_id)
+                WHERE external_id IS NOT NULL;
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_obj_resell_listing_canonical_url
+                ON obj_resell_listing(canonical_url);
+            CREATE INDEX IF NOT EXISTS idx_obj_resell_listing_status
+                ON obj_resell_listing(listing_status);
+            CREATE INDEX IF NOT EXISTS idx_obj_resell_listing_watchlisted
+                ON obj_resell_listing(is_watchlisted);
+            ",
+        )?;
+
+        Self::seed_repair_resell_source_kinds(connection)?;
+        Self::seed_repair_resell_categories(connection)?;
+        Self::seed_repair_resell_keyword_flags(connection)?;
+        Self::seed_repair_resell_sources(connection)?;
+        Self::seed_repair_resell_search_profiles(connection)?;
+        Self::seed_repair_resell_travel_profiles(connection)?;
+        Ok(())
+    }
+
+    fn seed_repair_resell_source_kinds(connection: &Connection) -> Result<()> {
+        let rows = [
+            ("government_surplus", "Government Surplus"),
+            ("police_auction", "Police Auction"),
+            ("local_auction", "Local Auction"),
+            ("marketplace", "Marketplace"),
+            ("auction_directory", "Auction Directory"),
+            ("manual", "Manual Import"),
+        ];
+        for (key, label) in rows {
+            connection.execute(
+                "
+                INSERT OR IGNORE INTO def_resell_source_kind (
+                    id_def_resell_source_kind, key, label, description
+                )
+                VALUES (?1, ?2, ?3, '')
+                ",
+                params![format!("def_resell_source_kind_{key}"), key, label],
+            )?;
+        }
+        Ok(())
+    }
+
+    fn seed_repair_resell_categories(connection: &Connection) -> Result<()> {
+        let rows = [
+            ("bicycle", "Bicycle"),
+            ("mountain_bike", "Mountain Bike"),
+            ("push_mower", "Push Mower"),
+            ("riding_mower", "Riding Mower"),
+            ("zero_turn_mower", "Zero-Turn Mower"),
+            ("snow_blower", "Snow Blower"),
+            ("small_engine", "Small Engine"),
+            ("generator", "Generator"),
+            ("pressure_washer", "Pressure Washer"),
+            ("air_compressor", "Air Compressor"),
+            ("power_tool", "Power Tool"),
+            ("shop_equipment", "Shop Equipment"),
+            ("computer", "Computer"),
+            ("electronics", "Electronics"),
+            ("automotive_tool", "Automotive Tool"),
+            ("automotive_part", "Automotive Part"),
+            ("vehicle", "Vehicle"),
+            ("trailer", "Trailer"),
+            ("unknown", "Unknown"),
+        ];
+        for (index, (key, label)) in rows.iter().enumerate() {
+            connection.execute(
+                "
+                INSERT OR IGNORE INTO def_resell_category (
+                    id_def_resell_category, key, label, sort_order
+                )
+                VALUES (?1, ?2, ?3, ?4)
+                ",
+                params![
+                    format!("def_resell_category_{key}"),
+                    key,
+                    label,
+                    index as i64
+                ],
+            )?;
+        }
+        Ok(())
+    }
+
+    fn seed_repair_resell_keyword_flags(connection: &Connection) -> Result<()> {
+        let opportunity = [
+            "engine runs",
+            "runs great",
+            "needs carb clean",
+            "needs tune up",
+            "been sitting",
+            "stored in garage",
+            "garage cleanout",
+            "moving sale",
+            "not tested",
+            "battery dead",
+            "flat tire",
+            "needs cable",
+            "chain rusty",
+            "surface rust",
+            "minor repair",
+        ];
+        let risk = [
+            "transmission issue",
+            "does not operate",
+            "not working",
+            "seized",
+            "missing parts",
+            "cracked frame",
+            "hydraulic issue",
+            "no compression",
+            "water damage",
+            "unknown condition",
+            "as is where is",
+            "no inspection",
+            "pickup by appointment",
+            "parts only",
+        ];
+        let info = [
+            "Scott",
+            "Trek",
+            "Giant",
+            "Specialized",
+            "Cannondale",
+            "Honda",
+            "Toro",
+            "Ariens",
+            "Yamaha",
+            "John Deere",
+            "Briggs",
+            "Kohler",
+            "Tecumseh",
+            "DeWalt",
+            "Milwaukee",
+            "Makita",
+            "Stihl",
+            "Husqvarna",
+        ];
+        let mut sort_order = 0_i64;
+        for (flag_type, values) in [
+            ("opportunity", opportunity.as_slice()),
+            ("risk", risk.as_slice()),
+            ("info", info.as_slice()),
+        ] {
+            for pattern in values {
+                let key = normalize_resell_key(pattern);
+                connection.execute(
+                    "
+                    INSERT OR IGNORE INTO def_resell_keyword_flag (
+                        id_def_resell_keyword_flag,
+                        key,
+                        label,
+                        flag_type,
+                        pattern,
+                        sort_order
+                    )
+                    VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                    ",
+                    params![
+                        format!("def_resell_keyword_flag_{key}"),
+                        key,
+                        pattern,
+                        flag_type,
+                        pattern,
+                        sort_order
+                    ],
+                )?;
+                sort_order += 1;
+            }
+        }
+        Ok(())
+    }
+
+    fn seed_repair_resell_sources(connection: &Connection) -> Result<()> {
+        let rows = [
+            ("manual_import", "Manual Import", "manual", "", "User-entered", "manual_import", "manual"),
+            ("gcsurplus", "GCSurplus", "government_surplus", "https://gcsurplus.ca/mn-eng.cfm", "Canada", "public_http", "gcsurplus"),
+            ("govdeals_canada", "GovDeals Canada", "government_surplus", "https://www.govdeals.ca/en", "Canada", "public_http", "govdeals"),
+            ("govdeals_ontario", "GovDeals Ontario", "government_surplus", "https://www.govdeals.com/en/ontario", "Ontario", "public_http", "govdeals"),
+            ("police_auctions_canada", "Police Auctions Canada", "police_auction", "https://www.policeauctionscanada.com/", "Toronto / Canada", "public_http", "police_auctions_canada"),
+            ("kijiji_kw_bikes", "Kijiji KW Bikes", "marketplace", "https://www.kijiji.ca/b-bikes/kitchener-waterloo/bike/k0c644l1700212", "Kitchener / Waterloo", "public_http", "kijiji"),
+            ("kijiji_kw_lawnmower", "Kijiji KW Lawnmower Search", "marketplace", "https://www.kijiji.ca/b-kitchener-waterloo/lawnmower/k0l1700212", "Kitchener / Waterloo", "public_http", "kijiji"),
+            ("kijiji_kw_snowblower", "Kijiji KW Snowblower Search", "marketplace", "https://www.kijiji.ca/b-kitchener-waterloo/snowblower/k0l1700212", "Kitchener / Waterloo", "public_http", "kijiji"),
+            ("facebook_kw_power_equipment", "Facebook Marketplace KW Power Equipment", "marketplace", "https://www.facebook.com/marketplace/104045032964460/power-equipments/", "Kitchener / Waterloo", "manual_import", "manual"),
+            ("bryans_auction", "Bryan's Auction Services", "local_auction", "https://bryansauction.com/", "Puslinch / Trenton", "public_http", "generic_auction"),
+            ("bryans_hibid", "Bryan's HiBid", "local_auction", "https://bryansfarm.hibid.com/", "Puslinch / Trenton", "public_http", "hibid"),
+            ("erin_auctions", "Erin Auctions", "local_auction", "https://erinauctions.com/", "Erin", "public_http", "generic_auction"),
+            ("rapid_sell", "Rapid-Sell", "local_auction", "https://www.rapid-sell.ca/", "Guelph / Southern Ontario", "public_http", "generic_auction"),
+            ("mr_jutzi", "M.R. Jutzi Auctions", "local_auction", "https://www.mrjutzi.ca/", "Breslau", "public_http", "generic_auction"),
+            ("hibid_ontario", "HiBid Ontario", "auction_directory", "https://hibid.com/ontario/auctions", "Ontario", "public_http", "hibid"),
+        ];
+        for (index, row) in rows.iter().enumerate() {
+            connection.execute(
+                "
+                INSERT OR IGNORE INTO obj_resell_source (
+                    id_obj_resell_source,
+                    id_def_resell_source_kind,
+                    source_key,
+                    name,
+                    base_url,
+                    region_label,
+                    scrape_mode,
+                    adapter_key,
+                    priority,
+                    notes
+                )
+                SELECT
+                    ?1,
+                    kind.id_def_resell_source_kind,
+                    ?2,
+                    ?3,
+                    ?4,
+                    ?5,
+                    ?6,
+                    ?7,
+                    ?8,
+                    ''
+                FROM def_resell_source_kind kind
+                WHERE kind.key = ?9
+                ",
+                params![
+                    format!("obj_resell_source_{}", row.0),
+                    row.0,
+                    row.1,
+                    row.3,
+                    row.4,
+                    row.5,
+                    row.6,
+                    50_i64 + index as i64,
+                    row.2
+                ],
+            )?;
+        }
+        Ok(())
+    }
+
+    fn seed_repair_resell_search_profiles(connection: &Connection) -> Result<()> {
+        let rows = [
+            "Mountain Bikes - KW/GTA",
+            "Small Engines - KW/GTA",
+            "Mowers - KW/GTA",
+            "Snow Blowers - KW/GTA",
+            "Tools And Shop Equipment - KW/GTA",
+            "Computers And Electronics - KW/GTA",
+        ];
+        for name in rows {
+            let key = normalize_resell_key(name);
+            connection.execute(
+                "
+                INSERT OR IGNORE INTO obj_resell_search_profile (
+                    id_obj_resell_search_profile,
+                    name,
+                    home_location_label,
+                    query_text
+                )
+                VALUES (?1, ?2, 'Kitchener / Waterloo', ?3)
+                ",
+                params![format!("obj_resell_search_profile_{key}"), name, name],
+            )?;
+            connection.execute(
+                "
+                INSERT OR IGNORE INTO n2n_resell_source_search_profile (
+                    id_n2n_resell_source_search_profile,
+                    id_obj_resell_source,
+                    id_obj_resell_search_profile
+                )
+                SELECT
+                    'n2n_resell_source_search_profile_' || source.source_key || '_' || ?1,
+                    source.id_obj_resell_source,
+                    profile.id_obj_resell_search_profile
+                FROM obj_resell_source source
+                JOIN obj_resell_search_profile profile ON profile.name = ?2
+                WHERE source.enabled = 1
+                ",
+                params![key, name],
+            )?;
+        }
+        Ok(())
+    }
+
+    fn seed_repair_resell_travel_profiles(connection: &Connection) -> Result<()> {
+        connection.execute(
+            "
+            INSERT OR IGNORE INTO obj_resell_travel_profile (
+                id_obj_resell_travel_profile,
+                name,
+                home_location_label,
+                vehicle_label,
+                fuel_l_per_100km,
+                fuel_price_cents_per_litre,
+                default_round_trip_km,
+                notes,
+                is_default
+            )
+            VALUES (
+                'obj_resell_travel_profile_colorado_pickup',
+                'Colorado pickup profile',
+                'Kitchener / Waterloo',
+                '2016 Chevrolet Colorado',
+                NULL,
+                NULL,
+                NULL,
+                'Fuel and distance assumptions are user-editable estimates.',
+                1
+            )
+            ",
+            [],
+        )?;
+        Ok(())
+    }
+
     fn quote_identifier(identifier: &str) -> String {
         format!("\"{}\"", identifier.replace('"', "\"\""))
     }
@@ -2644,6 +3736,7 @@ impl AppDatabase {
             ("obj_game_catalog_reference", "id"),
             ("obj_game_data_location", "id"),
             ("obj_game_catalog_screenshot", "id"),
+            ("obj_gearblocks_part_render_profile", "id"),
             ("obj_game_runtime_part", "id"),
             ("obj_game_runtime_part_alias", "id"),
             ("obj_game_runtime_part_api_attribute", "id"),
@@ -2722,7 +3815,7 @@ impl AppDatabase {
         Ok(())
     }
 
-    fn normalized_schema_tables() -> [&'static str; 53] {
+    fn normalized_schema_tables() -> [&'static str; 55] {
         [
             "obj_scratchpad",
             "obj_setting",
@@ -2737,6 +3830,7 @@ impl AppDatabase {
             "def_game",
             "obj_game",
             "obj_game_setting",
+            "obj_game_character_build",
             "obj_project",
             "obj_planning_conversation",
             "obj_planning_message",
@@ -2749,6 +3843,7 @@ impl AppDatabase {
             "obj_game_catalog_reference",
             "obj_game_data_location",
             "obj_game_catalog_screenshot",
+            "obj_gearblocks_part_render_profile",
             "def_gearblocks_part",
             "obj_game_runtime_part",
             "obj_game_runtime_part_instance",
@@ -3415,6 +4510,539 @@ impl AppDatabase {
             params![current_cigarette_count],
         )?;
         Self::get_smoking_cessation_settings_for_connection(&connection)
+    }
+
+    pub fn list_repair_resell_sources(&self) -> Result<Vec<RepairResellSourceRecord>> {
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                source.id_obj_resell_source,
+                kind.key,
+                kind.label,
+                source.source_key,
+                source.name,
+                source.base_url,
+                COALESCE(source.region_label, ''),
+                source.scrape_mode,
+                source.adapter_key,
+                source.enabled,
+                source.priority,
+                source.rate_limit_seconds,
+                COALESCE(source.notes, ''),
+                COALESCE(source.last_scraped_at, ''),
+                source.created_at,
+                source.modified_at
+            FROM obj_resell_source source
+            JOIN def_resell_source_kind kind
+                ON kind.id_def_resell_source_kind = source.id_def_resell_source_kind
+            ORDER BY source.priority ASC, source.name ASC
+            ",
+        )?;
+        let records = statement
+            .query_map([], repair_resell_source_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(records)
+    }
+
+    pub fn get_repair_resell_source_by_id(
+        &self,
+        source_id: &str,
+    ) -> Result<RepairResellSourceRecord> {
+        let connection = self.connection()?;
+        Self::get_repair_resell_source_by_id_for_connection(&connection, source_id)
+    }
+
+    pub fn update_repair_resell_source_enabled(
+        &self,
+        source_id: &str,
+        enabled: bool,
+    ) -> Result<RepairResellSourceRecord> {
+        let connection = self.connection()?;
+        connection.execute(
+            "
+            UPDATE obj_resell_source
+            SET enabled = ?1,
+                modified_at = CURRENT_TIMESTAMP
+            WHERE id_obj_resell_source = ?2
+            ",
+            params![if enabled { 1 } else { 0 }, source_id],
+        )?;
+        Self::get_repair_resell_source_by_id_for_connection(&connection, source_id)
+    }
+
+    pub fn list_repair_resell_categories(&self) -> Result<Vec<RepairResellCategoryRecord>> {
+        let connection = self.connection()?;
+        Self::list_repair_resell_categories_for_connection(&connection)
+    }
+
+    pub fn list_repair_resell_keyword_flags(&self) -> Result<Vec<RepairResellKeywordFlagRecord>> {
+        let connection = self.connection()?;
+        Self::list_repair_resell_keyword_flags_for_connection(&connection)
+    }
+
+    pub fn list_repair_resell_travel_profiles(
+        &self,
+    ) -> Result<Vec<RepairResellTravelProfileRecord>> {
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                id_obj_resell_travel_profile,
+                name,
+                COALESCE(home_location_label, ''),
+                COALESCE(vehicle_label, ''),
+                fuel_l_per_100km,
+                fuel_price_cents_per_litre,
+                default_round_trip_km,
+                COALESCE(notes, ''),
+                is_default
+            FROM obj_resell_travel_profile
+            ORDER BY is_default DESC, name ASC
+            ",
+        )?;
+        let records = statement
+            .query_map([], repair_resell_travel_profile_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(records)
+    }
+
+    pub fn list_repair_resell_listings(&self) -> Result<Vec<RepairResellListingRecord>> {
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                listing.id_obj_resell_listing,
+                listing.id_obj_resell_source,
+                source.name,
+                source.source_key,
+                COALESCE(listing.external_id, ''),
+                listing.canonical_url,
+                listing.title,
+                COALESCE(listing.normalized_title, ''),
+                COALESCE(listing.description_text, ''),
+                COALESCE(listing.source_category_text, ''),
+                COALESCE(listing.make, ''),
+                COALESCE(listing.model, ''),
+                listing.model_year,
+                COALESCE(listing.lot_number, ''),
+                COALESCE(listing.condition_text, ''),
+                COALESCE(listing.location_text, ''),
+                listing.currency_code,
+                listing.current_price_cents,
+                listing.bid_count,
+                COALESCE(listing.closing_at, ''),
+                COALESCE(listing.posted_at, ''),
+                COALESCE(listing.last_seen_at, ''),
+                listing.listing_status,
+                COALESCE(listing.pickup_text, ''),
+                COALESCE(listing.inspection_text, ''),
+                listing.is_watchlisted,
+                listing.created_at,
+                listing.modified_at
+            FROM obj_resell_listing listing
+            JOIN obj_resell_source source
+                ON source.id_obj_resell_source = listing.id_obj_resell_source
+            ORDER BY
+                listing.is_watchlisted DESC,
+                CASE listing.listing_status WHEN 'active' THEN 0 WHEN 'unknown' THEN 1 ELSE 2 END,
+                listing.modified_at DESC
+            ",
+        )?;
+        let mut rows = statement
+            .query_map([], repair_resell_listing_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        for row in &mut rows {
+            row.flags = Self::list_repair_resell_listing_flags_for_connection(&connection, &row.id)?;
+            row.categories =
+                Self::list_repair_resell_listing_categories_for_connection(&connection, &row.id)?;
+        }
+        Ok(rows)
+    }
+
+    pub fn import_repair_resell_listing(
+        &self,
+        draft: RepairResellListingDraft,
+        scrape_run_id: Option<&str>,
+    ) -> Result<RepairResellListingRecord> {
+        let connection = self.connection()?;
+        let normalized_title = normalize_resell_text(&draft.title);
+        let listing_id: Option<String> = if let Some(external_id) = draft.external_id.as_deref() {
+            connection
+                .query_row(
+                    "
+                    SELECT id_obj_resell_listing
+                    FROM obj_resell_listing
+                    WHERE id_obj_resell_source = ?1
+                        AND external_id = ?2
+                    ",
+                    params![draft.source_id, external_id],
+                    |row| row.get(0),
+                )
+                .optional()?
+        } else {
+            None
+        }
+        .or_else(|| {
+            connection
+                .query_row(
+                    "
+                    SELECT id_obj_resell_listing
+                    FROM obj_resell_listing
+                    WHERE canonical_url = ?1
+                    ",
+                    params![draft.canonical_url],
+                    |row| row.get(0),
+                )
+                .optional()
+                .ok()
+                .flatten()
+        });
+
+        let listing_id = if let Some(listing_id) = listing_id {
+            connection.execute(
+                "
+                UPDATE obj_resell_listing
+                SET title = ?1,
+                    normalized_title = ?2,
+                    description_text = ?3,
+                    source_category_text = ?4,
+                    condition_text = ?5,
+                    location_text = ?6,
+                    current_price_cents = ?7,
+                    closing_at = ?8,
+                    pickup_text = ?9,
+                    inspection_text = ?10,
+                    listing_status = ?11,
+                    content_hash = ?12,
+                    structured_json = ?13,
+                    last_seen_at = CURRENT_TIMESTAMP,
+                    modified_at = CURRENT_TIMESTAMP
+                WHERE id_obj_resell_listing = ?14
+                ",
+                params![
+                    draft.title.trim(),
+                    normalized_title,
+                    draft.description_text.trim(),
+                    draft.source_category_text.trim(),
+                    draft.condition_text.trim(),
+                    draft.location_text.trim(),
+                    draft.current_price_cents,
+                    draft.closing_at.trim(),
+                    draft.pickup_text.trim(),
+                    draft.inspection_text.trim(),
+                    valid_resell_listing_status(&draft.listing_status),
+                    draft.content_hash,
+                    draft.structured_json,
+                    listing_id
+                ],
+            )?;
+            listing_id
+        } else {
+            let listing_id = repair_resell_id("obj_resell_listing");
+            connection.execute(
+                "
+                INSERT INTO obj_resell_listing (
+                    id_obj_resell_listing,
+                    id_obj_resell_source,
+                    external_id,
+                    canonical_url,
+                    title,
+                    normalized_title,
+                    description_text,
+                    source_category_text,
+                    condition_text,
+                    location_text,
+                    current_price_cents,
+                    closing_at,
+                    last_seen_at,
+                    listing_status,
+                    pickup_text,
+                    inspection_text,
+                    content_hash,
+                    structured_json
+                )
+                VALUES (
+                    ?1, ?2, NULLIF(?3, ''), ?4, ?5, ?6, ?7, ?8, ?9, ?10,
+                    ?11, ?12, CURRENT_TIMESTAMP, ?13, ?14, ?15, ?16, ?17
+                )
+                ",
+                params![
+                    listing_id,
+                    draft.source_id,
+                    draft.external_id.unwrap_or_default(),
+                    draft.canonical_url.trim(),
+                    draft.title.trim(),
+                    normalized_title,
+                    draft.description_text.trim(),
+                    draft.source_category_text.trim(),
+                    draft.condition_text.trim(),
+                    draft.location_text.trim(),
+                    draft.current_price_cents,
+                    draft.closing_at.trim(),
+                    valid_resell_listing_status(&draft.listing_status),
+                    draft.pickup_text.trim(),
+                    draft.inspection_text.trim(),
+                    draft.content_hash,
+                    draft.structured_json
+                ],
+            )?;
+            listing_id
+        };
+
+        Self::insert_repair_resell_listing_snapshot(&connection, &listing_id, scrape_run_id)?;
+        Self::apply_repair_resell_keyword_flags(&connection, &listing_id)?;
+        Self::apply_repair_resell_categories(&connection, &listing_id)?;
+        Self::get_repair_resell_listing_by_id_for_connection(&connection, &listing_id)
+    }
+
+    pub fn set_repair_resell_listing_watchlist(
+        &self,
+        listing_id: &str,
+        is_watchlisted: bool,
+        watch_status: &str,
+        notes: &str,
+    ) -> Result<RepairResellListingRecord> {
+        let connection = self.connection()?;
+        connection.execute(
+            "
+            UPDATE obj_resell_listing
+            SET is_watchlisted = ?1,
+                modified_at = CURRENT_TIMESTAMP
+            WHERE id_obj_resell_listing = ?2
+            ",
+            params![if is_watchlisted { 1 } else { 0 }, listing_id],
+        )?;
+        if is_watchlisted {
+            connection.execute(
+                "
+                INSERT INTO obj_resell_watchlist_entry (
+                    id_obj_resell_watchlist_entry,
+                    id_obj_resell_listing,
+                    watch_status,
+                    notes
+                )
+                VALUES (?1, ?2, ?3, ?4)
+                ON CONFLICT(id_obj_resell_listing) DO UPDATE SET
+                    watch_status = excluded.watch_status,
+                    notes = excluded.notes,
+                    modified_at = CURRENT_TIMESTAMP
+                ",
+                params![
+                    repair_resell_id("obj_resell_watchlist_entry"),
+                    listing_id,
+                    valid_resell_watch_status(watch_status),
+                    notes
+                ],
+            )?;
+        }
+        Self::get_repair_resell_listing_by_id_for_connection(&connection, listing_id)
+    }
+
+    pub fn create_repair_resell_scrape_run(
+        &self,
+        source_id: &str,
+    ) -> Result<RepairResellScrapeRunRecord> {
+        let connection = self.connection()?;
+        let run_id = repair_resell_id("obj_resell_scrape_run");
+        connection.execute(
+            "
+            INSERT INTO obj_resell_scrape_run (
+                id_obj_resell_scrape_run,
+                id_obj_resell_source,
+                started_at,
+                status
+            )
+            VALUES (?1, ?2, CURRENT_TIMESTAMP, 'running')
+            ",
+            params![run_id, source_id],
+        )?;
+        Self::get_repair_resell_scrape_run_by_id_for_connection(&connection, &run_id)
+    }
+
+    pub fn finish_repair_resell_scrape_run(
+        &self,
+        run_id: &str,
+        status: &str,
+        listing_count: i64,
+        new_listing_count: i64,
+        updated_listing_count: i64,
+        skipped_count: i64,
+        error_text: &str,
+    ) -> Result<RepairResellScrapeRunRecord> {
+        let connection = self.connection()?;
+        connection.execute(
+            "
+            UPDATE obj_resell_scrape_run
+            SET finished_at = CURRENT_TIMESTAMP,
+                status = ?1,
+                listing_count = ?2,
+                new_listing_count = ?3,
+                updated_listing_count = ?4,
+                skipped_count = ?5,
+                error_text = ?6,
+                modified_at = CURRENT_TIMESTAMP
+            WHERE id_obj_resell_scrape_run = ?7
+            ",
+            params![
+                valid_resell_scrape_status(status),
+                listing_count,
+                new_listing_count,
+                updated_listing_count,
+                skipped_count,
+                error_text,
+                run_id
+            ],
+        )?;
+        let run = Self::get_repair_resell_scrape_run_by_id_for_connection(&connection, run_id)?;
+        connection.execute(
+            "
+            UPDATE obj_resell_source
+            SET last_scraped_at = ?1,
+                modified_at = CURRENT_TIMESTAMP
+            WHERE id_obj_resell_source = ?2
+            ",
+            params![run.finished_at, run.source_id],
+        )?;
+        Ok(run)
+    }
+
+    pub fn list_repair_resell_deal_estimates(
+        &self,
+        listing_id: &str,
+    ) -> Result<Vec<RepairResellDealEstimateRecord>> {
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                id_obj_resell_deal_estimate,
+                id_obj_resell_listing,
+                COALESCE(id_obj_resell_travel_profile, ''),
+                estimate_label,
+                acquisition_price_cents,
+                buyer_premium_cents,
+                tax_cents,
+                travel_km,
+                fuel_cost_cents,
+                parts_cost_cents,
+                other_cost_cents,
+                expected_resale_low_cents,
+                expected_resale_high_cents,
+                expected_resale_target_cents,
+                desired_profit_cents,
+                risk_buffer_cents,
+                max_safe_bid_cents,
+                net_profit_low_cents,
+                net_profit_target_cents,
+                estimate_method,
+                confidence,
+                COALESCE(notes, ''),
+                created_at,
+                modified_at
+            FROM obj_resell_deal_estimate
+            WHERE id_obj_resell_listing = ?1
+            ORDER BY modified_at DESC
+            ",
+        )?;
+        let records = statement
+            .query_map(params![listing_id], repair_resell_deal_estimate_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(records)
+    }
+
+    pub fn save_repair_resell_deal_estimate(
+        &self,
+        draft: RepairResellDealEstimateDraft,
+    ) -> Result<RepairResellDealEstimateRecord> {
+        let connection = self.connection()?;
+        let fuel_cost = draft.fuel_cost_cents.or_else(|| {
+            estimate_resell_fuel_cost(
+                draft.travel_km,
+                draft.travel_profile_id.as_deref(),
+                &connection,
+            )
+            .ok()
+            .flatten()
+        });
+        let max_safe_bid = draft.expected_resale_target_cents.map(|target| {
+            target
+                - draft.desired_profit_cents.unwrap_or(0)
+                - draft.parts_cost_cents.unwrap_or(0)
+                - fuel_cost.unwrap_or(0)
+                - draft.buyer_premium_cents.unwrap_or(0)
+                - draft.tax_cents.unwrap_or(0)
+                - draft.risk_buffer_cents.unwrap_or(0)
+                - draft.other_cost_cents.unwrap_or(0)
+        });
+        let acquisition = draft.acquisition_price_cents.unwrap_or(0);
+        let total_cost = acquisition
+            + draft.buyer_premium_cents.unwrap_or(0)
+            + draft.tax_cents.unwrap_or(0)
+            + fuel_cost.unwrap_or(0)
+            + draft.parts_cost_cents.unwrap_or(0)
+            + draft.other_cost_cents.unwrap_or(0)
+            + draft.risk_buffer_cents.unwrap_or(0);
+        let net_low = draft.expected_resale_low_cents.map(|value| value - total_cost);
+        let net_target = draft
+            .expected_resale_target_cents
+            .map(|value| value - total_cost);
+        let estimate_id = repair_resell_id("obj_resell_deal_estimate");
+        connection.execute(
+            "
+            INSERT INTO obj_resell_deal_estimate (
+                id_obj_resell_deal_estimate,
+                id_obj_resell_listing,
+                id_obj_resell_travel_profile,
+                estimate_label,
+                acquisition_price_cents,
+                buyer_premium_cents,
+                tax_cents,
+                travel_km,
+                fuel_cost_cents,
+                parts_cost_cents,
+                other_cost_cents,
+                expected_resale_low_cents,
+                expected_resale_high_cents,
+                expected_resale_target_cents,
+                desired_profit_cents,
+                risk_buffer_cents,
+                max_safe_bid_cents,
+                net_profit_low_cents,
+                net_profit_target_cents,
+                estimate_method,
+                confidence,
+                notes
+            )
+            VALUES (
+                ?1, ?2, NULLIF(?3, ''), ?4, ?5, ?6, ?7, ?8, ?9, ?10,
+                ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, 'manual', ?20, ?21
+            )
+            ",
+            params![
+                estimate_id,
+                draft.listing_id,
+                draft.travel_profile_id.unwrap_or_default(),
+                draft.estimate_label.trim(),
+                draft.acquisition_price_cents,
+                draft.buyer_premium_cents,
+                draft.tax_cents,
+                draft.travel_km,
+                fuel_cost,
+                draft.parts_cost_cents,
+                draft.other_cost_cents,
+                draft.expected_resale_low_cents,
+                draft.expected_resale_high_cents,
+                draft.expected_resale_target_cents,
+                draft.desired_profit_cents,
+                draft.risk_buffer_cents,
+                max_safe_bid,
+                net_low,
+                net_target,
+                valid_resell_confidence(&draft.confidence),
+                draft.notes
+            ],
+        )?;
+        Self::get_repair_resell_deal_estimate_by_id_for_connection(&connection, &estimate_id)
     }
 
     pub fn list_schedulers(&self) -> Result<Vec<SchedulerRecord>> {
@@ -4437,6 +6065,10 @@ impl AppDatabase {
             params![id],
         )?;
         connection.execute(
+            "DELETE FROM obj_game_character_build WHERE game_id = ?1",
+            params![id],
+        )?;
+        connection.execute(
             "DELETE FROM obj_game_catalog_reference WHERE game_id = ?1",
             params![id],
         )?;
@@ -4449,6 +6081,158 @@ impl AppDatabase {
             params![id],
         )?;
         connection.execute("DELETE FROM obj_game WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    pub fn list_game_character_builds(
+        &self,
+        game_id: i64,
+    ) -> Result<Vec<GameCharacterBuildRecord>> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        let mut statement = connection.prepare(
+            "
+            SELECT id, game_id, id_game, title, character_class, ascendancy, build_role,
+                status, source_label, source_url, patch, summary, tags, notes, is_active,
+                created_at, updated_at
+            FROM obj_game_character_build
+            WHERE game_id = ?1
+            ORDER BY is_active DESC, updated_at DESC, id DESC
+            ",
+        )?;
+
+        let builds = statement
+            .query_map(params![game_id], game_character_build_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(builds)
+    }
+
+    pub fn create_game_character_build(
+        &self,
+        draft: GameCharacterBuildDraft<'_>,
+    ) -> Result<GameCharacterBuildRecord> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, draft.game_id)?;
+        let id_game = Self::game_definition_id_by_game_id(&connection, draft.game_id)?;
+        if draft.is_active {
+            Self::clear_active_game_character_builds(&connection, draft.game_id)?;
+        }
+        connection.execute(
+            "
+            INSERT INTO obj_game_character_build (
+                game_id,
+                id_game,
+                title,
+                character_class,
+                ascendancy,
+                build_role,
+                status,
+                source_label,
+                source_url,
+                patch,
+                summary,
+                tags,
+                notes,
+                is_active
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+            ",
+            params![
+                draft.game_id,
+                id_game,
+                draft.title.trim(),
+                draft.character_class.trim(),
+                draft.ascendancy.trim(),
+                draft.build_role.trim(),
+                normalized_game_character_build_status(draft.status),
+                draft.source_label.trim(),
+                draft.source_url.trim(),
+                draft.patch.trim(),
+                draft.summary.trim(),
+                draft.tags.trim(),
+                draft.notes.trim(),
+                if draft.is_active { 1 } else { 0 }
+            ],
+        )?;
+
+        let id = connection.last_insert_rowid();
+        Self::get_game_character_build_by_id(&connection, id)
+    }
+
+    pub fn update_game_character_build(
+        &self,
+        draft: GameCharacterBuildUpdateDraft<'_>,
+    ) -> Result<GameCharacterBuildRecord> {
+        let connection = self.connection()?;
+        let existing = Self::get_game_character_build_by_id(&connection, draft.id)?;
+        if draft.is_active {
+            Self::clear_active_game_character_builds(&connection, existing.game_id)?;
+        }
+        connection.execute(
+            "
+            UPDATE obj_game_character_build
+            SET title = ?2,
+                character_class = ?3,
+                ascendancy = ?4,
+                build_role = ?5,
+                status = ?6,
+                source_label = ?7,
+                source_url = ?8,
+                patch = ?9,
+                summary = ?10,
+                tags = ?11,
+                notes = ?12,
+                is_active = ?13,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?1
+            ",
+            params![
+                draft.id,
+                draft.title.trim(),
+                draft.character_class.trim(),
+                draft.ascendancy.trim(),
+                draft.build_role.trim(),
+                normalized_game_character_build_status(draft.status),
+                draft.source_label.trim(),
+                draft.source_url.trim(),
+                draft.patch.trim(),
+                draft.summary.trim(),
+                draft.tags.trim(),
+                draft.notes.trim(),
+                if draft.is_active { 1 } else { 0 }
+            ],
+        )?;
+
+        Self::get_game_character_build_by_id(&connection, draft.id)
+    }
+
+    pub fn set_active_game_character_build(
+        &self,
+        build_id: i64,
+    ) -> Result<GameCharacterBuildRecord> {
+        let connection = self.connection()?;
+        let existing = Self::get_game_character_build_by_id(&connection, build_id)?;
+        Self::clear_active_game_character_builds(&connection, existing.game_id)?;
+        connection.execute(
+            "
+            UPDATE obj_game_character_build
+            SET is_active = 1,
+                status = CASE WHEN status = 'archived' THEN 'planned' ELSE status END,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?1
+            ",
+            params![build_id],
+        )?;
+        Self::get_game_character_build_by_id(&connection, build_id)
+    }
+
+    pub fn delete_game_character_build(&self, build_id: i64) -> Result<()> {
+        let connection = self.connection()?;
+        Self::get_game_character_build_by_id(&connection, build_id)?;
+        connection.execute(
+            "DELETE FROM obj_game_character_build WHERE id = ?1",
+            params![build_id],
+        )?;
         Ok(())
     }
 
@@ -6565,6 +8349,123 @@ impl AppDatabase {
         Ok(connection.last_insert_rowid())
     }
 
+    pub fn list_gearblocks_part_render_profiles(
+        &self,
+        game_id: i64,
+    ) -> Result<Vec<GearBlocksPartRenderProfileRecord>> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        let mut statement = connection.prepare(
+            "
+            SELECT id, game_id, profile_key, part_key, part_name, source_object_name,
+                renderer_names_json, canonical_rotation_json, camera_preset_json,
+                bounds_center_json, bounds_size_json, edge_settings_json, latest_render_path,
+                latest_capture_id, latest_status_json, render_version, is_validated, notes,
+                created_at, updated_at
+            FROM obj_gearblocks_part_render_profile
+            WHERE game_id = ?1
+            ORDER BY part_name COLLATE NOCASE, profile_key COLLATE NOCASE
+            ",
+        )?;
+
+        let profiles = statement
+            .query_map(params![game_id], gearblocks_part_render_profile_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(profiles)
+    }
+
+    pub fn upsert_gearblocks_part_render_profile(
+        &self,
+        draft: GearBlocksPartRenderProfileDraft<'_>,
+    ) -> Result<GearBlocksPartRenderProfileRecord> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, draft.game_id)?;
+        let clean_profile_key = if draft.profile_key.trim().is_empty() {
+            normalized_profile_key(draft.part_name)
+        } else {
+            draft.profile_key.trim().to_string()
+        };
+        let clean_part_name = if draft.part_name.trim().is_empty() {
+            clean_profile_key.as_str()
+        } else {
+            draft.part_name.trim()
+        };
+
+        connection.execute(
+            "
+            INSERT INTO obj_gearblocks_part_render_profile (
+                game_id, profile_key, part_key, part_name, source_object_name,
+                renderer_names_json, canonical_rotation_json, camera_preset_json,
+                bounds_center_json, bounds_size_json, edge_settings_json, latest_render_path,
+                latest_capture_id, latest_status_json, render_version, is_validated, notes
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
+            ON CONFLICT(game_id, profile_key) DO UPDATE SET
+                part_key = excluded.part_key,
+                part_name = excluded.part_name,
+                source_object_name = excluded.source_object_name,
+                renderer_names_json = excluded.renderer_names_json,
+                canonical_rotation_json = excluded.canonical_rotation_json,
+                camera_preset_json = excluded.camera_preset_json,
+                bounds_center_json = excluded.bounds_center_json,
+                bounds_size_json = excluded.bounds_size_json,
+                edge_settings_json = excluded.edge_settings_json,
+                latest_render_path = excluded.latest_render_path,
+                latest_capture_id = excluded.latest_capture_id,
+                latest_status_json = excluded.latest_status_json,
+                render_version = excluded.render_version,
+                is_validated = excluded.is_validated,
+                notes = excluded.notes,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                draft.game_id,
+                clean_profile_key,
+                draft.part_key.trim(),
+                clean_part_name,
+                draft.source_object_name.trim(),
+                draft.renderer_names_json.trim(),
+                draft.canonical_rotation_json.trim(),
+                draft.camera_preset_json.trim(),
+                draft.bounds_center_json.trim(),
+                draft.bounds_size_json.trim(),
+                draft.edge_settings_json.trim(),
+                draft.latest_render_path.trim(),
+                draft.latest_capture_id.trim(),
+                draft.latest_status_json.trim(),
+                draft.render_version,
+                if draft.is_validated { 1 } else { 0 },
+                draft.notes.trim(),
+            ],
+        )?;
+
+        Self::get_gearblocks_part_render_profile_by_key(
+            &connection,
+            draft.game_id,
+            &clean_profile_key,
+        )
+    }
+
+    fn get_gearblocks_part_render_profile_by_key(
+        connection: &Connection,
+        game_id: i64,
+        profile_key: &str,
+    ) -> Result<GearBlocksPartRenderProfileRecord> {
+        connection.query_row(
+            "
+            SELECT id, game_id, profile_key, part_key, part_name, source_object_name,
+                renderer_names_json, canonical_rotation_json, camera_preset_json,
+                bounds_center_json, bounds_size_json, edge_settings_json, latest_render_path,
+                latest_capture_id, latest_status_json, render_version, is_validated, notes,
+                created_at, updated_at
+            FROM obj_gearblocks_part_render_profile
+            WHERE game_id = ?1 AND profile_key = ?2
+            ",
+            params![game_id, profile_key],
+            gearblocks_part_render_profile_from_row,
+        )
+    }
+
     pub fn list_game_chat_conversations(
         &self,
         game_id: i64,
@@ -7024,6 +8925,401 @@ impl AppDatabase {
         )
     }
 
+    fn get_repair_resell_source_by_id_for_connection(
+        connection: &Connection,
+        source_id: &str,
+    ) -> Result<RepairResellSourceRecord> {
+        connection.query_row(
+            "
+            SELECT
+                source.id_obj_resell_source,
+                kind.key,
+                kind.label,
+                source.source_key,
+                source.name,
+                source.base_url,
+                COALESCE(source.region_label, ''),
+                source.scrape_mode,
+                source.adapter_key,
+                source.enabled,
+                source.priority,
+                source.rate_limit_seconds,
+                COALESCE(source.notes, ''),
+                COALESCE(source.last_scraped_at, ''),
+                source.created_at,
+                source.modified_at
+            FROM obj_resell_source source
+            JOIN def_resell_source_kind kind
+                ON kind.id_def_resell_source_kind = source.id_def_resell_source_kind
+            WHERE source.id_obj_resell_source = ?1
+            ",
+            params![source_id],
+            repair_resell_source_from_row,
+        )
+    }
+
+    fn list_repair_resell_categories_for_connection(
+        connection: &Connection,
+    ) -> Result<Vec<RepairResellCategoryRecord>> {
+        let mut statement = connection.prepare(
+            "
+            SELECT id_def_resell_category, key, label
+            FROM def_resell_category
+            ORDER BY sort_order ASC, label ASC
+            ",
+        )?;
+        let records = statement
+            .query_map([], repair_resell_category_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(records)
+    }
+
+    fn list_repair_resell_keyword_flags_for_connection(
+        connection: &Connection,
+    ) -> Result<Vec<RepairResellKeywordFlagRecord>> {
+        let mut statement = connection.prepare(
+            "
+            SELECT id_def_resell_keyword_flag, key, label, flag_type, pattern
+            FROM def_resell_keyword_flag
+            ORDER BY sort_order ASC, label ASC
+            ",
+        )?;
+        let records = statement
+            .query_map([], repair_resell_keyword_flag_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(records)
+    }
+
+    fn get_repair_resell_listing_by_id_for_connection(
+        connection: &Connection,
+        listing_id: &str,
+    ) -> Result<RepairResellListingRecord> {
+        let mut listing = connection.query_row(
+            "
+            SELECT
+                listing.id_obj_resell_listing,
+                listing.id_obj_resell_source,
+                source.name,
+                source.source_key,
+                COALESCE(listing.external_id, ''),
+                listing.canonical_url,
+                listing.title,
+                COALESCE(listing.normalized_title, ''),
+                COALESCE(listing.description_text, ''),
+                COALESCE(listing.source_category_text, ''),
+                COALESCE(listing.make, ''),
+                COALESCE(listing.model, ''),
+                listing.model_year,
+                COALESCE(listing.lot_number, ''),
+                COALESCE(listing.condition_text, ''),
+                COALESCE(listing.location_text, ''),
+                listing.currency_code,
+                listing.current_price_cents,
+                listing.bid_count,
+                COALESCE(listing.closing_at, ''),
+                COALESCE(listing.posted_at, ''),
+                COALESCE(listing.last_seen_at, ''),
+                listing.listing_status,
+                COALESCE(listing.pickup_text, ''),
+                COALESCE(listing.inspection_text, ''),
+                listing.is_watchlisted,
+                listing.created_at,
+                listing.modified_at
+            FROM obj_resell_listing listing
+            JOIN obj_resell_source source
+                ON source.id_obj_resell_source = listing.id_obj_resell_source
+            WHERE listing.id_obj_resell_listing = ?1
+            ",
+            params![listing_id],
+            repair_resell_listing_from_row,
+        )?;
+        listing.flags = Self::list_repair_resell_listing_flags_for_connection(connection, listing_id)?;
+        listing.categories =
+            Self::list_repair_resell_listing_categories_for_connection(connection, listing_id)?;
+        Ok(listing)
+    }
+
+    fn list_repair_resell_listing_flags_for_connection(
+        connection: &Connection,
+        listing_id: &str,
+    ) -> Result<Vec<RepairResellKeywordFlagRecord>> {
+        let mut statement = connection.prepare(
+            "
+            SELECT flag.id_def_resell_keyword_flag, flag.key, flag.label, flag.flag_type, flag.pattern
+            FROM n2n_resell_listing_keyword_flag mapping
+            JOIN def_resell_keyword_flag flag
+                ON flag.id_def_resell_keyword_flag = mapping.id_def_resell_keyword_flag
+            WHERE mapping.id_obj_resell_listing = ?1
+            ORDER BY flag.flag_type, flag.sort_order
+            ",
+        )?;
+        let records = statement
+            .query_map(params![listing_id], repair_resell_keyword_flag_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(records)
+    }
+
+    fn list_repair_resell_listing_categories_for_connection(
+        connection: &Connection,
+        listing_id: &str,
+    ) -> Result<Vec<RepairResellCategoryRecord>> {
+        let mut statement = connection.prepare(
+            "
+            SELECT category.id_def_resell_category, category.key, category.label
+            FROM n2n_resell_listing_category mapping
+            JOIN def_resell_category category
+                ON category.id_def_resell_category = mapping.id_def_resell_category
+            WHERE mapping.id_obj_resell_listing = ?1
+            ORDER BY category.sort_order
+            ",
+        )?;
+        let records = statement
+            .query_map(params![listing_id], repair_resell_category_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(records)
+    }
+
+    fn insert_repair_resell_listing_snapshot(
+        connection: &Connection,
+        listing_id: &str,
+        scrape_run_id: Option<&str>,
+    ) -> Result<()> {
+        connection.execute(
+            "
+            INSERT INTO obj_resell_listing_snapshot (
+                id_obj_resell_listing_snapshot,
+                id_obj_resell_listing,
+                id_obj_resell_scrape_run,
+                snapshot_at,
+                current_price_cents,
+                bid_count,
+                listing_status,
+                title,
+                description_text,
+                condition_text,
+                location_text,
+                closing_at,
+                content_hash,
+                structured_json
+            )
+            SELECT
+                ?1,
+                id_obj_resell_listing,
+                NULLIF(?2, ''),
+                CURRENT_TIMESTAMP,
+                current_price_cents,
+                bid_count,
+                listing_status,
+                title,
+                description_text,
+                condition_text,
+                location_text,
+                closing_at,
+                content_hash,
+                structured_json
+            FROM obj_resell_listing
+            WHERE id_obj_resell_listing = ?3
+            ",
+            params![
+                repair_resell_id("obj_resell_listing_snapshot"),
+                scrape_run_id.unwrap_or_default(),
+                listing_id
+            ],
+        )?;
+        Ok(())
+    }
+
+    fn apply_repair_resell_keyword_flags(
+        connection: &Connection,
+        listing_id: &str,
+    ) -> Result<()> {
+        let search_text: String = connection.query_row(
+            "
+            SELECT lower(
+                title || ' ' ||
+                COALESCE(description_text, '') || ' ' ||
+                COALESCE(condition_text, '') || ' ' ||
+                COALESCE(source_category_text, '')
+            )
+            FROM obj_resell_listing
+            WHERE id_obj_resell_listing = ?1
+            ",
+            params![listing_id],
+            |row| row.get(0),
+        )?;
+        connection.execute(
+            "
+            DELETE FROM n2n_resell_listing_keyword_flag
+            WHERE id_obj_resell_listing = ?1
+                AND assigned_by = 'rule'
+            ",
+            params![listing_id],
+        )?;
+        for flag in Self::list_repair_resell_keyword_flags_for_connection(connection)? {
+            if search_text.contains(&flag.pattern.to_lowercase()) {
+                connection.execute(
+                    "
+                    INSERT OR IGNORE INTO n2n_resell_listing_keyword_flag (
+                        id_n2n_resell_listing_keyword_flag,
+                        id_obj_resell_listing,
+                        id_def_resell_keyword_flag,
+                        match_text,
+                        assigned_by
+                    )
+                    VALUES (?1, ?2, ?3, ?4, 'rule')
+                    ",
+                    params![
+                        repair_resell_id("n2n_resell_listing_keyword_flag"),
+                        listing_id,
+                        flag.id,
+                        flag.pattern
+                    ],
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    fn apply_repair_resell_categories(connection: &Connection, listing_id: &str) -> Result<()> {
+        let search_text: String = connection.query_row(
+            "
+            SELECT lower(
+                title || ' ' ||
+                COALESCE(description_text, '') || ' ' ||
+                COALESCE(source_category_text, '')
+            )
+            FROM obj_resell_listing
+            WHERE id_obj_resell_listing = ?1
+            ",
+            params![listing_id],
+            |row| row.get(0),
+        )?;
+        connection.execute(
+            "
+            DELETE FROM n2n_resell_listing_category
+            WHERE id_obj_resell_listing = ?1
+                AND assigned_by = 'rule'
+            ",
+            params![listing_id],
+        )?;
+        let mut categories = Vec::new();
+        for (category, terms) in [
+            ("mountain_bike", ["mountain bike", "mtb"].as_slice()),
+            ("bicycle", ["bike", "bicycle", "trek", "giant", "specialized"].as_slice()),
+            ("push_mower", ["push mower", "walk behind mower"].as_slice()),
+            ("riding_mower", ["riding mower", "lawn tractor"].as_slice()),
+            ("zero_turn_mower", ["zero turn", "zero-turn"].as_slice()),
+            ("snow_blower", ["snowblower", "snow blower"].as_slice()),
+            ("generator", ["generator"].as_slice()),
+            ("pressure_washer", ["pressure washer"].as_slice()),
+            ("air_compressor", ["air compressor", "compressor"].as_slice()),
+            ("power_tool", ["dewalt", "milwaukee", "makita", "power tool"].as_slice()),
+            ("computer", ["computer", "pc", "laptop", "desktop"].as_slice()),
+            ("electronics", ["electronics", "receiver", "amplifier"].as_slice()),
+            ("automotive_tool", ["automotive tool", "scan tool", "jack"].as_slice()),
+            ("automotive_part", ["automotive part", "car part", "truck part"].as_slice()),
+            ("vehicle", ["vehicle", "car", "truck"].as_slice()),
+            ("trailer", ["trailer"].as_slice()),
+            ("small_engine", ["small engine", "briggs", "kohler", "tecumseh", "honda"].as_slice()),
+        ] {
+            if terms.iter().any(|term| search_text.contains(term)) {
+                categories.push(category);
+            }
+        }
+        if categories.is_empty() {
+            categories.push("unknown");
+        }
+        for category_key in categories {
+            connection.execute(
+                "
+                INSERT OR IGNORE INTO n2n_resell_listing_category (
+                    id_n2n_resell_listing_category,
+                    id_obj_resell_listing,
+                    id_def_resell_category,
+                    confidence,
+                    assigned_by
+                )
+                SELECT ?1, ?2, category.id_def_resell_category, ?3, 'rule'
+                FROM def_resell_category category
+                WHERE category.key = ?4
+                ",
+                params![
+                    repair_resell_id("n2n_resell_listing_category"),
+                    listing_id,
+                    if category_key == "unknown" { 0.2 } else { 0.8 },
+                    category_key
+                ],
+            )?;
+        }
+        Ok(())
+    }
+
+    fn get_repair_resell_scrape_run_by_id_for_connection(
+        connection: &Connection,
+        run_id: &str,
+    ) -> Result<RepairResellScrapeRunRecord> {
+        connection.query_row(
+            "
+            SELECT
+                id_obj_resell_scrape_run,
+                id_obj_resell_source,
+                started_at,
+                COALESCE(finished_at, ''),
+                status,
+                listing_count,
+                new_listing_count,
+                updated_listing_count,
+                skipped_count,
+                COALESCE(error_text, ''),
+                created_at,
+                modified_at
+            FROM obj_resell_scrape_run
+            WHERE id_obj_resell_scrape_run = ?1
+            ",
+            params![run_id],
+            repair_resell_scrape_run_from_row,
+        )
+    }
+
+    fn get_repair_resell_deal_estimate_by_id_for_connection(
+        connection: &Connection,
+        estimate_id: &str,
+    ) -> Result<RepairResellDealEstimateRecord> {
+        connection.query_row(
+            "
+            SELECT
+                id_obj_resell_deal_estimate,
+                id_obj_resell_listing,
+                COALESCE(id_obj_resell_travel_profile, ''),
+                estimate_label,
+                acquisition_price_cents,
+                buyer_premium_cents,
+                tax_cents,
+                travel_km,
+                fuel_cost_cents,
+                parts_cost_cents,
+                other_cost_cents,
+                expected_resale_low_cents,
+                expected_resale_high_cents,
+                expected_resale_target_cents,
+                desired_profit_cents,
+                risk_buffer_cents,
+                max_safe_bid_cents,
+                net_profit_low_cents,
+                net_profit_target_cents,
+                estimate_method,
+                confidence,
+                COALESCE(notes, ''),
+                created_at,
+                modified_at
+            FROM obj_resell_deal_estimate
+            WHERE id_obj_resell_deal_estimate = ?1
+            ",
+            params![estimate_id],
+            repair_resell_deal_estimate_from_row,
+        )
+    }
+
     fn get_smoking_event_by_id(connection: &Connection, id: i64) -> Result<SmokingEventRecord> {
         connection.query_row(
             "
@@ -7426,6 +9722,46 @@ impl AppDatabase {
             ",
             params![id],
             game_from_row,
+        )
+    }
+
+    fn game_definition_id_by_game_id(connection: &Connection, game_id: i64) -> Result<i64> {
+        connection.query_row(
+            "SELECT id_game FROM obj_game WHERE id = ?1",
+            params![game_id],
+            |row| row.get(0),
+        )
+    }
+
+    fn clear_active_game_character_builds(connection: &Connection, game_id: i64) -> Result<()> {
+        connection.execute(
+            "
+            UPDATE obj_game_character_build
+            SET is_active = 0,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE game_id = ?1
+                AND is_active = 1
+            ",
+            params![game_id],
+        )?;
+        Ok(())
+    }
+
+    fn get_game_character_build_by_id(
+        connection: &Connection,
+        id: i64,
+    ) -> Result<GameCharacterBuildRecord> {
+        connection.query_row(
+            "
+            SELECT id, game_id, id_game, title, character_class, ascendancy, build_role,
+                status, source_label, source_url, patch, summary, tags, notes, is_active,
+                created_at, updated_at
+            FROM obj_game_character_build
+            WHERE id = ?1
+            LIMIT 1
+            ",
+            params![id],
+            game_character_build_from_row,
         )
     }
 
@@ -8442,7 +10778,7 @@ fn build_planning_context_payload(
     } else {
         format!(
             "Local repository Markdown context:\n\
-The following Markdown files were read from the selected project's configured local repository root and are available as source context for this chat. Use them when answering questions about the project files, README, docs, bridge files, project plan, or milestone state.\n\n{}\n\nConversation manual attachments:\n\n{}",
+The following Markdown files were read from the selected project's configured local repository root and are available as source context for this chat. Use them when answering questions about the project files, README, docs, bridge files, project plan, or current project state.\n\n{}\n\nConversation manual attachments:\n\n{}",
             markdown_text, attachment_text
         )
     };
@@ -8976,6 +11312,243 @@ fn gearblocks_api_docs_url(page: &str) -> String {
     }
 }
 
+fn repair_resell_id(table: &str) -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    let sequence = REPAIR_RESELL_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+    format!("{table}_{nanos:x}_{sequence:x}")
+}
+
+fn normalize_resell_key(value: &str) -> String {
+    value
+        .trim()
+        .to_lowercase()
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() {
+                character
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>()
+        .split('_')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("_")
+}
+
+fn normalize_resell_text(value: &str) -> String {
+    value
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
+}
+
+fn valid_resell_listing_status(value: &str) -> &str {
+    match value {
+        "active" | "closed" | "sold" | "removed" | "unknown" => value,
+        _ => "unknown",
+    }
+}
+
+fn valid_resell_scrape_status(value: &str) -> &str {
+    match value {
+        "queued" | "running" | "succeeded" | "partial" | "failed" | "skipped" => value,
+        _ => "failed",
+    }
+}
+
+fn valid_resell_watch_status(value: &str) -> &str {
+    match value {
+        "watching" | "interested" | "bid_planned" | "bid_placed" | "won" | "lost"
+        | "ignored" => value,
+        _ => "watching",
+    }
+}
+
+fn valid_resell_confidence(value: &str) -> &str {
+    match value {
+        "low" | "medium" | "high" => value,
+        _ => "low",
+    }
+}
+
+fn estimate_resell_fuel_cost(
+    travel_km: Option<f64>,
+    travel_profile_id: Option<&str>,
+    connection: &Connection,
+) -> Result<Option<i64>> {
+    let Some(travel_km) = travel_km else {
+        return Ok(None);
+    };
+    let Some(travel_profile_id) = travel_profile_id.filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+    let values: Option<(Option<f64>, Option<i64>)> = connection
+        .query_row(
+            "
+            SELECT fuel_l_per_100km, fuel_price_cents_per_litre
+            FROM obj_resell_travel_profile
+            WHERE id_obj_resell_travel_profile = ?1
+            ",
+            params![travel_profile_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?;
+    let Some((Some(l_per_100km), Some(cents_per_litre))) = values else {
+        return Ok(None);
+    };
+    Ok(Some(
+        ((travel_km / 100.0) * l_per_100km * cents_per_litre as f64).round() as i64,
+    ))
+}
+
+fn repair_resell_source_from_row(row: &rusqlite::Row<'_>) -> Result<RepairResellSourceRecord> {
+    Ok(RepairResellSourceRecord {
+        id: row.get(0)?,
+        kind_key: row.get(1)?,
+        kind_label: row.get(2)?,
+        source_key: row.get(3)?,
+        name: row.get(4)?,
+        base_url: row.get(5)?,
+        region_label: row.get(6)?,
+        scrape_mode: row.get(7)?,
+        adapter_key: row.get(8)?,
+        enabled: row.get::<_, i64>(9)? == 1,
+        priority: row.get(10)?,
+        rate_limit_seconds: row.get(11)?,
+        notes: row.get(12)?,
+        last_scraped_at: row.get(13)?,
+        created_at: row.get(14)?,
+        modified_at: row.get(15)?,
+    })
+}
+
+fn repair_resell_category_from_row(row: &rusqlite::Row<'_>) -> Result<RepairResellCategoryRecord> {
+    Ok(RepairResellCategoryRecord {
+        id: row.get(0)?,
+        key: row.get(1)?,
+        label: row.get(2)?,
+    })
+}
+
+fn repair_resell_keyword_flag_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<RepairResellKeywordFlagRecord> {
+    Ok(RepairResellKeywordFlagRecord {
+        id: row.get(0)?,
+        key: row.get(1)?,
+        label: row.get(2)?,
+        flag_type: row.get(3)?,
+        pattern: row.get(4)?,
+    })
+}
+
+fn repair_resell_listing_from_row(row: &rusqlite::Row<'_>) -> Result<RepairResellListingRecord> {
+    Ok(RepairResellListingRecord {
+        id: row.get(0)?,
+        source_id: row.get(1)?,
+        source_name: row.get(2)?,
+        source_key: row.get(3)?,
+        external_id: row.get(4)?,
+        canonical_url: row.get(5)?,
+        title: row.get(6)?,
+        normalized_title: row.get(7)?,
+        description_text: row.get(8)?,
+        source_category_text: row.get(9)?,
+        make: row.get(10)?,
+        model: row.get(11)?,
+        model_year: row.get(12)?,
+        lot_number: row.get(13)?,
+        condition_text: row.get(14)?,
+        location_text: row.get(15)?,
+        currency_code: row.get(16)?,
+        current_price_cents: row.get(17)?,
+        bid_count: row.get(18)?,
+        closing_at: row.get(19)?,
+        posted_at: row.get(20)?,
+        last_seen_at: row.get(21)?,
+        listing_status: row.get(22)?,
+        pickup_text: row.get(23)?,
+        inspection_text: row.get(24)?,
+        is_watchlisted: row.get::<_, i64>(25)? == 1,
+        created_at: row.get(26)?,
+        modified_at: row.get(27)?,
+        flags: Vec::new(),
+        categories: Vec::new(),
+    })
+}
+
+fn repair_resell_scrape_run_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<RepairResellScrapeRunRecord> {
+    Ok(RepairResellScrapeRunRecord {
+        id: row.get(0)?,
+        source_id: row.get(1)?,
+        started_at: row.get(2)?,
+        finished_at: row.get(3)?,
+        status: row.get(4)?,
+        listing_count: row.get(5)?,
+        new_listing_count: row.get(6)?,
+        updated_listing_count: row.get(7)?,
+        skipped_count: row.get(8)?,
+        error_text: row.get(9)?,
+        created_at: row.get(10)?,
+        modified_at: row.get(11)?,
+    })
+}
+
+fn repair_resell_travel_profile_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<RepairResellTravelProfileRecord> {
+    Ok(RepairResellTravelProfileRecord {
+        id: row.get(0)?,
+        name: row.get(1)?,
+        home_location_label: row.get(2)?,
+        vehicle_label: row.get(3)?,
+        fuel_l_per_100km: row.get(4)?,
+        fuel_price_cents_per_litre: row.get(5)?,
+        default_round_trip_km: row.get(6)?,
+        notes: row.get(7)?,
+        is_default: row.get::<_, i64>(8)? == 1,
+    })
+}
+
+fn repair_resell_deal_estimate_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<RepairResellDealEstimateRecord> {
+    Ok(RepairResellDealEstimateRecord {
+        id: row.get(0)?,
+        listing_id: row.get(1)?,
+        travel_profile_id: row.get(2)?,
+        estimate_label: row.get(3)?,
+        acquisition_price_cents: row.get(4)?,
+        buyer_premium_cents: row.get(5)?,
+        tax_cents: row.get(6)?,
+        travel_km: row.get(7)?,
+        fuel_cost_cents: row.get(8)?,
+        parts_cost_cents: row.get(9)?,
+        other_cost_cents: row.get(10)?,
+        expected_resale_low_cents: row.get(11)?,
+        expected_resale_high_cents: row.get(12)?,
+        expected_resale_target_cents: row.get(13)?,
+        desired_profit_cents: row.get(14)?,
+        risk_buffer_cents: row.get(15)?,
+        max_safe_bid_cents: row.get(16)?,
+        net_profit_low_cents: row.get(17)?,
+        net_profit_target_cents: row.get(18)?,
+        estimate_method: row.get(19)?,
+        confidence: row.get(20)?,
+        notes: row.get(21)?,
+        created_at: row.get(22)?,
+        modified_at: row.get(23)?,
+    })
+}
+
 fn smoking_event_from_row(row: &rusqlite::Row<'_>) -> Result<SmokingEventRecord> {
     Ok(SmokingEventRecord {
         id: row.get(0)?,
@@ -9058,6 +11631,29 @@ fn game_setting_from_row(row: &rusqlite::Row<'_>) -> Result<GameSettingRecord> {
         schema_json: row.get(5)?,
         created_at: row.get(6)?,
         modified_at: row.get(7)?,
+    })
+}
+
+fn game_character_build_from_row(row: &rusqlite::Row<'_>) -> Result<GameCharacterBuildRecord> {
+    let is_active: i64 = row.get(14)?;
+    Ok(GameCharacterBuildRecord {
+        id: row.get(0)?,
+        game_id: row.get(1)?,
+        id_game: row.get(2)?,
+        title: row.get(3)?,
+        character_class: row.get(4)?,
+        ascendancy: row.get(5)?,
+        build_role: row.get(6)?,
+        status: row.get(7)?,
+        source_label: row.get(8)?,
+        source_url: row.get(9)?,
+        patch: row.get(10)?,
+        summary: row.get(11)?,
+        tags: row.get(12)?,
+        notes: row.get(13)?,
+        is_active: is_active != 0,
+        created_at: row.get(15)?,
+        updated_at: row.get(16)?,
     })
 }
 
@@ -9439,6 +12035,34 @@ fn game_screenshot_capture_request_from_row(
     })
 }
 
+fn gearblocks_part_render_profile_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<GearBlocksPartRenderProfileRecord> {
+    let is_validated: i64 = row.get(16)?;
+    Ok(GearBlocksPartRenderProfileRecord {
+        id: row.get(0)?,
+        game_id: row.get(1)?,
+        profile_key: row.get(2)?,
+        part_key: row.get(3)?,
+        part_name: row.get(4)?,
+        source_object_name: row.get(5)?,
+        renderer_names_json: row.get(6)?,
+        canonical_rotation_json: row.get(7)?,
+        camera_preset_json: row.get(8)?,
+        bounds_center_json: row.get(9)?,
+        bounds_size_json: row.get(10)?,
+        edge_settings_json: row.get(11)?,
+        latest_render_path: row.get(12)?,
+        latest_capture_id: row.get(13)?,
+        latest_status_json: row.get(14)?,
+        render_version: row.get(15)?,
+        is_validated: is_validated != 0,
+        notes: row.get(17)?,
+        created_at: row.get(18)?,
+        updated_at: row.get(19)?,
+    })
+}
+
 fn game_chat_conversation_from_row(row: &rusqlite::Row<'_>) -> Result<GameChatConversationRecord> {
     Ok(GameChatConversationRecord {
         id: row.get(0)?,
@@ -9534,6 +12158,40 @@ fn game_slug(name: &str) -> String {
     }
 }
 
+fn normalized_profile_key(value: &str) -> String {
+    let mut key = String::new();
+    let mut previous_was_separator = false;
+
+    for character in value.trim().chars() {
+        if character.is_ascii_alphanumeric() {
+            key.push(character.to_ascii_lowercase());
+            previous_was_separator = false;
+        } else if !previous_was_separator && !key.is_empty() {
+            key.push('-');
+            previous_was_separator = true;
+        }
+    }
+
+    while key.ends_with('-') {
+        key.pop();
+    }
+
+    if key.is_empty() {
+        "part-render-profile".to_string()
+    } else {
+        key
+    }
+}
+
+fn normalized_game_character_build_status(status: &str) -> &'static str {
+    match status.trim() {
+        "active" => "active",
+        "currently_playing" => "currently_playing",
+        "archived" => "archived",
+        _ => "planned",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -9569,6 +12227,7 @@ mod tests {
             "def_game",
             "obj_game",
             "obj_game_setting",
+            "obj_game_character_build",
             "obj_setting",
             "obj_scheduler",
             "n2n_planning_conversation_context",

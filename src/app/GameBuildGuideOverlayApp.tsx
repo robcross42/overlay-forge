@@ -8,14 +8,18 @@ import {
   type BuildStepVisualElement,
   type BuildStepVisualModel
 } from "../features/gaming/buildGuideVisuals";
+import { createBuildGuideManifestRows } from "../features/gaming/buildGuideManifest";
+import { cleanBuildGuideDisplayText } from "../features/gaming/buildGuideText";
 import {
   getActiveGameBuildGuideOverlay,
   getGameBuildGuide,
-  listGames
+  listGameRuntimePartInstances,
+  syncGearBlocksRuntimeContext
 } from "../services/gaming";
 import type {
-  Game,
   GameBuildGuideOverlaySelection,
+  GameBuildGuidePart,
+  GameRuntimePartInstance,
   GameBuildGuidePayload
 } from "../services/gaming";
 import { applyStandaloneOverlayFocusState, startOverlayDrag } from "../services/windowControls";
@@ -28,16 +32,35 @@ const FONT_SIZES = ["small", "medium", "large"] as const;
 const MIN_DIAGRAM_ZOOM = 1;
 const MAX_DIAGRAM_ZOOM = 3;
 const DIAGRAM_ZOOM_STEP = 0.25;
+const BUILD_GUIDE_NON_DRAG_SELECTOR = [
+  "button",
+  "a",
+  "input",
+  "select",
+  "textarea",
+  "[role='button']",
+  ".build-guide-meta-row",
+  ".build-guide-context-panel",
+  ".build-guide-section",
+  ".build-guide-part-group",
+  ".build-guide-step",
+  ".build-guide-diagram-frame",
+  ".build-guide-placement-cues",
+  ".build-guide-related-parts"
+].join(",");
 type BuildGuideFontSize = (typeof FONT_SIZES)[number];
 type BuildGuideViewMode = "info" | "steps";
 
 export default function GameBuildGuideOverlayApp() {
-  const [game, setGame] = useState<Game | null>(null);
   const [payload, setPayload] = useState<GameBuildGuidePayload | null>(null);
   const [status, setStatus] = useState("Loading build guide");
   const [fontSize, setFontSize] = useState<BuildGuideFontSize>(loadStoredFontSize);
   const [viewMode, setViewMode] = useState<BuildGuideViewMode>("info");
   const [diagramZoom, setDiagramZoom] = useState(loadStoredDiagramZoom);
+  const [phaseTwoRunning, setPhaseTwoRunning] = useState(false);
+  const [exportAllRunning, setExportAllRunning] = useState(false);
+  const [hasBuildGuideExport, setHasBuildGuideExport] = useState(false);
+  const [runtimeInstances, setRuntimeInstances] = useState<GameRuntimePartInstance[]>([]);
 
   const visualModels = useMemo(() => {
     if (!payload) {
@@ -50,6 +73,8 @@ export default function GameBuildGuideOverlayApp() {
 
   useEffect(() => {
     setViewMode("info");
+    setHasBuildGuideExport(false);
+    setRuntimeInstances([]);
   }, [payload?.guide.id]);
 
   useEffect(() => {
@@ -97,8 +122,8 @@ export default function GameBuildGuideOverlayApp() {
     try {
       const selection = loadStoredBuildGuideSelection() ?? (await getActiveGameBuildGuideOverlay());
       if (!selection) {
-        setGame(null);
         setPayload(null);
+        setRuntimeInstances([]);
         setStatus("Loading build guide");
         if (attempt < 8) {
           window.setTimeout(() => {
@@ -110,11 +135,9 @@ export default function GameBuildGuideOverlayApp() {
         return;
       }
 
-      const [games, nextPayload] = await Promise.all([
-        listGames(),
-        getGameBuildGuide(selection.guideId)
-      ]);
-      setGame(games.find((item) => item.id === selection.gameId) ?? null);
+      const nextPayload = await getGameBuildGuide(selection.guideId);
+      setHasBuildGuideExport(false);
+      setRuntimeInstances([]);
       setPayload(nextPayload);
       setStatus("Ready");
     } catch (error) {
@@ -122,11 +145,50 @@ export default function GameBuildGuideOverlayApp() {
     }
   }
 
-  function startGuideDrag(event: MouseEvent) {
-    if (event.detail !== 1 || event.button !== 0) {
+  async function exportAllForBuildGuide() {
+    if (!payload) {
+      setStatus("No build guide loaded");
       return;
     }
-    void startOverlayDrag();
+
+    setExportAllRunning(true);
+    setStatus("Exporting all GearBlocks scene parts");
+    try {
+      const sync = await syncGearBlocksRuntimeContext(payload.guide.gameId);
+      const instances = await listGameRuntimePartInstances(payload.guide.gameId);
+      setRuntimeInstances(instances);
+      setHasBuildGuideExport(true);
+      setStatus(
+        `Exported all: ${instances.length} placed part instance(s), ${sync.runtimePartCount} indexed part definition(s)`
+      );
+    } catch (error) {
+      setStatus(formatError(error));
+    } finally {
+      setExportAllRunning(false);
+    }
+  }
+
+  async function generateStepsFromBuildGuideExport() {
+    if (!payload) {
+      setStatus("No build guide loaded");
+      return;
+    }
+    if (!hasBuildGuideExport) {
+      setStatus("Run Export All before generating step images");
+      return;
+    }
+
+    setPhaseTwoRunning(true);
+    setStatus("Generating step images");
+    try {
+      setPayload(await getGameBuildGuide(payload.guide.id));
+      setViewMode("steps");
+      setStatus(`Generated step images from current build-guide export: ${runtimeInstances.length} placed part instance(s)`);
+    } catch (error) {
+      setStatus(formatError(error));
+    } finally {
+      setPhaseTwoRunning(false);
+    }
   }
 
   function changeFontSize(event: WheelEvent) {
@@ -155,6 +217,75 @@ export default function GameBuildGuideOverlayApp() {
     });
   }
 
+  function saveBuildReviewSnapshot() {
+    if (!payload || visualModels.length === 0) {
+      setStatus("Build review snapshot is not ready yet");
+      return;
+    }
+
+    const snapshots = payload.steps.flatMap((step, index) => {
+      const model = visualModels[index];
+      const stepCard = document.querySelector<HTMLElement>(
+        `[data-build-guide-step='${step.stepNumber}']`
+      );
+      if (!model || !stepCard) {
+        return [];
+      }
+      return [
+        {
+          stepNumber: step.stepNumber,
+          stepTitle: step.title || `Step ${step.stepNumber}`,
+          stepBody: step.body,
+          stepMarkup: stepCard.outerHTML,
+          captionLines: model.captionLines,
+          placementCues: model.callouts,
+          relatedParts: model.relatedParts
+        }
+      ];
+    });
+    if (snapshots.length === 0) {
+      setStatus("Build review snapshot could not find rendered step cards");
+      return;
+    }
+
+    try {
+      const html = createStepReviewSnapshotHtml({
+        guideTitle: payload.guide.title,
+        buildGoal: payload.guide.buildGoal,
+        steps: snapshots,
+        styleText: collectDocumentStyleText()
+      });
+      const fileName = `${slugifyFileName(payload.guide.title || "build-guide")}-build-review.html`;
+      downloadTextFile(fileName, html, "text/html");
+      setStatus(`Build review download started: ${fileName}`);
+    } catch (error) {
+      setStatus(formatError(error));
+    }
+  }
+
+  function startDragFromEmptyGuideSpace(event: MouseEvent<HTMLElement>) {
+    if (event.detail !== 1 || event.button !== 0) {
+      return;
+    }
+
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    if (target.closest(BUILD_GUIDE_NON_DRAG_SELECTOR)) {
+      return;
+    }
+
+    const dragSurface = target.closest(".build-guide-overlay-content, .build-guide-view-toolbar");
+    if (!dragSurface) {
+      return;
+    }
+
+    event.preventDefault();
+    void startOverlayDrag();
+  }
+
   return (
     <main
       className={`overlay-frame overlay-frame-chat-mode standalone-overlay-window build-guide-overlay-frame build-guide-font-${fontSize}`}
@@ -165,19 +296,40 @@ export default function GameBuildGuideOverlayApp() {
     >
       <WindowResizeHandles />
       <div className="build-guide-overlay-shell">
-        <div
-          className="overlay-window-titlebar build-guide-title-drag-box"
-          onMouseDown={startGuideDrag}
-          role="presentation"
+        <section
+          className="build-guide-overlay-content"
+          aria-label="Build guide"
+          onMouseDown={startDragFromEmptyGuideSpace}
         >
-          <h1>{payload?.guide.title ?? status}</h1>
-          {game && <span>{game.name}</span>}
-        </div>
-
-        <section className="build-guide-overlay-content" aria-label="Build guide">
           {payload && (
             <>
               <div className="build-guide-view-toolbar">
+                <button
+                  type="button"
+                  className="ghost-button build-guide-view-toggle"
+                  disabled={exportAllRunning || phaseTwoRunning}
+                  onClick={exportAllForBuildGuide}
+                >
+                  {exportAllRunning ? "Exporting..." : "Export All"}
+                </button>
+                <button
+                  type="button"
+                  className="ghost-button build-guide-view-toggle"
+                  disabled={phaseTwoRunning || exportAllRunning}
+                  onClick={generateStepsFromBuildGuideExport}
+                >
+                  {phaseTwoRunning ? "Generating..." : "Generate Steps/Images"}
+                </button>
+                {viewMode === "steps" && payload.steps.length > 0 && (
+                  <button
+                    type="button"
+                    className="ghost-button build-guide-view-toggle"
+                    onClick={saveBuildReviewSnapshot}
+                  >
+                    Save Build Review
+                  </button>
+                )}
+                {status !== "Ready" && <span className="build-guide-toolbar-status">{status}</span>}
                 {viewMode === "steps" && (
                   <div className="build-guide-zoom-controls" aria-label="Diagram zoom controls">
                     <button
@@ -211,7 +363,11 @@ export default function GameBuildGuideOverlayApp() {
               </div>
 
               {viewMode === "info" ? (
-                <BuildGuideInfoView payload={payload} status={status} />
+                <BuildGuideInfoView
+                  hasBuildGuideExport={hasBuildGuideExport}
+                  payload={payload}
+                  runtimeInstances={runtimeInstances}
+                />
               ) : (
                 <BuildGuideStepsView
                   diagramZoom={diagramZoom}
@@ -228,25 +384,19 @@ export default function GameBuildGuideOverlayApp() {
 }
 
 function BuildGuideInfoView({
+  hasBuildGuideExport,
   payload,
-  status
+  runtimeInstances
 }: {
+  hasBuildGuideExport: boolean;
   payload: GameBuildGuidePayload;
-  status: string;
+  runtimeInstances: GameRuntimePartInstance[];
 }) {
+  const manifestRows = createBuildGuideManifestRows(payload);
   return (
     <div className="build-guide-info-view">
-      <div className="build-guide-meta-row" aria-label="Build guide summary">
-        <span>{payload.parts.length} parts</span>
-        <span>{payload.steps.length} steps</span>
-        <span>{status}</span>
-      </div>
-
       <section className="build-guide-context-panel" aria-label="Guide context">
         <GuideTextSection title="Goal" value={payload.guide.buildGoal} />
-        <GuideTextSection title="Scale" value={payload.guide.scaleReference} />
-        <GuideTextSection title="Geometry" value={payload.guide.geometryNotes} />
-        <GuideTextSection title="Glossary" value={payload.guide.glossaryText} />
       </section>
 
       {payload.checklist.length > 0 && (
@@ -259,6 +409,58 @@ function BuildGuideInfoView({
           </ul>
         </section>
       )}
+
+      <section className="build-guide-section" aria-label="Build guide staging manifest">
+        <h2>Staging Manifest</h2>
+        <p>
+          Place these parts before phase 2 so Overlay Forge can export render references. Paint the
+          listed slot when the duplicated part is paintable; slot numbers restart for each part type.
+          Attach staged parts to temporary white jig blocks when needed, but keep jig blocks out of
+          the final build design.
+        </p>
+        <div className="build-guide-manifest-list">
+          {manifestRows.length > 0 ? (
+            <>
+              <div className="build-guide-manifest-row build-guide-manifest-header">
+                <span>Type</span>
+                <span>Name</span>
+                <span>Paint</span>
+                <span>Rotation</span>
+              </div>
+              {manifestRows.map((row) => (
+                <div className="build-guide-manifest-row" key={row.key}>
+                  <strong>{row.partName}</strong>
+                  <span>{row.instanceName}</span>
+                  <span>{row.paintSlotLabel}</span>
+                  <span>{row.rotationLabel}</span>
+                </div>
+              ))}
+            </>
+          ) : (
+            <p>No parsed part rows found.</p>
+          )}
+        </div>
+      </section>
+
+      {hasBuildGuideExport && runtimeInstances.length > 0 && (
+        <section className="build-guide-section" aria-label="Latest exported GearBlocks parts">
+          <h2>Latest Export</h2>
+          <div className="build-guide-runtime-list">
+            {runtimeInstances.slice(0, 80).map((part) => (
+              <div className="build-guide-runtime-row" key={part.partInstanceKey}>
+                <strong>{part.fullDisplayName || part.displayName || part.assetName}</strong>
+                <span>{part.partInstanceKey}</span>
+                <span>{formatRuntimePosition(part)}</span>
+              </div>
+            ))}
+          </div>
+          {runtimeInstances.length > 80 && (
+            <p>{runtimeInstances.length - 80} additional exported instance(s) omitted.</p>
+          )}
+        </section>
+      )}
+
+      <GuideTextSection title="Glossary" value={payload.guide.glossaryText} />
     </div>
   );
 }
@@ -289,7 +491,11 @@ function BuildGuideStepsView({
           return null;
         }
         return (
-          <article className="build-guide-step-card" key={step.id}>
+          <article
+            className="build-guide-step-card"
+            data-build-guide-step={step.stepNumber}
+            key={step.id}
+          >
             <section className="build-guide-visual-panel" aria-label={`Step ${step.stepNumber} diagram`}>
               <BuildStepDiagram
                 diagramZoom={diagramZoom}
@@ -312,6 +518,17 @@ function BuildGuideStepsView({
       })}
     </section>
   );
+}
+
+function formatRuntimePosition(part: GameRuntimePartInstance) {
+  if (part.worldX === null || part.worldY === null || part.worldZ === null) {
+    return "world position unavailable";
+  }
+  return `world ${formatCoordinate(part.worldX)}, ${formatCoordinate(part.worldY)}, ${formatCoordinate(part.worldZ)}`;
+}
+
+function formatCoordinate(value: number) {
+  return Number.isFinite(value) ? value.toFixed(2) : "0.00";
 }
 
 function BuildStepDiagram({
@@ -337,6 +554,7 @@ function BuildStepDiagram({
     [model.grid.xMax, 0, model.grid.zMax],
     [model.grid.xMin, 0, model.grid.zMax]
   ], projector);
+  const axes = createDiagramAxes(model.grid, projector);
 
   return (
     <div className="build-guide-diagram-frame">
@@ -391,6 +609,23 @@ function BuildStepDiagram({
               />
             </marker>
           ))}
+          {(["x", "y", "z"] as const).map((axis) => (
+            <marker
+              key={`build-guide-axis-arrow-${axis}`}
+              id={`build-guide-axis-arrow-${axis}`}
+              viewBox="0 0 10 10"
+              refX="8.2"
+              refY="5"
+              markerWidth="7"
+              markerHeight="7"
+              orient="auto"
+            >
+              <path
+                className={`build-guide-axis-arrow-head build-guide-axis-${axis}`}
+                d="M 1 1 L 9 5 L 1 9 z"
+              />
+            </marker>
+          ))}
           <linearGradient id="build-guide-ground-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="rgba(105, 142, 177, 0.26)" />
             <stop offset="100%" stopColor="rgba(34, 48, 64, 0.12)" />
@@ -416,6 +651,24 @@ function BuildStepDiagram({
               <line key={`x-${offset}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} />
             );
           })}
+        </g>
+        <g className="build-guide-axis-lines" aria-label="GearBlocks coordinate axes">
+          {axes.map((axis) => (
+            <g key={axis.id} className={`build-guide-axis-${axis.axis}`}>
+              <line
+                x1={axis.start.x}
+                y1={axis.start.y}
+                x2={axis.end.x}
+                y2={axis.end.y}
+                markerEnd={`url(#build-guide-axis-arrow-${axis.axis})`}
+              />
+              {axis.labels.map((label) => (
+                <text key={label.text} x={label.x} y={label.y} textAnchor={label.anchor}>
+                  {label.text}
+                </text>
+              ))}
+            </g>
+          ))}
         </g>
         <g>
           {sortedElements.map((element) => (
@@ -740,6 +993,246 @@ function points(values: Array<[number, number, number]>, projector: IsoProjector
     .join(" ");
 }
 
+type StepReviewSnapshotInput = {
+  guideTitle: string;
+  buildGoal: string;
+  steps: StepReviewSnapshotStep[];
+  styleText: string;
+};
+
+type StepReviewSnapshotStep = {
+  stepNumber: number;
+  stepTitle: string;
+  stepBody: string;
+  stepMarkup: string;
+  captionLines: string[];
+  placementCues: string[];
+  relatedParts: GameBuildGuidePart[];
+};
+
+function createStepReviewSnapshotHtml(input: StepReviewSnapshotInput) {
+  const createdAt = new Date().toLocaleString();
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(input.guideTitle)} - Build Review</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --text: #eef6fb;
+      --muted: #9dafbf;
+      --accent: #4fd0a5;
+      --line: rgba(185, 205, 222, 0.18);
+      --standalone-panel-strong-bg: rgba(28, 36, 47, 0.62);
+    }
+    body {
+      margin: 0;
+      padding: 18px;
+      background: #06090d;
+      color: var(--text);
+      font-family: Inter, "Segoe UI", Arial, sans-serif;
+    }
+    main {
+      display: grid;
+      gap: 14px;
+      max-width: 920px;
+      margin: 0 auto;
+    }
+    .snapshot-panel {
+      display: grid;
+      gap: 8px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.035);
+    }
+    .snapshot-panel h1,
+    .snapshot-panel h2,
+    .snapshot-panel p {
+      margin: 0;
+    }
+    .snapshot-panel h1 {
+      font-size: 20px;
+    }
+    .snapshot-panel h2 {
+      font-size: 14px;
+      text-transform: uppercase;
+    }
+    .snapshot-panel p,
+    .snapshot-panel li {
+      color: #d7e2ec;
+      line-height: 1.45;
+    }
+    .snapshot-panel ul {
+      display: grid;
+      gap: 5px;
+      margin: 0;
+      padding-left: 18px;
+    }
+    ${input.styleText}
+    body {
+      overflow: auto !important;
+    }
+    .build-guide-step-card {
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="snapshot-panel">
+      <h1>${escapeHtml(input.guideTitle)}</h1>
+      <p>${input.steps.length} step build review snapshot</p>
+      <p>Saved ${escapeHtml(createdAt)}</p>
+      ${input.buildGoal ? `<p>Goal: ${escapeHtml(input.buildGoal)}</p>` : ""}
+    </section>
+    ${input.steps.map(stepReviewSnapshotSectionHtml).join("\n")}
+  </main>
+</body>
+</html>`;
+}
+
+function stepReviewSnapshotSectionHtml(step: StepReviewSnapshotStep) {
+  return `
+    <section class="snapshot-panel">
+      <h2>Step ${step.stepNumber}: ${escapeHtml(step.stepTitle)}</h2>
+    </section>
+    ${step.stepMarkup}
+    <section class="snapshot-panel">
+      <h2>Step ${step.stepNumber} Caption Text</h2>
+      ${paragraphsHtml(step.captionLines)}
+    </section>
+    <section class="snapshot-panel">
+      <h2>Step ${step.stepNumber} Body</h2>
+      ${paragraphsHtml([step.stepBody || "No parsed step body."])}
+    </section>
+    <section class="snapshot-panel">
+      <h2>Step ${step.stepNumber} Placement Cues</h2>
+      ${listHtml(step.placementCues)}
+    </section>
+    <section class="snapshot-panel">
+      <h2>Step ${step.stepNumber} Related Parts</h2>
+      ${relatedPartsHtml(step.relatedParts)}
+    </section>`;
+}
+
+function collectDocumentStyleText() {
+  return Array.from(document.styleSheets)
+    .map((sheet) => {
+      try {
+        return Array.from(sheet.cssRules)
+          .map((rule) => rule.cssText)
+          .join("\n");
+      } catch {
+        return "";
+      }
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function paragraphsHtml(lines: string[]) {
+  const values = lines.map(cleanMarkdownLine).filter(Boolean);
+  if (values.length === 0) {
+    return "<p>No text.</p>";
+  }
+  return values.map((line) => `<p>${escapeHtml(line)}</p>`).join("\n");
+}
+
+function listHtml(items: string[]) {
+  const values = items.map(cleanMarkdownLine).filter(Boolean);
+  if (values.length === 0) {
+    return "<p>No placement cues.</p>";
+  }
+  return `<ul>${values.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
+}
+
+function relatedPartsHtml(parts: GameBuildGuidePart[]) {
+  if (parts.length === 0) {
+    return "<p>No related parts.</p>";
+  }
+  return `<ul>${parts
+    .map((part) => {
+      const quantity = part.quantity ? `${cleanBuildGuideDisplayText(part.quantity)} ` : "";
+      const purpose = part.purpose ? ` - ${cleanBuildGuideDisplayText(part.purpose)}` : "";
+      return `<li>${escapeHtml(cleanBuildGuideDisplayText(`${quantity}${part.partName}${purpose}`))}</li>`;
+    })
+    .join("")}</ul>`;
+}
+
+function downloadTextFile(fileName: string, text: string, mimeType: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: mimeType }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function slugifyFileName(value: string) {
+  const slug = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "build-guide";
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+type DiagramAxis = {
+  id: string;
+  axis: "x" | "y" | "z";
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+  labels: Array<{ text: string; x: number; y: number; anchor: "start" | "middle" | "end" }>;
+};
+
+function createDiagramAxes(
+  grid: BuildStepVisualModel["grid"],
+  projector: IsoProjector
+): DiagramAxis[] {
+  const originX = grid.xMin;
+  const originZ = grid.zMax;
+  const origin = projector.project(originX, 0, originZ);
+  const xPositive = projector.project(grid.xMax - 0.7, 0, originZ);
+  const zNegative = projector.project(originX, 0, grid.zMin + 0.7);
+  const yPositive = projector.project(originX, 2.6, originZ);
+
+  return [
+    {
+      id: "x-axis",
+      axis: "x",
+      start: origin,
+      end: xPositive,
+      labels: [{ text: "+X Right", x: xPositive.x + 8, y: xPositive.y + 3, anchor: "start" }]
+    },
+    {
+      id: "z-axis",
+      axis: "z",
+      start: origin,
+      end: zNegative,
+      labels: [{ text: "-Z Back", x: zNegative.x + 3, y: zNegative.y - 8, anchor: "middle" }]
+    },
+    {
+      id: "y-axis",
+      axis: "y",
+      start: origin,
+      end: yPositive,
+      labels: [{ text: "+Y Up", x: yPositive.x + 8, y: yPositive.y - 6, anchor: "start" }]
+    }
+  ];
+}
+
 function arrowMarkerUrl(prefix: string, role: BuildStepVisualElement["role"]) {
   return `url(#${prefix}-${role})`;
 }
@@ -832,11 +1325,11 @@ function MarkdownLines({ value }: { value: string }) {
 }
 
 function cleanMarkdownLine(value: string) {
-  return value
+  return cleanBuildGuideDisplayText(value
     .trim()
     .replace(/^[-*]\s+/, "")
     .replace(/^`{3,}\s*[A-Za-z0-9_-]*\s*$/, "")
-    .trim();
+    .trim());
 }
 
 function shouldDisplayMarkdownLine(value: string) {
@@ -893,7 +1386,14 @@ function loadStoredDiagramZoom() {
 }
 
 function clampDiagramZoom(value: number) {
-  return Math.min(MAX_DIAGRAM_ZOOM, Math.max(MIN_DIAGRAM_ZOOM, value));
+  return clampNumber(value, MIN_DIAGRAM_ZOOM, MAX_DIAGRAM_ZOOM);
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  if (min > max) {
+    return (min + max) / 2;
+  }
+  return Math.min(max, Math.max(min, value));
 }
 
 function storeBuildGuideSelection(selection: GameBuildGuideOverlaySelection) {

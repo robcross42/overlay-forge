@@ -1,8 +1,9 @@
 use crate::db::{
-    BridgeFileDraftRecord, CalendarEventRecord, CalendarEventUpdateDraft, GameBuildGuideDraft,
+    CalendarEventRecord, CalendarEventUpdateDraft, GameBuildGuideDraft,
     GameBuildGuidePartDraft, GameBuildGuidePartRecord, GameBuildGuideRecord,
     GameBuildGuideStepDraft, GameBuildGuideStepRecord, GameCatalogObjectDraft,
-    GameCatalogObjectRecord, GameCatalogReferenceDraft, GameChatConversationRecord,
+    GameCatalogObjectRecord, GameCatalogReferenceDraft, GameCharacterBuildDraft,
+    GameCharacterBuildRecord, GameCharacterBuildUpdateDraft, GameChatConversationRecord,
     GameChatMessageRecord, GameConstructionDraft, GameConstructionRecord, GameDataLocationRecord,
     GameRecord, GameRuntimeConstructionExportDraft, GameRuntimeConstructionExportRecord,
     GameRuntimePartAliasDraft, GameRuntimePartAliasRecord, GameRuntimePartApiAttributeObservation,
@@ -12,18 +13,23 @@ use crate::db::{
     GameRuntimePartMetadataValueDraft, GameRuntimePartOutputChannelValueDraft,
     GameRuntimePartPropertyObservation, GameRuntimePartRecord, GameRuntimePartSettingValueDraft,
     GameRuntimePartSource, GameRuntimePartValueObservation, GameScreenshotCaptureRequestDraft,
-    GameScreenshotCaptureRequestRecord, GameSettingRecord, GearBlocksApiCatalogRecord, NoteRecord,
-    PlanningConversationContextRecord, PlanningConversationRecord, PlanningMessageRecord,
-    PlanningPromptPreviewRecord, ProjectGitHubRepositoryRecord, ProjectMarkdownContextPayload,
-    ProjectMarkdownContextRecord, ProjectRecord, SchedulerRecord, SmokingCessationSettingsRecord,
-    SmokingEventRecord, TaskRecord, YouTubeReferenceRecord, YouTubeReferenceUpdateDraft,
+    GameScreenshotCaptureRequestRecord, GameSettingRecord, GearBlocksApiCatalogRecord,
+    GearBlocksPartRenderProfileDraft, GearBlocksPartRenderProfileRecord, NoteRecord,
+    RepairResellCategoryRecord,
+    RepairResellDealEstimateRecord, RepairResellKeywordFlagRecord, RepairResellListingRecord,
+    RepairResellSourceRecord, RepairResellTravelProfileRecord, SchedulerRecord,
+    SmokingCessationSettingsRecord, SmokingEventRecord, TaskRecord, YouTubeReferenceRecord,
+    YouTubeReferenceUpdateDraft,
 };
 use crate::gearblocks_api_scraper::{scrape_official_gearblocks_api, GearBlocksApiImportResult};
 use crate::gearblocks_scene_context::GearBlocksSceneContextService;
-use crate::github;
 use crate::hotkeys;
 use crate::lifecycle;
 use crate::openai;
+use crate::repair_resell::{
+    self, RepairResellDealEstimateInput, RepairResellManualImportInput,
+    RepairResellRefreshResult, RepairResellWatchlistInput,
+};
 use crate::windows::{self, StandaloneWindowConfig, WindowKind, WindowManager};
 use crate::{AppState, GameBuildGuideOverlaySelection, GameChatOverlaySelection};
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -51,10 +57,13 @@ const BUILD_GUIDE_SOURCE_HTML_MAX_BYTES: u64 = 4 * 1024 * 1024;
 const BUILD_GUIDE_SOURCE_TEXT_MAX_CHARS: usize = 60_000;
 const BUILD_GUIDE_SOURCE_IMAGE_MAX_COUNT: usize = 24;
 const BUILD_GUIDE_SOURCE_IMAGE_MAX_BYTES: u64 = 10 * 1024 * 1024;
+const GEARBLOCKS_PART_RENDER_PROFILE_VERSION: i64 = 1;
+const GEARBLOCKS_ROTATION_SNAP_ANGLES: [f64; 10] = [
+    0.0, 40.0, 45.0, 60.0, 72.0, 90.0, 120.0, 135.0, 150.0, 157.5,
+];
 
 #[derive(Serialize)]
-pub struct MilestoneStatus {
-    milestone: String,
+pub struct AppStatus {
     hotkey: String,
     #[serde(rename = "databaseReady")]
     database_ready: bool,
@@ -110,6 +119,24 @@ pub struct GamePartCategoryRecord {
     #[serde(rename = "iconPath")]
     pub icon_path: String,
     pub count: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GameCharacterBuildInput {
+    pub game_id: i64,
+    pub title: String,
+    pub character_class: String,
+    pub ascendancy: String,
+    pub build_role: String,
+    pub status: String,
+    pub source_label: String,
+    pub source_url: String,
+    pub patch: String,
+    pub summary: String,
+    pub tags: String,
+    pub notes: String,
+    pub is_active: bool,
 }
 
 #[derive(Serialize)]
@@ -244,6 +271,21 @@ pub struct GearBlocksMarkerCommandResult {
     pub command_directory: String,
     #[serde(rename = "statusDirectory")]
     pub status_directory: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GearBlocksPartRenderProfileInput {
+    pub game_id: i64,
+    pub capture_id: String,
+    pub profile_key: String,
+    pub part_name: String,
+    pub part_key: Option<String>,
+    pub canonical_rotation_x_degrees: Option<f64>,
+    pub canonical_rotation_y_degrees: Option<f64>,
+    pub canonical_rotation_z_degrees: Option<f64>,
+    pub is_validated: Option<bool>,
+    pub notes: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -389,9 +431,8 @@ pub fn save_scratchpad(content: String, state: State<'_, AppState>) -> Result<()
 }
 
 #[tauri::command]
-pub fn get_milestone_status(state: State<'_, AppState>) -> Result<MilestoneStatus, String> {
-    Ok(MilestoneStatus {
-        milestone: "Milestone 13".to_string(),
+pub fn get_app_status(state: State<'_, AppState>) -> Result<AppStatus, String> {
+    Ok(AppStatus {
         hotkey: "Ctrl+Shift+Space / Ctrl+Shift+C".to_string(),
         database_ready: state.database.is_ready(),
     })
@@ -1924,10 +1965,31 @@ fn build_guide_part_quantity_count(quantity: &str) -> usize {
 
 fn build_guide_step_connection_type(title: &str, body: &str) -> &'static str {
     let text = format!("{title} {body}").to_ascii_lowercase();
-    if has_any_text(&text, &["crank", "axle", "shaft", "gear", "wheel", "hub", "drivetrain"]) {
+    if has_any_text(
+        &text,
+        &[
+            "crank",
+            "axle",
+            "shaft",
+            "gear",
+            "wheel",
+            "hub",
+            "drivetrain",
+        ],
+    ) {
         return "rotary connections";
     }
-    if has_any_text(&text, &["steering", "suspension", "spring", "damper", "knuckle", "pivot"]) {
+    if has_any_text(
+        &text,
+        &[
+            "steering",
+            "suspension",
+            "spring",
+            "damper",
+            "knuckle",
+            "pivot",
+        ],
+    ) {
         return "pivot/rotary connections";
     }
     if has_any_text(&text, &["align", "jig", "reference"]) {
@@ -1948,6 +2010,41 @@ fn split_numbered_heading(heading: &str) -> (Option<i64>, String) {
     let number = number_text.trim().parse::<i64>().ok();
     let title = title.trim().to_string();
     (number, title)
+}
+
+#[cfg(test)]
+mod build_guide_parser_tests {
+    use super::*;
+
+    #[test]
+    fn imports_all_parsed_build_guide_steps() {
+        let markdown = r#"
+# Engine Guide
+
+## Assembly Instructions
+
+### 1. First
+Place Beam x3.
+
+### 2. Second
+Attach crank.
+
+### 3. Third
+Attach cylinder.
+
+### 4. Fourth
+Attach head.
+
+### 5. Fifth
+Attach starter.
+"#;
+
+        let parsed = parse_game_build_guide_markdown(markdown);
+
+        assert_eq!(parsed.steps.len(), 5);
+        assert_eq!(parsed.steps[0].title, "First");
+        assert_eq!(parsed.steps[4].title, "Fifth");
+    }
 }
 
 #[tauri::command]
@@ -2222,6 +2319,111 @@ pub fn export_smoking_cessation_chatgpt_context(
     })
 }
 
+#[tauri::command]
+pub fn list_repair_resell_sources(
+    state: State<'_, AppState>,
+) -> Result<Vec<RepairResellSourceRecord>, String> {
+    state
+        .database
+        .list_repair_resell_sources()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn update_repair_resell_source_enabled(
+    source_id: String,
+    enabled: bool,
+    state: State<'_, AppState>,
+) -> Result<RepairResellSourceRecord, String> {
+    state
+        .database
+        .update_repair_resell_source_enabled(&source_id, enabled)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn list_repair_resell_categories(
+    state: State<'_, AppState>,
+) -> Result<Vec<RepairResellCategoryRecord>, String> {
+    state
+        .database
+        .list_repair_resell_categories()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn list_repair_resell_keyword_flags(
+    state: State<'_, AppState>,
+) -> Result<Vec<RepairResellKeywordFlagRecord>, String> {
+    state
+        .database
+        .list_repair_resell_keyword_flags()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn list_repair_resell_travel_profiles(
+    state: State<'_, AppState>,
+) -> Result<Vec<RepairResellTravelProfileRecord>, String> {
+    state
+        .database
+        .list_repair_resell_travel_profiles()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn list_repair_resell_listings(
+    state: State<'_, AppState>,
+) -> Result<Vec<RepairResellListingRecord>, String> {
+    state
+        .database
+        .list_repair_resell_listings()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn manual_import_repair_resell_listing(
+    input: RepairResellManualImportInput,
+    state: State<'_, AppState>,
+) -> Result<RepairResellListingRecord, String> {
+    repair_resell::manual_import_listing(&state.database, input)
+}
+
+#[tauri::command]
+pub fn refresh_repair_resell_source(
+    source_id: String,
+    state: State<'_, AppState>,
+) -> Result<RepairResellRefreshResult, String> {
+    repair_resell::refresh_source(&state.database, source_id)
+}
+
+#[tauri::command]
+pub fn set_repair_resell_listing_watchlist(
+    input: RepairResellWatchlistInput,
+    state: State<'_, AppState>,
+) -> Result<RepairResellListingRecord, String> {
+    repair_resell::set_watchlist(&state.database, input)
+}
+
+#[tauri::command]
+pub fn list_repair_resell_deal_estimates(
+    listing_id: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<RepairResellDealEstimateRecord>, String> {
+    state
+        .database
+        .list_repair_resell_deal_estimates(&listing_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn save_repair_resell_deal_estimate(
+    input: RepairResellDealEstimateInput,
+    state: State<'_, AppState>,
+) -> Result<RepairResellDealEstimateRecord, String> {
+    repair_resell::save_deal_estimate(&state.database, input)
+}
+
 pub fn update_smoking_cessation_chatgpt_export(
     app: &AppHandle,
     state: &AppState,
@@ -2350,354 +2552,6 @@ fn markdown_table_cell(value: &str) -> String {
 }
 
 #[tauri::command]
-pub fn list_projects(state: State<'_, AppState>) -> Result<Vec<ProjectRecord>, String> {
-    state
-        .database
-        .list_projects()
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn create_project(
-    name: String,
-    description: String,
-    status: String,
-    state: State<'_, AppState>,
-) -> Result<ProjectRecord, String> {
-    validate_project(&name, &status)?;
-    state
-        .database
-        .create_project(&name, &description, &status)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn update_project(
-    id: i64,
-    name: String,
-    description: String,
-    status: String,
-    state: State<'_, AppState>,
-) -> Result<ProjectRecord, String> {
-    validate_project(&name, &status)?;
-    state
-        .database
-        .update_project(id, &name, &description, &status)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn delete_project(id: i64, state: State<'_, AppState>) -> Result<(), String> {
-    state
-        .database
-        .delete_project(id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn get_project_github_repository(
-    project_id: i64,
-    state: State<'_, AppState>,
-) -> Result<Option<ProjectGitHubRepositoryRecord>, String> {
-    state
-        .database
-        .get_project_github_repository(project_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn save_project_github_repository(
-    project_id: i64,
-    repository_full_name: String,
-    state: State<'_, AppState>,
-) -> Result<ProjectGitHubRepositoryRecord, String> {
-    let normalized = github::normalize_repository_full_name(&repository_full_name)?;
-    state
-        .database
-        .save_project_github_repository(project_id, &normalized)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn delete_project_github_repository(
-    project_id: i64,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    state
-        .database
-        .delete_project_github_repository(project_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub async fn fetch_project_github_metadata(
-    project_id: i64,
-    state: State<'_, AppState>,
-) -> Result<ProjectGitHubRepositoryRecord, String> {
-    let link = state
-        .database
-        .get_project_github_repository(project_id)
-        .map_err(|error| error.to_string())?
-        .ok_or_else(|| "Link a GitHub repository before fetching metadata.".to_string())?;
-
-    match github::fetch_repository_metadata(&link.repository_full_name).await {
-        Ok(metadata) => state
-            .database
-            .update_project_github_metadata(
-                project_id,
-                &metadata.repository_full_name,
-                &metadata.repository_url,
-                &metadata.default_branch,
-                &metadata.visibility,
-                "Fetched GitHub repository metadata successfully",
-            )
-            .map_err(|error| error.to_string()),
-        Err(error) => {
-            let _ = state
-                .database
-                .update_project_github_fetch_status(project_id, &error);
-            Err(error)
-        }
-    }
-}
-
-#[tauri::command]
-pub fn get_project_markdown_context(
-    project_id: i64,
-    state: State<'_, AppState>,
-) -> Result<Option<ProjectMarkdownContextRecord>, String> {
-    state
-        .database
-        .get_project_markdown_context(project_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn save_project_markdown_context(
-    project_id: i64,
-    root_path: String,
-    readme_path: String,
-    state: State<'_, AppState>,
-) -> Result<ProjectMarkdownContextRecord, String> {
-    require_text(&root_path, "Markdown context root")?;
-    state
-        .database
-        .save_project_markdown_context(project_id, &root_path, &readme_path)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn delete_project_markdown_context(
-    project_id: i64,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    state
-        .database
-        .delete_project_markdown_context(project_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn load_project_markdown_context(
-    project_id: i64,
-    state: State<'_, AppState>,
-) -> Result<ProjectMarkdownContextPayload, String> {
-    state
-        .database
-        .load_project_markdown_context(project_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn list_planning_conversations(
-    project_id: Option<i64>,
-    state: State<'_, AppState>,
-) -> Result<Vec<PlanningConversationRecord>, String> {
-    state
-        .database
-        .list_planning_conversations(project_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn create_planning_conversation(
-    project_id: i64,
-    title: Option<String>,
-    state: State<'_, AppState>,
-) -> Result<PlanningConversationRecord, String> {
-    state
-        .database
-        .create_planning_conversation(project_id, title.as_deref().unwrap_or_default())
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn list_planning_messages(
-    conversation_id: i64,
-    state: State<'_, AppState>,
-) -> Result<Vec<PlanningMessageRecord>, String> {
-    state
-        .database
-        .list_planning_messages(conversation_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub async fn send_planning_message(
-    conversation_id: i64,
-    content: String,
-    state: State<'_, AppState>,
-) -> Result<Vec<PlanningMessageRecord>, String> {
-    require_text(&content, "Message")?;
-    let conversation = state
-        .database
-        .get_planning_conversation(conversation_id)
-        .map_err(|error| error.to_string())?;
-    let project = state
-        .database
-        .get_project(conversation.project_id)
-        .map_err(|error| error.to_string())?;
-
-    state
-        .database
-        .create_planning_message(conversation_id, "user", &content)
-        .map_err(|error| error.to_string())?;
-
-    let recent_messages = state
-        .database
-        .recent_planning_messages(conversation_id, 20)
-        .map_err(|error| error.to_string())?;
-    let context_payload = state
-        .database
-        .planning_conversation_context_payload(conversation_id)
-        .map_err(|error| error.to_string())?;
-    let api_key = configured_openai_api_key(&state)?;
-    let assistant_content = openai::create_planning_response(
-        &api_key,
-        &project,
-        &recent_messages,
-        &context_payload.content,
-    )
-    .await?;
-
-    state
-        .database
-        .create_planning_message(conversation_id, "assistant", &assistant_content)
-        .map_err(|error| error.to_string())?;
-
-    state
-        .database
-        .list_planning_messages(conversation_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn delete_planning_conversation(
-    conversation_id: i64,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    state
-        .database
-        .delete_planning_conversation(conversation_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn list_planning_conversation_context(
-    conversation_id: i64,
-    state: State<'_, AppState>,
-) -> Result<Vec<PlanningConversationContextRecord>, String> {
-    state
-        .database
-        .list_planning_conversation_context(conversation_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn attach_planning_conversation_context(
-    conversation_id: i64,
-    context_type: String,
-    source_id: Option<i64>,
-    label: String,
-    state: State<'_, AppState>,
-) -> Result<PlanningConversationContextRecord, String> {
-    validate_context_type(&context_type)?;
-    require_text(&label, "Context label")?;
-    state
-        .database
-        .attach_planning_conversation_context(conversation_id, &context_type, source_id, &label)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn remove_planning_conversation_context(
-    id: i64,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    state
-        .database
-        .remove_planning_conversation_context(id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn preview_planning_chat_prompt(
-    conversation_id: i64,
-    draft_message: String,
-    state: State<'_, AppState>,
-) -> Result<PlanningPromptPreviewRecord, String> {
-    state
-        .database
-        .preview_planning_chat_prompt(
-            conversation_id,
-            &draft_message,
-            openai::PLANNING_SYSTEM_INSTRUCTION,
-        )
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn list_bridge_file_drafts(
-    project_id: i64,
-    state: State<'_, AppState>,
-) -> Result<Vec<BridgeFileDraftRecord>, String> {
-    state
-        .database
-        .list_bridge_file_drafts(project_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn get_bridge_file_draft(
-    id: i64,
-    state: State<'_, AppState>,
-) -> Result<BridgeFileDraftRecord, String> {
-    state
-        .database
-        .get_bridge_file_draft(id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn create_bridge_file_draft_from_conversation(
-    conversation_id: i64,
-    state: State<'_, AppState>,
-) -> Result<BridgeFileDraftRecord, String> {
-    state
-        .database
-        .create_bridge_file_draft_from_conversation(conversation_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn delete_bridge_file_draft(id: i64, state: State<'_, AppState>) -> Result<(), String> {
-    state
-        .database
-        .delete_bridge_file_draft(id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
 pub fn list_youtube_references(
     state: State<'_, AppState>,
 ) -> Result<Vec<YouTubeReferenceRecord>, String> {
@@ -2796,6 +2650,89 @@ pub fn get_game_setting(
     state
         .database
         .get_game_setting(game_id, &setting_key)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn list_game_character_builds(
+    game_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<GameCharacterBuildRecord>, String> {
+    state
+        .database
+        .list_game_character_builds(game_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn create_game_character_build(
+    input: GameCharacterBuildInput,
+    state: State<'_, AppState>,
+) -> Result<GameCharacterBuildRecord, String> {
+    require_text(&input.title, "Build title")?;
+    state
+        .database
+        .create_game_character_build(GameCharacterBuildDraft {
+            game_id: input.game_id,
+            title: &input.title,
+            character_class: &input.character_class,
+            ascendancy: &input.ascendancy,
+            build_role: &input.build_role,
+            status: &input.status,
+            source_label: &input.source_label,
+            source_url: &input.source_url,
+            patch: &input.patch,
+            summary: &input.summary,
+            tags: &input.tags,
+            notes: &input.notes,
+            is_active: input.is_active,
+        })
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn update_game_character_build(
+    id: i64,
+    input: GameCharacterBuildInput,
+    state: State<'_, AppState>,
+) -> Result<GameCharacterBuildRecord, String> {
+    require_text(&input.title, "Build title")?;
+    state
+        .database
+        .update_game_character_build(GameCharacterBuildUpdateDraft {
+            id,
+            title: &input.title,
+            character_class: &input.character_class,
+            ascendancy: &input.ascendancy,
+            build_role: &input.build_role,
+            status: &input.status,
+            source_label: &input.source_label,
+            source_url: &input.source_url,
+            patch: &input.patch,
+            summary: &input.summary,
+            tags: &input.tags,
+            notes: &input.notes,
+            is_active: input.is_active,
+        })
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn set_active_game_character_build(
+    id: i64,
+    state: State<'_, AppState>,
+) -> Result<GameCharacterBuildRecord, String> {
+    state
+        .database
+        .set_active_game_character_build(id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn delete_game_character_build(id: i64, state: State<'_, AppState>) -> Result<(), String> {
+    state
+        .database
+        .delete_game_character_build(id)
         .map_err(|error| error.to_string())
 }
 
@@ -3013,6 +2950,22 @@ pub fn import_gearblocks_runtime_context(
 }
 
 #[tauri::command]
+pub fn list_game_runtime_part_instances(
+    game_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<GameRuntimePartInstanceRecord>, String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    require_gearblocks_game(&game)?;
+    state
+        .database
+        .list_game_runtime_part_instances(game_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 pub fn send_gearblocks_marker_commands(
     game_id: i64,
     markers: Vec<GearBlocksMarkerInput>,
@@ -3116,6 +3069,190 @@ pub fn clear_gearblocks_markers(
         command_directory: command_directory.to_string_lossy().to_string(),
         status_directory: status_directory.to_string_lossy().to_string(),
     })
+}
+
+#[tauri::command]
+pub fn list_gearblocks_rotation_snap_angles() -> Vec<f64> {
+    GEARBLOCKS_ROTATION_SNAP_ANGLES.to_vec()
+}
+
+#[tauri::command]
+pub fn list_gearblocks_part_render_profiles(
+    game_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<GearBlocksPartRenderProfileRecord>, String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    require_gearblocks_game(&game)?;
+    state
+        .database
+        .list_gearblocks_part_render_profiles(game_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn save_gearblocks_part_render_profile_from_capture(
+    input: GearBlocksPartRenderProfileInput,
+    state: State<'_, AppState>,
+) -> Result<GearBlocksPartRenderProfileRecord, String> {
+    let game = state
+        .database
+        .get_game(input.game_id)
+        .map_err(|error| error.to_string())?;
+    require_gearblocks_game(&game)?;
+
+    let capture_id = sanitize_command_id(&input.capture_id);
+    if capture_id.trim().is_empty() {
+        return Err("Capture id is required.".to_string());
+    }
+
+    let status_path = gearblocks_plugin_status_directory()?.join(format!("{capture_id}.json"));
+    let status_text = fs::read_to_string(&status_path).map_err(|error| {
+        format!(
+            "Could not read GearBlocks part-preview status '{}': {error}",
+            status_path.display()
+        )
+    })?;
+    let status_json: serde_json::Value = serde_json::from_str(&status_text)
+        .map_err(|error| format!("Could not parse part-preview status JSON: {error}"))?;
+    if !status_json
+        .get("ok")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false)
+    {
+        return Err("Cannot save a render profile from a failed preview capture.".to_string());
+    }
+
+    let status_id = status_json
+        .get("id")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or(&capture_id);
+    let part_name = if input.part_name.trim().is_empty() {
+        status_json
+            .get("label")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("GearBlocks part")
+            .to_string()
+    } else {
+        input.part_name.trim().to_string()
+    };
+    let canonical_rotation = json!({
+        "xDegrees": input.canonical_rotation_x_degrees.unwrap_or_else(|| status_number_path(&status_json, &["partRotation", "xDegrees"]).unwrap_or(0.0)),
+        "yDegrees": input.canonical_rotation_y_degrees.unwrap_or_else(|| status_number_path(&status_json, &["partRotation", "yDegrees"]).unwrap_or(0.0)),
+        "zDegrees": input.canonical_rotation_z_degrees.unwrap_or_else(|| status_number_path(&status_json, &["partRotation", "zDegrees"]).unwrap_or(0.0)),
+    });
+    let camera_preset = json!({
+        "yawDegrees": status_number_path(&status_json, &["cameraYawDegrees"]).unwrap_or(35.0),
+        "pitchDegrees": status_number_path(&status_json, &["cameraPitchDegrees"]).unwrap_or(28.0),
+        "width": status_number_path(&status_json, &["width"]).unwrap_or(1024.0),
+        "height": status_number_path(&status_json, &["height"]).unwrap_or(576.0),
+    });
+    let edge_settings = json!({
+        "edgeLineCount": status_number_path(&status_json, &["edgeLineCount"]).unwrap_or(0.0),
+        "edgeSkippedMeshCount": status_number_path(&status_json, &["edgeSkippedMeshCount"]).unwrap_or(0.0),
+    });
+    let renderer_names = status_json
+        .get("rendererNames")
+        .cloned()
+        .unwrap_or_else(|| serde_json::Value::Array(Vec::new()));
+    let bounds_center = status_json
+        .get("boundsCenter")
+        .cloned()
+        .unwrap_or_else(|| json!({}));
+    let bounds_size = status_json
+        .get("boundsSize")
+        .cloned()
+        .unwrap_or_else(|| json!({}));
+    let renderer_names_json = serde_json::to_string(&renderer_names)
+        .map_err(|error| format!("Could not serialize renderer names JSON: {error}"))?;
+    let canonical_rotation_json = serde_json::to_string(&canonical_rotation)
+        .map_err(|error| format!("Could not serialize canonical rotation JSON: {error}"))?;
+    let camera_preset_json = serde_json::to_string(&camera_preset)
+        .map_err(|error| format!("Could not serialize camera preset JSON: {error}"))?;
+    let bounds_center_json = serde_json::to_string(&bounds_center)
+        .map_err(|error| format!("Could not serialize bounds center JSON: {error}"))?;
+    let bounds_size_json = serde_json::to_string(&bounds_size)
+        .map_err(|error| format!("Could not serialize bounds size JSON: {error}"))?;
+    let edge_settings_json = serde_json::to_string(&edge_settings)
+        .map_err(|error| format!("Could not serialize edge settings JSON: {error}"))?;
+    let latest_status_json = serde_json::to_string_pretty(&status_json)
+        .map_err(|error| format!("Could not serialize latest status JSON: {error}"))?;
+
+    state
+        .database
+        .upsert_gearblocks_part_render_profile(GearBlocksPartRenderProfileDraft {
+            game_id: input.game_id,
+            profile_key: &input.profile_key,
+            part_key: input.part_key.as_deref().unwrap_or(""),
+            part_name: &part_name,
+            source_object_name: status_json
+                .get("sourceObjectName")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or(""),
+            renderer_names_json: &renderer_names_json,
+            canonical_rotation_json: &canonical_rotation_json,
+            camera_preset_json: &camera_preset_json,
+            bounds_center_json: &bounds_center_json,
+            bounds_size_json: &bounds_size_json,
+            edge_settings_json: &edge_settings_json,
+            latest_render_path: status_json
+                .get("renderPath")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or(""),
+            latest_capture_id: status_id,
+            latest_status_json: &latest_status_json,
+            render_version: GEARBLOCKS_PART_RENDER_PROFILE_VERSION,
+            is_validated: input.is_validated.unwrap_or(true),
+            notes: input.notes.as_deref().unwrap_or(""),
+        })
+        .map_err(|error| error.to_string())
+}
+
+pub fn create_gearblocks_test_part_preview_command() -> Result<PathBuf, String> {
+    let command_directory = gearblocks_plugin_command_directory()?;
+    let status_directory = gearblocks_plugin_status_directory()?;
+    let render_directory = gearblocks_plugin_render_directory()?;
+    let processed_directory = gearblocks_plugin_processed_directory()?;
+
+    fs::create_dir_all(&command_directory).map_err(|error| {
+        format!("Could not create GearBlocks preview command directory: {error}")
+    })?;
+    fs::create_dir_all(&status_directory).map_err(|error| {
+        format!("Could not create GearBlocks preview status directory: {error}")
+    })?;
+    fs::create_dir_all(&render_directory).map_err(|error| {
+        format!("Could not create GearBlocks preview render directory: {error}")
+    })?;
+
+    let id = next_test_part_preview_id(&[
+        command_directory.as_path(),
+        status_directory.as_path(),
+        render_directory.as_path(),
+        processed_directory.as_path(),
+    ]);
+    let command = json!({
+        "action": "capture_center_part_preview",
+        "id": id,
+        "label": "Test Part",
+        "width": 1024,
+        "height": 576,
+        "yawDegrees": 35,
+        "pitchDegrees": 28,
+        "partRotationXDegrees": 0,
+        "partRotationYDegrees": 0,
+        "partRotationZDegrees": 0,
+    });
+    let command_path = command_directory.join(format!("{id}.json"));
+    fs::write(
+        &command_path,
+        serde_json::to_string_pretty(&command)
+            .map_err(|error| format!("Could not serialize part preview command: {error}"))?,
+    )
+    .map_err(|error| format!("Could not write part preview command file: {error}"))?;
+
+    Ok(command_path)
 }
 
 fn sync_gearblocks_saved_constructions_for_game(
@@ -4438,6 +4575,8 @@ fn gearblocks_units_prompt_context() -> String {
         "Use GearBlocks metric scale for build advice: 1 GearBlocks unit = 10 cm in real life. A 0.5 unit plate is 5 cm thick, and 16 units is 160 cm.",
         "Use the user-tested player character height as 20 GearBlocks units / 20 blocks / 200 cm. Use this for cabins, roll cages, cockpit clearance, doors, standing clearance, ladders, steps, and other human-scale build features.",
         "When suggesting part movement, spacing, dimensions, or alignment, answer in centimeters and/or GearBlocks units such as 1 unit, 0.5 units, 16 units. Do not give imperial-distance suggestions such as inches or feet unless the user explicitly asks for imperial conversion.",
+        "GearBlocks coordinate axes: X controls width with Left (-X) and Right (+X); Y controls height with Down (-Y) and Up (+Y); Z controls depth with Backward (-Z) and Forward (+Z) in the game's building manipulators.",
+        "Standard vehicle orientation: for cars and car-like vehicles, always use the Z-axis for vehicle length. The front of the car points toward +Z, the rear points toward -Z, vehicle width runs on -X/+X, and vehicle height runs on -Y/+Y.",
         "Scale caveat: the developer noted that the player character, wheels, and other parts are slightly oversized to allow room for gears and other parts inside vehicles. Treat those parts as gameplay-clearance exceptions rather than strict real-world scale references.",
     ]
     .join("\n")
@@ -4481,23 +4620,6 @@ fn gearblocks_current_build_guide_prompt_context(
     ];
     if !guide.build_goal.trim().is_empty() {
         sections.push(format!("## Build Goal\n{}", guide.build_goal.trim()));
-    }
-    if !guide.scale_reference.trim().is_empty() {
-        sections.push(format!(
-            "## Scale Reference\n{}",
-            guide.scale_reference.trim()
-        ));
-    }
-    if !guide.geometry_notes.trim().is_empty() {
-        sections.push(format!(
-            "## Geometry Notes\n{}",
-            guide.geometry_notes.trim()
-        ));
-    }
-    if !guide.glossary_text.trim().is_empty() {
-        sections.push(format!("## Glossary\n{}", guide.glossary_text.trim()));
-    } else {
-        sections.push("## Glossary\nNo glossary was parsed for this guide. When using real-life terms, define them in terms of exact GearBlocks parts or relative subassemblies before relying on them.".to_string());
     }
 
     if !parts.is_empty() {
@@ -4563,6 +4685,12 @@ fn gearblocks_current_build_guide_prompt_context(
                 .collect::<Vec<_>>()
                 .join("\n")
         ));
+    }
+
+    if !guide.glossary_text.trim().is_empty() {
+        sections.push(format!("## Glossary\n{}", guide.glossary_text.trim()));
+    } else {
+        sections.push("## Glossary\nNo glossary was parsed for this guide. When using real-life terms, define them in terms of exact GearBlocks parts or relative subassemblies before relying on them.".to_string());
     }
 
     Ok(Some(sections.join("\n\n")))
@@ -4935,22 +5063,6 @@ fn validate_calendar_event(
     Ok(())
 }
 
-fn validate_project(name: &str, status: &str) -> Result<(), String> {
-    require_text(name, "Project name")?;
-    match status.trim() {
-        "ACTIVE" | "ARCHIVED" => Ok(()),
-        _ => Err("Project status must be ACTIVE or ARCHIVED".to_string()),
-    }
-}
-
-fn validate_context_type(context_type: &str) -> Result<(), String> {
-    match context_type.trim() {
-        "project" | "github_repository" | "note" | "task" | "calendar_event"
-        | "youtube_reference" | "scratchpad" => Ok(()),
-        _ => Err("Unsupported context type".to_string()),
-    }
-}
-
 fn extract_youtube_video_id(url: &str) -> Result<String, String> {
     let trimmed = url.trim();
     if trimmed.is_empty() {
@@ -5127,6 +5239,63 @@ fn gearblocks_plugin_command_directory() -> Result<PathBuf, String> {
 
 fn gearblocks_plugin_status_directory() -> Result<PathBuf, String> {
     Ok(gearblocks_plugin_root()?.join("status"))
+}
+
+fn gearblocks_plugin_render_directory() -> Result<PathBuf, String> {
+    Ok(gearblocks_plugin_root()?.join("renders"))
+}
+
+fn gearblocks_plugin_processed_directory() -> Result<PathBuf, String> {
+    Ok(gearblocks_plugin_root()?.join("processed"))
+}
+
+fn sanitize_command_id(value: &str) -> String {
+    value
+        .trim()
+        .chars()
+        .filter(|character| {
+            character.is_ascii_alphanumeric()
+                || *character == '-'
+                || *character == '_'
+                || *character == '.'
+        })
+        .collect()
+}
+
+fn status_number_path(value: &serde_json::Value, path: &[&str]) -> Option<f64> {
+    let mut current = value;
+    for segment in path {
+        current = current.get(*segment)?;
+    }
+    current
+        .as_f64()
+        .or_else(|| current.as_i64().map(|number| number as f64))
+        .or_else(|| current.as_u64().map(|number| number as f64))
+}
+
+fn next_test_part_preview_id(directories: &[&Path]) -> String {
+    let next_number = directories
+        .iter()
+        .filter_map(|directory| fs::read_dir(directory).ok())
+        .flat_map(|entries| entries.filter_map(Result::ok))
+        .filter_map(|entry| {
+            entry
+                .path()
+                .file_stem()
+                .and_then(|stem| stem.to_str())
+                .and_then(test_part_preview_number)
+        })
+        .max()
+        .unwrap_or(0)
+        + 1;
+    format!("test-part-preview-{next_number}")
+}
+
+fn test_part_preview_number(value: &str) -> Option<u64> {
+    value
+        .strip_prefix("test-part-preview-")
+        .and_then(|suffix| suffix.split('.').next())
+        .and_then(|suffix| suffix.parse::<u64>().ok())
 }
 
 fn gearblocks_game_install_root(state: &AppState, game_id: i64) -> Option<PathBuf> {
@@ -7379,7 +7548,7 @@ fn gearblocks_marker_coordinate_reference_section(parts: &[GearBlocksRuntimePart
             .to_string()
     } else {
         format!(
-            "## Runtime Coordinate Reference\nCoordinates are GearBlocks units; 1 unit equals 10 cm. Use coordinates for spatial reasoning, measurements, and part identification. Do not request or emit Overlay Forge marker blocks; in-game visual markers are disabled for now.\n{}",
+            "## Runtime Coordinate Reference\nCoordinates are GearBlocks units; 1 unit equals 10 cm. X controls width with Left (-X) and Right (+X); Y controls height with Down (-Y) and Up (+Y); Z controls depth with Backward (-Z) and Forward (+Z) in the game's building manipulators. For cars and car-like vehicles, always use Z for length with the front toward +Z and rear toward -Z. Use coordinates for spatial reasoning, measurements, and part identification. Do not request or emit Overlay Forge marker blocks; in-game visual markers are disabled for now.\n{}",
             lines.join("\n")
         )
     }

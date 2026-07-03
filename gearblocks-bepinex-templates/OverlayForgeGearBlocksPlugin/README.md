@@ -2,7 +2,7 @@
 
 Source-only template for Overlay Forge's direct GearBlocks BepInEx plugin.
 
-This plugin does not depend on GearLib. It is intended for Overlay Forge-owned in-game integration features where Lua is too limited, starting with temporary visual markers that can be placed from command files.
+This plugin does not depend on GearLib. It is intended for Overlay Forge-owned in-game integration features where Lua is too limited, including Unity-rendered part previews and temporary visual markers that can be placed from command files.
 
 ## Local Development
 
@@ -19,7 +19,7 @@ Rename-Item gearblocks-bepinex-workspace\OverlayForgeGearBlocksPlugin\OverlayFor
 Rename-Item gearblocks-bepinex-workspace\OverlayForgeGearBlocksPlugin\Plugin.cs.template Plugin.cs
 ```
 
-Copy local reference DLLs from the GearBlocks BepInEx `interop` folder into the workspace `libs` folder. Do not commit those DLLs.
+Copy local reference DLLs from the GearBlocks BepInEx `interop` folder into the workspace `libs` folder. Do not commit those DLLs. The preview renderer needs `UnityEngine.ImageConversionModule.dll` so it can write PNG captures.
 
 Then build:
 
@@ -40,6 +40,38 @@ At runtime the plugin watches:
 ```text
 <GearBlocks persistent data>\OverlayForgePlugin\commands\*.json
 ```
+
+Rendered preview PNGs are written to:
+
+```text
+<GearBlocks persistent data>\OverlayForgePlugin\renders\*.png
+```
+
+Status JSON is written to:
+
+```text
+<GearBlocks persistent data>\OverlayForgePlugin\status\*.json
+```
+
+### Part Preview Capture
+
+`capture_center_part_preview` raycasts from the center of the active camera, clones the hit object's renderers into an isolated Unity preview layer, renders only the part/object on a neutral background with an offscreen orthographic camera, and writes a PNG. Grid planes and axis markers are intentionally excluded from individual part images; build-step composition owns grid and axis display.
+
+```json
+{
+  "action": "capture_center_part_preview",
+  "id": "beam-x3-preview",
+  "label": "Beam x3",
+  "width": 1024,
+  "height": 576,
+  "yawDegrees": 35,
+  "pitchDegrees": 28
+}
+```
+
+The matching status file includes the `renderPath`, source object name, renderer count, output size, and source bounds. This command is meant for iterating on real in-game part representation before promoting a part-rendering contract into Overlay Forge.
+
+### Marker Commands
 
 Supported marker commands include camera-center and world-coordinate markers:
 

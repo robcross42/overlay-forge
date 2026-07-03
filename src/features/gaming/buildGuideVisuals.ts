@@ -1,4 +1,5 @@
 import type { GameBuildGuidePart, GameBuildGuideStep } from "../../services/gaming";
+import { cleanBuildGuideDisplayText } from "./buildGuideText";
 
 export type BuildStepVisualKind =
   | "crankshaft"
@@ -149,7 +150,8 @@ export function createBuildStepVisualModel(
   const template = templateForKind(kind, newInstances, existingInstances);
   const elements = template.map((item, index) => ({
     id: `visual-${index}`,
-    ...item
+    ...item,
+    label: `${index + 1}. ${item.label}`
   }));
   const links = defaultLinks(elements, kind);
   const callouts = calloutsForStep(step, kind, partPlan.newParts);
@@ -225,8 +227,16 @@ function planPartsForStep(
     fallbackStart + MAX_NEW_PARTS_PER_STEP
   );
   if (stepIndex === 0) {
+    const structuralAnchor = structuralAnchorPartForStep(text, visibleParts);
     return {
-      newParts: takeUniqueParts(fallbackParts, MAX_NEW_PARTS_PER_STEP),
+      newParts: takeUniqueParts(
+        [
+          ...(structuralAnchor ? [structuralAnchor] : []),
+          ...scored,
+          ...fallbackParts
+        ],
+        MAX_NEW_PARTS_PER_STEP
+      ),
       existingParts: []
     };
   }
@@ -334,6 +344,29 @@ function fallbackPart(partName: string, rowOrder: number): GameBuildGuidePart {
   };
 }
 
+function structuralAnchorPartForStep(
+  text: string,
+  visibleParts: GameBuildGuidePart[]
+): GameBuildGuidePart | null {
+  const beamMatch = text.match(/\bbeam(?:\s*\([^)]*\))?\s*x\s*(\d+)\b/);
+  if (!beamMatch) {
+    return null;
+  }
+
+  const beamLabel = `Beam x${beamMatch[1]}`;
+  const matchingPart = visibleParts.find((part) =>
+    part.partName.toLowerCase().includes(beamLabel.toLowerCase())
+  );
+  if (matchingPart) {
+    return matchingPart;
+  }
+
+  return {
+    ...fallbackPart(beamLabel, 0),
+    purpose: "Primary stand/reference block. Place this first; later parts attach back to it directly or indirectly."
+  };
+}
+
 function partQuantityCount(quantity: string) {
   const match = cleanLabel(quantity).match(/\d+/);
   if (!match) {
@@ -347,11 +380,11 @@ function partQuantityCount(quantity: string) {
 }
 
 function cleanLabel(value: string) {
-  return value
+  return cleanBuildGuideDisplayText(value
     .replace(/`/g, "")
     .replace(/\[[^\]]+\]\([^)]+\)/g, "")
     .replace(/^[-*]\s+/, "")
-    .trim();
+    .trim());
 }
 
 function templateForKind(
@@ -395,6 +428,19 @@ function newPartVisual(
       position.x,
       position.y,
       position.z
+    );
+  }
+  if (hasAny(label.toLowerCase(), ["beam"])) {
+    return beam(
+      label,
+      "new",
+      "z",
+      position.x,
+      position.y,
+      position.z,
+      dimensions.width,
+      dimensions.depth,
+      dimensions.height
     );
   }
   if (kind === "crankshaft" || hasAny(label.toLowerCase(), ["axle", "shaft"])) {
@@ -921,7 +967,7 @@ function calloutsForStep(
 ) {
   const bodyLines = step.body
     .split(/\r?\n/)
-    .map((line) => line.trim().replace(/^[-*]\s+/, ""))
+    .map((line) => cleanBuildGuideDisplayText(line.trim().replace(/^[-*]\s+/, "")))
     .filter(Boolean)
     .slice(0, 3);
 

@@ -9,12 +9,13 @@ import {
   clearGearBlocksMarkers,
   createGame,
   createGameBuildGuideFromChat,
+  createGameCharacterBuild,
   createGameChatConversation,
   createGameChatScreenshotCapture,
   createGameScreenshotCaptureRequest,
   decodeGearBlocksConstructionFile,
   deleteGameBuildGuide,
-  getGameSetting,
+  deleteGameCharacterBuild,
   getGearBlocksThirdPartyDependencyStatus,
   importGameBuildGuideMarkdown,
   importGameBuildGuideUrl,
@@ -27,6 +28,7 @@ import {
   deleteGameScreenshot,
   deleteGame,
   listGameChatConversations,
+  listGameCharacterBuilds,
   listGameDataLocations,
   listGameChatMessages,
   listGameCatalogObjects,
@@ -40,16 +42,20 @@ import {
   listGameScreenshots,
   openGameBuildGuideOverlayWindow,
   saveGameDataLocation,
+  setActiveGameCharacterBuild,
   setGameRuntimePartDisplayImage,
   sendGameChatMessage,
   sendGearBlocksMarkerCommands,
   syncGearBlocksRuntimeContext,
   syncGearBlocksSavedConstructions,
+  updateGameCharacterBuild,
   updateGameRuntimePartNotes
 } from "../../services/gaming";
 import type {
   Game,
   GameBuildGuide,
+  GameCharacterBuild,
+  GameCharacterBuildInput,
   GameChatConversation,
   GameChatMessage,
   GameCatalogObject,
@@ -100,20 +106,19 @@ type ScreenshotContextMenu = {
   y: number;
 };
 
-type PathOfExile2CurrentBuild = {
+type PathOfExile2BuildDraft = {
   title: string;
-  source: string;
-  sourceUrl: string;
   characterClass: string;
   ascendancy: string;
-  creator: string;
   buildRole: string;
-  patch: string;
   status: string;
-  updatedOn: string;
+  sourceLabel: string;
+  sourceUrl: string;
+  patch: string;
   summary: string;
-  tags: string[];
-  activeVariant: string;
+  tags: string;
+  notes: string;
+  isActive: boolean;
 };
 
 type GameView =
@@ -134,7 +139,20 @@ type GameView =
   | "trade";
 const CHAT_SCREENSHOTS_PER_PAGE = 8;
 const PATH_OF_EXILE_2_SLUG = "path-of-exile-2";
-const PATH_OF_EXILE_2_CURRENT_BUILD_SETTING_KEY = "current_build";
+const EMPTY_PATH_OF_EXILE_2_BUILD_DRAFT: PathOfExile2BuildDraft = {
+  title: "",
+  characterClass: "",
+  ascendancy: "",
+  buildRole: "",
+  status: "planned",
+  sourceLabel: "",
+  sourceUrl: "",
+  patch: "",
+  summary: "",
+  tags: "",
+  notes: "",
+  isActive: false
+};
 const ENABLE_GEARBLOCKS_MARKERS = false;
 const ENABLE_GEARBLOCKS_PLUGIN_STATUS = false;
 const PATH_OF_EXILE_2_SECTIONS: Array<{
@@ -273,11 +291,20 @@ export function Gaming({
   const [buildGuides, setBuildGuides] = useState<GameBuildGuide[]>([]);
   const [isImportingBuildGuide, setIsImportingBuildGuide] = useState(false);
   const [isImportingBuildGuideUrl, setIsImportingBuildGuideUrl] = useState(false);
+  const [buildGuideImportProgressFrame, setBuildGuideImportProgressFrame] = useState(0);
   const [isGeneratingBuildGuide, setIsGeneratingBuildGuide] = useState(false);
   const [isOpeningBuildGuide, setIsOpeningBuildGuide] = useState(false);
   const [deletingBuildGuideId, setDeletingBuildGuideId] = useState<number | null>(null);
-  const [pathOfExile2CurrentBuild, setPathOfExile2CurrentBuild] =
-    useState<PathOfExile2CurrentBuild | null>(null);
+  const [pathOfExile2Builds, setPathOfExile2Builds] = useState<GameCharacterBuild[]>([]);
+  const [pathOfExile2BuildDraft, setPathOfExile2BuildDraft] =
+    useState<PathOfExile2BuildDraft>(EMPTY_PATH_OF_EXILE_2_BUILD_DRAFT);
+  const [editingPathOfExile2BuildId, setEditingPathOfExile2BuildId] = useState<number | null>(
+    null
+  );
+  const [isSavingPathOfExile2Build, setIsSavingPathOfExile2Build] = useState(false);
+  const [deletingPathOfExile2BuildId, setDeletingPathOfExile2BuildId] = useState<number | null>(
+    null
+  );
   const [newChatTitle, setNewChatTitle] = useState("");
   const [chatDraft, setChatDraft] = useState("");
   const [isSendingChat, setIsSendingChat] = useState(false);
@@ -437,10 +464,15 @@ export function Gaming({
       setBuildGuides([]);
       setIsImportingBuildGuide(false);
       setIsImportingBuildGuideUrl(false);
+      setBuildGuideImportProgressFrame(0);
       setIsGeneratingBuildGuide(false);
       setIsOpeningBuildGuide(false);
       setDeletingBuildGuideId(null);
-      setPathOfExile2CurrentBuild(null);
+      setPathOfExile2Builds([]);
+      setPathOfExile2BuildDraft(EMPTY_PATH_OF_EXILE_2_BUILD_DRAFT);
+      setEditingPathOfExile2BuildId(null);
+      setIsSavingPathOfExile2Build(false);
+      setDeletingPathOfExile2BuildId(null);
       setSelectedPromptScreenshotIds([]);
       setChatScreenshotPage(0);
       setIsChatScreenshotPickerOpen(false);
@@ -485,16 +517,15 @@ export function Gaming({
       .then(setBuildGuides)
       .catch((error) => setStatus(formatError(error)));
     if (selectedGame.slug === PATH_OF_EXILE_2_SLUG) {
-      getGameSetting(selectedGame.id, PATH_OF_EXILE_2_CURRENT_BUILD_SETTING_KEY)
-        .then((setting) => {
-          setPathOfExile2CurrentBuild(parsePathOfExile2CurrentBuild(setting?.settingValueJson));
-        })
-        .catch((error) => {
-          setPathOfExile2CurrentBuild(null);
-          setStatus(formatError(error));
-        });
+      listGameCharacterBuilds(selectedGame.id)
+        .then(setPathOfExile2Builds)
+        .catch((error) => setStatus(formatError(error)));
     } else {
-      setPathOfExile2CurrentBuild(null);
+      setPathOfExile2Builds([]);
+      setPathOfExile2BuildDraft(EMPTY_PATH_OF_EXILE_2_BUILD_DRAFT);
+      setEditingPathOfExile2BuildId(null);
+      setIsSavingPathOfExile2Build(false);
+      setDeletingPathOfExile2BuildId(null);
     }
     listGameChatConversations(selectedGame.id)
       .then((conversations) => {
@@ -508,6 +539,19 @@ export function Gaming({
       })
       .catch((error) => setStatus(formatError(error)));
   }, [selectedGame?.id]);
+
+  useEffect(() => {
+    if (!isImportingBuildGuide && !isImportingBuildGuideUrl) {
+      setBuildGuideImportProgressFrame(0);
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setBuildGuideImportProgressFrame((current) => (current + 1) % 3);
+    }, 450);
+
+    return () => window.clearInterval(intervalId);
+  }, [isImportingBuildGuide, isImportingBuildGuideUrl]);
 
   useEffect(() => {
     if (!navAction || !navAction.gameId) {
@@ -1146,6 +1190,95 @@ export function Gaming({
       window.alert(formatError(error));
     } finally {
       setDeletingBuildGuideId(null);
+    }
+  }
+
+  async function refreshPathOfExile2Builds(gameId: number) {
+    try {
+      const builds = await listGameCharacterBuilds(gameId);
+      setPathOfExile2Builds(builds);
+      return builds;
+    } catch (error) {
+      setStatus(formatError(error));
+      return null;
+    }
+  }
+
+  function startNewPathOfExile2Build() {
+    setEditingPathOfExile2BuildId(null);
+    setPathOfExile2BuildDraft({
+      ...EMPTY_PATH_OF_EXILE_2_BUILD_DRAFT,
+      status: "planned",
+      isActive: pathOfExile2Builds.length === 0
+    });
+  }
+
+  function editPathOfExile2Build(build: GameCharacterBuild) {
+    setEditingPathOfExile2BuildId(build.id);
+    setPathOfExile2BuildDraft(gameCharacterBuildToDraft(build));
+  }
+
+  async function savePathOfExile2Build(game: Game) {
+    if (game.slug !== PATH_OF_EXILE_2_SLUG) {
+      return;
+    }
+    if (!pathOfExile2BuildDraft.title.trim()) {
+      setStatus("Build title is required");
+      return;
+    }
+
+    setIsSavingPathOfExile2Build(true);
+    try {
+      const input = gameCharacterBuildDraftToInput(game.id, pathOfExile2BuildDraft);
+      const saved =
+        editingPathOfExile2BuildId === null
+          ? await createGameCharacterBuild(input)
+          : await updateGameCharacterBuild(editingPathOfExile2BuildId, input);
+      await refreshPathOfExile2Builds(game.id);
+      setEditingPathOfExile2BuildId(saved.id);
+      setPathOfExile2BuildDraft(gameCharacterBuildToDraft(saved));
+      setStatus(`Saved POE2 build "${saved.title}"`);
+      showToast("Build saved");
+    } catch (error) {
+      setStatus(formatError(error));
+      window.alert(formatError(error));
+    } finally {
+      setIsSavingPathOfExile2Build(false);
+    }
+  }
+
+  async function activatePathOfExile2Build(game: Game, build: GameCharacterBuild) {
+    if (game.slug !== PATH_OF_EXILE_2_SLUG) {
+      return;
+    }
+    try {
+      const active = await setActiveGameCharacterBuild(build.id);
+      await refreshPathOfExile2Builds(game.id);
+      setStatus(`Active POE2 build set to "${active.title}"`);
+    } catch (error) {
+      setStatus(formatError(error));
+    }
+  }
+
+  async function removePathOfExile2Build(game: Game, build: GameCharacterBuild) {
+    if (!window.confirm(`Delete POE2 build "${build.title}"?`)) {
+      return;
+    }
+
+    setDeletingPathOfExile2BuildId(build.id);
+    try {
+      await deleteGameCharacterBuild(build.id);
+      await refreshPathOfExile2Builds(game.id);
+      if (editingPathOfExile2BuildId === build.id) {
+        setEditingPathOfExile2BuildId(null);
+        setPathOfExile2BuildDraft(EMPTY_PATH_OF_EXILE_2_BUILD_DRAFT);
+      }
+      setStatus("POE2 build deleted");
+    } catch (error) {
+      setStatus(formatError(error));
+      window.alert(formatError(error));
+    } finally {
+      setDeletingPathOfExile2BuildId(null);
     }
   }
 
@@ -2062,7 +2195,9 @@ export function Gaming({
                     onClick={() => void importBuildGuideFromUrl(selectedGame)}
                     type="button"
                   >
-                    Import URL
+                    {isImportingBuildGuideUrl
+                      ? buildGuideImportProgressLabel(buildGuideImportProgressFrame)
+                      : "Import URL"}
                   </button>
                   <button
                     className="primary-button"
@@ -2070,7 +2205,9 @@ export function Gaming({
                     onClick={() => void importBuildGuide(selectedGame)}
                     type="button"
                   >
-                    Import Markdown
+                    {isImportingBuildGuide
+                      ? buildGuideImportProgressLabel(buildGuideImportProgressFrame)
+                      : "Import Markdown"}
                   </button>
                 </div>
               </div>
@@ -2374,8 +2511,19 @@ export function Gaming({
             PATH_OF_EXILE_2_SECTIONS.map((section) =>
               gameView === section.view ? (
                 <PathOfExile2SectionScaffold
-                  currentBuild={pathOfExile2CurrentBuild}
+                  builds={pathOfExile2Builds}
+                  deletingBuildId={deletingPathOfExile2BuildId}
+                  draft={pathOfExile2BuildDraft}
+                  editingBuildId={editingPathOfExile2BuildId}
+                  game={selectedGame}
+                  isSaving={isSavingPathOfExile2Build}
                   key={section.view}
+                  onActivateBuild={activatePathOfExile2Build}
+                  onDeleteBuild={removePathOfExile2Build}
+                  onDraftChange={setPathOfExile2BuildDraft}
+                  onEditBuild={editPathOfExile2Build}
+                  onNewBuild={startNewPathOfExile2Build}
+                  onSaveBuild={savePathOfExile2Build}
                   section={section}
                 />
               ) : null
@@ -3131,10 +3279,32 @@ function PathOfExile2HomeScaffold() {
 }
 
 function PathOfExile2SectionScaffold({
-  currentBuild,
+  builds,
+  deletingBuildId,
+  draft,
+  editingBuildId,
+  game,
+  isSaving,
+  onActivateBuild,
+  onDeleteBuild,
+  onDraftChange,
+  onEditBuild,
+  onNewBuild,
+  onSaveBuild,
   section
 }: {
-  currentBuild: PathOfExile2CurrentBuild | null;
+  builds: GameCharacterBuild[];
+  deletingBuildId: number | null;
+  draft: PathOfExile2BuildDraft;
+  editingBuildId: number | null;
+  game: Game;
+  isSaving: boolean;
+  onActivateBuild: (game: Game, build: GameCharacterBuild) => void | Promise<void>;
+  onDeleteBuild: (game: Game, build: GameCharacterBuild) => void | Promise<void>;
+  onDraftChange: (draft: PathOfExile2BuildDraft) => void;
+  onEditBuild: (build: GameCharacterBuild) => void;
+  onNewBuild: () => void;
+  onSaveBuild: (game: Game) => void | Promise<void>;
   section: (typeof PATH_OF_EXILE_2_SECTIONS)[number];
 }) {
   const isBuildsSection = section.view === "builds";
@@ -3147,36 +3317,21 @@ function PathOfExile2SectionScaffold({
           <h3>{section.label}</h3>
         </div>
       </div>
-      {isBuildsSection && currentBuild ? (
-        <article className="poe2-current-build-card">
-          <div className="poe2-current-build-head">
-            <div>
-              <p>Currently Playing</p>
-              <h4>{currentBuild.title}</h4>
-            </div>
-            <span>{currentBuild.patch}</span>
-          </div>
-          <div className="poe2-current-build-meta">
-            <span>{currentBuild.characterClass}</span>
-            <span>{currentBuild.ascendancy}</span>
-            <span>{currentBuild.buildRole}</span>
-            <span>By {currentBuild.creator}</span>
-          </div>
-          <p>{currentBuild.summary}</p>
-          {currentBuild.tags.length > 0 && (
-            <div className="poe2-current-build-tags">
-              {currentBuild.tags.map((tag) => (
-                <span key={tag}>{tag}</span>
-              ))}
-            </div>
-          )}
-          <div className="poe2-current-build-actions">
-            <a href={currentBuild.sourceUrl} rel="noreferrer" target="_blank">
-              Open {currentBuild.source}
-            </a>
-            <span>Updated {currentBuild.updatedOn}</span>
-          </div>
-        </article>
+      {isBuildsSection ? (
+        <PathOfExile2BuildsPanel
+          builds={builds}
+          deletingBuildId={deletingBuildId}
+          draft={draft}
+          editingBuildId={editingBuildId}
+          game={game}
+          isSaving={isSaving}
+          onActivateBuild={onActivateBuild}
+          onDeleteBuild={onDeleteBuild}
+          onDraftChange={onDraftChange}
+          onEditBuild={onEditBuild}
+          onNewBuild={onNewBuild}
+          onSaveBuild={onSaveBuild}
+        />
       ) : (
         <article className="poe2-section-card large">
           <div>
@@ -3190,35 +3345,303 @@ function PathOfExile2SectionScaffold({
   );
 }
 
-function parsePathOfExile2CurrentBuild(value: string | undefined): PathOfExile2CurrentBuild | null {
-  if (!value) {
-    return null;
-  }
+function PathOfExile2BuildsPanel({
+  builds,
+  deletingBuildId,
+  draft,
+  editingBuildId,
+  game,
+  isSaving,
+  onActivateBuild,
+  onDeleteBuild,
+  onDraftChange,
+  onEditBuild,
+  onNewBuild,
+  onSaveBuild
+}: {
+  builds: GameCharacterBuild[];
+  deletingBuildId: number | null;
+  draft: PathOfExile2BuildDraft;
+  editingBuildId: number | null;
+  game: Game;
+  isSaving: boolean;
+  onActivateBuild: (game: Game, build: GameCharacterBuild) => void | Promise<void>;
+  onDeleteBuild: (game: Game, build: GameCharacterBuild) => void | Promise<void>;
+  onDraftChange: (draft: PathOfExile2BuildDraft) => void;
+  onEditBuild: (build: GameCharacterBuild) => void;
+  onNewBuild: () => void;
+  onSaveBuild: (game: Game) => void | Promise<void>;
+}) {
+  const updateDraft = <K extends keyof PathOfExile2BuildDraft>(
+    key: K,
+    value: PathOfExile2BuildDraft[K]
+  ) => {
+    onDraftChange({ ...draft, [key]: value });
+  };
 
-  try {
-    const parsed = JSON.parse(value) as Partial<PathOfExile2CurrentBuild>;
-    if (!parsed.title || !parsed.sourceUrl) {
-      return null;
-    }
+  return (
+    <div className="poe2-build-workspace">
+      <section className="poe2-build-list" aria-label="Path of Exile 2 builds">
+        <div className="poe2-build-list-head">
+          <div>
+            <p>Local Builds</p>
+            <h4>{builds.length} build{builds.length === 1 ? "" : "s"}</h4>
+          </div>
+          <button className="ghost-button" onClick={onNewBuild} type="button">
+            New Build
+          </button>
+        </div>
 
-    return {
-      title: parsed.title,
-      source: parsed.source || "Source",
-      sourceUrl: parsed.sourceUrl,
-      characterClass: parsed.characterClass || "Class unknown",
-      ascendancy: parsed.ascendancy || "Ascendancy unknown",
-      creator: parsed.creator || "Unknown creator",
-      buildRole: parsed.buildRole || "Build",
-      patch: parsed.patch || "Patch unknown",
-      status: parsed.status || "currently_playing",
-      updatedOn: parsed.updatedOn || "unknown",
-      summary: parsed.summary || "",
-      tags: Array.isArray(parsed.tags) ? parsed.tags.filter(Boolean) : [],
-      activeVariant: parsed.activeVariant || ""
-    };
-  } catch {
-    return null;
-  }
+        {builds.length === 0 ? (
+          <article className="poe2-section-card large">
+            <div>
+              <p>Planner</p>
+              <h4>No builds saved</h4>
+            </div>
+            <span>Local character builds will appear here.</span>
+          </article>
+        ) : (
+          <div className="poe2-build-card-list">
+            {builds.map((build) => (
+              <article
+                className={
+                  build.id === editingBuildId ? "poe2-build-card selected" : "poe2-build-card"
+                }
+                key={build.id}
+              >
+                <div className="poe2-build-card-head">
+                  <div>
+                    <p>{build.isActive ? "Active" : formatPathOfExile2BuildStatus(build.status)}</p>
+                    <h4>{build.title}</h4>
+                  </div>
+                  {build.patch && <span>{build.patch}</span>}
+                </div>
+                <div className="poe2-current-build-meta">
+                  {build.characterClass && <span>{build.characterClass}</span>}
+                  {build.ascendancy && <span>{build.ascendancy}</span>}
+                  {build.buildRole && <span>{build.buildRole}</span>}
+                </div>
+                {build.summary && <p>{build.summary}</p>}
+                {splitPathOfExile2BuildTags(build.tags).length > 0 && (
+                  <div className="poe2-current-build-tags">
+                    {splitPathOfExile2BuildTags(build.tags).map((tag) => (
+                      <span key={tag}>{tag}</span>
+                    ))}
+                  </div>
+                )}
+                <div className="poe2-current-build-actions">
+                  <button className="ghost-button" onClick={() => onEditBuild(build)} type="button">
+                    Edit
+                  </button>
+                  <button
+                    className="ghost-button"
+                    disabled={build.isActive}
+                    onClick={() => void onActivateBuild(game, build)}
+                    type="button"
+                  >
+                    Set Active
+                  </button>
+                  {build.sourceUrl && (
+                    <a href={build.sourceUrl} rel="noreferrer" target="_blank">
+                      Open {build.sourceLabel || "Source"}
+                    </a>
+                  )}
+                  <button
+                    className="ghost-button"
+                    disabled={deletingBuildId === build.id}
+                    onClick={() => void onDeleteBuild(game, build)}
+                    type="button"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="poe2-build-editor" aria-label="Path of Exile 2 build editor">
+        <div className="poe2-build-list-head">
+          <div>
+            <p>{editingBuildId === null ? "New Build" : "Build Details"}</p>
+            <h4>{draft.title || "Untitled build"}</h4>
+          </div>
+          <label className="toggle-row compact">
+            <input
+              checked={draft.isActive}
+              onChange={(event) => updateDraft("isActive", event.target.checked)}
+              type="checkbox"
+            />
+            <span>Active</span>
+          </label>
+        </div>
+
+        <div className="poe2-build-form-grid">
+          <label>
+            <span>Title</span>
+            <input
+              className="text-input"
+              onChange={(event) => updateDraft("title", event.target.value)}
+              value={draft.title}
+            />
+          </label>
+          <label>
+            <span>Status</span>
+            <select
+              className="text-input"
+              onChange={(event) => updateDraft("status", event.target.value)}
+              value={draft.status}
+            >
+              <option value="planned">Planned</option>
+              <option value="currently_playing">Currently Playing</option>
+              <option value="active">Active</option>
+              <option value="archived">Archived</option>
+            </select>
+          </label>
+          <label>
+            <span>Class</span>
+            <input
+              className="text-input"
+              onChange={(event) => updateDraft("characterClass", event.target.value)}
+              value={draft.characterClass}
+            />
+          </label>
+          <label>
+            <span>Ascendancy</span>
+            <input
+              className="text-input"
+              onChange={(event) => updateDraft("ascendancy", event.target.value)}
+              value={draft.ascendancy}
+            />
+          </label>
+          <label>
+            <span>Role</span>
+            <input
+              className="text-input"
+              onChange={(event) => updateDraft("buildRole", event.target.value)}
+              value={draft.buildRole}
+            />
+          </label>
+          <label>
+            <span>Patch</span>
+            <input
+              className="text-input"
+              onChange={(event) => updateDraft("patch", event.target.value)}
+              value={draft.patch}
+            />
+          </label>
+          <label>
+            <span>Source</span>
+            <input
+              className="text-input"
+              onChange={(event) => updateDraft("sourceLabel", event.target.value)}
+              value={draft.sourceLabel}
+            />
+          </label>
+          <label>
+            <span>Source URL</span>
+            <input
+              className="text-input"
+              onChange={(event) => updateDraft("sourceUrl", event.target.value)}
+              value={draft.sourceUrl}
+            />
+          </label>
+          <label className="wide">
+            <span>Tags</span>
+            <input
+              className="text-input"
+              onChange={(event) => updateDraft("tags", event.target.value)}
+              value={draft.tags}
+            />
+          </label>
+          <label className="wide">
+            <span>Summary</span>
+            <textarea
+              className="text-area"
+              onChange={(event) => updateDraft("summary", event.target.value)}
+              value={draft.summary}
+            />
+          </label>
+          <label className="wide">
+            <span>Notes</span>
+            <textarea
+              className="text-area"
+              onChange={(event) => updateDraft("notes", event.target.value)}
+              value={draft.notes}
+            />
+          </label>
+        </div>
+
+        <div className="poe2-build-editor-actions">
+          <button
+            className="primary-button"
+            disabled={isSaving || draft.title.trim().length === 0}
+            onClick={() => void onSaveBuild(game)}
+            type="button"
+          >
+            Save Build
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function gameCharacterBuildToDraft(build: GameCharacterBuild): PathOfExile2BuildDraft {
+  return {
+    title: build.title,
+    characterClass: build.characterClass,
+    ascendancy: build.ascendancy,
+    buildRole: build.buildRole,
+    status: build.status,
+    sourceLabel: build.sourceLabel,
+    sourceUrl: build.sourceUrl,
+    patch: build.patch,
+    summary: build.summary,
+    tags: build.tags,
+    notes: build.notes,
+    isActive: build.isActive
+  };
+}
+
+function gameCharacterBuildDraftToInput(
+  gameId: number,
+  draft: PathOfExile2BuildDraft
+): GameCharacterBuildInput {
+  return {
+    gameId,
+    title: draft.title,
+    characterClass: draft.characterClass,
+    ascendancy: draft.ascendancy,
+    buildRole: draft.buildRole,
+    status: draft.status,
+    sourceLabel: draft.sourceLabel,
+    sourceUrl: draft.sourceUrl,
+    patch: draft.patch,
+    summary: draft.summary,
+    tags: draft.tags,
+    notes: draft.notes,
+    isActive: draft.isActive
+  };
+}
+
+function splitPathOfExile2BuildTags(value: string) {
+  return value
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
+function formatPathOfExile2BuildStatus(status: string) {
+  return status
+    .split("_")
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+}
+
+function buildGuideImportProgressLabel(frame: number) {
+  return `Importing${".".repeat((frame % 3) + 1)}`;
 }
 
 function clearStoredBuildGuideSelection(deletedGuideId: number) {
