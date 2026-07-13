@@ -33,6 +33,7 @@ Overlay Forge organizes calendar items, references, game context, and focused ut
 - Scheduler framework.
 - SQLite naming normalization.
 - Path of Exile 2 game module scaffold and local build records.
+- The Spell Brigade game module scaffold for chats, screenshots, and co-op run planning.
 - Former Projects module removed from active code while legacy project/planning SQLite data remains preserved.
 
 ## Active Documentation Structure
@@ -58,6 +59,7 @@ Overlay Forge organizes calendar items, references, game context, and focused ut
 | `docs/GEARBLOCKS_PARTS_CATALOG.md` | Validated GearBlocks parts vocabulary. |
 | `docs/SMOKING_CESSATION.md` | Smoking Cessation module scope. |
 | `docs/REPAIR_RESELL.md` | Repair Resell restoration, pickup, and learning-path vision. |
+| `docs/THE_SPELL_BRIGADE.md` | The Spell Brigade module scope and planning scaffold. |
 
 ## Terminology
 

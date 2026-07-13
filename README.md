@@ -31,6 +31,7 @@ Overlay Forge is now maintained as an evolving local-first command hub. Current 
 - Scheduler framework.
 - SQLite naming normalization.
 - Path of Exile 2 game module scaffold.
+- The Spell Brigade game module scaffold for wizard, spell, upgrade, synergy, and run planning.
 - Former Projects module removed from active code; legacy project/planning SQLite rows are retained for data preservation and future review.
 
 ## Documentation Map
@@ -55,6 +56,7 @@ Overlay Forge is now maintained as an evolving local-first command hub. Current 
 | `docs/GEARBLOCKS_PARTS_CATALOG.md` | Validated GearBlocks parts vocabulary. |
 | `docs/SMOKING_CESSATION.md` | Smoking Cessation module scope. |
 | `docs/REPAIR_RESELL.md` | Repair Resell restoration, pickup, and learning-path vision. |
+| `docs/THE_SPELL_BRIGADE.md` | The Spell Brigade module scope and planning scaffold. |
 
 ## Development
 

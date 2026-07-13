@@ -133,6 +133,9 @@ pub fn run() {
             window_manager
                 .configure_runtime(main_window_config.base.kind)
                 .map_err(std::io::Error::other)?;
+            window_manager
+                .register_focus_loss_behavior(main_window_config.base.kind)
+                .map_err(std::io::Error::other)?;
             let game_chat_window_config = StandaloneWindowConfig::game_chat();
             if let Some(window) = window_manager.window(game_chat_window_config.base.kind) {
                 window_manager

@@ -185,6 +185,23 @@ Current out-of-scope boundaries:
 - Do not create POE2-only settings tables for build data.
 - Do not claim full POE2 calculation parity until passive tree, item, gem, ailment, damage, defense, and condition modeling are represented and validated.
 
+## The Spell Brigade Module Scope
+
+The Spell Brigade is a local-first Gaming module scaffold.
+
+Current in-scope foundation:
+
+- Seed a stable `def_game` definition and matching local `obj_game` section.
+- Reuse shared Gaming chat and screenshot workflows.
+- Provide focused Wizards, Spells, Upgrades, Synergies, and Runs planning sections.
+
+Out of scope unless explicitly requested:
+
+- Persisted wizard, spell, upgrade, synergy, or run-history domain records.
+- Automated build or tier-list recommendations.
+- Save-file parsing, process inspection, telemetry, or live game integration.
+- Automatic imports from community wikis or other third-party sources.
+
 ## Persistence Boundary
 
 SQLite is the source of truth for persisted app data.

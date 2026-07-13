@@ -216,7 +216,7 @@ created_at
 modified_at
 ```
 
-Static game definitions. `GearBlocks` is seeded with `id_game = 1`. `Path of Exile 2` is seeded with `id_game = 2`.
+Static game definitions. `GearBlocks` is seeded with `id_game = 1`, `Path of Exile 2` with `id_game = 2`, and `The Spell Brigade` with `id_game = 3`.
 
 ### `obj_game`
 

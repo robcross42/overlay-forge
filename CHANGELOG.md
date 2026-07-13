@@ -20,6 +20,30 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+### 2026-07-11
+
+#### Added
+
+- 18:41:54 EDT - Added The Spell Brigade as a seeded Gaming module with shared chats and screenshots plus Wizards, Spells, Upgrades, Synergies, and Runs planning scaffolds.
+- 18:51:50 EDT - Added a game-context picker as the first Gaming workspace toolbar control so games can be switched without expanding the left navigation tree.
+
+#### Changed
+
+- 18:41:54 EDT - Centralized supported game-module section metadata so Path of Exile 2 and The Spell Brigade use the same module navigation and home-scaffold abstraction.
+- 19:00:45 EDT - Changed the primary Overlay Forge window to be non-topmost and hide on focus loss while preserving always-on-top behavior for standalone game chat and build-guide windows.
+
+#### Documentation
+
+- 18:41:54 EDT - Documented The Spell Brigade module scope, current scaffold, persistence definition, and deferred game-specific data integrations.
+- 18:51:50 EDT - Documented the toolbar game picker as the primary direct path into The Spell Brigade.
+- 19:00:45 EDT - Documented the primary-window focus-loss boundary and its manual regression check.
+
+#### Validation
+
+- 18:41:54 EDT - Validated The Spell Brigade module with `npm run build`, `npm run cargo:build`, `npm run cargo:test`, `npm run cargo:clippy`, and `git diff --check`.
+- 18:51:50 EDT - Validated the Gaming toolbar game-context picker with `npm run build` and `git diff --check`.
+- 19:00:45 EDT - Validated the primary-window focus behavior with `npm run cargo:build`, `npm run cargo:test`, `npm run build`, Windows HWND visibility/topmost inspection, and `git diff --check`; the main window was non-topmost and hid after focus moved, while standalone window policies remained topmost in runtime inspection and unit tests.
+
 ### 2026-07-02
 
 #### Added

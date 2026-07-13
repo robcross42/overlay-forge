@@ -76,6 +76,18 @@ import type {
 } from "../../services/gaming";
 import { timestampLabel } from "../../utils/datetime";
 import { formatUnknownError as formatError } from "../../utils/errors";
+import {
+  getSupportedGameModule,
+  isSupportedGameModuleView,
+  PATH_OF_EXILE_2_SLUG,
+  THE_SPELL_BRIGADE_SLUG
+} from "./gameModules";
+import type {
+  SupportedGameModule,
+  SupportedGameModuleSection,
+  SupportedGameModuleView
+} from "./gameModules";
+import { GameContextPicker } from "./GameContextPicker";
 
 type GamingProps = {
   chatOverlayMode?: boolean;
@@ -130,15 +142,8 @@ type GameView =
   | "api"
   | "tools"
   | "build-guides"
-  | "builds"
-  | "skill-tree"
-  | "items"
-  | "skill-gems"
-  | "support-gems"
-  | "loot-filter"
-  | "trade";
+  | SupportedGameModuleView;
 const CHAT_SCREENSHOTS_PER_PAGE = 8;
-const PATH_OF_EXILE_2_SLUG = "path-of-exile-2";
 const EMPTY_PATH_OF_EXILE_2_BUILD_DRAFT: PathOfExile2BuildDraft = {
   title: "",
   characterClass: "",
@@ -155,55 +160,6 @@ const EMPTY_PATH_OF_EXILE_2_BUILD_DRAFT: PathOfExile2BuildDraft = {
 };
 const ENABLE_GEARBLOCKS_MARKERS = false;
 const ENABLE_GEARBLOCKS_PLUGIN_STATUS = false;
-const PATH_OF_EXILE_2_SECTIONS: Array<{
-  view: GameView;
-  label: string;
-  eyebrow: string;
-  description: string;
-}> = [
-  {
-    view: "builds",
-    label: "Builds",
-    eyebrow: "Character Planning",
-    description: "Planned location for character builds, ascendancy choices, campaign notes, and endgame goals."
-  },
-  {
-    view: "skill-tree",
-    label: "Skill Tree",
-    eyebrow: "Passive Planning",
-    description: "Planned location for passive tree routes, keystones, weapon swaps, and respec notes."
-  },
-  {
-    view: "items",
-    label: "Items",
-    eyebrow: "Equipment",
-    description: "Planned location for gear targets, rare item notes, uniques, affixes, and upgrade priorities."
-  },
-  {
-    view: "skill-gems",
-    label: "Skill Gems",
-    eyebrow: "Active Skills",
-    description: "Planned location for active skill gems, gem levels, quality notes, and socket groups."
-  },
-  {
-    view: "support-gems",
-    label: "Support Gems",
-    eyebrow: "Links",
-    description: "Planned location for support gem combinations, damage conversions, and utility links."
-  },
-  {
-    view: "loot-filter",
-    label: "Loot Filter",
-    eyebrow: "Drops",
-    description: "Planned location for loot filter rules, strictness profiles, currency visibility, and leveling presets."
-  },
-  {
-    view: "trade",
-    label: "Trade",
-    eyebrow: "Market",
-    description: "Planned location for trade searches, price notes, acquisition targets, and economy references."
-  }
-];
 const GEARBLOCKS_PARTS_CATALOG_METADATA = {
   gameVersion: "0.8.96622",
   completeness: "Complete",
@@ -323,6 +279,10 @@ export function Gaming({
     () => gameSections.find((game) => game.id === selectedGameId) ?? null,
     [gameSections, selectedGameId]
   );
+  const selectedGameModule = useMemo(
+    () => (selectedGame ? getSupportedGameModule(selectedGame.slug) : null),
+    [selectedGame?.slug]
+  );
   const displayedParts = useMemo(
     () =>
       selectedPartCategory === "all"
@@ -420,12 +380,12 @@ export function Gaming({
   useEffect(() => {
     if (
       selectedGame &&
-      selectedGame.slug !== PATH_OF_EXILE_2_SLUG &&
-      PATH_OF_EXILE_2_SECTIONS.some((section) => section.view === gameView)
+      !selectedGameModule?.sections.some((section) => section.view === gameView) &&
+      isSupportedGameModuleView(gameView)
     ) {
       setGameView("home");
     }
-  }, [gameView, selectedGame?.id, selectedGame?.slug]);
+  }, [gameView, selectedGame?.id, selectedGameModule]);
 
   useEffect(() => {
     if (!selectedGame) {
@@ -1583,6 +1543,17 @@ export function Gaming({
 
         {!chatOverlayMode && (
         <div className="game-canvas-toolbar" aria-label="Game workspace actions">
+          <GameContextPicker
+            games={gameSections}
+            onSelectGame={(gameId) => {
+              setGameView("home");
+              setSelectedPromptScreenshotIds([]);
+              setIsChatScreenshotPickerOpen(false);
+              onSelectGame(gameId);
+              setStatus("Game context selected");
+            }}
+            selectedGame={selectedGame}
+          />
           <button
             className={gameView === "home" ? "primary-button" : "ghost-button"}
             onClick={() => setGameView("home")}
@@ -1636,8 +1607,9 @@ export function Gaming({
               <span className="button-count">{buildGuides.length}</span>
             </button>
           )}
-          {selectedGame.slug === PATH_OF_EXILE_2_SLUG ? (
-            PATH_OF_EXILE_2_SECTIONS.map((section) => (
+          {selectedGameModule ? (
+            <>
+            {selectedGameModule.sections.map((section) => (
               <button
                 className={gameView === section.view ? "primary-button" : "ghost-button"}
                 key={section.view}
@@ -1646,7 +1618,18 @@ export function Gaming({
               >
                 {section.label}
               </button>
-            ))
+            ))}
+            {selectedGameModule.showScreenshots && (
+              <button
+                className={gameView === "screenshots" ? "primary-button" : "ghost-button"}
+                onClick={() => setGameView("screenshots")}
+                type="button"
+              >
+                Screenshots
+                <span className="button-count">{screenshots.length}</span>
+              </button>
+            )}
+            </>
           ) : (
             <>
               <button
@@ -1960,7 +1943,7 @@ export function Gaming({
                   )}
                 </section>
               )}
-              {selectedGame.slug === PATH_OF_EXILE_2_SLUG && <PathOfExile2HomeScaffold />}
+              {selectedGameModule && <GameModuleHomeScaffold module={selectedGameModule} />}
             </section>
           )}
 
@@ -2508,7 +2491,7 @@ export function Gaming({
           )}
 
           {selectedGame.slug === PATH_OF_EXILE_2_SLUG &&
-            PATH_OF_EXILE_2_SECTIONS.map((section) =>
+            selectedGameModule?.sections.map((section) =>
               gameView === section.view ? (
                 <PathOfExile2SectionScaffold
                   builds={pathOfExile2Builds}
@@ -2524,6 +2507,17 @@ export function Gaming({
                   onEditBuild={editPathOfExile2Build}
                   onNewBuild={startNewPathOfExile2Build}
                   onSaveBuild={savePathOfExile2Build}
+                  section={section}
+                />
+              ) : null
+            )}
+
+          {selectedGame.slug === THE_SPELL_BRIGADE_SLUG &&
+            selectedGameModule?.sections.map((section) =>
+              gameView === section.view ? (
+                <GameModuleSectionScaffold
+                  gameName={selectedGame.name}
+                  key={section.view}
                   section={section}
                 />
               ) : null
@@ -3254,18 +3248,18 @@ function RuntimePartApiMemberFlags({ member }: { member: GameRuntimePartApiMembe
   );
 }
 
-function PathOfExile2HomeScaffold() {
+function GameModuleHomeScaffold({ module }: { module: SupportedGameModule }) {
   return (
-    <section className="poe2-home-scaffold" aria-label="Path of Exile 2 module sections">
+    <section className="game-module-home-scaffold" aria-label={`${module.name} module sections`}>
       <div className="game-data-locations-head">
         <div>
-          <p>Module Scaffold</p>
-          <h4>Path of Exile 2</h4>
+          <p>{module.eyebrow}</p>
+          <h4>{module.name}</h4>
         </div>
       </div>
-      <div className="poe2-section-grid">
-        {PATH_OF_EXILE_2_SECTIONS.map((section) => (
-          <article className="poe2-section-card" key={section.view}>
+      <div className="game-module-section-grid">
+        {module.sections.map((section) => (
+          <article className="game-module-section-card" key={section.view}>
             <div>
               <p>{section.eyebrow}</p>
               <h4>{section.label}</h4>
@@ -3274,6 +3268,30 @@ function PathOfExile2HomeScaffold() {
           </article>
         ))}
       </div>
+    </section>
+  );
+}
+
+function GameModuleSectionScaffold({
+  gameName,
+  section
+}: {
+  gameName: string;
+  section: SupportedGameModuleSection;
+}) {
+  return (
+    <section className="game-module-section-panel" aria-label={`${gameName} ${section.label}`}>
+      <div className="game-view-head">
+        <div>
+          <p>{section.eyebrow}</p>
+          <h3>{section.label}</h3>
+        </div>
+      </div>
+      <article className="game-module-section-card large">
+        <p>Local-first workspace</p>
+        <h4>{section.label}</h4>
+        <span>{section.description}</span>
+      </article>
     </section>
   );
 }
@@ -3305,7 +3323,7 @@ function PathOfExile2SectionScaffold({
   onEditBuild: (build: GameCharacterBuild) => void;
   onNewBuild: () => void;
   onSaveBuild: (game: Game) => void | Promise<void>;
-  section: (typeof PATH_OF_EXILE_2_SECTIONS)[number];
+  section: SupportedGameModuleSection;
 }) {
   const isBuildsSection = section.view === "builds";
 

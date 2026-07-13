@@ -624,7 +624,7 @@ fn show_game_chat_overlay_window(
 ) -> Result<(), String> {
     let window_manager = WindowManager::new(app);
     let window = window_manager.required_window(WindowKind::GameChat)?;
-    window_manager.prepare_for_interaction(&window)?;
+    window_manager.prepare_for_interaction(WindowKind::GameChat, &window)?;
     let state = app.state::<AppState>();
     if let Ok(conversation) = state
         .database
@@ -1075,7 +1075,7 @@ fn show_game_build_guide_overlay_window(
 ) -> Result<(), String> {
     let window_manager = WindowManager::new(app);
     let window = window_manager.required_window(WindowKind::GameBuildGuide)?;
-    window_manager.prepare_for_interaction(&window)?;
+    window_manager.prepare_for_interaction(WindowKind::GameBuildGuide, &window)?;
     let state = app.state::<AppState>();
     if let Ok(guide) = state.database.get_game_build_guide(selection.guide_id) {
         if let (Some(overlay_x), Some(overlay_y)) = (guide.overlay_x, guide.overlay_y) {
@@ -4396,13 +4396,19 @@ fn restore_previously_visible_overlay_windows(
         if !hidden_window.was_visible || hidden_window.kind.label() == invoking_window_label {
             continue;
         }
-        let _ = hidden_window.window.set_always_on_top(true);
+        let config = hidden_window.kind.runtime_config();
+        let _ = hidden_window
+            .window
+            .set_always_on_top(config.always_on_top);
         let _ = windows::ensure_window_accepts_mouse_input(&hidden_window.window);
         let _ = windows::set_overlay_opacity(
             &hidden_window.window,
-            hidden_window.kind.runtime_config().restore_opacity,
+            config.restore_opacity,
         );
-        let _ = windows::show_window_without_activation(&hidden_window.window);
+        let _ = windows::show_window_without_activation(
+            &hidden_window.window,
+            config.always_on_top,
+        );
     }
 }
 

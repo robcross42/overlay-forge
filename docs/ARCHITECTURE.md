@@ -142,6 +142,8 @@ WindowStateRepository
   SQLite-backed persistence for size, position, visibility, and related state
 ```
 
+The primary `Main` overlay is transient: it is not always-on-top and hides when it loses focus. Standalone `GameChat` and `GameBuildGuide` windows remain always-on-top and must not inherit the main window's focus-loss behavior.
+
 `WindowKind` should be an enum, not scattered string labels. `StandaloneWindowConfig` and `OverlayWindowConfig` should compose `BaseWindowConfig` rather than model Java-style inheritance.
 
 Before changing window behavior, inspect all existing creation paths. If more than one file constructs windows, sets default options, generates labels, restores geometry, or handles standalone-window configuration, consolidate the shared path before applying the feature or fix.

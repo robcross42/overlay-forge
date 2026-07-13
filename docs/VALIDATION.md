@@ -46,6 +46,16 @@ Overlay appears using existing hotkey behavior.
 ```
 
 ```text
+Click a different application while the primary overlay is focused.
+```
+
+Pass criteria:
+
+```text
+The primary overlay hides and does not remain always-on-top. Standalone game chat and build-guide windows retain their existing always-on-top behavior.
+```
+
+```text
 Switch between Calendar, Cessation, Repair Resell, Gaming, YouTube, and Settings.
 ```
 

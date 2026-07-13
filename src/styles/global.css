@@ -1524,6 +1524,65 @@ select.text-input option:hover {
   gap: 8px;
 }
 
+.game-context-picker {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.game-context-picker-trigger {
+  max-width: 220px;
+}
+
+.game-context-picker-trigger strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-context-picker-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 80;
+  display: grid;
+  gap: 3px;
+  width: min(280px, calc(100vw - 32px));
+  padding: 7px;
+  border: 1px solid rgba(139, 155, 173, 0.36);
+  border-radius: 8px;
+  background: rgba(19, 25, 33, 0.98);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.42);
+}
+
+.game-context-picker-menu button {
+  justify-content: space-between;
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.game-context-picker-menu button:hover,
+.game-context-picker-menu button:focus-visible,
+.game-context-picker-menu button.active {
+  border-color: rgba(79, 208, 165, 0.38);
+  background: rgba(79, 208, 165, 0.1);
+}
+
+.game-context-picker-menu button span {
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
 .button-count {
   display: inline-grid;
   place-items: center;
@@ -2084,7 +2143,8 @@ select.text-input option:hover {
   line-height: 1.45;
 }
 
-.poe2-home-scaffold,
+.game-module-home-scaffold,
+.game-module-section-panel,
 .poe2-section-panel {
   display: grid;
   flex: 1 0 100%;
@@ -2092,13 +2152,14 @@ select.text-input option:hover {
   min-width: 0;
 }
 
-.poe2-section-grid {
+.game-module-section-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   min-width: 0;
 }
 
+.game-module-section-card,
 .poe2-section-card {
   display: grid;
   align-content: start;
@@ -2110,15 +2171,19 @@ select.text-input option:hover {
   background: rgba(255, 255, 255, 0.04);
 }
 
+.game-module-section-card.large,
 .poe2-section-card.large {
   max-width: 720px;
 }
 
+.game-module-section-card p,
+.game-module-section-card h4,
 .poe2-section-card p,
 .poe2-section-card h4 {
   margin: 0;
 }
 
+.game-module-section-card p,
 .poe2-section-card p {
   color: var(--muted);
   font-size: 0.72rem;
@@ -2126,6 +2191,7 @@ select.text-input option:hover {
   text-transform: uppercase;
 }
 
+.game-module-section-card h4,
 .poe2-section-card h4 {
   overflow: hidden;
   color: var(--text);
@@ -2134,6 +2200,7 @@ select.text-input option:hover {
   white-space: nowrap;
 }
 
+.game-module-section-card span,
 .poe2-section-card span {
   color: var(--muted);
   font-size: 0.84rem;

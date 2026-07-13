@@ -28,6 +28,7 @@ Read the smallest relevant set before editing:
 | GearBlocks feature work | `docs/GEARBLOCKS.md`, then the focused GearBlocks docs |
 | Smoking Cessation | `docs/SMOKING_CESSATION.md` |
 | Repair Resell | `docs/REPAIR_RESELL.md` |
+| The Spell Brigade | `docs/THE_SPELL_BRIGADE.md` |
 
 ## Reasoning Model Selection
 

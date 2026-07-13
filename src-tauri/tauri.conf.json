@@ -22,7 +22,7 @@
         "transparent": true,
         "backgroundColor": "#00000000",
         "resizable": true,
-        "alwaysOnTop": true,
+        "alwaysOnTop": false,
         "center": true,
         "visible": false
       },

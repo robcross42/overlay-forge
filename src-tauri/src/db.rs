@@ -2557,6 +2557,22 @@ impl AppDatabase {
                 'path-of-exile-2',
                 'Game-specific workspace section for Path of Exile 2 chats, builds, passive planning, item tracking, gems, loot filters, and trade.'
             );
+
+            INSERT OR IGNORE INTO def_game (id_game, game_key, ui_name, summary, schema_json)
+            VALUES (
+                3,
+                'the-spell-brigade',
+                'The Spell Brigade',
+                'Supported The Spell Brigade game module definition.',
+                '{\"fields\":{\"id_game\":\"stable integer game definition id\",\"game_key\":\"stable lowercase game key\",\"ui_name\":\"visible game definition name\",\"summary\":\"definition summary\"}}'
+            );
+
+            INSERT OR IGNORE INTO obj_game (name, slug, summary)
+            VALUES (
+                'The Spell Brigade',
+                'the-spell-brigade',
+                'Game-specific workspace for The Spell Brigade chats, wizard and spell planning, upgrades, team synergies, run notes, and screenshots.'
+            );
             ",
         )?;
         Self::ensure_repair_resell_schema(&connection)?;
@@ -2575,6 +2591,10 @@ impl AppDatabase {
         )?;
         connection.execute(
             "UPDATE obj_game SET id_game = 2 WHERE slug = 'path-of-exile-2'",
+            [],
+        )?;
+        connection.execute(
+            "UPDATE obj_game SET id_game = 3 WHERE slug = 'the-spell-brigade'",
             [],
         )?;
         Self::ensure_column(
@@ -12255,6 +12275,15 @@ mod tests {
             )
             .expect("Path of Exile 2 game row should be seeded");
         assert_eq!(path_of_exile_id_game, 2);
+
+        let spell_brigade_id_game: i64 = connection
+            .query_row(
+                "SELECT id_game FROM obj_game WHERE slug = 'the-spell-brigade'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("The Spell Brigade game row should be seeded");
+        assert_eq!(spell_brigade_id_game, 3);
 
         drop(connection);
         drop(database);

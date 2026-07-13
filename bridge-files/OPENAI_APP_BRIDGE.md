@@ -8,7 +8,7 @@ Future changelog and versioning updates must follow `AGENTS.md`. `docs/PROJECT_H
 
 ## Current App Shape
 
-Overlay Forge is a local-first Tauri v2 desktop command hub with a React + TypeScript frontend, Rust/Tauri backend commands, and SQLite persistence. The shell supports always-on-top desktop use, configurable hotkeys, custom window controls, game context, and utility modules.
+Overlay Forge is a local-first Tauri v2 desktop command hub with a React + TypeScript frontend, Rust/Tauri backend commands, and SQLite persistence. The primary overlay is transient and hides on focus loss, while standalone game overlays remain always-on-top. The shell also supports configurable hotkeys, custom window controls, game context, and utility modules.
 
 ## Current Capabilities
 
