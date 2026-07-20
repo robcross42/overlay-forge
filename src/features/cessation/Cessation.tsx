@@ -9,6 +9,7 @@ import {
   updateSmokingCigaretteCount
 } from "../../services/smokingCessation";
 import type { SmokingCessationSettings, SmokingEvent } from "../../services/smokingCessation";
+import { formatUnknownError as formatError } from "../../utils/errors";
 
 type GraphRange = "day" | "week" | "month" | "year";
 
@@ -447,8 +448,4 @@ function formatTimeOnly(date: Date) {
 
 function formatDateTimeFromDate(date: Date) {
   return `${localDateKey(date)} ${formatTimeOnly(date)}`;
-}
-
-function formatError(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
 }

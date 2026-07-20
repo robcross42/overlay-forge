@@ -9,12 +9,17 @@ import {
   clearGearBlocksMarkers,
   createGame,
   createGameBuildGuideFromChat,
+  createGameCharacterBuild,
   createGameChatConversation,
   createGameChatScreenshotCapture,
   createGameScreenshotCaptureRequest,
   decodeGearBlocksConstructionFile,
+  deleteGameBuildGuide,
+  deleteGameCharacterBuild,
   getGearBlocksThirdPartyDependencyStatus,
   importGameBuildGuideMarkdown,
+  importGameBuildGuideUrl,
+  importGearBlocksOfficialApiDocs,
   installGearBlocksLuaExporter,
   importGearBlocksCatalogScreenshotImages,
   importGearBlocksRuntimePartIndex,
@@ -23,6 +28,7 @@ import {
   deleteGameScreenshot,
   deleteGame,
   listGameChatConversations,
+  listGameCharacterBuilds,
   listGameDataLocations,
   listGameChatMessages,
   listGameCatalogObjects,
@@ -36,16 +42,20 @@ import {
   listGameScreenshots,
   openGameBuildGuideOverlayWindow,
   saveGameDataLocation,
+  setActiveGameCharacterBuild,
   setGameRuntimePartDisplayImage,
   sendGameChatMessage,
   sendGearBlocksMarkerCommands,
   syncGearBlocksRuntimeContext,
   syncGearBlocksSavedConstructions,
+  updateGameCharacterBuild,
   updateGameRuntimePartNotes
 } from "../../services/gaming";
 import type {
   Game,
   GameBuildGuide,
+  GameCharacterBuild,
+  GameCharacterBuildInput,
   GameChatConversation,
   GameChatMessage,
   GameCatalogObject,
@@ -64,6 +74,20 @@ import type {
   GamePartCategory,
   GameScreenshotCaptureRequest
 } from "../../services/gaming";
+import { timestampLabel } from "../../utils/datetime";
+import { formatUnknownError as formatError } from "../../utils/errors";
+import {
+  getSupportedGameModule,
+  isSupportedGameModuleView,
+  PATH_OF_EXILE_2_SLUG,
+  THE_SPELL_BRIGADE_SLUG
+} from "./gameModules";
+import type {
+  SupportedGameModule,
+  SupportedGameModuleSection,
+  SupportedGameModuleView
+} from "./gameModules";
+import { GameContextPicker } from "./GameContextPicker";
 
 type GamingProps = {
   chatOverlayMode?: boolean;
@@ -94,6 +118,21 @@ type ScreenshotContextMenu = {
   y: number;
 };
 
+type PathOfExile2BuildDraft = {
+  title: string;
+  characterClass: string;
+  ascendancy: string;
+  buildRole: string;
+  status: string;
+  sourceLabel: string;
+  sourceUrl: string;
+  patch: string;
+  summary: string;
+  tags: string;
+  notes: string;
+  isActive: boolean;
+};
+
 type GameView =
   | "home"
   | "chat"
@@ -103,66 +142,24 @@ type GameView =
   | "api"
   | "tools"
   | "build-guides"
-  | "builds"
-  | "skill-tree"
-  | "items"
-  | "skill-gems"
-  | "support-gems"
-  | "loot-filter"
-  | "trade";
+  | SupportedGameModuleView;
 const CHAT_SCREENSHOTS_PER_PAGE = 8;
-const PATH_OF_EXILE_2_SLUG = "path-of-exile-2";
+const EMPTY_PATH_OF_EXILE_2_BUILD_DRAFT: PathOfExile2BuildDraft = {
+  title: "",
+  characterClass: "",
+  ascendancy: "",
+  buildRole: "",
+  status: "planned",
+  sourceLabel: "",
+  sourceUrl: "",
+  patch: "",
+  summary: "",
+  tags: "",
+  notes: "",
+  isActive: false
+};
 const ENABLE_GEARBLOCKS_MARKERS = false;
 const ENABLE_GEARBLOCKS_PLUGIN_STATUS = false;
-const PATH_OF_EXILE_2_SECTIONS: Array<{
-  view: GameView;
-  label: string;
-  eyebrow: string;
-  description: string;
-}> = [
-  {
-    view: "builds",
-    label: "Builds",
-    eyebrow: "Character Planning",
-    description: "Planned location for character builds, ascendancy choices, campaign notes, and endgame goals."
-  },
-  {
-    view: "skill-tree",
-    label: "Skill Tree",
-    eyebrow: "Passive Planning",
-    description: "Planned location for passive tree routes, keystones, weapon swaps, and respec notes."
-  },
-  {
-    view: "items",
-    label: "Items",
-    eyebrow: "Equipment",
-    description: "Planned location for gear targets, rare item notes, uniques, affixes, and upgrade priorities."
-  },
-  {
-    view: "skill-gems",
-    label: "Skill Gems",
-    eyebrow: "Active Skills",
-    description: "Planned location for active skill gems, gem levels, quality notes, and socket groups."
-  },
-  {
-    view: "support-gems",
-    label: "Support Gems",
-    eyebrow: "Links",
-    description: "Planned location for support gem combinations, damage conversions, and utility links."
-  },
-  {
-    view: "loot-filter",
-    label: "Loot Filter",
-    eyebrow: "Drops",
-    description: "Planned location for loot filter rules, strictness profiles, currency visibility, and leveling presets."
-  },
-  {
-    view: "trade",
-    label: "Trade",
-    eyebrow: "Market",
-    description: "Planned location for trade searches, price notes, acquisition targets, and economy references."
-  }
-];
 const GEARBLOCKS_PARTS_CATALOG_METADATA = {
   gameVersion: "0.8.96622",
   completeness: "Complete",
@@ -232,6 +229,7 @@ export function Gaming({
     null
   );
   const [isLoadingGearBlocksApiCatalog, setIsLoadingGearBlocksApiCatalog] = useState(false);
+  const [isImportingGearBlocksApiDocs, setIsImportingGearBlocksApiDocs] = useState(false);
   const [isImportingRuntimeExports, setIsImportingRuntimeExports] = useState(false);
   const [isImportingCatalogScreenshot, setIsImportingCatalogScreenshot] = useState(false);
   const [isClearingRuntimeCategoryImages, setIsClearingRuntimeCategoryImages] = useState(false);
@@ -248,8 +246,21 @@ export function Gaming({
   const [chatMessages, setChatMessages] = useState<GameChatMessage[]>([]);
   const [buildGuides, setBuildGuides] = useState<GameBuildGuide[]>([]);
   const [isImportingBuildGuide, setIsImportingBuildGuide] = useState(false);
+  const [isImportingBuildGuideUrl, setIsImportingBuildGuideUrl] = useState(false);
+  const [buildGuideImportProgressFrame, setBuildGuideImportProgressFrame] = useState(0);
   const [isGeneratingBuildGuide, setIsGeneratingBuildGuide] = useState(false);
   const [isOpeningBuildGuide, setIsOpeningBuildGuide] = useState(false);
+  const [deletingBuildGuideId, setDeletingBuildGuideId] = useState<number | null>(null);
+  const [pathOfExile2Builds, setPathOfExile2Builds] = useState<GameCharacterBuild[]>([]);
+  const [pathOfExile2BuildDraft, setPathOfExile2BuildDraft] =
+    useState<PathOfExile2BuildDraft>(EMPTY_PATH_OF_EXILE_2_BUILD_DRAFT);
+  const [editingPathOfExile2BuildId, setEditingPathOfExile2BuildId] = useState<number | null>(
+    null
+  );
+  const [isSavingPathOfExile2Build, setIsSavingPathOfExile2Build] = useState(false);
+  const [deletingPathOfExile2BuildId, setDeletingPathOfExile2BuildId] = useState<number | null>(
+    null
+  );
   const [newChatTitle, setNewChatTitle] = useState("");
   const [chatDraft, setChatDraft] = useState("");
   const [isSendingChat, setIsSendingChat] = useState(false);
@@ -267,6 +278,10 @@ export function Gaming({
   const selectedGame = useMemo(
     () => gameSections.find((game) => game.id === selectedGameId) ?? null,
     [gameSections, selectedGameId]
+  );
+  const selectedGameModule = useMemo(
+    () => (selectedGame ? getSupportedGameModule(selectedGame.slug) : null),
+    [selectedGame?.slug]
   );
   const displayedParts = useMemo(
     () =>
@@ -365,12 +380,12 @@ export function Gaming({
   useEffect(() => {
     if (
       selectedGame &&
-      selectedGame.slug !== PATH_OF_EXILE_2_SLUG &&
-      PATH_OF_EXILE_2_SECTIONS.some((section) => section.view === gameView)
+      !selectedGameModule?.sections.some((section) => section.view === gameView) &&
+      isSupportedGameModuleView(gameView)
     ) {
       setGameView("home");
     }
-  }, [gameView, selectedGame?.id, selectedGame?.slug]);
+  }, [gameView, selectedGame?.id, selectedGameModule]);
 
   useEffect(() => {
     if (!selectedGame) {
@@ -408,8 +423,16 @@ export function Gaming({
       setChatMessages([]);
       setBuildGuides([]);
       setIsImportingBuildGuide(false);
+      setIsImportingBuildGuideUrl(false);
+      setBuildGuideImportProgressFrame(0);
       setIsGeneratingBuildGuide(false);
       setIsOpeningBuildGuide(false);
+      setDeletingBuildGuideId(null);
+      setPathOfExile2Builds([]);
+      setPathOfExile2BuildDraft(EMPTY_PATH_OF_EXILE_2_BUILD_DRAFT);
+      setEditingPathOfExile2BuildId(null);
+      setIsSavingPathOfExile2Build(false);
+      setDeletingPathOfExile2BuildId(null);
       setSelectedPromptScreenshotIds([]);
       setChatScreenshotPage(0);
       setIsChatScreenshotPickerOpen(false);
@@ -453,6 +476,17 @@ export function Gaming({
     listGameBuildGuides(selectedGame.id)
       .then(setBuildGuides)
       .catch((error) => setStatus(formatError(error)));
+    if (selectedGame.slug === PATH_OF_EXILE_2_SLUG) {
+      listGameCharacterBuilds(selectedGame.id)
+        .then(setPathOfExile2Builds)
+        .catch((error) => setStatus(formatError(error)));
+    } else {
+      setPathOfExile2Builds([]);
+      setPathOfExile2BuildDraft(EMPTY_PATH_OF_EXILE_2_BUILD_DRAFT);
+      setEditingPathOfExile2BuildId(null);
+      setIsSavingPathOfExile2Build(false);
+      setDeletingPathOfExile2BuildId(null);
+    }
     listGameChatConversations(selectedGame.id)
       .then((conversations) => {
         setChatConversations(conversations);
@@ -465,6 +499,19 @@ export function Gaming({
       })
       .catch((error) => setStatus(formatError(error)));
   }, [selectedGame?.id]);
+
+  useEffect(() => {
+    if (!isImportingBuildGuide && !isImportingBuildGuideUrl) {
+      setBuildGuideImportProgressFrame(0);
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setBuildGuideImportProgressFrame((current) => (current + 1) % 3);
+    }, 450);
+
+    return () => window.clearInterval(intervalId);
+  }, [isImportingBuildGuide, isImportingBuildGuideUrl]);
 
   useEffect(() => {
     if (!navAction || !navAction.gameId) {
@@ -654,7 +701,7 @@ export function Gaming({
     try {
       const request = await createGameScreenshotCaptureRequest(
         game.id,
-        screenshotTimestampLabel(new Date())
+        timestampLabel(new Date())
       );
       setScreenshots((current) => [request, ...current.filter((item) => item.id !== request.id)]);
       setChatScreenshotPage(0);
@@ -678,7 +725,7 @@ export function Gaming({
     try {
       const request = await createGameChatScreenshotCapture(
         game.id,
-        screenshotTimestampLabel(new Date())
+        timestampLabel(new Date())
       );
       setScreenshots((current) => [request, ...current.filter((item) => item.id !== request.id)]);
       setSelectedPromptScreenshotIds((current) =>
@@ -793,7 +840,7 @@ export function Gaming({
     }
   }
 
-  async function sendGameChat() {
+  async function sendGameChat(includeSceneDiff = false) {
     if (!selectedChatConversationId) {
       setStatus("Create or select a chat first");
       return;
@@ -816,13 +863,14 @@ export function Gaming({
     setChatDraft("");
     setIsSendingChat(true);
     setChatMessages((current) => [...current, pendingMessage]);
-    setStatus("Waiting for OpenAI");
+    setStatus(includeSceneDiff ? "Including scene diff" : "Waiting for OpenAI");
 
     try {
       const nextMessages = await sendGameChatMessage(
         selectedChatConversationId,
         content,
-        selectedPromptScreenshotIds
+        selectedPromptScreenshotIds,
+        includeSceneDiff
       );
       setChatMessages(nextMessages);
       setSelectedPromptScreenshotIds([]);
@@ -1040,6 +1088,31 @@ export function Gaming({
     }
   }
 
+  async function importBuildGuideFromUrl(game: Game) {
+    const guideUrl = window.prompt("Steam build guide URL");
+    if (!guideUrl?.trim()) {
+      setStatus("Build guide URL import cancelled");
+      return;
+    }
+
+    setIsImportingBuildGuideUrl(true);
+    setStatus("Importing build guide URL");
+    try {
+      const imported = await importGameBuildGuideUrl(game.id, guideUrl.trim());
+      const guides = await listGameBuildGuides(game.id);
+      setBuildGuides(guides);
+      setStatus(
+        `Imported URL guide "${imported.guide.title}" with ${imported.parts.length} part row(s), ${imported.steps.length} step(s), and ${imported.imageReferenceCount} image reference(s)`
+      );
+      showToast("Successful");
+    } catch (error) {
+      setStatus(formatError(error));
+      window.alert(formatError(error));
+    } finally {
+      setIsImportingBuildGuideUrl(false);
+    }
+  }
+
   async function openBuildGuideOverlay(game: Game, guide: GameBuildGuide) {
     setIsOpeningBuildGuide(true);
     try {
@@ -1058,6 +1131,114 @@ export function Gaming({
       window.alert(formatError(error));
     } finally {
       setIsOpeningBuildGuide(false);
+    }
+  }
+
+  async function removeBuildGuide(guide: GameBuildGuide) {
+    if (!window.confirm(`Delete build guide "${guide.title}"?`)) {
+      return;
+    }
+
+    setDeletingBuildGuideId(guide.id);
+    try {
+      await deleteGameBuildGuide(guide.id);
+      setBuildGuides((current) => current.filter((item) => item.id !== guide.id));
+      clearStoredBuildGuideSelection(guide.id);
+      setStatus("Build guide deleted");
+    } catch (error) {
+      setStatus(formatError(error));
+      window.alert(formatError(error));
+    } finally {
+      setDeletingBuildGuideId(null);
+    }
+  }
+
+  async function refreshPathOfExile2Builds(gameId: number) {
+    try {
+      const builds = await listGameCharacterBuilds(gameId);
+      setPathOfExile2Builds(builds);
+      return builds;
+    } catch (error) {
+      setStatus(formatError(error));
+      return null;
+    }
+  }
+
+  function startNewPathOfExile2Build() {
+    setEditingPathOfExile2BuildId(null);
+    setPathOfExile2BuildDraft({
+      ...EMPTY_PATH_OF_EXILE_2_BUILD_DRAFT,
+      status: "planned",
+      isActive: pathOfExile2Builds.length === 0
+    });
+  }
+
+  function editPathOfExile2Build(build: GameCharacterBuild) {
+    setEditingPathOfExile2BuildId(build.id);
+    setPathOfExile2BuildDraft(gameCharacterBuildToDraft(build));
+  }
+
+  async function savePathOfExile2Build(game: Game) {
+    if (game.slug !== PATH_OF_EXILE_2_SLUG) {
+      return;
+    }
+    if (!pathOfExile2BuildDraft.title.trim()) {
+      setStatus("Build title is required");
+      return;
+    }
+
+    setIsSavingPathOfExile2Build(true);
+    try {
+      const input = gameCharacterBuildDraftToInput(game.id, pathOfExile2BuildDraft);
+      const saved =
+        editingPathOfExile2BuildId === null
+          ? await createGameCharacterBuild(input)
+          : await updateGameCharacterBuild(editingPathOfExile2BuildId, input);
+      await refreshPathOfExile2Builds(game.id);
+      setEditingPathOfExile2BuildId(saved.id);
+      setPathOfExile2BuildDraft(gameCharacterBuildToDraft(saved));
+      setStatus(`Saved POE2 build "${saved.title}"`);
+      showToast("Build saved");
+    } catch (error) {
+      setStatus(formatError(error));
+      window.alert(formatError(error));
+    } finally {
+      setIsSavingPathOfExile2Build(false);
+    }
+  }
+
+  async function activatePathOfExile2Build(game: Game, build: GameCharacterBuild) {
+    if (game.slug !== PATH_OF_EXILE_2_SLUG) {
+      return;
+    }
+    try {
+      const active = await setActiveGameCharacterBuild(build.id);
+      await refreshPathOfExile2Builds(game.id);
+      setStatus(`Active POE2 build set to "${active.title}"`);
+    } catch (error) {
+      setStatus(formatError(error));
+    }
+  }
+
+  async function removePathOfExile2Build(game: Game, build: GameCharacterBuild) {
+    if (!window.confirm(`Delete POE2 build "${build.title}"?`)) {
+      return;
+    }
+
+    setDeletingPathOfExile2BuildId(build.id);
+    try {
+      await deleteGameCharacterBuild(build.id);
+      await refreshPathOfExile2Builds(game.id);
+      if (editingPathOfExile2BuildId === build.id) {
+        setEditingPathOfExile2BuildId(null);
+        setPathOfExile2BuildDraft(EMPTY_PATH_OF_EXILE_2_BUILD_DRAFT);
+      }
+      setStatus("POE2 build deleted");
+    } catch (error) {
+      setStatus(formatError(error));
+      window.alert(formatError(error));
+    } finally {
+      setDeletingPathOfExile2BuildId(null);
     }
   }
 
@@ -1098,6 +1279,21 @@ export function Gaming({
       setStatus(formatError(error));
     } finally {
       setIsLoadingGearBlocksApiCatalog(false);
+    }
+  }
+
+  async function importOfficialGearBlocksApiDocs() {
+    setIsImportingGearBlocksApiDocs(true);
+    try {
+      const result = await importGearBlocksOfficialApiDocs();
+      setStatus(
+        `Imported ${result.importedTypeCount} GearBlocks API types, ${result.importedMemberCount} members, ${result.importedParameterCount} parameters, and ${result.importedEnumValueCount} enum values from ${result.fetchedPages} official docs pages.`
+      );
+      await refreshGearBlocksApiCatalog();
+    } catch (error) {
+      setStatus(formatError(error));
+    } finally {
+      setIsImportingGearBlocksApiDocs(false);
     }
   }
 
@@ -1347,6 +1543,17 @@ export function Gaming({
 
         {!chatOverlayMode && (
         <div className="game-canvas-toolbar" aria-label="Game workspace actions">
+          <GameContextPicker
+            games={gameSections}
+            onSelectGame={(gameId) => {
+              setGameView("home");
+              setSelectedPromptScreenshotIds([]);
+              setIsChatScreenshotPickerOpen(false);
+              onSelectGame(gameId);
+              setStatus("Game context selected");
+            }}
+            selectedGame={selectedGame}
+          />
           <button
             className={gameView === "home" ? "primary-button" : "ghost-button"}
             onClick={() => setGameView("home")}
@@ -1400,8 +1607,9 @@ export function Gaming({
               <span className="button-count">{buildGuides.length}</span>
             </button>
           )}
-          {selectedGame.slug === PATH_OF_EXILE_2_SLUG ? (
-            PATH_OF_EXILE_2_SECTIONS.map((section) => (
+          {selectedGameModule ? (
+            <>
+            {selectedGameModule.sections.map((section) => (
               <button
                 className={gameView === section.view ? "primary-button" : "ghost-button"}
                 key={section.view}
@@ -1410,7 +1618,18 @@ export function Gaming({
               >
                 {section.label}
               </button>
-            ))
+            ))}
+            {selectedGameModule.showScreenshots && (
+              <button
+                className={gameView === "screenshots" ? "primary-button" : "ghost-button"}
+                onClick={() => setGameView("screenshots")}
+                type="button"
+              >
+                Screenshots
+                <span className="button-count">{screenshots.length}</span>
+              </button>
+            )}
+            </>
           ) : (
             <>
               <button
@@ -1724,7 +1943,7 @@ export function Gaming({
                   )}
                 </section>
               )}
-              {selectedGame.slug === PATH_OF_EXILE_2_SLUG && <PathOfExile2HomeScaffold />}
+              {selectedGameModule && <GameModuleHomeScaffold module={selectedGameModule} />}
             </section>
           )}
 
@@ -1774,14 +1993,24 @@ export function Gaming({
                   <p>GearBlocks</p>
                   <h3>API Catalog</h3>
                 </div>
-                <button
-                  className="ghost-button"
-                  disabled={isLoadingGearBlocksApiCatalog}
-                  onClick={() => void refreshGearBlocksApiCatalog()}
-                  type="button"
-                >
-                  Refresh
-                </button>
+                <div className="game-view-actions">
+                  <button
+                    className="ghost-button"
+                    disabled={isLoadingGearBlocksApiCatalog || isImportingGearBlocksApiDocs}
+                    onClick={() => void refreshGearBlocksApiCatalog()}
+                    type="button"
+                  >
+                    Refresh
+                  </button>
+                  <button
+                    className="ghost-button"
+                    disabled={isLoadingGearBlocksApiCatalog || isImportingGearBlocksApiDocs}
+                    onClick={() => void importOfficialGearBlocksApiDocs()}
+                    type="button"
+                  >
+                    {isImportingGearBlocksApiDocs ? "Importing" : "Import Official Docs"}
+                  </button>
+                </div>
               </div>
 
               {!gearBlocksApiCatalog ? (
@@ -1942,14 +2171,28 @@ export function Gaming({
                   <p>GearBlocks</p>
                   <h3>Build Guides</h3>
                 </div>
-                <button
-                  className="primary-button"
-                  disabled={isImportingBuildGuide}
-                  onClick={() => void importBuildGuide(selectedGame)}
-                  type="button"
-                >
-                  Import Markdown
-                </button>
+                <div className="game-build-guide-header-actions">
+                  <button
+                    className="primary-button"
+                    disabled={isImportingBuildGuide || isImportingBuildGuideUrl}
+                    onClick={() => void importBuildGuideFromUrl(selectedGame)}
+                    type="button"
+                  >
+                    {isImportingBuildGuideUrl
+                      ? buildGuideImportProgressLabel(buildGuideImportProgressFrame)
+                      : "Import URL"}
+                  </button>
+                  <button
+                    className="primary-button"
+                    disabled={isImportingBuildGuide || isImportingBuildGuideUrl}
+                    onClick={() => void importBuildGuide(selectedGame)}
+                    type="button"
+                  >
+                    {isImportingBuildGuide
+                      ? buildGuideImportProgressLabel(buildGuideImportProgressFrame)
+                      : "Import Markdown"}
+                  </button>
+                </div>
               </div>
 
               <p>
@@ -1972,14 +2215,25 @@ export function Gaming({
                         <span>{guide.buildGoal || "No build goal summary found."}</span>
                         <code>{guide.sourcePath || "Imported Markdown"}</code>
                       </div>
-                      <button
-                        className="primary-button"
-                        disabled={isOpeningBuildGuide}
-                        onClick={() => void openBuildGuideOverlay(selectedGame, guide)}
-                        type="button"
-                      >
-                        Open
-                      </button>
+                      <div className="game-build-guide-actions">
+                        <button
+                          className="primary-button"
+                          disabled={isOpeningBuildGuide || deletingBuildGuideId === guide.id}
+                          onClick={() => void openBuildGuideOverlay(selectedGame, guide)}
+                          type="button"
+                        >
+                          Open
+                        </button>
+                        <button
+                          aria-label={`Delete ${guide.title}`}
+                          className="primary-button"
+                          disabled={deletingBuildGuideId === guide.id}
+                          onClick={() => void removeBuildGuide(guide)}
+                          type="button"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </article>
                   ))}
                 </div>
@@ -2135,18 +2389,37 @@ export function Gaming({
               inputPlaceholder={`Ask about ${selectedGame.name}...`}
               inputActionSlot={
                 selectedGame.slug === "gearblocks" ? (
-                  <button
-                    className="ghost-button chat-input-extra-action"
-                    disabled={
-                      isGeneratingBuildGuide ||
-                      isSendingChat ||
-                      !selectedChatConversationId
-                    }
-                    onClick={() => void generateBuildGuideFromChat()}
-                    type="button"
-                  >
-                    Guide
-                  </button>
+                  <>
+                    <button
+                      aria-label="Generate build guide"
+                      className="ghost-button chat-input-extra-action"
+                      disabled={
+                        isGeneratingBuildGuide ||
+                        isSendingChat ||
+                        !selectedChatConversationId
+                      }
+                      onClick={() => void generateBuildGuideFromChat()}
+                      title="Guide"
+                      type="button"
+                    >
+                      G
+                    </button>
+                    <button
+                      aria-label="Send with latest scene diff"
+                      className="ghost-button chat-input-extra-action"
+                      disabled={
+                        isGeneratingBuildGuide ||
+                        isSendingChat ||
+                        !selectedChatConversationId ||
+                        chatDraft.trim().length === 0
+                      }
+                      onClick={() => void sendGameChat(true)}
+                      title="Diff"
+                      type="button"
+                    >
+                      D↑
+                    </button>
+                  </>
                 ) : null
               }
               isSending={isSendingChat}
@@ -2168,7 +2441,7 @@ export function Gaming({
                 setSelectedPromptScreenshotIds([]);
                 setIsChatScreenshotPickerOpen(false);
               }}
-              onSendMessage={() => void sendGameChat()}
+              onSendMessage={() => void sendGameChat(false)}
               renderMessageContent={(message) => {
                 const content =
                   selectedGame.slug === "gearblocks" && message.role === "assistant"
@@ -2218,9 +2491,35 @@ export function Gaming({
           )}
 
           {selectedGame.slug === PATH_OF_EXILE_2_SLUG &&
-            PATH_OF_EXILE_2_SECTIONS.map((section) =>
+            selectedGameModule?.sections.map((section) =>
               gameView === section.view ? (
-                <PathOfExile2SectionScaffold key={section.view} section={section} />
+                <PathOfExile2SectionScaffold
+                  builds={pathOfExile2Builds}
+                  deletingBuildId={deletingPathOfExile2BuildId}
+                  draft={pathOfExile2BuildDraft}
+                  editingBuildId={editingPathOfExile2BuildId}
+                  game={selectedGame}
+                  isSaving={isSavingPathOfExile2Build}
+                  key={section.view}
+                  onActivateBuild={activatePathOfExile2Build}
+                  onDeleteBuild={removePathOfExile2Build}
+                  onDraftChange={setPathOfExile2BuildDraft}
+                  onEditBuild={editPathOfExile2Build}
+                  onNewBuild={startNewPathOfExile2Build}
+                  onSaveBuild={savePathOfExile2Build}
+                  section={section}
+                />
+              ) : null
+            )}
+
+          {selectedGame.slug === THE_SPELL_BRIGADE_SLUG &&
+            selectedGameModule?.sections.map((section) =>
+              gameView === section.view ? (
+                <GameModuleSectionScaffold
+                  gameName={selectedGame.name}
+                  key={section.view}
+                  section={section}
+                />
               ) : null
             )}
 
@@ -2722,10 +3021,6 @@ export function Gaming({
   );
 }
 
-function formatError(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
-
 function stripGearBlocksMarkerBlocks(content: string) {
   return content
     .replace(/```overlay-forge-markers\s*[\s\S]*?```/gi, "")
@@ -2795,20 +3090,6 @@ function parseJsonOrFallback(value: string, fallback: unknown) {
   }
 }
 
-function screenshotTimestampLabel(date: Date) {
-  const year = date.getFullYear();
-  const month = padDatePart(date.getMonth() + 1);
-  const day = padDatePart(date.getDate());
-  const hours = padDatePart(date.getHours());
-  const minutes = padDatePart(date.getMinutes());
-  const seconds = padDatePart(date.getSeconds());
-
-  return `${year}${month}${day}_${hours}${minutes}${seconds}`;
-}
-
-function padDatePart(value: number) {
-  return value.toString().padStart(2, "0");
-}
 
 function formatCapturedAt(screenshot: GameScreenshotCaptureRequest) {
   const value = screenshot.capturedAt || screenshot.createdAt;
@@ -2967,18 +3248,18 @@ function RuntimePartApiMemberFlags({ member }: { member: GameRuntimePartApiMembe
   );
 }
 
-function PathOfExile2HomeScaffold() {
+function GameModuleHomeScaffold({ module }: { module: SupportedGameModule }) {
   return (
-    <section className="poe2-home-scaffold" aria-label="Path of Exile 2 module sections">
+    <section className="game-module-home-scaffold" aria-label={`${module.name} module sections`}>
       <div className="game-data-locations-head">
         <div>
-          <p>Module Scaffold</p>
-          <h4>Path of Exile 2</h4>
+          <p>{module.eyebrow}</p>
+          <h4>{module.name}</h4>
         </div>
       </div>
-      <div className="poe2-section-grid">
-        {PATH_OF_EXILE_2_SECTIONS.map((section) => (
-          <article className="poe2-section-card" key={section.view}>
+      <div className="game-module-section-grid">
+        {module.sections.map((section) => (
+          <article className="game-module-section-card" key={section.view}>
             <div>
               <p>{section.eyebrow}</p>
               <h4>{section.label}</h4>
@@ -2991,11 +3272,61 @@ function PathOfExile2HomeScaffold() {
   );
 }
 
-function PathOfExile2SectionScaffold({
+function GameModuleSectionScaffold({
+  gameName,
   section
 }: {
-  section: (typeof PATH_OF_EXILE_2_SECTIONS)[number];
+  gameName: string;
+  section: SupportedGameModuleSection;
 }) {
+  return (
+    <section className="game-module-section-panel" aria-label={`${gameName} ${section.label}`}>
+      <div className="game-view-head">
+        <div>
+          <p>{section.eyebrow}</p>
+          <h3>{section.label}</h3>
+        </div>
+      </div>
+      <article className="game-module-section-card large">
+        <p>Local-first workspace</p>
+        <h4>{section.label}</h4>
+        <span>{section.description}</span>
+      </article>
+    </section>
+  );
+}
+
+function PathOfExile2SectionScaffold({
+  builds,
+  deletingBuildId,
+  draft,
+  editingBuildId,
+  game,
+  isSaving,
+  onActivateBuild,
+  onDeleteBuild,
+  onDraftChange,
+  onEditBuild,
+  onNewBuild,
+  onSaveBuild,
+  section
+}: {
+  builds: GameCharacterBuild[];
+  deletingBuildId: number | null;
+  draft: PathOfExile2BuildDraft;
+  editingBuildId: number | null;
+  game: Game;
+  isSaving: boolean;
+  onActivateBuild: (game: Game, build: GameCharacterBuild) => void | Promise<void>;
+  onDeleteBuild: (game: Game, build: GameCharacterBuild) => void | Promise<void>;
+  onDraftChange: (draft: PathOfExile2BuildDraft) => void;
+  onEditBuild: (build: GameCharacterBuild) => void;
+  onNewBuild: () => void;
+  onSaveBuild: (game: Game) => void | Promise<void>;
+  section: SupportedGameModuleSection;
+}) {
+  const isBuildsSection = section.view === "builds";
+
   return (
     <section className="poe2-section-panel" aria-label={`Path of Exile 2 ${section.label}`}>
       <div className="game-view-head">
@@ -3004,15 +3335,346 @@ function PathOfExile2SectionScaffold({
           <h3>{section.label}</h3>
         </div>
       </div>
-      <article className="poe2-section-card large">
-        <div>
-          <p>Scaffold</p>
-          <h4>{section.label}</h4>
-        </div>
-        <span>{section.description}</span>
-      </article>
+      {isBuildsSection ? (
+        <PathOfExile2BuildsPanel
+          builds={builds}
+          deletingBuildId={deletingBuildId}
+          draft={draft}
+          editingBuildId={editingBuildId}
+          game={game}
+          isSaving={isSaving}
+          onActivateBuild={onActivateBuild}
+          onDeleteBuild={onDeleteBuild}
+          onDraftChange={onDraftChange}
+          onEditBuild={onEditBuild}
+          onNewBuild={onNewBuild}
+          onSaveBuild={onSaveBuild}
+        />
+      ) : (
+        <article className="poe2-section-card large">
+          <div>
+            <p>Scaffold</p>
+            <h4>{section.label}</h4>
+          </div>
+          <span>{section.description}</span>
+        </article>
+      )}
     </section>
   );
+}
+
+function PathOfExile2BuildsPanel({
+  builds,
+  deletingBuildId,
+  draft,
+  editingBuildId,
+  game,
+  isSaving,
+  onActivateBuild,
+  onDeleteBuild,
+  onDraftChange,
+  onEditBuild,
+  onNewBuild,
+  onSaveBuild
+}: {
+  builds: GameCharacterBuild[];
+  deletingBuildId: number | null;
+  draft: PathOfExile2BuildDraft;
+  editingBuildId: number | null;
+  game: Game;
+  isSaving: boolean;
+  onActivateBuild: (game: Game, build: GameCharacterBuild) => void | Promise<void>;
+  onDeleteBuild: (game: Game, build: GameCharacterBuild) => void | Promise<void>;
+  onDraftChange: (draft: PathOfExile2BuildDraft) => void;
+  onEditBuild: (build: GameCharacterBuild) => void;
+  onNewBuild: () => void;
+  onSaveBuild: (game: Game) => void | Promise<void>;
+}) {
+  const updateDraft = <K extends keyof PathOfExile2BuildDraft>(
+    key: K,
+    value: PathOfExile2BuildDraft[K]
+  ) => {
+    onDraftChange({ ...draft, [key]: value });
+  };
+
+  return (
+    <div className="poe2-build-workspace">
+      <section className="poe2-build-list" aria-label="Path of Exile 2 builds">
+        <div className="poe2-build-list-head">
+          <div>
+            <p>Local Builds</p>
+            <h4>{builds.length} build{builds.length === 1 ? "" : "s"}</h4>
+          </div>
+          <button className="ghost-button" onClick={onNewBuild} type="button">
+            New Build
+          </button>
+        </div>
+
+        {builds.length === 0 ? (
+          <article className="poe2-section-card large">
+            <div>
+              <p>Planner</p>
+              <h4>No builds saved</h4>
+            </div>
+            <span>Local character builds will appear here.</span>
+          </article>
+        ) : (
+          <div className="poe2-build-card-list">
+            {builds.map((build) => (
+              <article
+                className={
+                  build.id === editingBuildId ? "poe2-build-card selected" : "poe2-build-card"
+                }
+                key={build.id}
+              >
+                <div className="poe2-build-card-head">
+                  <div>
+                    <p>{build.isActive ? "Active" : formatPathOfExile2BuildStatus(build.status)}</p>
+                    <h4>{build.title}</h4>
+                  </div>
+                  {build.patch && <span>{build.patch}</span>}
+                </div>
+                <div className="poe2-current-build-meta">
+                  {build.characterClass && <span>{build.characterClass}</span>}
+                  {build.ascendancy && <span>{build.ascendancy}</span>}
+                  {build.buildRole && <span>{build.buildRole}</span>}
+                </div>
+                {build.summary && <p>{build.summary}</p>}
+                {splitPathOfExile2BuildTags(build.tags).length > 0 && (
+                  <div className="poe2-current-build-tags">
+                    {splitPathOfExile2BuildTags(build.tags).map((tag) => (
+                      <span key={tag}>{tag}</span>
+                    ))}
+                  </div>
+                )}
+                <div className="poe2-current-build-actions">
+                  <button className="ghost-button" onClick={() => onEditBuild(build)} type="button">
+                    Edit
+                  </button>
+                  <button
+                    className="ghost-button"
+                    disabled={build.isActive}
+                    onClick={() => void onActivateBuild(game, build)}
+                    type="button"
+                  >
+                    Set Active
+                  </button>
+                  {build.sourceUrl && (
+                    <a href={build.sourceUrl} rel="noreferrer" target="_blank">
+                      Open {build.sourceLabel || "Source"}
+                    </a>
+                  )}
+                  <button
+                    className="ghost-button"
+                    disabled={deletingBuildId === build.id}
+                    onClick={() => void onDeleteBuild(game, build)}
+                    type="button"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="poe2-build-editor" aria-label="Path of Exile 2 build editor">
+        <div className="poe2-build-list-head">
+          <div>
+            <p>{editingBuildId === null ? "New Build" : "Build Details"}</p>
+            <h4>{draft.title || "Untitled build"}</h4>
+          </div>
+          <label className="toggle-row compact">
+            <input
+              checked={draft.isActive}
+              onChange={(event) => updateDraft("isActive", event.target.checked)}
+              type="checkbox"
+            />
+            <span>Active</span>
+          </label>
+        </div>
+
+        <div className="poe2-build-form-grid">
+          <label>
+            <span>Title</span>
+            <input
+              className="text-input"
+              onChange={(event) => updateDraft("title", event.target.value)}
+              value={draft.title}
+            />
+          </label>
+          <label>
+            <span>Status</span>
+            <select
+              className="text-input"
+              onChange={(event) => updateDraft("status", event.target.value)}
+              value={draft.status}
+            >
+              <option value="planned">Planned</option>
+              <option value="currently_playing">Currently Playing</option>
+              <option value="active">Active</option>
+              <option value="archived">Archived</option>
+            </select>
+          </label>
+          <label>
+            <span>Class</span>
+            <input
+              className="text-input"
+              onChange={(event) => updateDraft("characterClass", event.target.value)}
+              value={draft.characterClass}
+            />
+          </label>
+          <label>
+            <span>Ascendancy</span>
+            <input
+              className="text-input"
+              onChange={(event) => updateDraft("ascendancy", event.target.value)}
+              value={draft.ascendancy}
+            />
+          </label>
+          <label>
+            <span>Role</span>
+            <input
+              className="text-input"
+              onChange={(event) => updateDraft("buildRole", event.target.value)}
+              value={draft.buildRole}
+            />
+          </label>
+          <label>
+            <span>Patch</span>
+            <input
+              className="text-input"
+              onChange={(event) => updateDraft("patch", event.target.value)}
+              value={draft.patch}
+            />
+          </label>
+          <label>
+            <span>Source</span>
+            <input
+              className="text-input"
+              onChange={(event) => updateDraft("sourceLabel", event.target.value)}
+              value={draft.sourceLabel}
+            />
+          </label>
+          <label>
+            <span>Source URL</span>
+            <input
+              className="text-input"
+              onChange={(event) => updateDraft("sourceUrl", event.target.value)}
+              value={draft.sourceUrl}
+            />
+          </label>
+          <label className="wide">
+            <span>Tags</span>
+            <input
+              className="text-input"
+              onChange={(event) => updateDraft("tags", event.target.value)}
+              value={draft.tags}
+            />
+          </label>
+          <label className="wide">
+            <span>Summary</span>
+            <textarea
+              className="text-area"
+              onChange={(event) => updateDraft("summary", event.target.value)}
+              value={draft.summary}
+            />
+          </label>
+          <label className="wide">
+            <span>Notes</span>
+            <textarea
+              className="text-area"
+              onChange={(event) => updateDraft("notes", event.target.value)}
+              value={draft.notes}
+            />
+          </label>
+        </div>
+
+        <div className="poe2-build-editor-actions">
+          <button
+            className="primary-button"
+            disabled={isSaving || draft.title.trim().length === 0}
+            onClick={() => void onSaveBuild(game)}
+            type="button"
+          >
+            Save Build
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function gameCharacterBuildToDraft(build: GameCharacterBuild): PathOfExile2BuildDraft {
+  return {
+    title: build.title,
+    characterClass: build.characterClass,
+    ascendancy: build.ascendancy,
+    buildRole: build.buildRole,
+    status: build.status,
+    sourceLabel: build.sourceLabel,
+    sourceUrl: build.sourceUrl,
+    patch: build.patch,
+    summary: build.summary,
+    tags: build.tags,
+    notes: build.notes,
+    isActive: build.isActive
+  };
+}
+
+function gameCharacterBuildDraftToInput(
+  gameId: number,
+  draft: PathOfExile2BuildDraft
+): GameCharacterBuildInput {
+  return {
+    gameId,
+    title: draft.title,
+    characterClass: draft.characterClass,
+    ascendancy: draft.ascendancy,
+    buildRole: draft.buildRole,
+    status: draft.status,
+    sourceLabel: draft.sourceLabel,
+    sourceUrl: draft.sourceUrl,
+    patch: draft.patch,
+    summary: draft.summary,
+    tags: draft.tags,
+    notes: draft.notes,
+    isActive: draft.isActive
+  };
+}
+
+function splitPathOfExile2BuildTags(value: string) {
+  return value
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
+function formatPathOfExile2BuildStatus(status: string) {
+  return status
+    .split("_")
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
+}
+
+function buildGuideImportProgressLabel(frame: number) {
+  return `Importing${".".repeat((frame % 3) + 1)}`;
+}
+
+function clearStoredBuildGuideSelection(deletedGuideId: number) {
+  try {
+    const value = window.localStorage.getItem("overlayForgeActiveBuildGuide");
+    if (!value) {
+      return;
+    }
+    const parsed = JSON.parse(value) as { guideId?: unknown };
+    if (parsed.guideId === deletedGuideId) {
+      window.localStorage.removeItem("overlayForgeActiveBuildGuide");
+    }
+  } catch {
+    window.localStorage.removeItem("overlayForgeActiveBuildGuide");
+  }
 }
 
 function GameChatDefaultsPane({

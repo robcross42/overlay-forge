@@ -25,6 +25,8 @@ import {
   setOverlayWindowOpacity,
   startOverlayDrag
 } from "../services/windowControls";
+import { timestampLabel } from "../utils/datetime";
+import { formatUnknownError as formatError } from "../utils/errors";
 
 export default function GameChatOverlayApp() {
   const [game, setGame] = useState<Game | null>(null);
@@ -160,7 +162,7 @@ export default function GameChatOverlayApp() {
     try {
       const request = await createGameChatScreenshotCapture(
         game.id,
-        screenshotTimestampLabel(new Date())
+        timestampLabel(new Date())
       );
       const attachmentKey = conversation
         ? chatAttachmentKey(game.id, conversation.id)
@@ -193,7 +195,7 @@ export default function GameChatOverlayApp() {
     await focusLastGameWindow().catch(() => false);
   }
 
-  async function sendMessage() {
+  async function sendMessage(includeSceneDiff = false) {
     if (!conversation || !draft.trim() || isSending) {
       return;
     }
@@ -210,13 +212,14 @@ export default function GameChatOverlayApp() {
     setDraft("");
     setIsSending(true);
     setMessages((current) => [...current, pendingMessage]);
-    setStatus("Waiting for OpenAI");
+    setStatus(includeSceneDiff ? "Including scene diff" : "Waiting for OpenAI");
 
     try {
       const nextMessages = await sendGameChatMessage(
         conversation.id,
         content,
-        selectedPromptScreenshotIds
+        selectedPromptScreenshotIds,
+        includeSceneDiff
       );
       setMessages(nextMessages);
       delete pendingScreenshotIdsByChatRef.current[chatAttachmentKey(conversation.gameId, conversation.id)];
@@ -304,14 +307,33 @@ export default function GameChatOverlayApp() {
             inputPlaceholder={game ? `Ask about ${game.name}...` : "Select a game chat..."}
             inputActionSlot={
               game?.slug === "gearblocks" ? (
-                <button
-                  className="ghost-button chat-input-extra-action"
-                  disabled={!conversation || isSending || isGeneratingBuildGuide}
-                  onClick={() => void generateBuildGuide()}
-                  type="button"
-                >
-                  Guide
-                </button>
+                <>
+                  <button
+                    aria-label="Generate build guide"
+                    className="ghost-button chat-input-extra-action"
+                    disabled={!conversation || isSending || isGeneratingBuildGuide}
+                    onClick={() => void generateBuildGuide()}
+                    title="Guide"
+                    type="button"
+                  >
+                    G
+                  </button>
+                  <button
+                    aria-label="Send with latest scene diff"
+                    className="ghost-button chat-input-extra-action"
+                    disabled={
+                      !conversation ||
+                      isSending ||
+                      isGeneratingBuildGuide ||
+                      draft.trim().length === 0
+                    }
+                    onClick={() => void sendMessage(true)}
+                    title="Diff"
+                    type="button"
+                  >
+                    D↑
+                  </button>
+                </>
               ) : null
             }
             isSending={isSending}
@@ -324,7 +346,7 @@ export default function GameChatOverlayApp() {
             onExitChatOverlayMode={() => void closeChatWindow()}
             onNewConversationTitleChange={() => {}}
             onSelectConversation={() => {}}
-            onSendMessage={() => void sendMessage()}
+            onSendMessage={() => void sendMessage(false)}
             promptContextSummary={
               isCapturingPromptScreenshot
                 ? "Capturing screenshot..."
@@ -344,10 +366,6 @@ export default function GameChatOverlayApp() {
   );
 }
 
-function formatError(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
-
 async function prepareChatOverlayWindow() {
   const window = getCurrentWindow();
   await window.setIgnoreCursorEvents(false).catch(() => {});
@@ -362,21 +380,6 @@ function waitForOverlayRepaint() {
   });
 }
 
-function screenshotTimestampLabel(date: Date) {
-  const year = date.getFullYear();
-  const month = padDatePart(date.getMonth() + 1);
-  const day = padDatePart(date.getDate());
-  const hours = padDatePart(date.getHours());
-  const minutes = padDatePart(date.getMinutes());
-  const seconds = padDatePart(date.getSeconds());
-
-  return `${year}${month}${day}_${hours}${minutes}${seconds}`;
-}
-
 function chatAttachmentKey(gameId: number, conversationId: number) {
   return `${gameId}:${conversationId}`;
-}
-
-function padDatePart(value: number) {
-  return value.toString().padStart(2, "0");
 }

@@ -1,10 +1,17 @@
 use crate::gearblocks_api;
+use crate::gearblocks_api_scraper::{GearBlocksApiImportResult, GearBlocksApiScrape};
 use rusqlite::{params, Connection, OptionalExtension, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Mutex, MutexGuard,
+};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+static REPAIR_RESELL_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 const MARKDOWN_CONTEXT_PER_FILE_LIMIT: usize = 200_000;
 const MARKDOWN_CONTEXT_TOTAL_LIMIT: usize = 650_000;
@@ -53,6 +60,16 @@ pub struct CalendarEventRecord {
     pub updated_at: String,
 }
 
+pub struct CalendarEventUpdateDraft<'a> {
+    pub id: i64,
+    pub title: &'a str,
+    pub start_date: &'a str,
+    pub start_time: &'a str,
+    pub end_date: &'a str,
+    pub end_time: &'a str,
+    pub notes: &'a str,
+}
+
 #[derive(Clone, Serialize)]
 pub struct SmokingEventRecord {
     pub id: i64,
@@ -79,6 +96,244 @@ pub struct SmokingCessationSettingsRecord {
     pub created_at: String,
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct RepairResellSourceRecord {
+    pub id: String,
+    #[serde(rename = "kindKey")]
+    pub kind_key: String,
+    #[serde(rename = "kindLabel")]
+    pub kind_label: String,
+    #[serde(rename = "sourceKey")]
+    pub source_key: String,
+    pub name: String,
+    #[serde(rename = "baseUrl")]
+    pub base_url: String,
+    #[serde(rename = "regionLabel")]
+    pub region_label: String,
+    #[serde(rename = "scrapeMode")]
+    pub scrape_mode: String,
+    #[serde(rename = "adapterKey")]
+    pub adapter_key: String,
+    pub enabled: bool,
+    pub priority: i64,
+    #[serde(rename = "rateLimitSeconds")]
+    pub rate_limit_seconds: i64,
+    pub notes: String,
+    #[serde(rename = "lastScrapedAt")]
+    pub last_scraped_at: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "modifiedAt")]
+    pub modified_at: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct RepairResellCategoryRecord {
+    pub id: String,
+    pub key: String,
+    pub label: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct RepairResellKeywordFlagRecord {
+    pub id: String,
+    pub key: String,
+    pub label: String,
+    #[serde(rename = "flagType")]
+    pub flag_type: String,
+    pub pattern: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct RepairResellListingRecord {
+    pub id: String,
+    #[serde(rename = "sourceId")]
+    pub source_id: String,
+    #[serde(rename = "sourceName")]
+    pub source_name: String,
+    #[serde(rename = "sourceKey")]
+    pub source_key: String,
+    #[serde(rename = "externalId")]
+    pub external_id: String,
+    #[serde(rename = "canonicalUrl")]
+    pub canonical_url: String,
+    pub title: String,
+    #[serde(rename = "normalizedTitle")]
+    pub normalized_title: String,
+    #[serde(rename = "descriptionText")]
+    pub description_text: String,
+    #[serde(rename = "sourceCategoryText")]
+    pub source_category_text: String,
+    pub make: String,
+    pub model: String,
+    #[serde(rename = "modelYear")]
+    pub model_year: Option<i64>,
+    #[serde(rename = "lotNumber")]
+    pub lot_number: String,
+    #[serde(rename = "conditionText")]
+    pub condition_text: String,
+    #[serde(rename = "locationText")]
+    pub location_text: String,
+    #[serde(rename = "currencyCode")]
+    pub currency_code: String,
+    #[serde(rename = "currentPriceCents")]
+    pub current_price_cents: Option<i64>,
+    #[serde(rename = "bidCount")]
+    pub bid_count: Option<i64>,
+    #[serde(rename = "closingAt")]
+    pub closing_at: String,
+    #[serde(rename = "postedAt")]
+    pub posted_at: String,
+    #[serde(rename = "lastSeenAt")]
+    pub last_seen_at: String,
+    #[serde(rename = "listingStatus")]
+    pub listing_status: String,
+    #[serde(rename = "pickupText")]
+    pub pickup_text: String,
+    #[serde(rename = "inspectionText")]
+    pub inspection_text: String,
+    #[serde(rename = "isWatchlisted")]
+    pub is_watchlisted: bool,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "modifiedAt")]
+    pub modified_at: String,
+    pub flags: Vec<RepairResellKeywordFlagRecord>,
+    pub categories: Vec<RepairResellCategoryRecord>,
+}
+
+#[derive(Clone, Serialize)]
+pub struct RepairResellScrapeRunRecord {
+    pub id: String,
+    #[serde(rename = "sourceId")]
+    pub source_id: String,
+    #[serde(rename = "startedAt")]
+    pub started_at: String,
+    #[serde(rename = "finishedAt")]
+    pub finished_at: String,
+    pub status: String,
+    #[serde(rename = "listingCount")]
+    pub listing_count: i64,
+    #[serde(rename = "newListingCount")]
+    pub new_listing_count: i64,
+    #[serde(rename = "updatedListingCount")]
+    pub updated_listing_count: i64,
+    #[serde(rename = "skippedCount")]
+    pub skipped_count: i64,
+    #[serde(rename = "errorText")]
+    pub error_text: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "modifiedAt")]
+    pub modified_at: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct RepairResellTravelProfileRecord {
+    pub id: String,
+    pub name: String,
+    #[serde(rename = "homeLocationLabel")]
+    pub home_location_label: String,
+    #[serde(rename = "vehicleLabel")]
+    pub vehicle_label: String,
+    #[serde(rename = "fuelLPer100Km")]
+    pub fuel_l_per_100km: Option<f64>,
+    #[serde(rename = "fuelPriceCentsPerLitre")]
+    pub fuel_price_cents_per_litre: Option<i64>,
+    #[serde(rename = "defaultRoundTripKm")]
+    pub default_round_trip_km: Option<f64>,
+    pub notes: String,
+    #[serde(rename = "isDefault")]
+    pub is_default: bool,
+}
+
+#[derive(Clone, Serialize)]
+pub struct RepairResellDealEstimateRecord {
+    pub id: String,
+    #[serde(rename = "listingId")]
+    pub listing_id: String,
+    #[serde(rename = "travelProfileId")]
+    pub travel_profile_id: String,
+    #[serde(rename = "estimateLabel")]
+    pub estimate_label: String,
+    #[serde(rename = "acquisitionPriceCents")]
+    pub acquisition_price_cents: Option<i64>,
+    #[serde(rename = "buyerPremiumCents")]
+    pub buyer_premium_cents: Option<i64>,
+    #[serde(rename = "taxCents")]
+    pub tax_cents: Option<i64>,
+    #[serde(rename = "travelKm")]
+    pub travel_km: Option<f64>,
+    #[serde(rename = "fuelCostCents")]
+    pub fuel_cost_cents: Option<i64>,
+    #[serde(rename = "partsCostCents")]
+    pub parts_cost_cents: Option<i64>,
+    #[serde(rename = "otherCostCents")]
+    pub other_cost_cents: Option<i64>,
+    #[serde(rename = "expectedResaleLowCents")]
+    pub expected_resale_low_cents: Option<i64>,
+    #[serde(rename = "expectedResaleHighCents")]
+    pub expected_resale_high_cents: Option<i64>,
+    #[serde(rename = "expectedResaleTargetCents")]
+    pub expected_resale_target_cents: Option<i64>,
+    #[serde(rename = "desiredProfitCents")]
+    pub desired_profit_cents: Option<i64>,
+    #[serde(rename = "riskBufferCents")]
+    pub risk_buffer_cents: Option<i64>,
+    #[serde(rename = "maxSafeBidCents")]
+    pub max_safe_bid_cents: Option<i64>,
+    #[serde(rename = "netProfitLowCents")]
+    pub net_profit_low_cents: Option<i64>,
+    #[serde(rename = "netProfitTargetCents")]
+    pub net_profit_target_cents: Option<i64>,
+    #[serde(rename = "estimateMethod")]
+    pub estimate_method: String,
+    pub confidence: String,
+    pub notes: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "modifiedAt")]
+    pub modified_at: String,
+}
+
+pub struct RepairResellListingDraft {
+    pub source_id: String,
+    pub external_id: Option<String>,
+    pub canonical_url: String,
+    pub title: String,
+    pub description_text: String,
+    pub source_category_text: String,
+    pub condition_text: String,
+    pub location_text: String,
+    pub current_price_cents: Option<i64>,
+    pub closing_at: String,
+    pub pickup_text: String,
+    pub inspection_text: String,
+    pub listing_status: String,
+    pub content_hash: String,
+    pub structured_json: String,
+}
+
+pub struct RepairResellDealEstimateDraft {
+    pub listing_id: String,
+    pub travel_profile_id: Option<String>,
+    pub estimate_label: String,
+    pub acquisition_price_cents: Option<i64>,
+    pub buyer_premium_cents: Option<i64>,
+    pub tax_cents: Option<i64>,
+    pub travel_km: Option<f64>,
+    pub fuel_cost_cents: Option<i64>,
+    pub parts_cost_cents: Option<i64>,
+    pub other_cost_cents: Option<i64>,
+    pub expected_resale_low_cents: Option<i64>,
+    pub expected_resale_high_cents: Option<i64>,
+    pub expected_resale_target_cents: Option<i64>,
+    pub desired_profit_cents: Option<i64>,
+    pub risk_buffer_cents: Option<i64>,
+    pub confidence: String,
+    pub notes: String,
 }
 
 #[derive(Clone, Serialize)]
@@ -237,6 +492,16 @@ pub struct YouTubeReferenceRecord {
     pub updated_at: String,
 }
 
+pub struct YouTubeReferenceUpdateDraft<'a> {
+    pub id: i64,
+    pub title: &'a str,
+    pub url: &'a str,
+    pub video_id: &'a str,
+    pub channel_name: &'a str,
+    pub notes: &'a str,
+    pub tags: &'a str,
+}
+
 #[derive(Clone, Serialize)]
 pub struct GameRecord {
     pub id: i64,
@@ -247,6 +512,87 @@ pub struct GameRecord {
     pub created_at: String,
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct GameSettingRecord {
+    pub id: i64,
+    #[serde(rename = "gameId")]
+    pub game_id: i64,
+    #[serde(rename = "idGame")]
+    pub id_game: i64,
+    #[serde(rename = "settingKey")]
+    pub setting_key: String,
+    #[serde(rename = "settingValueJson")]
+    pub setting_value_json: String,
+    #[serde(rename = "schemaJson")]
+    pub schema_json: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "modifiedAt")]
+    pub modified_at: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct GameCharacterBuildRecord {
+    pub id: i64,
+    #[serde(rename = "gameId")]
+    pub game_id: i64,
+    #[serde(rename = "idGame")]
+    pub id_game: i64,
+    pub title: String,
+    #[serde(rename = "characterClass")]
+    pub character_class: String,
+    pub ascendancy: String,
+    #[serde(rename = "buildRole")]
+    pub build_role: String,
+    pub status: String,
+    #[serde(rename = "sourceLabel")]
+    pub source_label: String,
+    #[serde(rename = "sourceUrl")]
+    pub source_url: String,
+    pub patch: String,
+    pub summary: String,
+    pub tags: String,
+    pub notes: String,
+    #[serde(rename = "isActive")]
+    pub is_active: bool,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+pub struct GameCharacterBuildDraft<'a> {
+    pub game_id: i64,
+    pub title: &'a str,
+    pub character_class: &'a str,
+    pub ascendancy: &'a str,
+    pub build_role: &'a str,
+    pub status: &'a str,
+    pub source_label: &'a str,
+    pub source_url: &'a str,
+    pub patch: &'a str,
+    pub summary: &'a str,
+    pub tags: &'a str,
+    pub notes: &'a str,
+    pub is_active: bool,
+}
+
+pub struct GameCharacterBuildUpdateDraft<'a> {
+    pub id: i64,
+    pub title: &'a str,
+    pub character_class: &'a str,
+    pub ascendancy: &'a str,
+    pub build_role: &'a str,
+    pub status: &'a str,
+    pub source_label: &'a str,
+    pub source_url: &'a str,
+    pub patch: &'a str,
+    pub summary: &'a str,
+    pub tags: &'a str,
+    pub notes: &'a str,
+    pub is_active: bool,
 }
 
 #[derive(Clone, Serialize)]
@@ -289,6 +635,31 @@ pub struct GameCatalogObjectRecord {
     pub created_at: String,
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
+}
+
+pub struct GameCatalogObjectDraft<'a> {
+    pub game_id: i64,
+    pub name: &'a str,
+    pub object_type: &'a str,
+    pub category: &'a str,
+    pub category_icon: &'a str,
+    pub category_icon_path: &'a str,
+    pub description: &'a str,
+    pub notes: &'a str,
+    pub tags: &'a str,
+    pub thumbnail_path: &'a str,
+    pub source_screenshot_path: &'a str,
+}
+
+pub struct GameCatalogReferenceDraft<'a> {
+    pub game_id: i64,
+    pub object_id: Option<i64>,
+    pub title: &'a str,
+    pub reference_type: &'a str,
+    pub url: &'a str,
+    pub local_path: &'a str,
+    pub notes: &'a str,
+    pub tags: &'a str,
 }
 
 #[derive(Clone, Serialize)]
@@ -343,6 +714,180 @@ pub struct GameRuntimePartRecord {
     pub updated_at: String,
 }
 
+pub struct GameRuntimePartIdentity<'a> {
+    pub game_id: i64,
+    pub part_key: &'a str,
+    pub asset_guid: &'a str,
+    pub asset_name: &'a str,
+    pub display_name: &'a str,
+    pub full_display_name: &'a str,
+    pub category: &'a str,
+}
+
+pub struct GameRuntimePartSource<'a> {
+    pub source_export_id: &'a str,
+    pub source_construction_id: &'a str,
+    pub seen_at: &'a str,
+}
+
+pub struct GameRuntimePartDraft<'a> {
+    pub identity: GameRuntimePartIdentity<'a>,
+    pub mass: f64,
+    pub world_position: Option<(f64, f64, f64)>,
+    pub local_position: Option<(f64, f64, f64)>,
+    pub world_position_json: &'a str,
+    pub local_position_json: &'a str,
+    pub properties_json: &'a str,
+    pub source: GameRuntimePartSource<'a>,
+}
+
+#[derive(Clone, Serialize)]
+pub struct GearBlocksPartRenderProfileRecord {
+    pub id: i64,
+    #[serde(rename = "gameId")]
+    pub game_id: i64,
+    #[serde(rename = "profileKey")]
+    pub profile_key: String,
+    #[serde(rename = "partKey")]
+    pub part_key: String,
+    #[serde(rename = "partName")]
+    pub part_name: String,
+    #[serde(rename = "sourceObjectName")]
+    pub source_object_name: String,
+    #[serde(rename = "rendererNamesJson")]
+    pub renderer_names_json: String,
+    #[serde(rename = "canonicalRotationJson")]
+    pub canonical_rotation_json: String,
+    #[serde(rename = "cameraPresetJson")]
+    pub camera_preset_json: String,
+    #[serde(rename = "boundsCenterJson")]
+    pub bounds_center_json: String,
+    #[serde(rename = "boundsSizeJson")]
+    pub bounds_size_json: String,
+    #[serde(rename = "edgeSettingsJson")]
+    pub edge_settings_json: String,
+    #[serde(rename = "latestRenderPath")]
+    pub latest_render_path: String,
+    #[serde(rename = "latestCaptureId")]
+    pub latest_capture_id: String,
+    #[serde(rename = "latestStatusJson")]
+    pub latest_status_json: String,
+    #[serde(rename = "renderVersion")]
+    pub render_version: i64,
+    #[serde(rename = "isValidated")]
+    pub is_validated: bool,
+    pub notes: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
+pub struct GearBlocksPartRenderProfileDraft<'a> {
+    pub game_id: i64,
+    pub profile_key: &'a str,
+    pub part_key: &'a str,
+    pub part_name: &'a str,
+    pub source_object_name: &'a str,
+    pub renderer_names_json: &'a str,
+    pub canonical_rotation_json: &'a str,
+    pub camera_preset_json: &'a str,
+    pub bounds_center_json: &'a str,
+    pub bounds_size_json: &'a str,
+    pub edge_settings_json: &'a str,
+    pub latest_render_path: &'a str,
+    pub latest_capture_id: &'a str,
+    pub latest_status_json: &'a str,
+    pub render_version: i64,
+    pub is_validated: bool,
+    pub notes: &'a str,
+}
+
+pub struct GameRuntimePartInstanceDraft {
+    pub part_key: String,
+    pub asset_guid: String,
+    pub asset_name: String,
+    pub display_name: String,
+    pub full_display_name: String,
+    pub category: String,
+    pub source_export_id: String,
+    pub source_construction_id: String,
+    pub part_instance_key: String,
+    pub runtime_part_id: i64,
+    pub runtime_part_index: i64,
+    pub mass: f64,
+    pub world_position: Option<(f64, f64, f64)>,
+    pub local_position: Option<(f64, f64, f64)>,
+    pub world_position_json: String,
+    pub local_position_json: String,
+    pub current_unit_size_json: String,
+    pub link_node_count: i64,
+    pub behaviour_names_json: String,
+    pub dynamic_summary_json: String,
+    pub last_seen_at: String,
+}
+
+#[derive(Clone, Serialize)]
+pub struct GameRuntimePartInstanceRecord {
+    pub id: i64,
+    #[serde(rename = "gameId")]
+    pub game_id: i64,
+    #[serde(rename = "partDefinitionId")]
+    pub part_definition_id: i64,
+    #[serde(rename = "partKey")]
+    pub part_key: String,
+    #[serde(rename = "assetGuid")]
+    pub asset_guid: String,
+    #[serde(rename = "assetName")]
+    pub asset_name: String,
+    #[serde(rename = "displayName")]
+    pub display_name: String,
+    #[serde(rename = "fullDisplayName")]
+    pub full_display_name: String,
+    pub category: String,
+    #[serde(rename = "sourceExportId")]
+    pub source_export_id: String,
+    #[serde(rename = "sourceConstructionId")]
+    pub source_construction_id: String,
+    #[serde(rename = "partInstanceKey")]
+    pub part_instance_key: String,
+    #[serde(rename = "runtimePartId")]
+    pub runtime_part_id: i64,
+    #[serde(rename = "runtimePartIndex")]
+    pub runtime_part_index: i64,
+    pub mass: f64,
+    #[serde(rename = "worldX")]
+    pub world_x: Option<f64>,
+    #[serde(rename = "worldY")]
+    pub world_y: Option<f64>,
+    #[serde(rename = "worldZ")]
+    pub world_z: Option<f64>,
+    #[serde(rename = "localX")]
+    pub local_x: Option<f64>,
+    #[serde(rename = "localY")]
+    pub local_y: Option<f64>,
+    #[serde(rename = "localZ")]
+    pub local_z: Option<f64>,
+    #[serde(rename = "worldPositionJson")]
+    pub world_position_json: String,
+    #[serde(rename = "localPositionJson")]
+    pub local_position_json: String,
+    #[serde(rename = "currentUnitSizeJson")]
+    pub current_unit_size_json: String,
+    #[serde(rename = "linkNodeCount")]
+    pub link_node_count: i64,
+    #[serde(rename = "behaviourNamesJson")]
+    pub behaviour_names_json: String,
+    #[serde(rename = "dynamicSummaryJson")]
+    pub dynamic_summary_json: String,
+    #[serde(rename = "lastSeenAt")]
+    pub last_seen_at: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "updatedAt")]
+    pub updated_at: String,
+}
+
 #[derive(Clone, Serialize)]
 pub struct GameRuntimePartAliasRecord {
     pub id: i64,
@@ -379,6 +924,158 @@ pub struct GameRuntimePartAliasRecord {
     pub created_at: String,
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
+}
+
+pub struct GameRuntimePartAliasDraft<'a> {
+    pub game_id: i64,
+    pub part_instance_key: &'a str,
+    pub friendly_name: &'a str,
+    pub asset_guid: &'a str,
+    pub asset_name: &'a str,
+    pub display_name: &'a str,
+    pub full_display_name: &'a str,
+    pub category: &'a str,
+    pub source_log_path: &'a str,
+    pub source_construction_id: &'a str,
+    pub world_position_json: &'a str,
+    pub local_position_json: &'a str,
+    pub current_unit_size_json: &'a str,
+    pub payload_json: &'a str,
+    pub last_seen_at: &'a str,
+}
+
+pub struct GameRuntimePartApiAttributeObservation<'a> {
+    pub identity: GameRuntimePartIdentity<'a>,
+    pub interface_name: &'a str,
+    pub attribute_name: &'a str,
+    pub value_type: &'a str,
+    pub availability: &'a str,
+    pub source: GameRuntimePartSource<'a>,
+}
+
+pub struct GameRuntimePartApiMemberObservation<'a> {
+    pub game_id: i64,
+    pub part_key: &'a str,
+    pub interface_name: &'a str,
+    pub attribute_name: &'a str,
+    pub availability: &'a str,
+    pub source: GameRuntimePartSource<'a>,
+}
+
+pub struct GameRuntimePartValueObservation<'a> {
+    pub identity: GameRuntimePartIdentity<'a>,
+    pub field_path: &'a str,
+    pub value_type: &'a str,
+    pub value_json: &'a str,
+    pub source: GameRuntimePartSource<'a>,
+}
+
+pub struct GameRuntimePartPropertyObservation<'a> {
+    pub identity: GameRuntimePartIdentity<'a>,
+    pub property_path: &'a str,
+    pub value_type: &'a str,
+    pub value_json: &'a str,
+    pub source: GameRuntimePartSource<'a>,
+}
+
+pub struct GameRuntimePartAttachmentObservation<'a> {
+    pub identity: GameRuntimePartIdentity<'a>,
+    pub attachment_path: &'a str,
+    pub value_type: &'a str,
+    pub attachment_json: &'a str,
+    pub source: GameRuntimePartSource<'a>,
+}
+
+pub struct GameRuntimePartMetadataValueDraft<'a> {
+    pub game_id: i64,
+    pub part_key: &'a str,
+    pub source_area: &'a str,
+    pub field_path: &'a str,
+    pub value_type: &'a str,
+    pub value_json: &'a str,
+    pub source: GameRuntimePartSource<'a>,
+}
+
+pub struct GameRuntimePartAttachmentTypeDraft<'a> {
+    pub game_id: i64,
+    pub part_key: &'a str,
+    pub attachment_path: &'a str,
+    pub type_name: &'a str,
+    pub value_type: &'a str,
+    pub attachment_json: &'a str,
+    pub source: GameRuntimePartSource<'a>,
+}
+
+pub struct GameRuntimePartSettingValueDraft<'a> {
+    pub game_id: i64,
+    pub part_key: &'a str,
+    pub setting_key: &'a str,
+    pub label: &'a str,
+    pub setting_area: &'a str,
+    pub value_type: &'a str,
+    pub value_json: &'a str,
+    pub source: GameRuntimePartSource<'a>,
+}
+
+pub struct GameRuntimePartOutputChannelValueDraft<'a> {
+    pub game_id: i64,
+    pub part_key: &'a str,
+    pub channel_key: &'a str,
+    pub label: &'a str,
+    pub channel_area: &'a str,
+    pub value_type: &'a str,
+    pub value_json: &'a str,
+    pub source: GameRuntimePartSource<'a>,
+}
+
+#[derive(Clone)]
+pub struct GameRuntimePartMetadataValueRecord {
+    pub part_key: String,
+    pub source_area: String,
+    pub field_path: String,
+    pub value_type: String,
+    pub value_json: String,
+    pub source_export_id: String,
+    pub source_construction_id: String,
+    pub last_seen_at: String,
+}
+
+#[derive(Clone)]
+pub struct GameRuntimePartAttachmentTypeRecord {
+    pub part_key: String,
+    pub attachment_path: String,
+    pub type_name: String,
+    pub value_type: String,
+    pub attachment_json: String,
+    pub source_export_id: String,
+    pub source_construction_id: String,
+    pub last_seen_at: String,
+}
+
+#[derive(Clone)]
+pub struct GameRuntimePartSettingValueRecord {
+    pub part_key: String,
+    pub setting_key: String,
+    pub label: String,
+    pub setting_area: String,
+    pub value_type: String,
+    pub value_json: String,
+    pub source_export_id: String,
+    pub source_construction_id: String,
+    pub last_seen_at: String,
+}
+
+#[derive(Clone)]
+pub struct GameRuntimePartOutputChannelValueRecord {
+    pub part_key: String,
+    pub channel_key: String,
+    pub label: String,
+    pub channel_area: String,
+    pub value_type: String,
+    pub value_json: String,
+    pub source_export_id: String,
+    pub source_construction_id: String,
+    pub last_seen_at: String,
 }
 
 #[derive(Clone, Serialize)]
@@ -420,6 +1117,25 @@ pub struct GameRuntimeConstructionExportRecord {
     pub updated_at: String,
 }
 
+pub struct GameRuntimeConstructionExportDraft<'a> {
+    pub game_id: i64,
+    pub export_id: &'a str,
+    pub name: &'a str,
+    pub export_kind: &'a str,
+    pub intended_path: &'a str,
+    pub source_log_path: &'a str,
+    pub byte_size: i64,
+    pub construction_id: &'a str,
+    pub exported_at: &'a str,
+    pub part_count: i64,
+    pub mass: f64,
+    pub is_frozen: Option<bool>,
+    pub is_invulnerable: Option<bool>,
+    pub is_player_character: Option<bool>,
+    pub document_json: &'a str,
+    pub last_indexed_at: &'a str,
+}
+
 #[derive(Clone, Serialize)]
 pub struct GearBlocksApiTypeRecord {
     pub id: i64,
@@ -442,6 +1158,16 @@ pub struct GearBlocksApiTypeRecord {
     pub created_at: String,
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
+}
+
+struct GearBlocksApiTypeSeed<'a> {
+    namespace: &'a str,
+    type_name: &'a str,
+    type_kind: &'a str,
+    docs_url: &'a str,
+    source: &'a str,
+    source_version: &'a str,
+    notes: &'a str,
 }
 
 #[derive(Clone, Serialize)]
@@ -619,6 +1345,26 @@ pub struct GameConstructionRecord {
     pub updated_at: String,
 }
 
+pub struct GameConstructionDraft<'a> {
+    pub game_id: i64,
+    pub name: &'a str,
+    pub folder_path: &'a str,
+    pub construction_path: &'a str,
+    pub byte_size: i64,
+    pub decoded_byte_size: i64,
+    pub composite_count: i64,
+    pub part_count: i64,
+    pub unique_asset_guid_count: i64,
+    pub attachment_count: i64,
+    pub link_count: i64,
+    pub intersection_count: i64,
+    pub is_frozen: Option<bool>,
+    pub is_invulnerable: Option<bool>,
+    pub summary_json: &'a str,
+    pub document_json: &'a str,
+    pub last_indexed_at: &'a str,
+}
+
 #[derive(Serialize)]
 pub struct GameScreenshotCaptureRequestRecord {
     pub id: i64,
@@ -639,6 +1385,17 @@ pub struct GameScreenshotCaptureRequestRecord {
     pub created_at: String,
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
+}
+
+pub struct GameScreenshotCaptureRequestDraft<'a> {
+    pub game_id: i64,
+    pub title: &'a str,
+    pub file_path: &'a str,
+    pub request_id: &'a str,
+    pub request_path: &'a str,
+    pub capture_status: &'a str,
+    pub captured_at: &'a str,
+    pub notes: &'a str,
 }
 
 #[derive(Serialize)]
@@ -673,6 +1430,8 @@ pub struct GameBuildGuideRecord {
     pub scale_reference: String,
     #[serde(rename = "geometryNotes")]
     pub geometry_notes: String,
+    #[serde(rename = "glossaryText")]
+    pub glossary_text: String,
     #[serde(rename = "checklistJson")]
     pub checklist_json: String,
     #[serde(rename = "overlayX")]
@@ -687,6 +1446,18 @@ pub struct GameBuildGuideRecord {
     pub created_at: String,
     #[serde(rename = "updatedAt")]
     pub updated_at: String,
+}
+
+pub struct GameBuildGuideDraft<'a> {
+    pub game_id: i64,
+    pub title: &'a str,
+    pub source_path: &'a str,
+    pub raw_markdown: &'a str,
+    pub build_goal: &'a str,
+    pub scale_reference: &'a str,
+    pub geometry_notes: &'a str,
+    pub glossary_text: &'a str,
+    pub checklist_json: &'a str,
 }
 
 #[derive(Clone, Serialize)]
@@ -1081,6 +1852,28 @@ impl AppDatabase {
                 FOREIGN KEY (id_game) REFERENCES def_game(id_game)
             );
 
+            CREATE TABLE IF NOT EXISTS obj_game_character_build (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                id_game INTEGER NOT NULL DEFAULT 1,
+                title TEXT NOT NULL DEFAULT '',
+                character_class TEXT NOT NULL DEFAULT '',
+                ascendancy TEXT NOT NULL DEFAULT '',
+                build_role TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'planned',
+                source_label TEXT NOT NULL DEFAULT '',
+                source_url TEXT NOT NULL DEFAULT '',
+                patch TEXT NOT NULL DEFAULT '',
+                summary TEXT NOT NULL DEFAULT '',
+                tags TEXT NOT NULL DEFAULT '',
+                notes TEXT NOT NULL DEFAULT '',
+                is_active INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (game_id) REFERENCES obj_game(id),
+                FOREIGN KEY (id_game) REFERENCES def_game(id_game)
+            );
+
             CREATE TABLE IF NOT EXISTS obj_game_catalog_object (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id INTEGER NOT NULL,
@@ -1161,6 +1954,74 @@ impl AppDatabase {
                 notes TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS def_gearblocks_part (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                part_key TEXT NOT NULL UNIQUE,
+                asset_guid TEXT NOT NULL DEFAULT '',
+                asset_name TEXT NOT NULL DEFAULT '',
+                display_name TEXT NOT NULL DEFAULT '',
+                full_display_name TEXT NOT NULL DEFAULT '',
+                category TEXT NOT NULL DEFAULT '',
+                first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_gearblocks_part_render_profile (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                profile_key TEXT NOT NULL COLLATE NOCASE,
+                part_key TEXT NOT NULL DEFAULT '',
+                part_name TEXT NOT NULL DEFAULT '',
+                source_object_name TEXT NOT NULL DEFAULT '',
+                renderer_names_json TEXT NOT NULL DEFAULT '[]',
+                canonical_rotation_json TEXT NOT NULL DEFAULT '{}',
+                camera_preset_json TEXT NOT NULL DEFAULT '{}',
+                bounds_center_json TEXT NOT NULL DEFAULT '{}',
+                bounds_size_json TEXT NOT NULL DEFAULT '{}',
+                edge_settings_json TEXT NOT NULL DEFAULT '{}',
+                latest_render_path TEXT NOT NULL DEFAULT '',
+                latest_capture_id TEXT NOT NULL DEFAULT '',
+                latest_status_json TEXT NOT NULL DEFAULT '{}',
+                render_version INTEGER NOT NULL DEFAULT 1,
+                is_validated INTEGER NOT NULL DEFAULT 0,
+                notes TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (game_id) REFERENCES obj_game(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_game_runtime_part_instance (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                part_definition_id INTEGER NOT NULL,
+                source_export_id TEXT NOT NULL DEFAULT '',
+                source_construction_id TEXT NOT NULL DEFAULT '',
+                part_instance_key TEXT NOT NULL DEFAULT '',
+                runtime_part_id INTEGER NOT NULL DEFAULT 0,
+                runtime_part_index INTEGER NOT NULL DEFAULT 0,
+                mass REAL NOT NULL DEFAULT 0,
+                world_x REAL,
+                world_y REAL,
+                world_z REAL,
+                local_x REAL,
+                local_y REAL,
+                local_z REAL,
+                world_position_json TEXT NOT NULL DEFAULT '{}',
+                local_position_json TEXT NOT NULL DEFAULT '{}',
+                current_unit_size_json TEXT NOT NULL DEFAULT '{}',
+                link_node_count INTEGER NOT NULL DEFAULT 0,
+                behaviour_names_json TEXT NOT NULL DEFAULT '[]',
+                dynamic_summary_json TEXT NOT NULL DEFAULT '{}',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (game_id) REFERENCES obj_game(id) ON DELETE CASCADE,
+                FOREIGN KEY (part_definition_id) REFERENCES def_gearblocks_part(id) ON DELETE RESTRICT,
+                UNIQUE(game_id, part_instance_key)
             );
 
             CREATE TABLE IF NOT EXISTS obj_game_runtime_part_alias (
@@ -1263,6 +2124,125 @@ impl AppDatabase {
                 last_seen_at TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS def_gearblocks_part_metadata_item (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                source_area TEXT NOT NULL DEFAULT '',
+                field_path TEXT NOT NULL DEFAULT '',
+                value_type TEXT NOT NULL DEFAULT '',
+                first_seen_at TEXT NOT NULL DEFAULT '',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(source_area, field_path)
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_game_runtime_part_metadata_value (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                part_key TEXT NOT NULL,
+                metadata_item_id INTEGER NOT NULL,
+                value_type TEXT NOT NULL DEFAULT '',
+                value_json TEXT NOT NULL DEFAULT 'null',
+                source_export_id TEXT NOT NULL DEFAULT '',
+                source_construction_id TEXT NOT NULL DEFAULT '',
+                first_seen_at TEXT NOT NULL DEFAULT '',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (game_id) REFERENCES obj_game(id) ON DELETE CASCADE,
+                FOREIGN KEY (metadata_item_id) REFERENCES def_gearblocks_part_metadata_item(id) ON DELETE RESTRICT,
+                UNIQUE(game_id, part_key, metadata_item_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS def_gearblocks_attachment_type (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                attachment_path TEXT NOT NULL DEFAULT '',
+                type_name TEXT NOT NULL DEFAULT '',
+                value_type TEXT NOT NULL DEFAULT '',
+                first_seen_at TEXT NOT NULL DEFAULT '',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(attachment_path, type_name)
+            );
+
+            CREATE TABLE IF NOT EXISTS n2n_game_runtime_part_attachment_type (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                part_key TEXT NOT NULL,
+                attachment_type_id INTEGER NOT NULL,
+                attachment_json TEXT NOT NULL DEFAULT 'null',
+                source_export_id TEXT NOT NULL DEFAULT '',
+                source_construction_id TEXT NOT NULL DEFAULT '',
+                first_seen_at TEXT NOT NULL DEFAULT '',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (game_id) REFERENCES obj_game(id) ON DELETE CASCADE,
+                FOREIGN KEY (attachment_type_id) REFERENCES def_gearblocks_attachment_type(id) ON DELETE RESTRICT,
+                UNIQUE(game_id, part_key, attachment_type_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS def_gearblocks_part_setting (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                setting_key TEXT NOT NULL UNIQUE,
+                label TEXT NOT NULL DEFAULT '',
+                setting_area TEXT NOT NULL DEFAULT '',
+                value_type TEXT NOT NULL DEFAULT '',
+                first_seen_at TEXT NOT NULL DEFAULT '',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_game_runtime_part_setting_value (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                part_key TEXT NOT NULL,
+                setting_id INTEGER NOT NULL,
+                value_type TEXT NOT NULL DEFAULT '',
+                value_json TEXT NOT NULL DEFAULT 'null',
+                source_export_id TEXT NOT NULL DEFAULT '',
+                source_construction_id TEXT NOT NULL DEFAULT '',
+                first_seen_at TEXT NOT NULL DEFAULT '',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (game_id) REFERENCES obj_game(id) ON DELETE CASCADE,
+                FOREIGN KEY (setting_id) REFERENCES def_gearblocks_part_setting(id) ON DELETE RESTRICT,
+                UNIQUE(game_id, part_key, setting_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS def_gearblocks_part_output_channel (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                channel_key TEXT NOT NULL UNIQUE,
+                label TEXT NOT NULL DEFAULT '',
+                channel_area TEXT NOT NULL DEFAULT '',
+                value_type TEXT NOT NULL DEFAULT '',
+                first_seen_at TEXT NOT NULL DEFAULT '',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_game_runtime_part_output_channel_value (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id INTEGER NOT NULL,
+                part_key TEXT NOT NULL,
+                output_channel_id INTEGER NOT NULL,
+                value_type TEXT NOT NULL DEFAULT '',
+                value_json TEXT NOT NULL DEFAULT 'null',
+                source_export_id TEXT NOT NULL DEFAULT '',
+                source_construction_id TEXT NOT NULL DEFAULT '',
+                first_seen_at TEXT NOT NULL DEFAULT '',
+                last_seen_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (game_id) REFERENCES obj_game(id) ON DELETE CASCADE,
+                FOREIGN KEY (output_channel_id) REFERENCES def_gearblocks_part_output_channel(id) ON DELETE RESTRICT,
+                UNIQUE(game_id, part_key, output_channel_id)
             );
 
             CREATE TABLE IF NOT EXISTS def_gearblocks_api_type (
@@ -1410,6 +2390,7 @@ impl AppDatabase {
                 build_goal TEXT NOT NULL DEFAULT '',
                 scale_reference TEXT NOT NULL DEFAULT '',
                 geometry_notes TEXT NOT NULL DEFAULT '',
+                glossary_text TEXT NOT NULL DEFAULT '',
                 checklist_json TEXT NOT NULL DEFAULT '[]',
                 overlay_x INTEGER,
                 overlay_y INTEGER,
@@ -1452,6 +2433,10 @@ impl AppDatabase {
                 ON obj_game_catalog_reference (object_id);
             CREATE INDEX IF NOT EXISTS idx_game_data_locations_game_id
                 ON obj_game_data_location (game_id);
+            CREATE INDEX IF NOT EXISTS idx_game_character_builds_game_id
+                ON obj_game_character_build (game_id);
+            CREATE INDEX IF NOT EXISTS idx_game_character_builds_active
+                ON obj_game_character_build (game_id, is_active);
             CREATE INDEX IF NOT EXISTS idx_game_catalog_screenshots_game_id
                 ON obj_game_catalog_screenshot (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_catalog_screenshots_object_id
@@ -1468,6 +2453,16 @@ impl AppDatabase {
                 ON obj_game_build_guide_step (guide_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_parts_game_id
                 ON obj_game_runtime_part (game_id);
+            CREATE INDEX IF NOT EXISTS idx_gearblocks_parts_part_key
+                ON def_gearblocks_part (part_key);
+            CREATE INDEX IF NOT EXISTS idx_gearblocks_part_render_profiles_game_id
+                ON obj_gearblocks_part_render_profile (game_id);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_gearblocks_part_render_profiles_unique
+                ON obj_gearblocks_part_render_profile (game_id, profile_key);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_part_instances_game_export
+                ON obj_game_runtime_part_instance (game_id, source_export_id);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_part_instances_definition
+                ON obj_game_runtime_part_instance (part_definition_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_part_aliases_game_id
                 ON obj_game_runtime_part_alias (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_part_api_attributes_game_id
@@ -1486,6 +2481,22 @@ impl AppDatabase {
                 ON obj_game_runtime_part_attachment (game_id);
             CREATE INDEX IF NOT EXISTS idx_game_runtime_part_attachments_attachment_path
                 ON obj_game_runtime_part_attachment (game_id, attachment_path);
+            CREATE INDEX IF NOT EXISTS idx_gearblocks_part_metadata_items_path
+                ON def_gearblocks_part_metadata_item (source_area, field_path);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_part_metadata_values_game_id
+                ON obj_game_runtime_part_metadata_value (game_id);
+            CREATE INDEX IF NOT EXISTS idx_gearblocks_attachment_types_path
+                ON def_gearblocks_attachment_type (attachment_path, type_name);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_part_attachment_types_game_id
+                ON n2n_game_runtime_part_attachment_type (game_id);
+            CREATE INDEX IF NOT EXISTS idx_gearblocks_part_settings_key
+                ON def_gearblocks_part_setting (setting_key);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_part_setting_values_game_id
+                ON obj_game_runtime_part_setting_value (game_id);
+            CREATE INDEX IF NOT EXISTS idx_gearblocks_part_output_channels_key
+                ON def_gearblocks_part_output_channel (channel_key);
+            CREATE INDEX IF NOT EXISTS idx_game_runtime_part_output_channel_values_game_id
+                ON obj_game_runtime_part_output_channel_value (game_id);
             CREATE INDEX IF NOT EXISTS idx_gearblocks_api_types_namespace
                 ON def_gearblocks_api_type (namespace, type_name);
             CREATE INDEX IF NOT EXISTS idx_gearblocks_api_members_type_id
@@ -1546,8 +2557,25 @@ impl AppDatabase {
                 'path-of-exile-2',
                 'Game-specific workspace section for Path of Exile 2 chats, builds, passive planning, item tracking, gems, loot filters, and trade.'
             );
+
+            INSERT OR IGNORE INTO def_game (id_game, game_key, ui_name, summary, schema_json)
+            VALUES (
+                3,
+                'the-spell-brigade',
+                'The Spell Brigade',
+                'Supported The Spell Brigade game module definition.',
+                '{\"fields\":{\"id_game\":\"stable integer game definition id\",\"game_key\":\"stable lowercase game key\",\"ui_name\":\"visible game definition name\",\"summary\":\"definition summary\"}}'
+            );
+
+            INSERT OR IGNORE INTO obj_game (name, slug, summary)
+            VALUES (
+                'The Spell Brigade',
+                'the-spell-brigade',
+                'Game-specific workspace for The Spell Brigade chats, wizard and spell planning, upgrades, team synergies, run notes, and screenshots.'
+            );
             ",
         )?;
+        Self::ensure_repair_resell_schema(&connection)?;
         Self::ensure_column(&connection, "obj_task", "body", "TEXT NOT NULL DEFAULT ''")?;
         Self::ensure_column(
             &connection,
@@ -1563,6 +2591,10 @@ impl AppDatabase {
         )?;
         connection.execute(
             "UPDATE obj_game SET id_game = 2 WHERE slug = 'path-of-exile-2'",
+            [],
+        )?;
+        connection.execute(
+            "UPDATE obj_game SET id_game = 3 WHERE slug = 'the-spell-brigade'",
             [],
         )?;
         Self::ensure_column(
@@ -1662,6 +2694,12 @@ impl AppDatabase {
             "overlay_y",
             "INTEGER",
         )?;
+        Self::ensure_column(
+            &connection,
+            "obj_game_build_guide",
+            "glossary_text",
+            "TEXT NOT NULL DEFAULT ''",
+        )?;
         Self::ensure_schema_metadata_columns(&connection)?;
         Self::ensure_modified_at_triggers(&connection)?;
         Self::refresh_schema_json_metadata(&connection)?;
@@ -1683,6 +2721,88 @@ impl AppDatabase {
             "
             CREATE UNIQUE INDEX IF NOT EXISTS idx_obj_game_setting_game_key_unique
                 ON obj_game_setting (game_id, setting_key)
+            ",
+            [],
+        )?;
+        connection.execute(
+            "
+            INSERT INTO obj_game_setting (
+                game_id,
+                id_game,
+                setting_key,
+                setting_value_json,
+                schema_json
+            )
+            SELECT
+                id,
+                id_game,
+                'current_build',
+                '{
+                    \"title\": \"0.5 Ice Shot Deadeye Leveling Guide\",
+                    \"source\": \"Mobalytics\",
+                    \"sourceUrl\": \"https://mobalytics.gg/poe-2/builds/ice-shot-deadeye-leveling-guide#739a0a0f-6bd0-4807-8096-eee5ae1617ec-passive-tree-0\",
+                    \"characterClass\": \"Ranger\",
+                    \"ascendancy\": \"Deadeye\",
+                    \"creator\": \"Fubgun\",
+                    \"buildRole\": \"Speed Leveling\",
+                    \"patch\": \"0.5 RotA\",
+                    \"status\": \"currently_playing\",
+                    \"updatedOn\": \"2026-06-06\",
+                    \"summary\": \"Ice Shot Deadeye leveling build. Starts with Lightning Arrow and Lightning Rod because Ice Shot unlocks at level 31, then transitions toward the Ice Shot Deadeye endgame guide after campaign.\",
+                    \"tags\": [\"Starter\", \"Leveling\", \"Bow\", \"Ice Shot\", \"Lightning Arrow\", \"Lightning Rod\"],
+                    \"activeVariant\": \"passive-tree-0\"
+                }',
+                '{\"fields\":{\"title\":\"visible build title\",\"source\":\"build source site\",\"sourceUrl\":\"canonical external build URL\",\"characterClass\":\"base class\",\"ascendancy\":\"ascendancy\",\"creator\":\"guide creator\",\"buildRole\":\"guide role or archetype\",\"patch\":\"guide patch/league label\",\"status\":\"current play status\",\"updatedOn\":\"source update date\",\"summary\":\"short source-grounded summary\",\"tags\":\"string labels\",\"activeVariant\":\"selected source variant anchor\"}}'
+            FROM obj_game
+            WHERE slug = 'path-of-exile-2'
+            ON CONFLICT(game_id, setting_key) DO UPDATE SET
+                id_game = excluded.id_game,
+                setting_value_json = excluded.setting_value_json,
+                schema_json = excluded.schema_json,
+                modified_at = CURRENT_TIMESTAMP
+            ",
+            [],
+        )?;
+        connection.execute(
+            "
+            INSERT INTO obj_game_character_build (
+                game_id,
+                id_game,
+                title,
+                character_class,
+                ascendancy,
+                build_role,
+                status,
+                source_label,
+                source_url,
+                patch,
+                summary,
+                tags,
+                notes,
+                is_active
+            )
+            SELECT
+                id,
+                id_game,
+                '0.5 Ice Shot Deadeye Leveling Guide',
+                'Ranger',
+                'Deadeye',
+                'Speed Leveling',
+                'currently_playing',
+                'Mobalytics',
+                'https://mobalytics.gg/poe-2/builds/ice-shot-deadeye-leveling-guide#739a0a0f-6bd0-4807-8096-eee5ae1617ec-passive-tree-0',
+                '0.5 RotA',
+                'Ice Shot Deadeye leveling build. Starts with Lightning Arrow and Lightning Rod because Ice Shot unlocks at level 31, then transitions toward the Ice Shot Deadeye endgame guide after campaign.',
+                'Starter, Leveling, Bow, Ice Shot, Lightning Arrow, Lightning Rod',
+                'Seeded from the original Path of Exile 2 current-build setting.',
+                1
+            FROM obj_game
+            WHERE slug = 'path-of-exile-2'
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM obj_game_character_build
+                    WHERE game_id = obj_game.id
+                )
             ",
             [],
         )?;
@@ -1803,6 +2923,7 @@ impl AppDatabase {
             ",
             [],
         )?;
+        crate::media::repository::migrate_schema(&connection)?;
         Self::seed_gearblocks_api_catalog(&connection)?;
 
         Ok(Self {
@@ -1813,6 +2934,12 @@ impl AppDatabase {
 
     pub fn is_ready(&self) -> bool {
         self.ready
+    }
+
+    pub(crate) fn connection(&self) -> Result<MutexGuard<'_, Connection>> {
+        self.connection
+            .lock()
+            .map_err(|_| rusqlite::Error::InvalidQuery)
     }
 
     fn migrate_legacy_table_names(connection: &Connection) -> Result<()> {
@@ -1976,6 +3103,605 @@ impl AppDatabase {
         Ok(columns)
     }
 
+    fn ensure_repair_resell_schema(connection: &Connection) -> Result<()> {
+        connection.execute_batch(
+            "
+            CREATE TABLE IF NOT EXISTS def_resell_source_kind (
+                id_def_resell_source_kind TEXT PRIMARY KEY NOT NULL,
+                key TEXT NOT NULL UNIQUE,
+                label TEXT NOT NULL,
+                description TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS def_resell_category (
+                id_def_resell_category TEXT PRIMARY KEY NOT NULL,
+                parent_id_def_resell_category TEXT,
+                key TEXT NOT NULL UNIQUE,
+                label TEXT NOT NULL,
+                description TEXT,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (parent_id_def_resell_category)
+                    REFERENCES def_resell_category(id_def_resell_category)
+            );
+
+            CREATE TABLE IF NOT EXISTS def_resell_keyword_flag (
+                id_def_resell_keyword_flag TEXT PRIMARY KEY NOT NULL,
+                key TEXT NOT NULL UNIQUE,
+                label TEXT NOT NULL,
+                flag_type TEXT NOT NULL,
+                pattern TEXT NOT NULL,
+                description TEXT,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK (flag_type IN ('opportunity', 'risk', 'info'))
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_resell_source (
+                id_obj_resell_source TEXT PRIMARY KEY NOT NULL,
+                id_def_resell_source_kind TEXT NOT NULL,
+                source_key TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL,
+                base_url TEXT NOT NULL,
+                region_label TEXT,
+                scrape_mode TEXT NOT NULL,
+                adapter_key TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                priority INTEGER NOT NULL DEFAULT 100,
+                rate_limit_seconds INTEGER NOT NULL DEFAULT 60,
+                notes TEXT,
+                last_scraped_at TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK (scrape_mode IN ('public_http', 'manual_import', 'disabled')),
+                FOREIGN KEY (id_def_resell_source_kind)
+                    REFERENCES def_resell_source_kind(id_def_resell_source_kind)
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_resell_search_profile (
+                id_obj_resell_search_profile TEXT PRIMARY KEY NOT NULL,
+                name TEXT NOT NULL,
+                home_location_label TEXT,
+                home_latitude REAL,
+                home_longitude REAL,
+                max_distance_km REAL,
+                query_text TEXT,
+                positive_terms_json TEXT,
+                negative_terms_json TEXT,
+                category_filter_json TEXT,
+                min_price_cents INTEGER,
+                max_price_cents INTEGER,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS n2n_resell_source_search_profile (
+                id_n2n_resell_source_search_profile TEXT PRIMARY KEY NOT NULL,
+                id_obj_resell_source TEXT NOT NULL,
+                id_obj_resell_search_profile TEXT NOT NULL,
+                enabled INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE (id_obj_resell_source, id_obj_resell_search_profile),
+                FOREIGN KEY (id_obj_resell_source)
+                    REFERENCES obj_resell_source(id_obj_resell_source),
+                FOREIGN KEY (id_obj_resell_search_profile)
+                    REFERENCES obj_resell_search_profile(id_obj_resell_search_profile)
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_resell_scrape_run (
+                id_obj_resell_scrape_run TEXT PRIMARY KEY NOT NULL,
+                id_obj_resell_source TEXT NOT NULL,
+                id_obj_resell_search_profile TEXT,
+                started_at TEXT NOT NULL,
+                finished_at TEXT,
+                status TEXT NOT NULL,
+                listing_count INTEGER NOT NULL DEFAULT 0,
+                new_listing_count INTEGER NOT NULL DEFAULT 0,
+                updated_listing_count INTEGER NOT NULL DEFAULT 0,
+                skipped_count INTEGER NOT NULL DEFAULT 0,
+                error_text TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK (status IN ('queued', 'running', 'succeeded', 'partial', 'failed', 'skipped')),
+                FOREIGN KEY (id_obj_resell_source)
+                    REFERENCES obj_resell_source(id_obj_resell_source),
+                FOREIGN KEY (id_obj_resell_search_profile)
+                    REFERENCES obj_resell_search_profile(id_obj_resell_search_profile)
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_resell_listing (
+                id_obj_resell_listing TEXT PRIMARY KEY NOT NULL,
+                id_obj_resell_source TEXT NOT NULL,
+                external_id TEXT,
+                canonical_url TEXT NOT NULL,
+                title TEXT NOT NULL,
+                normalized_title TEXT,
+                description_text TEXT,
+                source_category_text TEXT,
+                make TEXT,
+                model TEXT,
+                model_year INTEGER,
+                serial_number TEXT,
+                lot_number TEXT,
+                condition_text TEXT,
+                location_text TEXT,
+                latitude REAL,
+                longitude REAL,
+                distance_km_manual REAL,
+                currency_code TEXT NOT NULL DEFAULT 'CAD',
+                current_price_cents INTEGER,
+                minimum_bid_cents INTEGER,
+                buy_now_price_cents INTEGER,
+                buyer_premium_text TEXT,
+                tax_text TEXT,
+                bid_count INTEGER,
+                closing_at TEXT,
+                posted_at TEXT,
+                last_seen_at TEXT,
+                listing_status TEXT NOT NULL DEFAULT 'unknown',
+                pickup_text TEXT,
+                inspection_text TEXT,
+                q_and_a_text TEXT,
+                is_watchlisted INTEGER NOT NULL DEFAULT 0,
+                content_hash TEXT,
+                structured_json TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK (listing_status IN ('active', 'closed', 'sold', 'removed', 'unknown')),
+                FOREIGN KEY (id_obj_resell_source)
+                    REFERENCES obj_resell_source(id_obj_resell_source)
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_resell_listing_snapshot (
+                id_obj_resell_listing_snapshot TEXT PRIMARY KEY NOT NULL,
+                id_obj_resell_listing TEXT NOT NULL,
+                id_obj_resell_scrape_run TEXT,
+                snapshot_at TEXT NOT NULL,
+                current_price_cents INTEGER,
+                bid_count INTEGER,
+                listing_status TEXT,
+                title TEXT,
+                description_text TEXT,
+                condition_text TEXT,
+                location_text TEXT,
+                closing_at TEXT,
+                content_hash TEXT,
+                structured_json TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (id_obj_resell_listing)
+                    REFERENCES obj_resell_listing(id_obj_resell_listing),
+                FOREIGN KEY (id_obj_resell_scrape_run)
+                    REFERENCES obj_resell_scrape_run(id_obj_resell_scrape_run)
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_resell_listing_image (
+                id_obj_resell_listing_image TEXT PRIMARY KEY NOT NULL,
+                id_obj_resell_listing TEXT NOT NULL,
+                source_image_url TEXT,
+                local_path TEXT,
+                image_sha256 TEXT,
+                width_px INTEGER,
+                height_px INTEGER,
+                sort_order INTEGER NOT NULL DEFAULT 0,
+                caption TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (id_obj_resell_listing)
+                    REFERENCES obj_resell_listing(id_obj_resell_listing)
+            );
+
+            CREATE TABLE IF NOT EXISTS n2n_resell_listing_category (
+                id_n2n_resell_listing_category TEXT PRIMARY KEY NOT NULL,
+                id_obj_resell_listing TEXT NOT NULL,
+                id_def_resell_category TEXT NOT NULL,
+                confidence REAL,
+                assigned_by TEXT NOT NULL DEFAULT 'rule',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK (assigned_by IN ('rule', 'manual', 'llm')),
+                UNIQUE (id_obj_resell_listing, id_def_resell_category),
+                FOREIGN KEY (id_obj_resell_listing)
+                    REFERENCES obj_resell_listing(id_obj_resell_listing),
+                FOREIGN KEY (id_def_resell_category)
+                    REFERENCES def_resell_category(id_def_resell_category)
+            );
+
+            CREATE TABLE IF NOT EXISTS n2n_resell_listing_keyword_flag (
+                id_n2n_resell_listing_keyword_flag TEXT PRIMARY KEY NOT NULL,
+                id_obj_resell_listing TEXT NOT NULL,
+                id_def_resell_keyword_flag TEXT NOT NULL,
+                match_text TEXT,
+                assigned_by TEXT NOT NULL DEFAULT 'rule',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK (assigned_by IN ('rule', 'manual', 'llm')),
+                UNIQUE (id_obj_resell_listing, id_def_resell_keyword_flag, match_text),
+                FOREIGN KEY (id_obj_resell_listing)
+                    REFERENCES obj_resell_listing(id_obj_resell_listing),
+                FOREIGN KEY (id_def_resell_keyword_flag)
+                    REFERENCES def_resell_keyword_flag(id_def_resell_keyword_flag)
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_resell_watchlist_entry (
+                id_obj_resell_watchlist_entry TEXT PRIMARY KEY NOT NULL,
+                id_obj_resell_listing TEXT NOT NULL UNIQUE,
+                watch_status TEXT NOT NULL DEFAULT 'watching',
+                user_priority INTEGER NOT NULL DEFAULT 3,
+                max_bid_cents INTEGER,
+                notes TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK (watch_status IN ('watching', 'interested', 'bid_planned', 'bid_placed', 'won', 'lost', 'ignored')),
+                FOREIGN KEY (id_obj_resell_listing)
+                    REFERENCES obj_resell_listing(id_obj_resell_listing)
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_resell_travel_profile (
+                id_obj_resell_travel_profile TEXT PRIMARY KEY NOT NULL,
+                name TEXT NOT NULL,
+                home_location_label TEXT,
+                vehicle_label TEXT,
+                fuel_l_per_100km REAL,
+                fuel_price_cents_per_litre INTEGER,
+                default_round_trip_km REAL,
+                notes TEXT,
+                is_default INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS obj_resell_deal_estimate (
+                id_obj_resell_deal_estimate TEXT PRIMARY KEY NOT NULL,
+                id_obj_resell_listing TEXT NOT NULL,
+                id_obj_resell_travel_profile TEXT,
+                estimate_label TEXT NOT NULL,
+                acquisition_price_cents INTEGER,
+                buyer_premium_cents INTEGER,
+                tax_cents INTEGER,
+                travel_km REAL,
+                fuel_cost_cents INTEGER,
+                parts_cost_cents INTEGER,
+                other_cost_cents INTEGER,
+                expected_resale_low_cents INTEGER,
+                expected_resale_high_cents INTEGER,
+                expected_resale_target_cents INTEGER,
+                desired_profit_cents INTEGER,
+                risk_buffer_cents INTEGER,
+                max_safe_bid_cents INTEGER,
+                net_profit_low_cents INTEGER,
+                net_profit_target_cents INTEGER,
+                estimate_method TEXT NOT NULL DEFAULT 'manual',
+                confidence TEXT NOT NULL DEFAULT 'low',
+                notes TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK (estimate_method IN ('manual', 'rule', 'llm')),
+                CHECK (confidence IN ('low', 'medium', 'high')),
+                FOREIGN KEY (id_obj_resell_listing)
+                    REFERENCES obj_resell_listing(id_obj_resell_listing),
+                FOREIGN KEY (id_obj_resell_travel_profile)
+                    REFERENCES obj_resell_travel_profile(id_obj_resell_travel_profile)
+            );
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_obj_resell_listing_source_external
+                ON obj_resell_listing(id_obj_resell_source, external_id)
+                WHERE external_id IS NOT NULL;
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_obj_resell_listing_canonical_url
+                ON obj_resell_listing(canonical_url);
+            CREATE INDEX IF NOT EXISTS idx_obj_resell_listing_status
+                ON obj_resell_listing(listing_status);
+            CREATE INDEX IF NOT EXISTS idx_obj_resell_listing_watchlisted
+                ON obj_resell_listing(is_watchlisted);
+            ",
+        )?;
+
+        Self::seed_repair_resell_source_kinds(connection)?;
+        Self::seed_repair_resell_categories(connection)?;
+        Self::seed_repair_resell_keyword_flags(connection)?;
+        Self::seed_repair_resell_sources(connection)?;
+        Self::seed_repair_resell_search_profiles(connection)?;
+        Self::seed_repair_resell_travel_profiles(connection)?;
+        Ok(())
+    }
+
+    fn seed_repair_resell_source_kinds(connection: &Connection) -> Result<()> {
+        let rows = [
+            ("government_surplus", "Government Surplus"),
+            ("police_auction", "Police Auction"),
+            ("local_auction", "Local Auction"),
+            ("marketplace", "Marketplace"),
+            ("auction_directory", "Auction Directory"),
+            ("manual", "Manual Import"),
+        ];
+        for (key, label) in rows {
+            connection.execute(
+                "
+                INSERT OR IGNORE INTO def_resell_source_kind (
+                    id_def_resell_source_kind, key, label, description
+                )
+                VALUES (?1, ?2, ?3, '')
+                ",
+                params![format!("def_resell_source_kind_{key}"), key, label],
+            )?;
+        }
+        Ok(())
+    }
+
+    fn seed_repair_resell_categories(connection: &Connection) -> Result<()> {
+        let rows = [
+            ("bicycle", "Bicycle"),
+            ("mountain_bike", "Mountain Bike"),
+            ("push_mower", "Push Mower"),
+            ("riding_mower", "Riding Mower"),
+            ("zero_turn_mower", "Zero-Turn Mower"),
+            ("snow_blower", "Snow Blower"),
+            ("small_engine", "Small Engine"),
+            ("generator", "Generator"),
+            ("pressure_washer", "Pressure Washer"),
+            ("air_compressor", "Air Compressor"),
+            ("power_tool", "Power Tool"),
+            ("shop_equipment", "Shop Equipment"),
+            ("computer", "Computer"),
+            ("electronics", "Electronics"),
+            ("automotive_tool", "Automotive Tool"),
+            ("automotive_part", "Automotive Part"),
+            ("vehicle", "Vehicle"),
+            ("trailer", "Trailer"),
+            ("unknown", "Unknown"),
+        ];
+        for (index, (key, label)) in rows.iter().enumerate() {
+            connection.execute(
+                "
+                INSERT OR IGNORE INTO def_resell_category (
+                    id_def_resell_category, key, label, sort_order
+                )
+                VALUES (?1, ?2, ?3, ?4)
+                ",
+                params![
+                    format!("def_resell_category_{key}"),
+                    key,
+                    label,
+                    index as i64
+                ],
+            )?;
+        }
+        Ok(())
+    }
+
+    fn seed_repair_resell_keyword_flags(connection: &Connection) -> Result<()> {
+        let opportunity = [
+            "engine runs",
+            "runs great",
+            "needs carb clean",
+            "needs tune up",
+            "been sitting",
+            "stored in garage",
+            "garage cleanout",
+            "moving sale",
+            "not tested",
+            "battery dead",
+            "flat tire",
+            "needs cable",
+            "chain rusty",
+            "surface rust",
+            "minor repair",
+        ];
+        let risk = [
+            "transmission issue",
+            "does not operate",
+            "not working",
+            "seized",
+            "missing parts",
+            "cracked frame",
+            "hydraulic issue",
+            "no compression",
+            "water damage",
+            "unknown condition",
+            "as is where is",
+            "no inspection",
+            "pickup by appointment",
+            "parts only",
+        ];
+        let info = [
+            "Scott",
+            "Trek",
+            "Giant",
+            "Specialized",
+            "Cannondale",
+            "Honda",
+            "Toro",
+            "Ariens",
+            "Yamaha",
+            "John Deere",
+            "Briggs",
+            "Kohler",
+            "Tecumseh",
+            "DeWalt",
+            "Milwaukee",
+            "Makita",
+            "Stihl",
+            "Husqvarna",
+        ];
+        let mut sort_order = 0_i64;
+        for (flag_type, values) in [
+            ("opportunity", opportunity.as_slice()),
+            ("risk", risk.as_slice()),
+            ("info", info.as_slice()),
+        ] {
+            for pattern in values {
+                let key = normalize_resell_key(pattern);
+                connection.execute(
+                    "
+                    INSERT OR IGNORE INTO def_resell_keyword_flag (
+                        id_def_resell_keyword_flag,
+                        key,
+                        label,
+                        flag_type,
+                        pattern,
+                        sort_order
+                    )
+                    VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                    ",
+                    params![
+                        format!("def_resell_keyword_flag_{key}"),
+                        key,
+                        pattern,
+                        flag_type,
+                        pattern,
+                        sort_order
+                    ],
+                )?;
+                sort_order += 1;
+            }
+        }
+        Ok(())
+    }
+
+    fn seed_repair_resell_sources(connection: &Connection) -> Result<()> {
+        let rows = [
+            ("manual_import", "Manual Import", "manual", "", "User-entered", "manual_import", "manual"),
+            ("gcsurplus", "GCSurplus", "government_surplus", "https://gcsurplus.ca/mn-eng.cfm", "Canada", "public_http", "gcsurplus"),
+            ("govdeals_canada", "GovDeals Canada", "government_surplus", "https://www.govdeals.ca/en", "Canada", "public_http", "govdeals"),
+            ("govdeals_ontario", "GovDeals Ontario", "government_surplus", "https://www.govdeals.com/en/ontario", "Ontario", "public_http", "govdeals"),
+            ("police_auctions_canada", "Police Auctions Canada", "police_auction", "https://www.policeauctionscanada.com/", "Toronto / Canada", "public_http", "police_auctions_canada"),
+            ("kijiji_kw_bikes", "Kijiji KW Bikes", "marketplace", "https://www.kijiji.ca/b-bikes/kitchener-waterloo/bike/k0c644l1700212", "Kitchener / Waterloo", "public_http", "kijiji"),
+            ("kijiji_kw_lawnmower", "Kijiji KW Lawnmower Search", "marketplace", "https://www.kijiji.ca/b-kitchener-waterloo/lawnmower/k0l1700212", "Kitchener / Waterloo", "public_http", "kijiji"),
+            ("kijiji_kw_snowblower", "Kijiji KW Snowblower Search", "marketplace", "https://www.kijiji.ca/b-kitchener-waterloo/snowblower/k0l1700212", "Kitchener / Waterloo", "public_http", "kijiji"),
+            ("facebook_kw_power_equipment", "Facebook Marketplace KW Power Equipment", "marketplace", "https://www.facebook.com/marketplace/104045032964460/power-equipments/", "Kitchener / Waterloo", "manual_import", "manual"),
+            ("bryans_auction", "Bryan's Auction Services", "local_auction", "https://bryansauction.com/", "Puslinch / Trenton", "public_http", "generic_auction"),
+            ("bryans_hibid", "Bryan's HiBid", "local_auction", "https://bryansfarm.hibid.com/", "Puslinch / Trenton", "public_http", "hibid"),
+            ("erin_auctions", "Erin Auctions", "local_auction", "https://erinauctions.com/", "Erin", "public_http", "generic_auction"),
+            ("rapid_sell", "Rapid-Sell", "local_auction", "https://www.rapid-sell.ca/", "Guelph / Southern Ontario", "public_http", "generic_auction"),
+            ("mr_jutzi", "M.R. Jutzi Auctions", "local_auction", "https://www.mrjutzi.ca/", "Breslau", "public_http", "generic_auction"),
+            ("hibid_ontario", "HiBid Ontario", "auction_directory", "https://hibid.com/ontario/auctions", "Ontario", "public_http", "hibid"),
+        ];
+        for (index, row) in rows.iter().enumerate() {
+            connection.execute(
+                "
+                INSERT OR IGNORE INTO obj_resell_source (
+                    id_obj_resell_source,
+                    id_def_resell_source_kind,
+                    source_key,
+                    name,
+                    base_url,
+                    region_label,
+                    scrape_mode,
+                    adapter_key,
+                    priority,
+                    notes
+                )
+                SELECT
+                    ?1,
+                    kind.id_def_resell_source_kind,
+                    ?2,
+                    ?3,
+                    ?4,
+                    ?5,
+                    ?6,
+                    ?7,
+                    ?8,
+                    ''
+                FROM def_resell_source_kind kind
+                WHERE kind.key = ?9
+                ",
+                params![
+                    format!("obj_resell_source_{}", row.0),
+                    row.0,
+                    row.1,
+                    row.3,
+                    row.4,
+                    row.5,
+                    row.6,
+                    50_i64 + index as i64,
+                    row.2
+                ],
+            )?;
+        }
+        Ok(())
+    }
+
+    fn seed_repair_resell_search_profiles(connection: &Connection) -> Result<()> {
+        let rows = [
+            "Mountain Bikes - KW/GTA",
+            "Small Engines - KW/GTA",
+            "Mowers - KW/GTA",
+            "Snow Blowers - KW/GTA",
+            "Tools And Shop Equipment - KW/GTA",
+            "Computers And Electronics - KW/GTA",
+        ];
+        for name in rows {
+            let key = normalize_resell_key(name);
+            connection.execute(
+                "
+                INSERT OR IGNORE INTO obj_resell_search_profile (
+                    id_obj_resell_search_profile,
+                    name,
+                    home_location_label,
+                    query_text
+                )
+                VALUES (?1, ?2, 'Kitchener / Waterloo', ?3)
+                ",
+                params![format!("obj_resell_search_profile_{key}"), name, name],
+            )?;
+            connection.execute(
+                "
+                INSERT OR IGNORE INTO n2n_resell_source_search_profile (
+                    id_n2n_resell_source_search_profile,
+                    id_obj_resell_source,
+                    id_obj_resell_search_profile
+                )
+                SELECT
+                    'n2n_resell_source_search_profile_' || source.source_key || '_' || ?1,
+                    source.id_obj_resell_source,
+                    profile.id_obj_resell_search_profile
+                FROM obj_resell_source source
+                JOIN obj_resell_search_profile profile ON profile.name = ?2
+                WHERE source.enabled = 1
+                ",
+                params![key, name],
+            )?;
+        }
+        Ok(())
+    }
+
+    fn seed_repair_resell_travel_profiles(connection: &Connection) -> Result<()> {
+        connection.execute(
+            "
+            INSERT OR IGNORE INTO obj_resell_travel_profile (
+                id_obj_resell_travel_profile,
+                name,
+                home_location_label,
+                vehicle_label,
+                fuel_l_per_100km,
+                fuel_price_cents_per_litre,
+                default_round_trip_km,
+                notes,
+                is_default
+            )
+            VALUES (
+                'obj_resell_travel_profile_colorado_pickup',
+                'Colorado pickup profile',
+                'Kitchener / Waterloo',
+                '2016 Chevrolet Colorado',
+                NULL,
+                NULL,
+                NULL,
+                'Fuel and distance assumptions are user-editable estimates.',
+                1
+            )
+            ",
+            [],
+        )?;
+        Ok(())
+    }
+
     fn quote_identifier(identifier: &str) -> String {
         format!("\"{}\"", identifier.replace('"', "\"\""))
     }
@@ -2031,12 +3757,21 @@ impl AppDatabase {
             ("obj_game_catalog_reference", "id"),
             ("obj_game_data_location", "id"),
             ("obj_game_catalog_screenshot", "id"),
+            ("obj_gearblocks_part_render_profile", "id"),
             ("obj_game_runtime_part", "id"),
             ("obj_game_runtime_part_alias", "id"),
             ("obj_game_runtime_part_api_attribute", "id"),
             ("obj_game_runtime_part_value", "id"),
             ("obj_game_runtime_part_property", "id"),
             ("obj_game_runtime_part_attachment", "id"),
+            ("def_gearblocks_part_metadata_item", "id"),
+            ("obj_game_runtime_part_metadata_value", "id"),
+            ("def_gearblocks_attachment_type", "id"),
+            ("n2n_game_runtime_part_attachment_type", "id"),
+            ("def_gearblocks_part_setting", "id"),
+            ("obj_game_runtime_part_setting_value", "id"),
+            ("def_gearblocks_part_output_channel", "id"),
+            ("obj_game_runtime_part_output_channel_value", "id"),
             ("def_gearblocks_api_type", "id"),
             ("def_gearblocks_api_member", "id"),
             ("def_gearblocks_api_parameter", "id"),
@@ -2088,7 +3823,20 @@ impl AppDatabase {
         Ok(())
     }
 
-    fn normalized_schema_tables() -> [&'static str; 43] {
+    fn clear_runtime_export_raw_documents(connection: &Connection, game_id: i64) -> Result<()> {
+        connection.execute(
+            "
+            UPDATE obj_game_runtime_construction_export
+            SET document_json = '{}'
+            WHERE game_id = ?1
+                AND document_json <> '{}'
+            ",
+            params![game_id],
+        )?;
+        Ok(())
+    }
+
+    fn normalized_schema_tables() -> [&'static str; 55] {
         [
             "obj_scratchpad",
             "obj_setting",
@@ -2103,6 +3851,7 @@ impl AppDatabase {
             "def_game",
             "obj_game",
             "obj_game_setting",
+            "obj_game_character_build",
             "obj_project",
             "obj_planning_conversation",
             "obj_planning_message",
@@ -2115,12 +3864,23 @@ impl AppDatabase {
             "obj_game_catalog_reference",
             "obj_game_data_location",
             "obj_game_catalog_screenshot",
+            "obj_gearblocks_part_render_profile",
+            "def_gearblocks_part",
             "obj_game_runtime_part",
+            "obj_game_runtime_part_instance",
             "obj_game_runtime_part_alias",
             "obj_game_runtime_part_api_attribute",
             "obj_game_runtime_part_value",
             "obj_game_runtime_part_property",
             "obj_game_runtime_part_attachment",
+            "def_gearblocks_part_metadata_item",
+            "obj_game_runtime_part_metadata_value",
+            "def_gearblocks_attachment_type",
+            "n2n_game_runtime_part_attachment_type",
+            "def_gearblocks_part_setting",
+            "obj_game_runtime_part_setting_value",
+            "def_gearblocks_part_output_channel",
+            "obj_game_runtime_part_output_channel_value",
             "def_gearblocks_api_type",
             "def_gearblocks_api_member",
             "def_gearblocks_api_parameter",
@@ -2161,13 +3921,15 @@ impl AppDatabase {
         for definition in gearblocks_api::CONSTRUCTION_CLASS_DEFINITIONS {
             Self::seed_gearblocks_api_type(
                 connection,
-                namespace,
-                definition.name,
-                definition.type_kind,
-                definition.docs_url,
-                "docs",
-                "0.8.96622",
-                definition.summary,
+                GearBlocksApiTypeSeed {
+                    namespace,
+                    type_name: definition.name,
+                    type_kind: definition.type_kind,
+                    docs_url: definition.docs_url,
+                    source: "docs",
+                    source_version: "0.8.96622",
+                    notes: definition.summary,
+                },
             )?;
         }
 
@@ -2175,13 +3937,15 @@ impl AppDatabase {
             let docs_url = gearblocks_api_docs_url(definition.docs_url);
             let type_id = Self::seed_gearblocks_api_type(
                 connection,
-                namespace,
-                definition.name,
-                "interface",
-                &docs_url,
-                "docs",
-                "0.8.96622",
-                "",
+                GearBlocksApiTypeSeed {
+                    namespace,
+                    type_name: definition.name,
+                    type_kind: "interface",
+                    docs_url: &docs_url,
+                    source: "docs",
+                    source_version: "0.8.96622",
+                    notes: "",
+                },
             )?;
 
             for raw_member in definition.members {
@@ -2283,18 +4047,21 @@ impl AppDatabase {
         }
 
         for definition in gearblocks_api::CONSTRUCTION_ENUM_DEFINITIONS {
+            let notes = format!(
+                "{} Underlying type: {}.",
+                definition.summary, definition.underlying_type
+            );
             let type_id = Self::seed_gearblocks_api_type(
                 connection,
-                namespace,
-                definition.name,
-                "enum",
-                definition.docs_url,
-                "docs",
-                "0.8.96622",
-                &format!(
-                    "{} Underlying type: {}.",
-                    definition.summary, definition.underlying_type
-                ),
+                GearBlocksApiTypeSeed {
+                    namespace,
+                    type_name: definition.name,
+                    type_kind: "enum",
+                    docs_url: definition.docs_url,
+                    source: "docs",
+                    source_version: "0.8.96622",
+                    notes: &notes,
+                },
             )?;
 
             connection.execute(
@@ -2345,13 +4112,7 @@ impl AppDatabase {
 
     fn seed_gearblocks_api_type(
         connection: &Connection,
-        namespace: &str,
-        type_name: &str,
-        type_kind: &str,
-        docs_url: &str,
-        source: &str,
-        source_version: &str,
-        notes: &str,
+        seed: GearBlocksApiTypeSeed<'_>,
     ) -> Result<i64> {
         connection.execute(
             "
@@ -2374,13 +4135,13 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                namespace.trim(),
-                type_name.trim(),
-                type_kind.trim(),
-                gearblocks_api_docs_url(docs_url),
-                source.trim(),
-                source_version.trim(),
-                notes.trim(),
+                seed.namespace.trim(),
+                seed.type_name.trim(),
+                seed.type_kind.trim(),
+                gearblocks_api_docs_url(seed.docs_url),
+                seed.source.trim(),
+                seed.source_version.trim(),
+                seed.notes.trim(),
             ],
         )?;
 
@@ -2391,13 +4152,13 @@ impl AppDatabase {
             WHERE namespace = ?1
                 AND type_name = ?2
             ",
-            params![namespace.trim(), type_name.trim()],
+            params![seed.namespace.trim(), seed.type_name.trim()],
             |row| row.get::<_, i64>(0),
         )
     }
 
     pub fn get_app_setting(&self, key: &str) -> Result<Option<String>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection
             .query_row(
                 "SELECT value FROM obj_setting WHERE key = ?1",
@@ -2408,7 +4169,7 @@ impl AppDatabase {
     }
 
     pub fn save_app_setting(&self, key: &str, value: &str) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             INSERT INTO obj_setting (key, value)
@@ -2423,7 +4184,7 @@ impl AppDatabase {
     }
 
     pub fn delete_app_setting(&self, key: &str) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "DELETE FROM obj_setting WHERE key = ?1",
             params![key.trim()],
@@ -2432,7 +4193,7 @@ impl AppDatabase {
     }
 
     pub fn get_scratchpad(&self) -> Result<String> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.query_row(
             "SELECT content FROM obj_scratchpad WHERE id = 1",
             [],
@@ -2441,7 +4202,7 @@ impl AppDatabase {
     }
 
     pub fn save_scratchpad(&self, content: &str) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             INSERT INTO obj_scratchpad (id, content, updated_at)
@@ -2457,7 +4218,7 @@ impl AppDatabase {
     }
 
     pub fn list_tasks(&self) -> Result<Vec<TaskRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT id, title, body, deadline, is_completed, created_at, updated_at
@@ -2488,7 +4249,7 @@ impl AppDatabase {
     }
 
     pub fn create_task(&self, title: &str, body: &str, deadline: &str) -> Result<TaskRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "INSERT INTO obj_task (title, body, deadline) VALUES (?1, ?2, ?3)",
             params![title.trim(), body, deadline.trim()],
@@ -2505,7 +4266,7 @@ impl AppDatabase {
         deadline: Option<&str>,
         is_completed: Option<bool>,
     ) -> Result<TaskRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
 
         if let Some(next_title) = title {
             connection.execute(
@@ -2543,13 +4304,13 @@ impl AppDatabase {
     }
 
     pub fn delete_task(&self, id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute("DELETE FROM obj_task WHERE id = ?1", params![id])?;
         Ok(())
     }
 
     pub fn list_notes(&self) -> Result<Vec<NoteRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT id, title, body, created_at, updated_at
@@ -2574,7 +4335,7 @@ impl AppDatabase {
     }
 
     pub fn create_note(&self, title: &str, body: &str) -> Result<NoteRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "INSERT INTO obj_note (title, body) VALUES (?1, ?2)",
             params![title.trim(), body],
@@ -2584,7 +4345,7 @@ impl AppDatabase {
     }
 
     pub fn update_note(&self, id: i64, title: &str, body: &str) -> Result<NoteRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             UPDATE obj_note
@@ -2598,13 +4359,13 @@ impl AppDatabase {
     }
 
     pub fn delete_note(&self, id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute("DELETE FROM obj_note WHERE id = ?1", params![id])?;
         Ok(())
     }
 
     pub fn list_calendar_events(&self) -> Result<Vec<CalendarEventRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT id, title, start_date, start_time, end_date, end_time, notes, created_at, updated_at
@@ -2641,7 +4402,7 @@ impl AppDatabase {
         end_time: &str,
         notes: &str,
     ) -> Result<CalendarEventRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             INSERT INTO obj_calendar_event (title, start_date, start_time, end_date, end_time, notes)
@@ -2662,15 +4423,9 @@ impl AppDatabase {
 
     pub fn update_calendar_event(
         &self,
-        id: i64,
-        title: &str,
-        start_date: &str,
-        start_time: &str,
-        end_date: &str,
-        end_time: &str,
-        notes: &str,
+        draft: CalendarEventUpdateDraft<'_>,
     ) -> Result<CalendarEventRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             UPDATE obj_calendar_event
@@ -2684,27 +4439,27 @@ impl AppDatabase {
             WHERE id = ?7
             ",
             params![
-                title.trim(),
-                start_date.trim(),
-                start_time.trim(),
-                end_date.trim(),
-                end_time.trim(),
-                notes,
-                id
+                draft.title.trim(),
+                draft.start_date.trim(),
+                draft.start_time.trim(),
+                draft.end_date.trim(),
+                draft.end_time.trim(),
+                draft.notes,
+                draft.id
             ],
         )?;
 
-        Self::get_calendar_event_by_id(&connection, id)
+        Self::get_calendar_event_by_id(&connection, draft.id)
     }
 
     pub fn delete_calendar_event(&self, id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute("DELETE FROM obj_calendar_event WHERE id = ?1", params![id])?;
         Ok(())
     }
 
     pub fn list_smoking_events(&self) -> Result<Vec<SmokingEventRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT id, smoked_at, source, notes, created_at
@@ -2725,7 +4480,7 @@ impl AppDatabase {
         source: &str,
         notes: &str,
     ) -> Result<SmokingEventRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             INSERT INTO obj_smoking_event (smoked_at, source, notes)
@@ -2751,13 +4506,13 @@ impl AppDatabase {
     }
 
     pub fn delete_smoking_event(&self, id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute("DELETE FROM obj_smoking_event WHERE id = ?1", params![id])?;
         Ok(())
     }
 
     pub fn get_smoking_cessation_settings(&self) -> Result<SmokingCessationSettingsRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_smoking_cessation_settings_for_connection(&connection)
     }
 
@@ -2765,7 +4520,7 @@ impl AppDatabase {
         &self,
         current_cigarette_count: i64,
     ) -> Result<SmokingCessationSettingsRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             UPDATE obj_smoking_cessation_setting
@@ -2778,8 +4533,541 @@ impl AppDatabase {
         Self::get_smoking_cessation_settings_for_connection(&connection)
     }
 
+    pub fn list_repair_resell_sources(&self) -> Result<Vec<RepairResellSourceRecord>> {
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                source.id_obj_resell_source,
+                kind.key,
+                kind.label,
+                source.source_key,
+                source.name,
+                source.base_url,
+                COALESCE(source.region_label, ''),
+                source.scrape_mode,
+                source.adapter_key,
+                source.enabled,
+                source.priority,
+                source.rate_limit_seconds,
+                COALESCE(source.notes, ''),
+                COALESCE(source.last_scraped_at, ''),
+                source.created_at,
+                source.modified_at
+            FROM obj_resell_source source
+            JOIN def_resell_source_kind kind
+                ON kind.id_def_resell_source_kind = source.id_def_resell_source_kind
+            ORDER BY source.priority ASC, source.name ASC
+            ",
+        )?;
+        let records = statement
+            .query_map([], repair_resell_source_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(records)
+    }
+
+    pub fn get_repair_resell_source_by_id(
+        &self,
+        source_id: &str,
+    ) -> Result<RepairResellSourceRecord> {
+        let connection = self.connection()?;
+        Self::get_repair_resell_source_by_id_for_connection(&connection, source_id)
+    }
+
+    pub fn update_repair_resell_source_enabled(
+        &self,
+        source_id: &str,
+        enabled: bool,
+    ) -> Result<RepairResellSourceRecord> {
+        let connection = self.connection()?;
+        connection.execute(
+            "
+            UPDATE obj_resell_source
+            SET enabled = ?1,
+                modified_at = CURRENT_TIMESTAMP
+            WHERE id_obj_resell_source = ?2
+            ",
+            params![if enabled { 1 } else { 0 }, source_id],
+        )?;
+        Self::get_repair_resell_source_by_id_for_connection(&connection, source_id)
+    }
+
+    pub fn list_repair_resell_categories(&self) -> Result<Vec<RepairResellCategoryRecord>> {
+        let connection = self.connection()?;
+        Self::list_repair_resell_categories_for_connection(&connection)
+    }
+
+    pub fn list_repair_resell_keyword_flags(&self) -> Result<Vec<RepairResellKeywordFlagRecord>> {
+        let connection = self.connection()?;
+        Self::list_repair_resell_keyword_flags_for_connection(&connection)
+    }
+
+    pub fn list_repair_resell_travel_profiles(
+        &self,
+    ) -> Result<Vec<RepairResellTravelProfileRecord>> {
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                id_obj_resell_travel_profile,
+                name,
+                COALESCE(home_location_label, ''),
+                COALESCE(vehicle_label, ''),
+                fuel_l_per_100km,
+                fuel_price_cents_per_litre,
+                default_round_trip_km,
+                COALESCE(notes, ''),
+                is_default
+            FROM obj_resell_travel_profile
+            ORDER BY is_default DESC, name ASC
+            ",
+        )?;
+        let records = statement
+            .query_map([], repair_resell_travel_profile_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(records)
+    }
+
+    pub fn list_repair_resell_listings(&self) -> Result<Vec<RepairResellListingRecord>> {
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                listing.id_obj_resell_listing,
+                listing.id_obj_resell_source,
+                source.name,
+                source.source_key,
+                COALESCE(listing.external_id, ''),
+                listing.canonical_url,
+                listing.title,
+                COALESCE(listing.normalized_title, ''),
+                COALESCE(listing.description_text, ''),
+                COALESCE(listing.source_category_text, ''),
+                COALESCE(listing.make, ''),
+                COALESCE(listing.model, ''),
+                listing.model_year,
+                COALESCE(listing.lot_number, ''),
+                COALESCE(listing.condition_text, ''),
+                COALESCE(listing.location_text, ''),
+                listing.currency_code,
+                listing.current_price_cents,
+                listing.bid_count,
+                COALESCE(listing.closing_at, ''),
+                COALESCE(listing.posted_at, ''),
+                COALESCE(listing.last_seen_at, ''),
+                listing.listing_status,
+                COALESCE(listing.pickup_text, ''),
+                COALESCE(listing.inspection_text, ''),
+                listing.is_watchlisted,
+                listing.created_at,
+                listing.modified_at
+            FROM obj_resell_listing listing
+            JOIN obj_resell_source source
+                ON source.id_obj_resell_source = listing.id_obj_resell_source
+            ORDER BY
+                listing.is_watchlisted DESC,
+                CASE listing.listing_status WHEN 'active' THEN 0 WHEN 'unknown' THEN 1 ELSE 2 END,
+                listing.modified_at DESC
+            ",
+        )?;
+        let mut rows = statement
+            .query_map([], repair_resell_listing_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        for row in &mut rows {
+            row.flags = Self::list_repair_resell_listing_flags_for_connection(&connection, &row.id)?;
+            row.categories =
+                Self::list_repair_resell_listing_categories_for_connection(&connection, &row.id)?;
+        }
+        Ok(rows)
+    }
+
+    pub fn import_repair_resell_listing(
+        &self,
+        draft: RepairResellListingDraft,
+        scrape_run_id: Option<&str>,
+    ) -> Result<RepairResellListingRecord> {
+        let connection = self.connection()?;
+        let normalized_title = normalize_resell_text(&draft.title);
+        let listing_id: Option<String> = if let Some(external_id) = draft.external_id.as_deref() {
+            connection
+                .query_row(
+                    "
+                    SELECT id_obj_resell_listing
+                    FROM obj_resell_listing
+                    WHERE id_obj_resell_source = ?1
+                        AND external_id = ?2
+                    ",
+                    params![draft.source_id, external_id],
+                    |row| row.get(0),
+                )
+                .optional()?
+        } else {
+            None
+        }
+        .or_else(|| {
+            connection
+                .query_row(
+                    "
+                    SELECT id_obj_resell_listing
+                    FROM obj_resell_listing
+                    WHERE canonical_url = ?1
+                    ",
+                    params![draft.canonical_url],
+                    |row| row.get(0),
+                )
+                .optional()
+                .ok()
+                .flatten()
+        });
+
+        let listing_id = if let Some(listing_id) = listing_id {
+            connection.execute(
+                "
+                UPDATE obj_resell_listing
+                SET title = ?1,
+                    normalized_title = ?2,
+                    description_text = ?3,
+                    source_category_text = ?4,
+                    condition_text = ?5,
+                    location_text = ?6,
+                    current_price_cents = ?7,
+                    closing_at = ?8,
+                    pickup_text = ?9,
+                    inspection_text = ?10,
+                    listing_status = ?11,
+                    content_hash = ?12,
+                    structured_json = ?13,
+                    last_seen_at = CURRENT_TIMESTAMP,
+                    modified_at = CURRENT_TIMESTAMP
+                WHERE id_obj_resell_listing = ?14
+                ",
+                params![
+                    draft.title.trim(),
+                    normalized_title,
+                    draft.description_text.trim(),
+                    draft.source_category_text.trim(),
+                    draft.condition_text.trim(),
+                    draft.location_text.trim(),
+                    draft.current_price_cents,
+                    draft.closing_at.trim(),
+                    draft.pickup_text.trim(),
+                    draft.inspection_text.trim(),
+                    valid_resell_listing_status(&draft.listing_status),
+                    draft.content_hash,
+                    draft.structured_json,
+                    listing_id
+                ],
+            )?;
+            listing_id
+        } else {
+            let listing_id = repair_resell_id("obj_resell_listing");
+            connection.execute(
+                "
+                INSERT INTO obj_resell_listing (
+                    id_obj_resell_listing,
+                    id_obj_resell_source,
+                    external_id,
+                    canonical_url,
+                    title,
+                    normalized_title,
+                    description_text,
+                    source_category_text,
+                    condition_text,
+                    location_text,
+                    current_price_cents,
+                    closing_at,
+                    last_seen_at,
+                    listing_status,
+                    pickup_text,
+                    inspection_text,
+                    content_hash,
+                    structured_json
+                )
+                VALUES (
+                    ?1, ?2, NULLIF(?3, ''), ?4, ?5, ?6, ?7, ?8, ?9, ?10,
+                    ?11, ?12, CURRENT_TIMESTAMP, ?13, ?14, ?15, ?16, ?17
+                )
+                ",
+                params![
+                    listing_id,
+                    draft.source_id,
+                    draft.external_id.unwrap_or_default(),
+                    draft.canonical_url.trim(),
+                    draft.title.trim(),
+                    normalized_title,
+                    draft.description_text.trim(),
+                    draft.source_category_text.trim(),
+                    draft.condition_text.trim(),
+                    draft.location_text.trim(),
+                    draft.current_price_cents,
+                    draft.closing_at.trim(),
+                    valid_resell_listing_status(&draft.listing_status),
+                    draft.pickup_text.trim(),
+                    draft.inspection_text.trim(),
+                    draft.content_hash,
+                    draft.structured_json
+                ],
+            )?;
+            listing_id
+        };
+
+        Self::insert_repair_resell_listing_snapshot(&connection, &listing_id, scrape_run_id)?;
+        Self::apply_repair_resell_keyword_flags(&connection, &listing_id)?;
+        Self::apply_repair_resell_categories(&connection, &listing_id)?;
+        Self::get_repair_resell_listing_by_id_for_connection(&connection, &listing_id)
+    }
+
+    pub fn set_repair_resell_listing_watchlist(
+        &self,
+        listing_id: &str,
+        is_watchlisted: bool,
+        watch_status: &str,
+        notes: &str,
+    ) -> Result<RepairResellListingRecord> {
+        let connection = self.connection()?;
+        connection.execute(
+            "
+            UPDATE obj_resell_listing
+            SET is_watchlisted = ?1,
+                modified_at = CURRENT_TIMESTAMP
+            WHERE id_obj_resell_listing = ?2
+            ",
+            params![if is_watchlisted { 1 } else { 0 }, listing_id],
+        )?;
+        if is_watchlisted {
+            connection.execute(
+                "
+                INSERT INTO obj_resell_watchlist_entry (
+                    id_obj_resell_watchlist_entry,
+                    id_obj_resell_listing,
+                    watch_status,
+                    notes
+                )
+                VALUES (?1, ?2, ?3, ?4)
+                ON CONFLICT(id_obj_resell_listing) DO UPDATE SET
+                    watch_status = excluded.watch_status,
+                    notes = excluded.notes,
+                    modified_at = CURRENT_TIMESTAMP
+                ",
+                params![
+                    repair_resell_id("obj_resell_watchlist_entry"),
+                    listing_id,
+                    valid_resell_watch_status(watch_status),
+                    notes
+                ],
+            )?;
+        }
+        Self::get_repair_resell_listing_by_id_for_connection(&connection, listing_id)
+    }
+
+    pub fn create_repair_resell_scrape_run(
+        &self,
+        source_id: &str,
+    ) -> Result<RepairResellScrapeRunRecord> {
+        let connection = self.connection()?;
+        let run_id = repair_resell_id("obj_resell_scrape_run");
+        connection.execute(
+            "
+            INSERT INTO obj_resell_scrape_run (
+                id_obj_resell_scrape_run,
+                id_obj_resell_source,
+                started_at,
+                status
+            )
+            VALUES (?1, ?2, CURRENT_TIMESTAMP, 'running')
+            ",
+            params![run_id, source_id],
+        )?;
+        Self::get_repair_resell_scrape_run_by_id_for_connection(&connection, &run_id)
+    }
+
+    pub fn finish_repair_resell_scrape_run(
+        &self,
+        run_id: &str,
+        status: &str,
+        listing_count: i64,
+        new_listing_count: i64,
+        updated_listing_count: i64,
+        skipped_count: i64,
+        error_text: &str,
+    ) -> Result<RepairResellScrapeRunRecord> {
+        let connection = self.connection()?;
+        connection.execute(
+            "
+            UPDATE obj_resell_scrape_run
+            SET finished_at = CURRENT_TIMESTAMP,
+                status = ?1,
+                listing_count = ?2,
+                new_listing_count = ?3,
+                updated_listing_count = ?4,
+                skipped_count = ?5,
+                error_text = ?6,
+                modified_at = CURRENT_TIMESTAMP
+            WHERE id_obj_resell_scrape_run = ?7
+            ",
+            params![
+                valid_resell_scrape_status(status),
+                listing_count,
+                new_listing_count,
+                updated_listing_count,
+                skipped_count,
+                error_text,
+                run_id
+            ],
+        )?;
+        let run = Self::get_repair_resell_scrape_run_by_id_for_connection(&connection, run_id)?;
+        connection.execute(
+            "
+            UPDATE obj_resell_source
+            SET last_scraped_at = ?1,
+                modified_at = CURRENT_TIMESTAMP
+            WHERE id_obj_resell_source = ?2
+            ",
+            params![run.finished_at, run.source_id],
+        )?;
+        Ok(run)
+    }
+
+    pub fn list_repair_resell_deal_estimates(
+        &self,
+        listing_id: &str,
+    ) -> Result<Vec<RepairResellDealEstimateRecord>> {
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                id_obj_resell_deal_estimate,
+                id_obj_resell_listing,
+                COALESCE(id_obj_resell_travel_profile, ''),
+                estimate_label,
+                acquisition_price_cents,
+                buyer_premium_cents,
+                tax_cents,
+                travel_km,
+                fuel_cost_cents,
+                parts_cost_cents,
+                other_cost_cents,
+                expected_resale_low_cents,
+                expected_resale_high_cents,
+                expected_resale_target_cents,
+                desired_profit_cents,
+                risk_buffer_cents,
+                max_safe_bid_cents,
+                net_profit_low_cents,
+                net_profit_target_cents,
+                estimate_method,
+                confidence,
+                COALESCE(notes, ''),
+                created_at,
+                modified_at
+            FROM obj_resell_deal_estimate
+            WHERE id_obj_resell_listing = ?1
+            ORDER BY modified_at DESC
+            ",
+        )?;
+        let records = statement
+            .query_map(params![listing_id], repair_resell_deal_estimate_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(records)
+    }
+
+    pub fn save_repair_resell_deal_estimate(
+        &self,
+        draft: RepairResellDealEstimateDraft,
+    ) -> Result<RepairResellDealEstimateRecord> {
+        let connection = self.connection()?;
+        let fuel_cost = draft.fuel_cost_cents.or_else(|| {
+            estimate_resell_fuel_cost(
+                draft.travel_km,
+                draft.travel_profile_id.as_deref(),
+                &connection,
+            )
+            .ok()
+            .flatten()
+        });
+        let max_safe_bid = draft.expected_resale_target_cents.map(|target| {
+            target
+                - draft.desired_profit_cents.unwrap_or(0)
+                - draft.parts_cost_cents.unwrap_or(0)
+                - fuel_cost.unwrap_or(0)
+                - draft.buyer_premium_cents.unwrap_or(0)
+                - draft.tax_cents.unwrap_or(0)
+                - draft.risk_buffer_cents.unwrap_or(0)
+                - draft.other_cost_cents.unwrap_or(0)
+        });
+        let acquisition = draft.acquisition_price_cents.unwrap_or(0);
+        let total_cost = acquisition
+            + draft.buyer_premium_cents.unwrap_or(0)
+            + draft.tax_cents.unwrap_or(0)
+            + fuel_cost.unwrap_or(0)
+            + draft.parts_cost_cents.unwrap_or(0)
+            + draft.other_cost_cents.unwrap_or(0)
+            + draft.risk_buffer_cents.unwrap_or(0);
+        let net_low = draft.expected_resale_low_cents.map(|value| value - total_cost);
+        let net_target = draft
+            .expected_resale_target_cents
+            .map(|value| value - total_cost);
+        let estimate_id = repair_resell_id("obj_resell_deal_estimate");
+        connection.execute(
+            "
+            INSERT INTO obj_resell_deal_estimate (
+                id_obj_resell_deal_estimate,
+                id_obj_resell_listing,
+                id_obj_resell_travel_profile,
+                estimate_label,
+                acquisition_price_cents,
+                buyer_premium_cents,
+                tax_cents,
+                travel_km,
+                fuel_cost_cents,
+                parts_cost_cents,
+                other_cost_cents,
+                expected_resale_low_cents,
+                expected_resale_high_cents,
+                expected_resale_target_cents,
+                desired_profit_cents,
+                risk_buffer_cents,
+                max_safe_bid_cents,
+                net_profit_low_cents,
+                net_profit_target_cents,
+                estimate_method,
+                confidence,
+                notes
+            )
+            VALUES (
+                ?1, ?2, NULLIF(?3, ''), ?4, ?5, ?6, ?7, ?8, ?9, ?10,
+                ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, 'manual', ?20, ?21
+            )
+            ",
+            params![
+                estimate_id,
+                draft.listing_id,
+                draft.travel_profile_id.unwrap_or_default(),
+                draft.estimate_label.trim(),
+                draft.acquisition_price_cents,
+                draft.buyer_premium_cents,
+                draft.tax_cents,
+                draft.travel_km,
+                fuel_cost,
+                draft.parts_cost_cents,
+                draft.other_cost_cents,
+                draft.expected_resale_low_cents,
+                draft.expected_resale_high_cents,
+                draft.expected_resale_target_cents,
+                draft.desired_profit_cents,
+                draft.risk_buffer_cents,
+                max_safe_bid,
+                net_low,
+                net_target,
+                valid_resell_confidence(&draft.confidence),
+                draft.notes
+            ],
+        )?;
+        Self::get_repair_resell_deal_estimate_by_id_for_connection(&connection, &estimate_id)
+    }
+
     pub fn list_schedulers(&self) -> Result<Vec<SchedulerRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT
@@ -2813,7 +5101,7 @@ impl AppDatabase {
     }
 
     pub fn list_due_schedulers(&self, limit: i64) -> Result<Vec<SchedulerRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT
@@ -2857,7 +5145,7 @@ impl AppDatabase {
     }
 
     pub fn try_acquire_scheduler(&self, scheduler_id: i64, lease_seconds: i64) -> Result<bool> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let changed = connection.execute(
             "
             UPDATE obj_scheduler
@@ -2876,7 +5164,7 @@ impl AppDatabase {
     }
 
     pub fn start_scheduler_run(&self, scheduler: &SchedulerRecord) -> Result<i64> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             INSERT INTO obj_scheduler_run (
@@ -2900,7 +5188,7 @@ impl AppDatabase {
         status: &str,
         message: &str,
     ) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let next_run_modifier = format!("+{} seconds", scheduler.interval_seconds.max(1));
         connection.execute(
             "
@@ -2935,7 +5223,7 @@ impl AppDatabase {
     }
 
     pub fn list_projects(&self) -> Result<Vec<ProjectRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT id, name, description, status, created_at, updated_at
@@ -2966,7 +5254,7 @@ impl AppDatabase {
         description: &str,
         status: &str,
     ) -> Result<ProjectRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "INSERT INTO obj_project (name, description, status) VALUES (?1, ?2, ?3)",
             params![name.trim(), description, status.trim()],
@@ -2982,7 +5270,7 @@ impl AppDatabase {
         description: &str,
         status: &str,
     ) -> Result<ProjectRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             UPDATE obj_project
@@ -2999,7 +5287,7 @@ impl AppDatabase {
     }
 
     pub fn delete_project(&self, id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "DELETE FROM obj_bridge_file_draft WHERE project_id = ?1",
             params![id],
@@ -3017,7 +5305,7 @@ impl AppDatabase {
     }
 
     pub fn get_project(&self, id: i64) -> Result<ProjectRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_project_by_id(&connection, id)
     }
 
@@ -3025,7 +5313,7 @@ impl AppDatabase {
         &self,
         project_id: i64,
     ) -> Result<Option<ProjectGitHubRepositoryRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_project_by_id(&connection, project_id)?;
         Self::get_project_github_repository_by_project_id(&connection, project_id).optional()
     }
@@ -3035,7 +5323,7 @@ impl AppDatabase {
         project_id: i64,
         repository_full_name: &str,
     ) -> Result<ProjectGitHubRepositoryRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_project_by_id(&connection, project_id)?;
         connection.execute(
             "
@@ -3066,7 +5354,7 @@ impl AppDatabase {
     }
 
     pub fn delete_project_github_repository(&self, project_id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_project_by_id(&connection, project_id)?;
         connection.execute(
             "DELETE FROM obj_project_github_repository WHERE project_id = ?1",
@@ -3084,7 +5372,7 @@ impl AppDatabase {
         visibility: &str,
         last_fetch_status: &str,
     ) -> Result<ProjectGitHubRepositoryRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             UPDATE obj_project_github_repository
@@ -3115,7 +5403,7 @@ impl AppDatabase {
         project_id: i64,
         last_fetch_status: &str,
     ) -> Result<ProjectGitHubRepositoryRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             UPDATE obj_project_github_repository
@@ -3134,7 +5422,7 @@ impl AppDatabase {
         &self,
         project_id: i64,
     ) -> Result<Option<ProjectMarkdownContextRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_project_by_id(&connection, project_id)?;
         Self::get_project_markdown_context_by_project_id(&connection, project_id).optional()
     }
@@ -3145,7 +5433,7 @@ impl AppDatabase {
         root_path: &str,
         readme_path: &str,
     ) -> Result<ProjectMarkdownContextRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_project_by_id(&connection, project_id)?;
         let clean_readme_path = if readme_path.trim().is_empty() {
             "README.md"
@@ -3174,7 +5462,7 @@ impl AppDatabase {
     }
 
     pub fn delete_project_markdown_context(&self, project_id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_project_by_id(&connection, project_id)?;
         connection.execute(
             "DELETE FROM obj_project_markdown_context WHERE project_id = ?1",
@@ -3187,7 +5475,7 @@ impl AppDatabase {
         &self,
         project_id: i64,
     ) -> Result<ProjectMarkdownContextPayload> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_project_by_id(&connection, project_id)?;
         Self::load_project_markdown_context_for_project(&connection, project_id)
     }
@@ -3196,7 +5484,7 @@ impl AppDatabase {
         &self,
         project_id: Option<i64>,
     ) -> Result<Vec<PlanningConversationRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
 
         if let Some(project_id) = project_id {
             let mut statement = connection.prepare(
@@ -3233,7 +5521,7 @@ impl AppDatabase {
         project_id: i64,
         title: &str,
     ) -> Result<PlanningConversationRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_project_by_id(&connection, project_id)?;
         let clean_title = if title.trim().is_empty() {
             "Planning conversation"
@@ -3254,7 +5542,7 @@ impl AppDatabase {
     }
 
     pub fn get_planning_conversation(&self, id: i64) -> Result<PlanningConversationRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_planning_conversation_by_id(&connection, id)
     }
 
@@ -3262,7 +5550,7 @@ impl AppDatabase {
         &self,
         conversation_id: i64,
     ) -> Result<Vec<PlanningMessageRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_planning_conversation_by_id(&connection, conversation_id)?;
         Self::list_planning_messages_for_connection(&connection, conversation_id)
     }
@@ -3272,7 +5560,7 @@ impl AppDatabase {
         conversation_id: i64,
         limit: i64,
     ) -> Result<Vec<PlanningMessageRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT id, conversation_id, role, content, created_at
@@ -3300,7 +5588,7 @@ impl AppDatabase {
         role: &str,
         content: &str,
     ) -> Result<PlanningMessageRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_planning_conversation_by_id(&connection, conversation_id)?;
         connection.execute(
             "
@@ -3323,7 +5611,7 @@ impl AppDatabase {
     }
 
     pub fn delete_planning_conversation(&self, conversation_id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "DELETE FROM obj_bridge_file_draft WHERE conversation_id = ?1",
             params![conversation_id],
@@ -3347,7 +5635,7 @@ impl AppDatabase {
         &self,
         conversation_id: i64,
     ) -> Result<Vec<PlanningConversationContextRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_planning_conversation_by_id(&connection, conversation_id)?;
         Self::list_planning_conversation_context_for_connection(&connection, conversation_id)
     }
@@ -3359,7 +5647,7 @@ impl AppDatabase {
         source_id: Option<i64>,
         label: &str,
     ) -> Result<PlanningConversationContextRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_planning_conversation_by_id(&connection, conversation_id)?;
 
         let normalized_context_type = context_type.trim();
@@ -3398,7 +5686,7 @@ impl AppDatabase {
     }
 
     pub fn remove_planning_conversation_context(&self, id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "DELETE FROM n2n_planning_conversation_context WHERE id = ?1",
             params![id],
@@ -3412,7 +5700,7 @@ impl AppDatabase {
         draft_message: &str,
         system_instruction: &str,
     ) -> Result<PlanningPromptPreviewRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let conversation = Self::get_planning_conversation_by_id(&connection, conversation_id)?;
         let project = Self::get_project_by_id(&connection, conversation.project_id)?;
         let contexts =
@@ -3507,7 +5795,7 @@ impl AppDatabase {
         &self,
         conversation_id: i64,
     ) -> Result<PlanningContextPayload> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let conversation = Self::get_planning_conversation_by_id(&connection, conversation_id)?;
         let project = Self::get_project_by_id(&connection, conversation.project_id)?;
         let contexts =
@@ -3536,7 +5824,7 @@ impl AppDatabase {
     }
 
     pub fn list_bridge_file_drafts(&self, project_id: i64) -> Result<Vec<BridgeFileDraftRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_project_by_id(&connection, project_id)?;
         let mut statement = connection.prepare(
             "
@@ -3555,7 +5843,7 @@ impl AppDatabase {
     }
 
     pub fn get_bridge_file_draft(&self, id: i64) -> Result<BridgeFileDraftRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_bridge_file_draft_by_id(&connection, id)
     }
 
@@ -3563,7 +5851,7 @@ impl AppDatabase {
         &self,
         conversation_id: i64,
     ) -> Result<BridgeFileDraftRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let conversation = Self::get_planning_conversation_by_id(&connection, conversation_id)?;
         let project = Self::get_project_by_id(&connection, conversation.project_id)?;
         let messages = Self::list_planning_messages_for_connection(&connection, conversation_id)?;
@@ -3616,7 +5904,7 @@ impl AppDatabase {
     }
 
     pub fn delete_bridge_file_draft(&self, id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "DELETE FROM obj_bridge_file_draft WHERE id = ?1",
             params![id],
@@ -3625,7 +5913,7 @@ impl AppDatabase {
     }
 
     pub fn list_youtube_references(&self) -> Result<Vec<YouTubeReferenceRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT id, title, url, video_id, channel_name, notes, tags, created_at, updated_at
@@ -3642,7 +5930,7 @@ impl AppDatabase {
     }
 
     pub fn get_youtube_reference(&self, id: i64) -> Result<YouTubeReferenceRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_youtube_reference_by_id(&connection, id)
     }
 
@@ -3655,7 +5943,7 @@ impl AppDatabase {
         notes: &str,
         tags: &str,
     ) -> Result<YouTubeReferenceRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             INSERT INTO obj_youtube_reference (title, url, video_id, channel_name, notes, tags)
@@ -3676,15 +5964,9 @@ impl AppDatabase {
 
     pub fn update_youtube_reference(
         &self,
-        id: i64,
-        title: &str,
-        url: &str,
-        video_id: &str,
-        channel_name: &str,
-        notes: &str,
-        tags: &str,
+        draft: YouTubeReferenceUpdateDraft<'_>,
     ) -> Result<YouTubeReferenceRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             UPDATE obj_youtube_reference
@@ -3698,21 +5980,21 @@ impl AppDatabase {
             WHERE id = ?7
             ",
             params![
-                title.trim(),
-                url.trim(),
-                video_id.trim(),
-                channel_name.trim(),
-                notes,
-                tags.trim(),
-                id
+                draft.title.trim(),
+                draft.url.trim(),
+                draft.video_id.trim(),
+                draft.channel_name.trim(),
+                draft.notes,
+                draft.tags.trim(),
+                draft.id
             ],
         )?;
 
-        Self::get_youtube_reference_by_id(&connection, id)
+        Self::get_youtube_reference_by_id(&connection, draft.id)
     }
 
     pub fn delete_youtube_reference(&self, id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "DELETE FROM obj_youtube_reference WHERE id = ?1",
             params![id],
@@ -3721,7 +6003,7 @@ impl AppDatabase {
     }
 
     pub fn list_games(&self) -> Result<Vec<GameRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT id, name, slug, summary, created_at, updated_at
@@ -3738,12 +6020,34 @@ impl AppDatabase {
     }
 
     pub fn get_game(&self, id: i64) -> Result<GameRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, id)
     }
 
+    pub fn get_game_setting(
+        &self,
+        game_id: i64,
+        setting_key: &str,
+    ) -> Result<Option<GameSettingRecord>> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        connection
+            .query_row(
+                "
+                SELECT id, game_id, id_game, setting_key, setting_value_json, schema_json,
+                    created_at, modified_at
+                FROM obj_game_setting
+                WHERE game_id = ?1 AND setting_key = ?2
+                LIMIT 1
+                ",
+                params![game_id, setting_key.trim()],
+                game_setting_from_row,
+            )
+            .optional()
+    }
+
     pub fn create_game(&self, name: &str, summary: &str) -> Result<GameRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let trimmed_name = name.trim();
         let slug = game_slug(trimmed_name);
         connection.execute(
@@ -3759,7 +6063,7 @@ impl AppDatabase {
     }
 
     pub fn delete_game(&self, id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             DELETE FROM obj_game_chat_message
@@ -3778,6 +6082,14 @@ impl AppDatabase {
             params![id],
         )?;
         connection.execute(
+            "DELETE FROM obj_game_setting WHERE game_id = ?1",
+            params![id],
+        )?;
+        connection.execute(
+            "DELETE FROM obj_game_character_build WHERE game_id = ?1",
+            params![id],
+        )?;
+        connection.execute(
             "DELETE FROM obj_game_catalog_reference WHERE game_id = ?1",
             params![id],
         )?;
@@ -3793,8 +6105,160 @@ impl AppDatabase {
         Ok(())
     }
 
+    pub fn list_game_character_builds(
+        &self,
+        game_id: i64,
+    ) -> Result<Vec<GameCharacterBuildRecord>> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        let mut statement = connection.prepare(
+            "
+            SELECT id, game_id, id_game, title, character_class, ascendancy, build_role,
+                status, source_label, source_url, patch, summary, tags, notes, is_active,
+                created_at, updated_at
+            FROM obj_game_character_build
+            WHERE game_id = ?1
+            ORDER BY is_active DESC, updated_at DESC, id DESC
+            ",
+        )?;
+
+        let builds = statement
+            .query_map(params![game_id], game_character_build_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(builds)
+    }
+
+    pub fn create_game_character_build(
+        &self,
+        draft: GameCharacterBuildDraft<'_>,
+    ) -> Result<GameCharacterBuildRecord> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, draft.game_id)?;
+        let id_game = Self::game_definition_id_by_game_id(&connection, draft.game_id)?;
+        if draft.is_active {
+            Self::clear_active_game_character_builds(&connection, draft.game_id)?;
+        }
+        connection.execute(
+            "
+            INSERT INTO obj_game_character_build (
+                game_id,
+                id_game,
+                title,
+                character_class,
+                ascendancy,
+                build_role,
+                status,
+                source_label,
+                source_url,
+                patch,
+                summary,
+                tags,
+                notes,
+                is_active
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+            ",
+            params![
+                draft.game_id,
+                id_game,
+                draft.title.trim(),
+                draft.character_class.trim(),
+                draft.ascendancy.trim(),
+                draft.build_role.trim(),
+                normalized_game_character_build_status(draft.status),
+                draft.source_label.trim(),
+                draft.source_url.trim(),
+                draft.patch.trim(),
+                draft.summary.trim(),
+                draft.tags.trim(),
+                draft.notes.trim(),
+                if draft.is_active { 1 } else { 0 }
+            ],
+        )?;
+
+        let id = connection.last_insert_rowid();
+        Self::get_game_character_build_by_id(&connection, id)
+    }
+
+    pub fn update_game_character_build(
+        &self,
+        draft: GameCharacterBuildUpdateDraft<'_>,
+    ) -> Result<GameCharacterBuildRecord> {
+        let connection = self.connection()?;
+        let existing = Self::get_game_character_build_by_id(&connection, draft.id)?;
+        if draft.is_active {
+            Self::clear_active_game_character_builds(&connection, existing.game_id)?;
+        }
+        connection.execute(
+            "
+            UPDATE obj_game_character_build
+            SET title = ?2,
+                character_class = ?3,
+                ascendancy = ?4,
+                build_role = ?5,
+                status = ?6,
+                source_label = ?7,
+                source_url = ?8,
+                patch = ?9,
+                summary = ?10,
+                tags = ?11,
+                notes = ?12,
+                is_active = ?13,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?1
+            ",
+            params![
+                draft.id,
+                draft.title.trim(),
+                draft.character_class.trim(),
+                draft.ascendancy.trim(),
+                draft.build_role.trim(),
+                normalized_game_character_build_status(draft.status),
+                draft.source_label.trim(),
+                draft.source_url.trim(),
+                draft.patch.trim(),
+                draft.summary.trim(),
+                draft.tags.trim(),
+                draft.notes.trim(),
+                if draft.is_active { 1 } else { 0 }
+            ],
+        )?;
+
+        Self::get_game_character_build_by_id(&connection, draft.id)
+    }
+
+    pub fn set_active_game_character_build(
+        &self,
+        build_id: i64,
+    ) -> Result<GameCharacterBuildRecord> {
+        let connection = self.connection()?;
+        let existing = Self::get_game_character_build_by_id(&connection, build_id)?;
+        Self::clear_active_game_character_builds(&connection, existing.game_id)?;
+        connection.execute(
+            "
+            UPDATE obj_game_character_build
+            SET is_active = 1,
+                status = CASE WHEN status = 'archived' THEN 'planned' ELSE status END,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?1
+            ",
+            params![build_id],
+        )?;
+        Self::get_game_character_build_by_id(&connection, build_id)
+    }
+
+    pub fn delete_game_character_build(&self, build_id: i64) -> Result<()> {
+        let connection = self.connection()?;
+        Self::get_game_character_build_by_id(&connection, build_id)?;
+        connection.execute(
+            "DELETE FROM obj_game_character_build WHERE id = ?1",
+            params![build_id],
+        )?;
+        Ok(())
+    }
+
     pub fn list_game_data_locations(&self, game_id: i64) -> Result<Vec<GameDataLocationRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let mut statement = connection.prepare(
             "
@@ -3825,7 +6289,7 @@ impl AppDatabase {
         label: &str,
         directory_path: &str,
     ) -> Result<GameDataLocationRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let trimmed_type = location_type.trim();
         connection.execute(
@@ -3844,7 +6308,7 @@ impl AppDatabase {
     }
 
     pub fn delete_game_data_location(&self, game_id: i64, location_type: &str) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "DELETE FROM obj_game_data_location WHERE game_id = ?1 AND location_type = ?2",
@@ -3854,7 +6318,7 @@ impl AppDatabase {
     }
 
     pub fn list_game_catalog_objects(&self, game_id: i64) -> Result<Vec<GameCatalogObjectRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT
@@ -3886,7 +6350,7 @@ impl AppDatabase {
     }
 
     pub fn delete_game_screenshot_catalog_objects(&self, game_id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             DELETE FROM obj_game_catalog_object
@@ -3900,19 +6364,9 @@ impl AppDatabase {
 
     pub fn upsert_game_catalog_object(
         &self,
-        game_id: i64,
-        name: &str,
-        object_type: &str,
-        category: &str,
-        category_icon: &str,
-        category_icon_path: &str,
-        description: &str,
-        notes: &str,
-        tags: &str,
-        thumbnail_path: &str,
-        source_screenshot_path: &str,
+        draft: GameCatalogObjectDraft<'_>,
     ) -> Result<GameCatalogObjectRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             INSERT INTO obj_game_catalog_object (
@@ -3942,25 +6396,25 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                game_id,
-                name.trim(),
-                object_type.trim(),
-                category.trim(),
-                category_icon.trim(),
-                category_icon_path.trim(),
-                description.trim(),
-                notes.trim(),
-                tags.trim(),
-                thumbnail_path.trim(),
-                source_screenshot_path.trim()
+                draft.game_id,
+                draft.name.trim(),
+                draft.object_type.trim(),
+                draft.category.trim(),
+                draft.category_icon.trim(),
+                draft.category_icon_path.trim(),
+                draft.description.trim(),
+                draft.notes.trim(),
+                draft.tags.trim(),
+                draft.thumbnail_path.trim(),
+                draft.source_screenshot_path.trim()
             ],
         )?;
 
-        Self::get_game_catalog_object_by_name(&connection, game_id, name)
+        Self::get_game_catalog_object_by_name(&connection, draft.game_id, draft.name)
     }
 
     pub fn list_game_runtime_parts(&self, game_id: i64) -> Result<Vec<GameRuntimePartRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let mut statement = connection.prepare(
             "
@@ -4004,11 +6458,151 @@ impl AppDatabase {
         Ok(parts)
     }
 
+    pub fn list_game_runtime_part_instances(
+        &self,
+        game_id: i64,
+    ) -> Result<Vec<GameRuntimePartInstanceRecord>> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                instances.id,
+                instances.game_id,
+                instances.part_definition_id,
+                parts.part_key,
+                parts.asset_guid,
+                parts.asset_name,
+                parts.display_name,
+                parts.full_display_name,
+                parts.category,
+                instances.source_export_id,
+                instances.source_construction_id,
+                instances.part_instance_key,
+                instances.runtime_part_id,
+                instances.runtime_part_index,
+                instances.mass,
+                instances.world_x,
+                instances.world_y,
+                instances.world_z,
+                instances.local_x,
+                instances.local_y,
+                instances.local_z,
+                instances.world_position_json,
+                instances.local_position_json,
+                instances.current_unit_size_json,
+                instances.link_node_count,
+                instances.behaviour_names_json,
+                instances.dynamic_summary_json,
+                instances.last_seen_at,
+                instances.created_at,
+                instances.updated_at
+            FROM obj_game_runtime_part_instance instances
+            INNER JOIN def_gearblocks_part parts
+                ON parts.id = instances.part_definition_id
+            WHERE instances.game_id = ?1
+            ORDER BY instances.runtime_part_index ASC, instances.runtime_part_id ASC, parts.display_name COLLATE NOCASE ASC
+            ",
+        )?;
+
+        let parts = statement
+            .query_map(params![game_id], game_runtime_part_instance_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(parts)
+    }
+
+    pub fn replace_game_runtime_part_instances(
+        &self,
+        game_id: i64,
+        parts: &[GameRuntimePartInstanceDraft],
+    ) -> Result<()> {
+        let mut connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        let transaction = connection.transaction()?;
+        transaction.execute(
+            "DELETE FROM obj_game_runtime_part_instance WHERE game_id = ?1",
+            params![game_id],
+        )?;
+
+        for part in parts {
+            let part_definition_id = Self::upsert_gearblocks_part_definition(&transaction, part)?;
+            let (world_x, world_y, world_z) = part
+                .world_position
+                .map(|(x, y, z)| (Some(x), Some(y), Some(z)))
+                .unwrap_or((None, None, None));
+            let (local_x, local_y, local_z) = part
+                .local_position
+                .map(|(x, y, z)| (Some(x), Some(y), Some(z)))
+                .unwrap_or((None, None, None));
+
+            transaction.execute(
+                "
+                INSERT INTO obj_game_runtime_part_instance (
+                    game_id,
+                    part_definition_id,
+                    source_export_id,
+                    source_construction_id,
+                    part_instance_key,
+                    runtime_part_id,
+                    runtime_part_index,
+                    mass,
+                    world_x,
+                    world_y,
+                    world_z,
+                    local_x,
+                    local_y,
+                    local_z,
+                    world_position_json,
+                    local_position_json,
+                    current_unit_size_json,
+                    link_node_count,
+                    behaviour_names_json,
+                    dynamic_summary_json,
+                    last_seen_at
+                )
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)
+                ",
+                params![
+                    game_id,
+                    part_definition_id,
+                    part.source_export_id.trim(),
+                    part.source_construction_id.trim(),
+                    part.part_instance_key.trim(),
+                    part.runtime_part_id,
+                    part.runtime_part_index,
+                    part.mass,
+                    world_x,
+                    world_y,
+                    world_z,
+                    local_x,
+                    local_y,
+                    local_z,
+                    part.world_position_json.trim(),
+                    part.local_position_json.trim(),
+                    part.current_unit_size_json.trim(),
+                    part.link_node_count,
+                    part.behaviour_names_json.trim(),
+                    part.dynamic_summary_json.trim(),
+                    part.last_seen_at.trim()
+                ],
+            )?;
+        }
+
+        transaction.commit()
+    }
+
+    pub fn clear_game_runtime_export_documents(&self, game_id: i64) -> Result<()> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        Self::clear_runtime_export_raw_documents(&connection, game_id)
+    }
+
     pub fn list_game_runtime_part_aliases(
         &self,
         game_id: i64,
     ) -> Result<Vec<GameRuntimePartAliasRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let mut statement = connection.prepare(
             "
@@ -4044,8 +6638,145 @@ impl AppDatabase {
         Ok(aliases)
     }
 
+    pub fn list_game_runtime_part_metadata_values(
+        &self,
+        game_id: i64,
+    ) -> Result<Vec<GameRuntimePartMetadataValueRecord>> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                values_rows.part_key,
+                definitions.source_area,
+                definitions.field_path,
+                values_rows.value_type,
+                values_rows.value_json,
+                values_rows.source_export_id,
+                values_rows.source_construction_id,
+                values_rows.last_seen_at
+            FROM obj_game_runtime_part_metadata_value values_rows
+            INNER JOIN def_gearblocks_part_metadata_item definitions
+                ON definitions.id = values_rows.metadata_item_id
+            WHERE values_rows.game_id = ?1
+            ORDER BY
+                values_rows.part_key COLLATE NOCASE ASC,
+                definitions.source_area COLLATE NOCASE ASC,
+                definitions.field_path COLLATE NOCASE ASC
+            ",
+        )?;
+        let values = statement
+            .query_map(params![game_id], game_runtime_part_metadata_value_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(values)
+    }
+
+    pub fn list_game_runtime_part_attachment_types(
+        &self,
+        game_id: i64,
+    ) -> Result<Vec<GameRuntimePartAttachmentTypeRecord>> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                mapping.part_key,
+                definitions.attachment_path,
+                definitions.type_name,
+                definitions.value_type,
+                mapping.attachment_json,
+                mapping.source_export_id,
+                mapping.source_construction_id,
+                mapping.last_seen_at
+            FROM n2n_game_runtime_part_attachment_type mapping
+            INNER JOIN def_gearblocks_attachment_type definitions
+                ON definitions.id = mapping.attachment_type_id
+            WHERE mapping.game_id = ?1
+            ORDER BY
+                mapping.part_key COLLATE NOCASE ASC,
+                definitions.attachment_path COLLATE NOCASE ASC,
+                definitions.type_name COLLATE NOCASE ASC
+            ",
+        )?;
+        let values = statement
+            .query_map(params![game_id], game_runtime_part_attachment_type_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(values)
+    }
+
+    pub fn list_game_runtime_part_setting_values(
+        &self,
+        game_id: i64,
+    ) -> Result<Vec<GameRuntimePartSettingValueRecord>> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                values_rows.part_key,
+                definitions.setting_key,
+                definitions.label,
+                definitions.setting_area,
+                values_rows.value_type,
+                values_rows.value_json,
+                values_rows.source_export_id,
+                values_rows.source_construction_id,
+                values_rows.last_seen_at
+            FROM obj_game_runtime_part_setting_value values_rows
+            INNER JOIN def_gearblocks_part_setting definitions
+                ON definitions.id = values_rows.setting_id
+            WHERE values_rows.game_id = ?1
+            ORDER BY
+                values_rows.part_key COLLATE NOCASE ASC,
+                definitions.setting_area COLLATE NOCASE ASC,
+                definitions.setting_key COLLATE NOCASE ASC
+            ",
+        )?;
+        let values = statement
+            .query_map(params![game_id], game_runtime_part_setting_value_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(values)
+    }
+
+    pub fn list_game_runtime_part_output_channel_values(
+        &self,
+        game_id: i64,
+    ) -> Result<Vec<GameRuntimePartOutputChannelValueRecord>> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        let mut statement = connection.prepare(
+            "
+            SELECT
+                values_rows.part_key,
+                definitions.channel_key,
+                definitions.label,
+                definitions.channel_area,
+                values_rows.value_type,
+                values_rows.value_json,
+                values_rows.source_export_id,
+                values_rows.source_construction_id,
+                values_rows.last_seen_at
+            FROM obj_game_runtime_part_output_channel_value values_rows
+            INNER JOIN def_gearblocks_part_output_channel definitions
+                ON definitions.id = values_rows.output_channel_id
+            WHERE values_rows.game_id = ?1
+            ORDER BY
+                values_rows.part_key COLLATE NOCASE ASC,
+                definitions.channel_area COLLATE NOCASE ASC,
+                definitions.channel_key COLLATE NOCASE ASC
+            ",
+        )?;
+        let values = statement
+            .query_map(
+                params![game_id],
+                game_runtime_part_output_channel_value_from_row,
+            )?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(values)
+    }
+
     pub fn count_game_runtime_parts(&self, game_id: i64) -> Result<usize> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let count = connection.query_row(
             "SELECT COUNT(*) FROM obj_game_runtime_part WHERE game_id = ?1",
@@ -4056,7 +6787,7 @@ impl AppDatabase {
     }
 
     pub fn list_gearblocks_api_catalog(&self) -> Result<GearBlocksApiCatalogRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut type_statement = connection.prepare(
             "
             SELECT
@@ -4179,12 +6910,215 @@ impl AppDatabase {
         })
     }
 
+    pub fn import_gearblocks_api_catalog(
+        &self,
+        scrape: &GearBlocksApiScrape,
+    ) -> Result<GearBlocksApiImportResult> {
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction()?;
+        let mut imported_member_count = 0usize;
+        let mut imported_parameter_count = 0usize;
+        let mut imported_enum_value_count = 0usize;
+
+        for api_type in &scrape.types {
+            let type_id = Self::seed_gearblocks_api_type(
+                &transaction,
+                GearBlocksApiTypeSeed {
+                    namespace: &api_type.namespace,
+                    type_name: &api_type.type_name,
+                    type_kind: &api_type.type_kind,
+                    docs_url: &api_type.docs_url,
+                    source: &scrape.source,
+                    source_version: &scrape.source_version,
+                    notes: &api_type.notes,
+                },
+            )?;
+
+            if !api_type.members.is_empty() {
+                transaction.execute(
+                    "
+                    DELETE FROM def_gearblocks_api_member
+                    WHERE type_id = ?1
+                        AND source = ?2
+                    ",
+                    params![type_id, scrape.source],
+                )?;
+            }
+
+            for member in &api_type.members {
+                transaction.execute(
+                    "
+                    INSERT INTO def_gearblocks_api_member (
+                        type_id,
+                        member_key,
+                        member_name,
+                        signature,
+                        member_kind,
+                        return_type,
+                        is_readable,
+                        is_writable,
+                        is_invokable,
+                        is_mutating,
+                        docs_url,
+                        source,
+                        source_version,
+                        notes
+                    )
+                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+                    ON CONFLICT(type_id, member_key) DO UPDATE SET
+                        member_name = excluded.member_name,
+                        signature = excluded.signature,
+                        member_kind = excluded.member_kind,
+                        return_type = excluded.return_type,
+                        is_readable = excluded.is_readable,
+                        is_writable = excluded.is_writable,
+                        is_invokable = excluded.is_invokable,
+                        is_mutating = excluded.is_mutating,
+                        docs_url = excluded.docs_url,
+                        source = excluded.source,
+                        source_version = excluded.source_version,
+                        notes = excluded.notes,
+                        updated_at = CURRENT_TIMESTAMP
+                    ",
+                    params![
+                        type_id,
+                        member.member_key,
+                        member.member_name,
+                        member.signature,
+                        member.member_kind,
+                        member.return_type,
+                        member.is_readable,
+                        member.is_writable,
+                        member.is_invokable,
+                        member.is_mutating,
+                        member.docs_url,
+                        scrape.source,
+                        scrape.source_version,
+                        member.notes,
+                    ],
+                )?;
+                imported_member_count += 1;
+
+                let member_id = transaction.query_row(
+                    "
+                    SELECT id
+                    FROM def_gearblocks_api_member
+                    WHERE type_id = ?1
+                        AND member_key = ?2
+                    ",
+                    params![type_id, member.member_key],
+                    |row| row.get::<_, i64>(0),
+                )?;
+
+                transaction.execute(
+                    "
+                    DELETE FROM def_gearblocks_api_parameter
+                    WHERE member_id = ?1
+                    ",
+                    params![member_id],
+                )?;
+
+                for parameter in &member.parameters {
+                    transaction.execute(
+                        "
+                        INSERT INTO def_gearblocks_api_parameter (
+                            member_id,
+                            position,
+                            parameter_name,
+                            parameter_type,
+                            default_value,
+                            is_optional
+                        )
+                        VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                        ON CONFLICT(member_id, position) DO UPDATE SET
+                            parameter_name = excluded.parameter_name,
+                            parameter_type = excluded.parameter_type,
+                            default_value = excluded.default_value,
+                            is_optional = excluded.is_optional,
+                            updated_at = CURRENT_TIMESTAMP
+                        ",
+                        params![
+                            member_id,
+                            parameter.position,
+                            parameter.parameter_name,
+                            parameter.parameter_type,
+                            parameter.default_value,
+                            parameter.is_optional,
+                        ],
+                    )?;
+                    imported_parameter_count += 1;
+                }
+            }
+
+            if !api_type.enum_values.is_empty() {
+                transaction.execute(
+                    "
+                    DELETE FROM def_gearblocks_api_enum_value
+                    WHERE type_id = ?1
+                        AND source = ?2
+                    ",
+                    params![type_id, scrape.source],
+                )?;
+            }
+
+            for value in &api_type.enum_values {
+                transaction.execute(
+                    "
+                    INSERT INTO def_gearblocks_api_enum_value (
+                        type_id,
+                        position,
+                        value_name,
+                        numeric_value,
+                        lua_name,
+                        description,
+                        source,
+                        source_version
+                    )
+                    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                    ON CONFLICT(type_id, value_name) DO UPDATE SET
+                        position = excluded.position,
+                        numeric_value = excluded.numeric_value,
+                        lua_name = excluded.lua_name,
+                        description = excluded.description,
+                        source = excluded.source,
+                        source_version = excluded.source_version,
+                        updated_at = CURRENT_TIMESTAMP
+                    ",
+                    params![
+                        type_id,
+                        value.position,
+                        value.value_name,
+                        value.numeric_value,
+                        value.lua_name,
+                        value.description,
+                        scrape.source,
+                        scrape.source_version,
+                    ],
+                )?;
+                imported_enum_value_count += 1;
+            }
+        }
+
+        transaction.commit()?;
+
+        Ok(GearBlocksApiImportResult {
+            source: scrape.source.clone(),
+            source_version: scrape.source_version.clone(),
+            docs_root: scrape.docs_root.clone(),
+            fetched_pages: scrape.fetched_pages,
+            imported_type_count: scrape.types.len(),
+            imported_member_count,
+            imported_parameter_count,
+            imported_enum_value_count,
+        })
+    }
+
     pub fn list_game_runtime_part_api_members(
         &self,
         game_id: i64,
         part_id: i64,
     ) -> Result<Vec<GameRuntimePartApiMemberRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let part_key = connection
             .query_row(
                 "
@@ -4253,7 +7187,7 @@ impl AppDatabase {
     }
 
     pub fn get_game_runtime_part(&self, id: i64) -> Result<Option<GameRuntimePartRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection
             .query_row(
                 "
@@ -4300,7 +7234,7 @@ impl AppDatabase {
         display_image_path: &str,
         source_image_path: &str,
     ) -> Result<GameRuntimePartRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "
@@ -4328,7 +7262,7 @@ impl AppDatabase {
         game_id: i64,
         category: &str,
     ) -> Result<Vec<GameRuntimePartRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "
@@ -4395,7 +7329,7 @@ impl AppDatabase {
         part_id: i64,
         notes: &str,
     ) -> Result<GameRuntimePartRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         connection.execute(
             "
@@ -4414,30 +7348,15 @@ impl AppDatabase {
 
     pub fn upsert_game_runtime_part(
         &self,
-        game_id: i64,
-        part_key: &str,
-        asset_guid: &str,
-        asset_name: &str,
-        display_name: &str,
-        full_display_name: &str,
-        category: &str,
-        mass: f64,
-        world_position: Option<(f64, f64, f64)>,
-        local_position: Option<(f64, f64, f64)>,
-        world_position_json: &str,
-        local_position_json: &str,
-        properties_json: &str,
-        source_export_id: &str,
-        source_construction_id: &str,
-        last_seen_at: &str,
+        draft: GameRuntimePartDraft<'_>,
     ) -> Result<GameRuntimePartRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
-        Self::get_game_by_id(&connection, game_id)?;
-        let (world_x, world_y, world_z) = match world_position {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, draft.identity.game_id)?;
+        let (world_x, world_y, world_z) = match draft.world_position {
             Some((x, y, z)) => (Some(x), Some(y), Some(z)),
             None => (None, None, None),
         };
-        let (local_x, local_y, local_z) = match local_position {
+        let (local_x, local_y, local_z) = match draft.local_position {
             Some((x, y, z)) => (Some(x), Some(y), Some(z)),
             None => (None, None, None),
         };
@@ -4488,52 +7407,42 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                game_id,
-                part_key.trim(),
-                asset_guid.trim(),
-                asset_name.trim(),
-                display_name.trim(),
-                full_display_name.trim(),
-                category.trim(),
-                mass,
+                draft.identity.game_id,
+                draft.identity.part_key.trim(),
+                draft.identity.asset_guid.trim(),
+                draft.identity.asset_name.trim(),
+                draft.identity.display_name.trim(),
+                draft.identity.full_display_name.trim(),
+                draft.identity.category.trim(),
+                draft.mass,
                 world_x,
                 world_y,
                 world_z,
                 local_x,
                 local_y,
                 local_z,
-                world_position_json.trim(),
-                local_position_json.trim(),
-                properties_json,
-                source_export_id.trim(),
-                source_construction_id.trim(),
-                last_seen_at.trim()
+                draft.world_position_json.trim(),
+                draft.local_position_json.trim(),
+                draft.properties_json,
+                draft.source.source_export_id.trim(),
+                draft.source.source_construction_id.trim(),
+                draft.source.seen_at.trim()
             ],
         )?;
 
-        Self::get_game_runtime_part_by_key(&connection, game_id, part_key)
+        Self::get_game_runtime_part_by_key(
+            &connection,
+            draft.identity.game_id,
+            draft.identity.part_key,
+        )
     }
 
     pub fn upsert_game_runtime_part_alias(
         &self,
-        game_id: i64,
-        part_instance_key: &str,
-        friendly_name: &str,
-        asset_guid: &str,
-        asset_name: &str,
-        display_name: &str,
-        full_display_name: &str,
-        category: &str,
-        source_log_path: &str,
-        source_construction_id: &str,
-        world_position_json: &str,
-        local_position_json: &str,
-        current_unit_size_json: &str,
-        payload_json: &str,
-        last_seen_at: &str,
+        draft: GameRuntimePartAliasDraft<'_>,
     ) -> Result<GameRuntimePartAliasRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
-        Self::get_game_by_id(&connection, game_id)?;
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, draft.game_id)?;
         connection.execute(
             "
             INSERT INTO obj_game_runtime_part_alias (
@@ -4571,21 +7480,21 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                game_id,
-                part_instance_key.trim(),
-                friendly_name.trim(),
-                asset_guid.trim(),
-                asset_name.trim(),
-                display_name.trim(),
-                full_display_name.trim(),
-                category.trim(),
-                source_log_path.trim(),
-                source_construction_id.trim(),
-                world_position_json.trim(),
-                local_position_json.trim(),
-                current_unit_size_json.trim(),
-                payload_json.trim(),
-                last_seen_at.trim()
+                draft.game_id,
+                draft.part_instance_key.trim(),
+                draft.friendly_name.trim(),
+                draft.asset_guid.trim(),
+                draft.asset_name.trim(),
+                draft.display_name.trim(),
+                draft.full_display_name.trim(),
+                draft.category.trim(),
+                draft.source_log_path.trim(),
+                draft.source_construction_id.trim(),
+                draft.world_position_json.trim(),
+                draft.local_position_json.trim(),
+                draft.current_unit_size_json.trim(),
+                draft.payload_json.trim(),
+                draft.last_seen_at.trim()
             ],
         )?;
 
@@ -4614,30 +7523,17 @@ impl AppDatabase {
             WHERE game_id = ?1
                 AND part_instance_key = ?2
             ",
-            params![game_id, part_instance_key.trim()],
+            params![draft.game_id, draft.part_instance_key.trim()],
             game_runtime_part_alias_from_row,
         )
     }
 
     pub fn upsert_game_runtime_part_api_attribute(
         &self,
-        game_id: i64,
-        part_key: &str,
-        asset_guid: &str,
-        asset_name: &str,
-        display_name: &str,
-        full_display_name: &str,
-        category: &str,
-        interface_name: &str,
-        attribute_name: &str,
-        value_type: &str,
-        availability: &str,
-        source_export_id: &str,
-        source_construction_id: &str,
-        seen_at: &str,
+        observation: GameRuntimePartApiAttributeObservation<'_>,
     ) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
-        Self::get_game_by_id(&connection, game_id)?;
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, observation.identity.game_id)?;
         connection.execute(
             "
             INSERT INTO obj_game_runtime_part_api_attribute (
@@ -4672,20 +7568,20 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                game_id,
-                part_key.trim(),
-                asset_guid.trim(),
-                asset_name.trim(),
-                display_name.trim(),
-                full_display_name.trim(),
-                category.trim(),
-                interface_name.trim(),
-                attribute_name.trim(),
-                value_type.trim(),
-                availability.trim(),
-                source_export_id.trim(),
-                source_construction_id.trim(),
-                seen_at.trim(),
+                observation.identity.game_id,
+                observation.identity.part_key.trim(),
+                observation.identity.asset_guid.trim(),
+                observation.identity.asset_name.trim(),
+                observation.identity.display_name.trim(),
+                observation.identity.full_display_name.trim(),
+                observation.identity.category.trim(),
+                observation.interface_name.trim(),
+                observation.attribute_name.trim(),
+                observation.value_type.trim(),
+                observation.availability.trim(),
+                observation.source.source_export_id.trim(),
+                observation.source.source_construction_id.trim(),
+                observation.source.seen_at.trim(),
             ],
         )?;
 
@@ -4694,18 +7590,11 @@ impl AppDatabase {
 
     pub fn upsert_game_runtime_part_api_member(
         &self,
-        game_id: i64,
-        part_key: &str,
-        interface_name: &str,
-        attribute_name: &str,
-        availability: &str,
-        source_export_id: &str,
-        source_construction_id: &str,
-        seen_at: &str,
+        observation: GameRuntimePartApiMemberObservation<'_>,
     ) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
-        Self::get_game_by_id(&connection, game_id)?;
-        let observed_member_name = gearblocks_observed_member_name(attribute_name);
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, observation.game_id)?;
+        let observed_member_name = gearblocks_observed_member_name(observation.attribute_name);
         let mut statement = connection.prepare(
             "
                 SELECT DISTINCT members.id
@@ -4723,8 +7612,8 @@ impl AppDatabase {
         let api_member_ids = statement
             .query_map(
                 params![
-                    interface_name.trim(),
-                    attribute_name.trim(),
+                    observation.interface_name.trim(),
+                    observation.attribute_name.trim(),
                     observed_member_name
                 ],
                 |row| row.get::<_, i64>(0),
@@ -4753,13 +7642,13 @@ impl AppDatabase {
                     updated_at = CURRENT_TIMESTAMP
                 ",
                 params![
-                    game_id,
-                    part_key.trim(),
+                    observation.game_id,
+                    observation.part_key.trim(),
                     api_member_id,
-                    availability.trim(),
-                    source_export_id.trim(),
-                    source_construction_id.trim(),
-                    seen_at.trim(),
+                    observation.availability.trim(),
+                    observation.source.source_export_id.trim(),
+                    observation.source.source_construction_id.trim(),
+                    observation.source.seen_at.trim(),
                 ],
             )?;
         }
@@ -4769,22 +7658,10 @@ impl AppDatabase {
 
     pub fn upsert_game_runtime_part_value(
         &self,
-        game_id: i64,
-        part_key: &str,
-        asset_guid: &str,
-        asset_name: &str,
-        display_name: &str,
-        full_display_name: &str,
-        category: &str,
-        field_path: &str,
-        value_type: &str,
-        value_json: &str,
-        source_export_id: &str,
-        source_construction_id: &str,
-        seen_at: &str,
+        observation: GameRuntimePartValueObservation<'_>,
     ) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
-        Self::get_game_by_id(&connection, game_id)?;
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, observation.identity.game_id)?;
         connection.execute(
             "
             INSERT INTO obj_game_runtime_part_value (
@@ -4818,19 +7695,19 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                game_id,
-                part_key.trim(),
-                asset_guid.trim(),
-                asset_name.trim(),
-                display_name.trim(),
-                full_display_name.trim(),
-                category.trim(),
-                field_path.trim(),
-                value_type.trim(),
-                value_json,
-                source_export_id.trim(),
-                source_construction_id.trim(),
-                seen_at.trim(),
+                observation.identity.game_id,
+                observation.identity.part_key.trim(),
+                observation.identity.asset_guid.trim(),
+                observation.identity.asset_name.trim(),
+                observation.identity.display_name.trim(),
+                observation.identity.full_display_name.trim(),
+                observation.identity.category.trim(),
+                observation.field_path.trim(),
+                observation.value_type.trim(),
+                observation.value_json,
+                observation.source.source_export_id.trim(),
+                observation.source.source_construction_id.trim(),
+                observation.source.seen_at.trim(),
             ],
         )?;
 
@@ -4839,22 +7716,10 @@ impl AppDatabase {
 
     pub fn upsert_game_runtime_part_property(
         &self,
-        game_id: i64,
-        part_key: &str,
-        asset_guid: &str,
-        asset_name: &str,
-        display_name: &str,
-        full_display_name: &str,
-        category: &str,
-        property_path: &str,
-        value_type: &str,
-        value_json: &str,
-        source_export_id: &str,
-        source_construction_id: &str,
-        seen_at: &str,
+        observation: GameRuntimePartPropertyObservation<'_>,
     ) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
-        Self::get_game_by_id(&connection, game_id)?;
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, observation.identity.game_id)?;
         connection.execute(
             "
             INSERT INTO obj_game_runtime_part_property (
@@ -4888,19 +7753,19 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                game_id,
-                part_key.trim(),
-                asset_guid.trim(),
-                asset_name.trim(),
-                display_name.trim(),
-                full_display_name.trim(),
-                category.trim(),
-                property_path.trim(),
-                value_type.trim(),
-                value_json,
-                source_export_id.trim(),
-                source_construction_id.trim(),
-                seen_at.trim(),
+                observation.identity.game_id,
+                observation.identity.part_key.trim(),
+                observation.identity.asset_guid.trim(),
+                observation.identity.asset_name.trim(),
+                observation.identity.display_name.trim(),
+                observation.identity.full_display_name.trim(),
+                observation.identity.category.trim(),
+                observation.property_path.trim(),
+                observation.value_type.trim(),
+                observation.value_json,
+                observation.source.source_export_id.trim(),
+                observation.source.source_construction_id.trim(),
+                observation.source.seen_at.trim(),
             ],
         )?;
 
@@ -4909,22 +7774,10 @@ impl AppDatabase {
 
     pub fn upsert_game_runtime_part_attachment(
         &self,
-        game_id: i64,
-        part_key: &str,
-        asset_guid: &str,
-        asset_name: &str,
-        display_name: &str,
-        full_display_name: &str,
-        category: &str,
-        attachment_path: &str,
-        value_type: &str,
-        attachment_json: &str,
-        source_export_id: &str,
-        source_construction_id: &str,
-        seen_at: &str,
+        observation: GameRuntimePartAttachmentObservation<'_>,
     ) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
-        Self::get_game_by_id(&connection, game_id)?;
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, observation.identity.game_id)?;
         connection.execute(
             "
             INSERT INTO obj_game_runtime_part_attachment (
@@ -4958,22 +7811,217 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                game_id,
-                part_key.trim(),
-                asset_guid.trim(),
-                asset_name.trim(),
-                display_name.trim(),
-                full_display_name.trim(),
-                category.trim(),
-                attachment_path.trim(),
-                value_type.trim(),
-                attachment_json,
-                source_export_id.trim(),
-                source_construction_id.trim(),
-                seen_at.trim(),
+                observation.identity.game_id,
+                observation.identity.part_key.trim(),
+                observation.identity.asset_guid.trim(),
+                observation.identity.asset_name.trim(),
+                observation.identity.display_name.trim(),
+                observation.identity.full_display_name.trim(),
+                observation.identity.category.trim(),
+                observation.attachment_path.trim(),
+                observation.value_type.trim(),
+                observation.attachment_json,
+                observation.source.source_export_id.trim(),
+                observation.source.source_construction_id.trim(),
+                observation.source.seen_at.trim(),
             ],
         )?;
 
+        Ok(())
+    }
+
+    pub fn upsert_game_runtime_part_metadata_value(
+        &self,
+        draft: GameRuntimePartMetadataValueDraft<'_>,
+    ) -> Result<()> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, draft.game_id)?;
+        let metadata_item_id = Self::upsert_gearblocks_metadata_item(
+            &connection,
+            draft.source_area,
+            draft.field_path,
+            draft.value_type,
+            draft.source.seen_at,
+        )?;
+        connection.execute(
+            "
+            INSERT INTO obj_game_runtime_part_metadata_value (
+                game_id,
+                part_key,
+                metadata_item_id,
+                value_type,
+                value_json,
+                source_export_id,
+                source_construction_id,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)
+            ON CONFLICT(game_id, part_key, metadata_item_id) DO UPDATE SET
+                value_type = excluded.value_type,
+                value_json = excluded.value_json,
+                source_export_id = excluded.source_export_id,
+                source_construction_id = excluded.source_construction_id,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                draft.game_id,
+                draft.part_key.trim(),
+                metadata_item_id,
+                draft.value_type.trim(),
+                draft.value_json,
+                draft.source.source_export_id.trim(),
+                draft.source.source_construction_id.trim(),
+                draft.source.seen_at.trim(),
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn upsert_game_runtime_part_attachment_type(
+        &self,
+        draft: GameRuntimePartAttachmentTypeDraft<'_>,
+    ) -> Result<()> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, draft.game_id)?;
+        let attachment_type_id = Self::upsert_gearblocks_attachment_type(
+            &connection,
+            draft.attachment_path,
+            draft.type_name,
+            draft.value_type,
+            draft.source.seen_at,
+        )?;
+        connection.execute(
+            "
+            INSERT INTO n2n_game_runtime_part_attachment_type (
+                game_id,
+                part_key,
+                attachment_type_id,
+                attachment_json,
+                source_export_id,
+                source_construction_id,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)
+            ON CONFLICT(game_id, part_key, attachment_type_id) DO UPDATE SET
+                attachment_json = excluded.attachment_json,
+                source_export_id = excluded.source_export_id,
+                source_construction_id = excluded.source_construction_id,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                draft.game_id,
+                draft.part_key.trim(),
+                attachment_type_id,
+                draft.attachment_json,
+                draft.source.source_export_id.trim(),
+                draft.source.source_construction_id.trim(),
+                draft.source.seen_at.trim(),
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn upsert_game_runtime_part_setting_value(
+        &self,
+        draft: GameRuntimePartSettingValueDraft<'_>,
+    ) -> Result<()> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, draft.game_id)?;
+        let setting_id = Self::upsert_gearblocks_part_setting(
+            &connection,
+            draft.setting_key,
+            draft.label,
+            draft.setting_area,
+            draft.value_type,
+            draft.source.seen_at,
+        )?;
+        connection.execute(
+            "
+            INSERT INTO obj_game_runtime_part_setting_value (
+                game_id,
+                part_key,
+                setting_id,
+                value_type,
+                value_json,
+                source_export_id,
+                source_construction_id,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)
+            ON CONFLICT(game_id, part_key, setting_id) DO UPDATE SET
+                value_type = excluded.value_type,
+                value_json = excluded.value_json,
+                source_export_id = excluded.source_export_id,
+                source_construction_id = excluded.source_construction_id,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                draft.game_id,
+                draft.part_key.trim(),
+                setting_id,
+                draft.value_type.trim(),
+                draft.value_json,
+                draft.source.source_export_id.trim(),
+                draft.source.source_construction_id.trim(),
+                draft.source.seen_at.trim(),
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn upsert_game_runtime_part_output_channel_value(
+        &self,
+        draft: GameRuntimePartOutputChannelValueDraft<'_>,
+    ) -> Result<()> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, draft.game_id)?;
+        let output_channel_id = Self::upsert_gearblocks_part_output_channel(
+            &connection,
+            draft.channel_key,
+            draft.label,
+            draft.channel_area,
+            draft.value_type,
+            draft.source.seen_at,
+        )?;
+        connection.execute(
+            "
+            INSERT INTO obj_game_runtime_part_output_channel_value (
+                game_id,
+                part_key,
+                output_channel_id,
+                value_type,
+                value_json,
+                source_export_id,
+                source_construction_id,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)
+            ON CONFLICT(game_id, part_key, output_channel_id) DO UPDATE SET
+                value_type = excluded.value_type,
+                value_json = excluded.value_json,
+                source_export_id = excluded.source_export_id,
+                source_construction_id = excluded.source_construction_id,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                draft.game_id,
+                draft.part_key.trim(),
+                output_channel_id,
+                draft.value_type.trim(),
+                draft.value_json,
+                draft.source.source_export_id.trim(),
+                draft.source.source_construction_id.trim(),
+                draft.source.seen_at.trim(),
+            ],
+        )?;
         Ok(())
     }
 
@@ -4981,7 +8029,7 @@ impl AppDatabase {
         &self,
         game_id: i64,
     ) -> Result<Vec<GameRuntimeConstructionExportRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let mut statement = connection.prepare(
             "
@@ -5019,7 +8067,7 @@ impl AppDatabase {
     }
 
     pub fn count_game_runtime_construction_exports(&self, game_id: i64) -> Result<usize> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let count = connection.query_row(
             "SELECT COUNT(*) FROM obj_game_runtime_construction_export WHERE game_id = ?1",
@@ -5033,7 +8081,7 @@ impl AppDatabase {
         &self,
         game_id: i64,
     ) -> Result<Option<GameRuntimeConstructionExportRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         connection
             .query_row(
@@ -5069,28 +8117,12 @@ impl AppDatabase {
             .optional()
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn upsert_game_runtime_construction_export(
         &self,
-        game_id: i64,
-        export_id: &str,
-        name: &str,
-        export_kind: &str,
-        intended_path: &str,
-        source_log_path: &str,
-        byte_size: i64,
-        construction_id: &str,
-        exported_at: &str,
-        part_count: i64,
-        mass: f64,
-        is_frozen: Option<bool>,
-        is_invulnerable: Option<bool>,
-        is_player_character: Option<bool>,
-        document_json: &str,
-        last_indexed_at: &str,
+        draft: GameRuntimeConstructionExportDraft<'_>,
     ) -> Result<GameRuntimeConstructionExportRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
-        Self::get_game_by_id(&connection, game_id)?;
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, draft.game_id)?;
         connection.execute(
             "
             INSERT INTO obj_game_runtime_construction_export (
@@ -5130,30 +8162,34 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                game_id,
-                export_id.trim(),
-                name.trim(),
-                export_kind.trim(),
-                intended_path.trim(),
-                source_log_path.trim(),
-                byte_size,
-                construction_id.trim(),
-                exported_at.trim(),
-                part_count,
-                mass,
-                is_frozen.map(i64::from),
-                is_invulnerable.map(i64::from),
-                is_player_character.map(i64::from),
-                document_json,
-                last_indexed_at.trim()
+                draft.game_id,
+                draft.export_id.trim(),
+                draft.name.trim(),
+                draft.export_kind.trim(),
+                draft.intended_path.trim(),
+                draft.source_log_path.trim(),
+                draft.byte_size,
+                draft.construction_id.trim(),
+                draft.exported_at.trim(),
+                draft.part_count,
+                draft.mass,
+                draft.is_frozen.map(i64::from),
+                draft.is_invulnerable.map(i64::from),
+                draft.is_player_character.map(i64::from),
+                draft.document_json,
+                draft.last_indexed_at.trim()
             ],
         )?;
 
-        Self::get_game_runtime_construction_export_by_export_id(&connection, game_id, export_id)
+        Self::get_game_runtime_construction_export_by_export_id(
+            &connection,
+            draft.game_id,
+            draft.export_id,
+        )
     }
 
     pub fn list_game_constructions(&self, game_id: i64) -> Result<Vec<GameConstructionRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let mut statement = connection.prepare(
             "
@@ -5192,7 +8228,7 @@ impl AppDatabase {
     }
 
     pub fn count_game_constructions(&self, game_id: i64) -> Result<usize> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let count = connection.query_row(
             "SELECT COUNT(*) FROM obj_game_construction WHERE game_id = ?1",
@@ -5202,29 +8238,12 @@ impl AppDatabase {
         Ok(count.max(0) as usize)
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn upsert_game_construction(
         &self,
-        game_id: i64,
-        name: &str,
-        folder_path: &str,
-        construction_path: &str,
-        byte_size: i64,
-        decoded_byte_size: i64,
-        composite_count: i64,
-        part_count: i64,
-        unique_asset_guid_count: i64,
-        attachment_count: i64,
-        link_count: i64,
-        intersection_count: i64,
-        is_frozen: Option<bool>,
-        is_invulnerable: Option<bool>,
-        summary_json: &str,
-        document_json: &str,
-        last_indexed_at: &str,
+        draft: GameConstructionDraft<'_>,
     ) -> Result<GameConstructionRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
-        Self::get_game_by_id(&connection, game_id)?;
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, draft.game_id)?;
         connection.execute(
             "
             INSERT INTO obj_game_construction (
@@ -5266,41 +8285,34 @@ impl AppDatabase {
                 updated_at = CURRENT_TIMESTAMP
             ",
             params![
-                game_id,
-                name.trim(),
-                folder_path.trim(),
-                construction_path.trim(),
-                byte_size,
-                decoded_byte_size,
-                composite_count,
-                part_count,
-                unique_asset_guid_count,
-                attachment_count,
-                link_count,
-                intersection_count,
-                is_frozen.map(i64::from),
-                is_invulnerable.map(i64::from),
-                summary_json,
-                document_json,
-                last_indexed_at.trim(),
+                draft.game_id,
+                draft.name.trim(),
+                draft.folder_path.trim(),
+                draft.construction_path.trim(),
+                draft.byte_size,
+                draft.decoded_byte_size,
+                draft.composite_count,
+                draft.part_count,
+                draft.unique_asset_guid_count,
+                draft.attachment_count,
+                draft.link_count,
+                draft.intersection_count,
+                draft.is_frozen.map(i64::from),
+                draft.is_invulnerable.map(i64::from),
+                draft.summary_json,
+                draft.document_json,
+                draft.last_indexed_at.trim(),
             ],
         )?;
 
-        Self::get_game_construction_by_path(&connection, game_id, construction_path)
+        Self::get_game_construction_by_path(&connection, draft.game_id, draft.construction_path)
     }
 
     pub fn create_game_screenshot_capture_request(
         &self,
-        game_id: i64,
-        title: &str,
-        file_path: &str,
-        request_id: &str,
-        request_path: &str,
-        capture_status: &str,
-        captured_at: &str,
-        notes: &str,
+        draft: GameScreenshotCaptureRequestDraft<'_>,
     ) -> Result<GameScreenshotCaptureRequestRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             INSERT INTO obj_game_catalog_screenshot (
@@ -5316,14 +8328,14 @@ impl AppDatabase {
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
             ",
             params![
-                game_id,
-                title.trim(),
-                file_path.trim(),
-                request_id.trim(),
-                request_path.trim(),
-                capture_status.trim(),
-                captured_at.trim(),
-                notes
+                draft.game_id,
+                draft.title.trim(),
+                draft.file_path.trim(),
+                draft.request_id.trim(),
+                draft.request_path.trim(),
+                draft.capture_status.trim(),
+                draft.captured_at.trim(),
+                draft.notes
             ],
         )?;
 
@@ -5331,11 +8343,155 @@ impl AppDatabase {
         Self::get_game_screenshot_capture_request_by_id(&connection, id)
     }
 
+    pub fn create_game_catalog_reference(
+        &self,
+        draft: GameCatalogReferenceDraft<'_>,
+    ) -> Result<i64> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, draft.game_id)?;
+        connection.execute(
+            "
+            INSERT INTO obj_game_catalog_reference (
+                game_id, object_id, title, reference_type, url, local_path, notes, tags
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            ",
+            params![
+                draft.game_id,
+                draft.object_id,
+                draft.title.trim(),
+                draft.reference_type.trim(),
+                draft.url.trim(),
+                draft.local_path.trim(),
+                draft.notes.trim(),
+                draft.tags.trim(),
+            ],
+        )?;
+        Ok(connection.last_insert_rowid())
+    }
+
+    pub fn list_gearblocks_part_render_profiles(
+        &self,
+        game_id: i64,
+    ) -> Result<Vec<GearBlocksPartRenderProfileRecord>> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, game_id)?;
+        let mut statement = connection.prepare(
+            "
+            SELECT id, game_id, profile_key, part_key, part_name, source_object_name,
+                renderer_names_json, canonical_rotation_json, camera_preset_json,
+                bounds_center_json, bounds_size_json, edge_settings_json, latest_render_path,
+                latest_capture_id, latest_status_json, render_version, is_validated, notes,
+                created_at, updated_at
+            FROM obj_gearblocks_part_render_profile
+            WHERE game_id = ?1
+            ORDER BY part_name COLLATE NOCASE, profile_key COLLATE NOCASE
+            ",
+        )?;
+
+        let profiles = statement
+            .query_map(params![game_id], gearblocks_part_render_profile_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(profiles)
+    }
+
+    pub fn upsert_gearblocks_part_render_profile(
+        &self,
+        draft: GearBlocksPartRenderProfileDraft<'_>,
+    ) -> Result<GearBlocksPartRenderProfileRecord> {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, draft.game_id)?;
+        let clean_profile_key = if draft.profile_key.trim().is_empty() {
+            normalized_profile_key(draft.part_name)
+        } else {
+            draft.profile_key.trim().to_string()
+        };
+        let clean_part_name = if draft.part_name.trim().is_empty() {
+            clean_profile_key.as_str()
+        } else {
+            draft.part_name.trim()
+        };
+
+        connection.execute(
+            "
+            INSERT INTO obj_gearblocks_part_render_profile (
+                game_id, profile_key, part_key, part_name, source_object_name,
+                renderer_names_json, canonical_rotation_json, camera_preset_json,
+                bounds_center_json, bounds_size_json, edge_settings_json, latest_render_path,
+                latest_capture_id, latest_status_json, render_version, is_validated, notes
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
+            ON CONFLICT(game_id, profile_key) DO UPDATE SET
+                part_key = excluded.part_key,
+                part_name = excluded.part_name,
+                source_object_name = excluded.source_object_name,
+                renderer_names_json = excluded.renderer_names_json,
+                canonical_rotation_json = excluded.canonical_rotation_json,
+                camera_preset_json = excluded.camera_preset_json,
+                bounds_center_json = excluded.bounds_center_json,
+                bounds_size_json = excluded.bounds_size_json,
+                edge_settings_json = excluded.edge_settings_json,
+                latest_render_path = excluded.latest_render_path,
+                latest_capture_id = excluded.latest_capture_id,
+                latest_status_json = excluded.latest_status_json,
+                render_version = excluded.render_version,
+                is_validated = excluded.is_validated,
+                notes = excluded.notes,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                draft.game_id,
+                clean_profile_key,
+                draft.part_key.trim(),
+                clean_part_name,
+                draft.source_object_name.trim(),
+                draft.renderer_names_json.trim(),
+                draft.canonical_rotation_json.trim(),
+                draft.camera_preset_json.trim(),
+                draft.bounds_center_json.trim(),
+                draft.bounds_size_json.trim(),
+                draft.edge_settings_json.trim(),
+                draft.latest_render_path.trim(),
+                draft.latest_capture_id.trim(),
+                draft.latest_status_json.trim(),
+                draft.render_version,
+                if draft.is_validated { 1 } else { 0 },
+                draft.notes.trim(),
+            ],
+        )?;
+
+        Self::get_gearblocks_part_render_profile_by_key(
+            &connection,
+            draft.game_id,
+            &clean_profile_key,
+        )
+    }
+
+    fn get_gearblocks_part_render_profile_by_key(
+        connection: &Connection,
+        game_id: i64,
+        profile_key: &str,
+    ) -> Result<GearBlocksPartRenderProfileRecord> {
+        connection.query_row(
+            "
+            SELECT id, game_id, profile_key, part_key, part_name, source_object_name,
+                renderer_names_json, canonical_rotation_json, camera_preset_json,
+                bounds_center_json, bounds_size_json, edge_settings_json, latest_render_path,
+                latest_capture_id, latest_status_json, render_version, is_validated, notes,
+                created_at, updated_at
+            FROM obj_gearblocks_part_render_profile
+            WHERE game_id = ?1 AND profile_key = ?2
+            ",
+            params![game_id, profile_key],
+            gearblocks_part_render_profile_from_row,
+        )
+    }
+
     pub fn list_game_chat_conversations(
         &self,
         game_id: i64,
     ) -> Result<Vec<GameChatConversationRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let mut statement = connection.prepare(
             "
@@ -5354,12 +8510,12 @@ impl AppDatabase {
     }
 
     pub fn list_game_build_guides(&self, game_id: i64) -> Result<Vec<GameBuildGuideRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let mut statement = connection.prepare(
             "
             SELECT id, game_id, title, source_path, raw_markdown, build_goal, scale_reference,
-                geometry_notes, checklist_json, overlay_x, overlay_y, overlay_width,
+                geometry_notes, glossary_text, checklist_json, overlay_x, overlay_y, overlay_width,
                 overlay_height, created_at, updated_at
             FROM obj_game_build_guide
             WHERE game_id = ?1
@@ -5374,13 +8530,13 @@ impl AppDatabase {
     }
 
     pub fn latest_game_build_guide(&self, game_id: i64) -> Result<Option<GameBuildGuideRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         connection
             .query_row(
                 "
                 SELECT id, game_id, title, source_path, raw_markdown, build_goal, scale_reference,
-                    geometry_notes, checklist_json, overlay_x, overlay_y, overlay_width,
+                    geometry_notes, glossary_text, checklist_json, overlay_x, overlay_y, overlay_width,
                     overlay_height, created_at, updated_at
                 FROM obj_game_build_guide
                 WHERE game_id = ?1
@@ -5394,45 +8550,57 @@ impl AppDatabase {
     }
 
     pub fn get_game_build_guide(&self, id: i64) -> Result<GameBuildGuideRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_build_guide_by_id(&connection, id)
+    }
+
+    pub fn delete_game_build_guide(&self, guide_id: i64) -> Result<()> {
+        let connection = self.connection()?;
+        Self::get_game_build_guide_by_id(&connection, guide_id)?;
+        connection.execute(
+            "DELETE FROM obj_game_build_guide_part WHERE guide_id = ?1",
+            params![guide_id],
+        )?;
+        connection.execute(
+            "DELETE FROM obj_game_build_guide_step WHERE guide_id = ?1",
+            params![guide_id],
+        )?;
+        connection.execute(
+            "DELETE FROM obj_game_build_guide WHERE id = ?1",
+            params![guide_id],
+        )?;
+        Ok(())
     }
 
     pub fn create_game_build_guide(
         &self,
-        game_id: i64,
-        title: &str,
-        source_path: &str,
-        raw_markdown: &str,
-        build_goal: &str,
-        scale_reference: &str,
-        geometry_notes: &str,
-        checklist_json: &str,
+        draft: GameBuildGuideDraft<'_>,
     ) -> Result<GameBuildGuideRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
-        Self::get_game_by_id(&connection, game_id)?;
-        let clean_title = if title.trim().is_empty() {
+        let connection = self.connection()?;
+        Self::get_game_by_id(&connection, draft.game_id)?;
+        let clean_title = if draft.title.trim().is_empty() {
             "Build guide"
         } else {
-            title.trim()
+            draft.title.trim()
         };
         connection.execute(
             "
             INSERT INTO obj_game_build_guide (
                 game_id, title, source_path, raw_markdown, build_goal, scale_reference,
-                geometry_notes, checklist_json
+                geometry_notes, glossary_text, checklist_json
             )
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
             ",
             params![
-                game_id,
+                draft.game_id,
                 clean_title,
-                source_path.trim(),
-                raw_markdown,
-                build_goal.trim(),
-                scale_reference.trim(),
-                geometry_notes.trim(),
-                checklist_json.trim()
+                draft.source_path.trim(),
+                draft.raw_markdown,
+                draft.build_goal.trim(),
+                draft.scale_reference.trim(),
+                draft.geometry_notes.trim(),
+                draft.glossary_text.trim(),
+                draft.checklist_json.trim()
             ],
         )?;
 
@@ -5445,7 +8613,7 @@ impl AppDatabase {
         guide_id: i64,
         parts: &[GameBuildGuidePartDraft],
     ) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_build_guide_by_id(&connection, guide_id)?;
         connection.execute(
             "DELETE FROM obj_game_build_guide_part WHERE guide_id = ?1",
@@ -5481,7 +8649,7 @@ impl AppDatabase {
         guide_id: i64,
         steps: &[GameBuildGuideStepDraft],
     ) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_build_guide_by_id(&connection, guide_id)?;
         connection.execute(
             "DELETE FROM obj_game_build_guide_step WHERE guide_id = ?1",
@@ -5515,7 +8683,7 @@ impl AppDatabase {
         &self,
         guide_id: i64,
     ) -> Result<Vec<GameBuildGuidePartRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_build_guide_by_id(&connection, guide_id)?;
         Self::list_game_build_guide_parts_for_connection(&connection, guide_id)
     }
@@ -5524,7 +8692,7 @@ impl AppDatabase {
         &self,
         guide_id: i64,
     ) -> Result<Vec<GameBuildGuideStepRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_build_guide_by_id(&connection, guide_id)?;
         Self::list_game_build_guide_steps_for_connection(&connection, guide_id)
     }
@@ -5537,7 +8705,7 @@ impl AppDatabase {
         overlay_width: Option<i32>,
         overlay_height: Option<i32>,
     ) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_build_guide_by_id(&connection, guide_id)?;
         connection.execute(
             "
@@ -5565,7 +8733,7 @@ impl AppDatabase {
         game_id: i64,
         title: &str,
     ) -> Result<GameChatConversationRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_by_id(&connection, game_id)?;
         let clean_title = if title.trim().is_empty() {
             "Game chat"
@@ -5586,7 +8754,7 @@ impl AppDatabase {
     }
 
     pub fn get_game_chat_conversation(&self, id: i64) -> Result<GameChatConversationRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_chat_conversation_by_id(&connection, id)
     }
 
@@ -5596,7 +8764,7 @@ impl AppDatabase {
         overlay_x: i32,
         overlay_y: i32,
     ) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_chat_conversation_by_id(&connection, conversation_id)?;
         connection.execute(
             "
@@ -5613,7 +8781,7 @@ impl AppDatabase {
         &self,
         conversation_id: i64,
     ) -> Result<Vec<GameChatMessageRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_chat_conversation_by_id(&connection, conversation_id)?;
         Self::list_game_chat_messages_for_connection(&connection, conversation_id)
     }
@@ -5623,7 +8791,7 @@ impl AppDatabase {
         conversation_id: i64,
         limit: i64,
     ) -> Result<Vec<GameChatMessageRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT id, conversation_id, role, content, created_at
@@ -5651,7 +8819,7 @@ impl AppDatabase {
         role: &str,
         content: &str,
     ) -> Result<GameChatMessageRecord> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_chat_conversation_by_id(&connection, conversation_id)?;
         connection.execute(
             "
@@ -5674,7 +8842,7 @@ impl AppDatabase {
     }
 
     pub fn delete_game_chat_conversation(&self, conversation_id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "DELETE FROM obj_game_chat_message WHERE conversation_id = ?1",
             params![conversation_id],
@@ -5690,7 +8858,7 @@ impl AppDatabase {
         &self,
         game_id: i64,
     ) -> Result<Vec<GameScreenshotCaptureRequestRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         let mut statement = connection.prepare(
             "
             SELECT
@@ -5722,7 +8890,7 @@ impl AppDatabase {
         &self,
         id: i64,
     ) -> Result<Option<GameScreenshotCaptureRequestRecord>> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         Self::get_game_screenshot_capture_request_by_id(&connection, id).optional()
     }
 
@@ -5732,7 +8900,7 @@ impl AppDatabase {
         file_path: &str,
         request_path: &str,
     ) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "
             DELETE FROM obj_game_catalog_reference
@@ -5748,7 +8916,7 @@ impl AppDatabase {
     }
 
     pub fn delete_game_screenshot(&self, id: i64) -> Result<()> {
-        let connection = self.connection.lock().expect("database mutex poisoned");
+        let connection = self.connection()?;
         connection.execute(
             "DELETE FROM obj_game_catalog_screenshot WHERE id = ?1",
             params![id],
@@ -5775,6 +8943,401 @@ impl AppDatabase {
                     updated_at: row.get(6)?,
                 })
             },
+        )
+    }
+
+    fn get_repair_resell_source_by_id_for_connection(
+        connection: &Connection,
+        source_id: &str,
+    ) -> Result<RepairResellSourceRecord> {
+        connection.query_row(
+            "
+            SELECT
+                source.id_obj_resell_source,
+                kind.key,
+                kind.label,
+                source.source_key,
+                source.name,
+                source.base_url,
+                COALESCE(source.region_label, ''),
+                source.scrape_mode,
+                source.adapter_key,
+                source.enabled,
+                source.priority,
+                source.rate_limit_seconds,
+                COALESCE(source.notes, ''),
+                COALESCE(source.last_scraped_at, ''),
+                source.created_at,
+                source.modified_at
+            FROM obj_resell_source source
+            JOIN def_resell_source_kind kind
+                ON kind.id_def_resell_source_kind = source.id_def_resell_source_kind
+            WHERE source.id_obj_resell_source = ?1
+            ",
+            params![source_id],
+            repair_resell_source_from_row,
+        )
+    }
+
+    fn list_repair_resell_categories_for_connection(
+        connection: &Connection,
+    ) -> Result<Vec<RepairResellCategoryRecord>> {
+        let mut statement = connection.prepare(
+            "
+            SELECT id_def_resell_category, key, label
+            FROM def_resell_category
+            ORDER BY sort_order ASC, label ASC
+            ",
+        )?;
+        let records = statement
+            .query_map([], repair_resell_category_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(records)
+    }
+
+    fn list_repair_resell_keyword_flags_for_connection(
+        connection: &Connection,
+    ) -> Result<Vec<RepairResellKeywordFlagRecord>> {
+        let mut statement = connection.prepare(
+            "
+            SELECT id_def_resell_keyword_flag, key, label, flag_type, pattern
+            FROM def_resell_keyword_flag
+            ORDER BY sort_order ASC, label ASC
+            ",
+        )?;
+        let records = statement
+            .query_map([], repair_resell_keyword_flag_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(records)
+    }
+
+    fn get_repair_resell_listing_by_id_for_connection(
+        connection: &Connection,
+        listing_id: &str,
+    ) -> Result<RepairResellListingRecord> {
+        let mut listing = connection.query_row(
+            "
+            SELECT
+                listing.id_obj_resell_listing,
+                listing.id_obj_resell_source,
+                source.name,
+                source.source_key,
+                COALESCE(listing.external_id, ''),
+                listing.canonical_url,
+                listing.title,
+                COALESCE(listing.normalized_title, ''),
+                COALESCE(listing.description_text, ''),
+                COALESCE(listing.source_category_text, ''),
+                COALESCE(listing.make, ''),
+                COALESCE(listing.model, ''),
+                listing.model_year,
+                COALESCE(listing.lot_number, ''),
+                COALESCE(listing.condition_text, ''),
+                COALESCE(listing.location_text, ''),
+                listing.currency_code,
+                listing.current_price_cents,
+                listing.bid_count,
+                COALESCE(listing.closing_at, ''),
+                COALESCE(listing.posted_at, ''),
+                COALESCE(listing.last_seen_at, ''),
+                listing.listing_status,
+                COALESCE(listing.pickup_text, ''),
+                COALESCE(listing.inspection_text, ''),
+                listing.is_watchlisted,
+                listing.created_at,
+                listing.modified_at
+            FROM obj_resell_listing listing
+            JOIN obj_resell_source source
+                ON source.id_obj_resell_source = listing.id_obj_resell_source
+            WHERE listing.id_obj_resell_listing = ?1
+            ",
+            params![listing_id],
+            repair_resell_listing_from_row,
+        )?;
+        listing.flags = Self::list_repair_resell_listing_flags_for_connection(connection, listing_id)?;
+        listing.categories =
+            Self::list_repair_resell_listing_categories_for_connection(connection, listing_id)?;
+        Ok(listing)
+    }
+
+    fn list_repair_resell_listing_flags_for_connection(
+        connection: &Connection,
+        listing_id: &str,
+    ) -> Result<Vec<RepairResellKeywordFlagRecord>> {
+        let mut statement = connection.prepare(
+            "
+            SELECT flag.id_def_resell_keyword_flag, flag.key, flag.label, flag.flag_type, flag.pattern
+            FROM n2n_resell_listing_keyword_flag mapping
+            JOIN def_resell_keyword_flag flag
+                ON flag.id_def_resell_keyword_flag = mapping.id_def_resell_keyword_flag
+            WHERE mapping.id_obj_resell_listing = ?1
+            ORDER BY flag.flag_type, flag.sort_order
+            ",
+        )?;
+        let records = statement
+            .query_map(params![listing_id], repair_resell_keyword_flag_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(records)
+    }
+
+    fn list_repair_resell_listing_categories_for_connection(
+        connection: &Connection,
+        listing_id: &str,
+    ) -> Result<Vec<RepairResellCategoryRecord>> {
+        let mut statement = connection.prepare(
+            "
+            SELECT category.id_def_resell_category, category.key, category.label
+            FROM n2n_resell_listing_category mapping
+            JOIN def_resell_category category
+                ON category.id_def_resell_category = mapping.id_def_resell_category
+            WHERE mapping.id_obj_resell_listing = ?1
+            ORDER BY category.sort_order
+            ",
+        )?;
+        let records = statement
+            .query_map(params![listing_id], repair_resell_category_from_row)?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(records)
+    }
+
+    fn insert_repair_resell_listing_snapshot(
+        connection: &Connection,
+        listing_id: &str,
+        scrape_run_id: Option<&str>,
+    ) -> Result<()> {
+        connection.execute(
+            "
+            INSERT INTO obj_resell_listing_snapshot (
+                id_obj_resell_listing_snapshot,
+                id_obj_resell_listing,
+                id_obj_resell_scrape_run,
+                snapshot_at,
+                current_price_cents,
+                bid_count,
+                listing_status,
+                title,
+                description_text,
+                condition_text,
+                location_text,
+                closing_at,
+                content_hash,
+                structured_json
+            )
+            SELECT
+                ?1,
+                id_obj_resell_listing,
+                NULLIF(?2, ''),
+                CURRENT_TIMESTAMP,
+                current_price_cents,
+                bid_count,
+                listing_status,
+                title,
+                description_text,
+                condition_text,
+                location_text,
+                closing_at,
+                content_hash,
+                structured_json
+            FROM obj_resell_listing
+            WHERE id_obj_resell_listing = ?3
+            ",
+            params![
+                repair_resell_id("obj_resell_listing_snapshot"),
+                scrape_run_id.unwrap_or_default(),
+                listing_id
+            ],
+        )?;
+        Ok(())
+    }
+
+    fn apply_repair_resell_keyword_flags(
+        connection: &Connection,
+        listing_id: &str,
+    ) -> Result<()> {
+        let search_text: String = connection.query_row(
+            "
+            SELECT lower(
+                title || ' ' ||
+                COALESCE(description_text, '') || ' ' ||
+                COALESCE(condition_text, '') || ' ' ||
+                COALESCE(source_category_text, '')
+            )
+            FROM obj_resell_listing
+            WHERE id_obj_resell_listing = ?1
+            ",
+            params![listing_id],
+            |row| row.get(0),
+        )?;
+        connection.execute(
+            "
+            DELETE FROM n2n_resell_listing_keyword_flag
+            WHERE id_obj_resell_listing = ?1
+                AND assigned_by = 'rule'
+            ",
+            params![listing_id],
+        )?;
+        for flag in Self::list_repair_resell_keyword_flags_for_connection(connection)? {
+            if search_text.contains(&flag.pattern.to_lowercase()) {
+                connection.execute(
+                    "
+                    INSERT OR IGNORE INTO n2n_resell_listing_keyword_flag (
+                        id_n2n_resell_listing_keyword_flag,
+                        id_obj_resell_listing,
+                        id_def_resell_keyword_flag,
+                        match_text,
+                        assigned_by
+                    )
+                    VALUES (?1, ?2, ?3, ?4, 'rule')
+                    ",
+                    params![
+                        repair_resell_id("n2n_resell_listing_keyword_flag"),
+                        listing_id,
+                        flag.id,
+                        flag.pattern
+                    ],
+                )?;
+            }
+        }
+        Ok(())
+    }
+
+    fn apply_repair_resell_categories(connection: &Connection, listing_id: &str) -> Result<()> {
+        let search_text: String = connection.query_row(
+            "
+            SELECT lower(
+                title || ' ' ||
+                COALESCE(description_text, '') || ' ' ||
+                COALESCE(source_category_text, '')
+            )
+            FROM obj_resell_listing
+            WHERE id_obj_resell_listing = ?1
+            ",
+            params![listing_id],
+            |row| row.get(0),
+        )?;
+        connection.execute(
+            "
+            DELETE FROM n2n_resell_listing_category
+            WHERE id_obj_resell_listing = ?1
+                AND assigned_by = 'rule'
+            ",
+            params![listing_id],
+        )?;
+        let mut categories = Vec::new();
+        for (category, terms) in [
+            ("mountain_bike", ["mountain bike", "mtb"].as_slice()),
+            ("bicycle", ["bike", "bicycle", "trek", "giant", "specialized"].as_slice()),
+            ("push_mower", ["push mower", "walk behind mower"].as_slice()),
+            ("riding_mower", ["riding mower", "lawn tractor"].as_slice()),
+            ("zero_turn_mower", ["zero turn", "zero-turn"].as_slice()),
+            ("snow_blower", ["snowblower", "snow blower"].as_slice()),
+            ("generator", ["generator"].as_slice()),
+            ("pressure_washer", ["pressure washer"].as_slice()),
+            ("air_compressor", ["air compressor", "compressor"].as_slice()),
+            ("power_tool", ["dewalt", "milwaukee", "makita", "power tool"].as_slice()),
+            ("computer", ["computer", "pc", "laptop", "desktop"].as_slice()),
+            ("electronics", ["electronics", "receiver", "amplifier"].as_slice()),
+            ("automotive_tool", ["automotive tool", "scan tool", "jack"].as_slice()),
+            ("automotive_part", ["automotive part", "car part", "truck part"].as_slice()),
+            ("vehicle", ["vehicle", "car", "truck"].as_slice()),
+            ("trailer", ["trailer"].as_slice()),
+            ("small_engine", ["small engine", "briggs", "kohler", "tecumseh", "honda"].as_slice()),
+        ] {
+            if terms.iter().any(|term| search_text.contains(term)) {
+                categories.push(category);
+            }
+        }
+        if categories.is_empty() {
+            categories.push("unknown");
+        }
+        for category_key in categories {
+            connection.execute(
+                "
+                INSERT OR IGNORE INTO n2n_resell_listing_category (
+                    id_n2n_resell_listing_category,
+                    id_obj_resell_listing,
+                    id_def_resell_category,
+                    confidence,
+                    assigned_by
+                )
+                SELECT ?1, ?2, category.id_def_resell_category, ?3, 'rule'
+                FROM def_resell_category category
+                WHERE category.key = ?4
+                ",
+                params![
+                    repair_resell_id("n2n_resell_listing_category"),
+                    listing_id,
+                    if category_key == "unknown" { 0.2 } else { 0.8 },
+                    category_key
+                ],
+            )?;
+        }
+        Ok(())
+    }
+
+    fn get_repair_resell_scrape_run_by_id_for_connection(
+        connection: &Connection,
+        run_id: &str,
+    ) -> Result<RepairResellScrapeRunRecord> {
+        connection.query_row(
+            "
+            SELECT
+                id_obj_resell_scrape_run,
+                id_obj_resell_source,
+                started_at,
+                COALESCE(finished_at, ''),
+                status,
+                listing_count,
+                new_listing_count,
+                updated_listing_count,
+                skipped_count,
+                COALESCE(error_text, ''),
+                created_at,
+                modified_at
+            FROM obj_resell_scrape_run
+            WHERE id_obj_resell_scrape_run = ?1
+            ",
+            params![run_id],
+            repair_resell_scrape_run_from_row,
+        )
+    }
+
+    fn get_repair_resell_deal_estimate_by_id_for_connection(
+        connection: &Connection,
+        estimate_id: &str,
+    ) -> Result<RepairResellDealEstimateRecord> {
+        connection.query_row(
+            "
+            SELECT
+                id_obj_resell_deal_estimate,
+                id_obj_resell_listing,
+                COALESCE(id_obj_resell_travel_profile, ''),
+                estimate_label,
+                acquisition_price_cents,
+                buyer_premium_cents,
+                tax_cents,
+                travel_km,
+                fuel_cost_cents,
+                parts_cost_cents,
+                other_cost_cents,
+                expected_resale_low_cents,
+                expected_resale_high_cents,
+                expected_resale_target_cents,
+                desired_profit_cents,
+                risk_buffer_cents,
+                max_safe_bid_cents,
+                net_profit_low_cents,
+                net_profit_target_cents,
+                estimate_method,
+                confidence,
+                COALESCE(notes, ''),
+                created_at,
+                modified_at
+            FROM obj_resell_deal_estimate
+            WHERE id_obj_resell_deal_estimate = ?1
+            ",
+            params![estimate_id],
+            repair_resell_deal_estimate_from_row,
         )
     }
 
@@ -6183,6 +9746,46 @@ impl AppDatabase {
         )
     }
 
+    fn game_definition_id_by_game_id(connection: &Connection, game_id: i64) -> Result<i64> {
+        connection.query_row(
+            "SELECT id_game FROM obj_game WHERE id = ?1",
+            params![game_id],
+            |row| row.get(0),
+        )
+    }
+
+    fn clear_active_game_character_builds(connection: &Connection, game_id: i64) -> Result<()> {
+        connection.execute(
+            "
+            UPDATE obj_game_character_build
+            SET is_active = 0,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE game_id = ?1
+                AND is_active = 1
+            ",
+            params![game_id],
+        )?;
+        Ok(())
+    }
+
+    fn get_game_character_build_by_id(
+        connection: &Connection,
+        id: i64,
+    ) -> Result<GameCharacterBuildRecord> {
+        connection.query_row(
+            "
+            SELECT id, game_id, id_game, title, character_class, ascendancy, build_role,
+                status, source_label, source_url, patch, summary, tags, notes, is_active,
+                created_at, updated_at
+            FROM obj_game_character_build
+            WHERE id = ?1
+            LIMIT 1
+            ",
+            params![id],
+            game_character_build_from_row,
+        )
+    }
+
     fn get_game_data_location_by_type(
         connection: &Connection,
         game_id: i64,
@@ -6270,6 +9873,213 @@ impl AppDatabase {
             ",
             params![game_id, part_key.trim()],
             game_runtime_part_from_row,
+        )
+    }
+
+    fn upsert_gearblocks_part_definition(
+        connection: &Connection,
+        part: &GameRuntimePartInstanceDraft,
+    ) -> Result<i64> {
+        connection.execute(
+            "
+            INSERT INTO def_gearblocks_part (
+                part_key,
+                asset_guid,
+                asset_name,
+                display_name,
+                full_display_name,
+                category,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)
+            ON CONFLICT(part_key) DO UPDATE SET
+                asset_guid = excluded.asset_guid,
+                asset_name = excluded.asset_name,
+                display_name = excluded.display_name,
+                full_display_name = excluded.full_display_name,
+                category = excluded.category,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                part.part_key.trim(),
+                part.asset_guid.trim(),
+                part.asset_name.trim(),
+                part.display_name.trim(),
+                part.full_display_name.trim(),
+                part.category.trim(),
+                part.last_seen_at.trim()
+            ],
+        )?;
+        connection.query_row(
+            "SELECT id FROM def_gearblocks_part WHERE part_key = ?1",
+            params![part.part_key.trim()],
+            |row| row.get(0),
+        )
+    }
+
+    fn upsert_gearblocks_metadata_item(
+        connection: &Connection,
+        source_area: &str,
+        field_path: &str,
+        value_type: &str,
+        seen_at: &str,
+    ) -> Result<i64> {
+        connection.execute(
+            "
+            INSERT INTO def_gearblocks_part_metadata_item (
+                source_area,
+                field_path,
+                value_type,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?4)
+            ON CONFLICT(source_area, field_path) DO UPDATE SET
+                value_type = excluded.value_type,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                source_area.trim(),
+                field_path.trim(),
+                value_type.trim(),
+                seen_at.trim()
+            ],
+        )?;
+        connection.query_row(
+            "
+            SELECT id
+            FROM def_gearblocks_part_metadata_item
+            WHERE source_area = ?1
+                AND field_path = ?2
+            ",
+            params![source_area.trim(), field_path.trim()],
+            |row| row.get(0),
+        )
+    }
+
+    fn upsert_gearblocks_attachment_type(
+        connection: &Connection,
+        attachment_path: &str,
+        type_name: &str,
+        value_type: &str,
+        seen_at: &str,
+    ) -> Result<i64> {
+        connection.execute(
+            "
+            INSERT INTO def_gearblocks_attachment_type (
+                attachment_path,
+                type_name,
+                value_type,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?4)
+            ON CONFLICT(attachment_path, type_name) DO UPDATE SET
+                value_type = excluded.value_type,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                attachment_path.trim(),
+                type_name.trim(),
+                value_type.trim(),
+                seen_at.trim()
+            ],
+        )?;
+        connection.query_row(
+            "
+            SELECT id
+            FROM def_gearblocks_attachment_type
+            WHERE attachment_path = ?1
+                AND type_name = ?2
+            ",
+            params![attachment_path.trim(), type_name.trim()],
+            |row| row.get(0),
+        )
+    }
+
+    fn upsert_gearblocks_part_setting(
+        connection: &Connection,
+        setting_key: &str,
+        label: &str,
+        setting_area: &str,
+        value_type: &str,
+        seen_at: &str,
+    ) -> Result<i64> {
+        connection.execute(
+            "
+            INSERT INTO def_gearblocks_part_setting (
+                setting_key,
+                label,
+                setting_area,
+                value_type,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?5)
+            ON CONFLICT(setting_key) DO UPDATE SET
+                label = excluded.label,
+                setting_area = excluded.setting_area,
+                value_type = excluded.value_type,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                setting_key.trim(),
+                label.trim(),
+                setting_area.trim(),
+                value_type.trim(),
+                seen_at.trim()
+            ],
+        )?;
+        connection.query_row(
+            "SELECT id FROM def_gearblocks_part_setting WHERE setting_key = ?1",
+            params![setting_key.trim()],
+            |row| row.get(0),
+        )
+    }
+
+    fn upsert_gearblocks_part_output_channel(
+        connection: &Connection,
+        channel_key: &str,
+        label: &str,
+        channel_area: &str,
+        value_type: &str,
+        seen_at: &str,
+    ) -> Result<i64> {
+        connection.execute(
+            "
+            INSERT INTO def_gearblocks_part_output_channel (
+                channel_key,
+                label,
+                channel_area,
+                value_type,
+                first_seen_at,
+                last_seen_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?5)
+            ON CONFLICT(channel_key) DO UPDATE SET
+                label = excluded.label,
+                channel_area = excluded.channel_area,
+                value_type = excluded.value_type,
+                last_seen_at = excluded.last_seen_at,
+                updated_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                channel_key.trim(),
+                label.trim(),
+                channel_area.trim(),
+                value_type.trim(),
+                seen_at.trim()
+            ],
+        )?;
+        connection.query_row(
+            "SELECT id FROM def_gearblocks_part_output_channel WHERE channel_key = ?1",
+            params![channel_key.trim()],
+            |row| row.get(0),
         )
     }
 
@@ -6436,7 +10246,7 @@ impl AppDatabase {
         connection.query_row(
             "
             SELECT id, game_id, title, source_path, raw_markdown, build_goal, scale_reference,
-                geometry_notes, checklist_json, overlay_x, overlay_y, overlay_width,
+                geometry_notes, glossary_text, checklist_json, overlay_x, overlay_y, overlay_width,
                 overlay_height, created_at, updated_at
             FROM obj_game_build_guide
             WHERE id = ?1
@@ -6989,7 +10799,7 @@ fn build_planning_context_payload(
     } else {
         format!(
             "Local repository Markdown context:\n\
-The following Markdown files were read from the selected project's configured local repository root and are available as source context for this chat. Use them when answering questions about the project files, README, docs, bridge files, project plan, or milestone state.\n\n{}\n\nConversation manual attachments:\n\n{}",
+The following Markdown files were read from the selected project's configured local repository root and are available as source context for this chat. Use them when answering questions about the project files, README, docs, bridge files, project plan, or current project state.\n\n{}\n\nConversation manual attachments:\n\n{}",
             markdown_text, attachment_text
         )
     };
@@ -7523,6 +11333,243 @@ fn gearblocks_api_docs_url(page: &str) -> String {
     }
 }
 
+fn repair_resell_id(table: &str) -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    let sequence = REPAIR_RESELL_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+    format!("{table}_{nanos:x}_{sequence:x}")
+}
+
+fn normalize_resell_key(value: &str) -> String {
+    value
+        .trim()
+        .to_lowercase()
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() {
+                character
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>()
+        .split('_')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("_")
+}
+
+fn normalize_resell_text(value: &str) -> String {
+    value
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
+}
+
+fn valid_resell_listing_status(value: &str) -> &str {
+    match value {
+        "active" | "closed" | "sold" | "removed" | "unknown" => value,
+        _ => "unknown",
+    }
+}
+
+fn valid_resell_scrape_status(value: &str) -> &str {
+    match value {
+        "queued" | "running" | "succeeded" | "partial" | "failed" | "skipped" => value,
+        _ => "failed",
+    }
+}
+
+fn valid_resell_watch_status(value: &str) -> &str {
+    match value {
+        "watching" | "interested" | "bid_planned" | "bid_placed" | "won" | "lost"
+        | "ignored" => value,
+        _ => "watching",
+    }
+}
+
+fn valid_resell_confidence(value: &str) -> &str {
+    match value {
+        "low" | "medium" | "high" => value,
+        _ => "low",
+    }
+}
+
+fn estimate_resell_fuel_cost(
+    travel_km: Option<f64>,
+    travel_profile_id: Option<&str>,
+    connection: &Connection,
+) -> Result<Option<i64>> {
+    let Some(travel_km) = travel_km else {
+        return Ok(None);
+    };
+    let Some(travel_profile_id) = travel_profile_id.filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+    let values: Option<(Option<f64>, Option<i64>)> = connection
+        .query_row(
+            "
+            SELECT fuel_l_per_100km, fuel_price_cents_per_litre
+            FROM obj_resell_travel_profile
+            WHERE id_obj_resell_travel_profile = ?1
+            ",
+            params![travel_profile_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?;
+    let Some((Some(l_per_100km), Some(cents_per_litre))) = values else {
+        return Ok(None);
+    };
+    Ok(Some(
+        ((travel_km / 100.0) * l_per_100km * cents_per_litre as f64).round() as i64,
+    ))
+}
+
+fn repair_resell_source_from_row(row: &rusqlite::Row<'_>) -> Result<RepairResellSourceRecord> {
+    Ok(RepairResellSourceRecord {
+        id: row.get(0)?,
+        kind_key: row.get(1)?,
+        kind_label: row.get(2)?,
+        source_key: row.get(3)?,
+        name: row.get(4)?,
+        base_url: row.get(5)?,
+        region_label: row.get(6)?,
+        scrape_mode: row.get(7)?,
+        adapter_key: row.get(8)?,
+        enabled: row.get::<_, i64>(9)? == 1,
+        priority: row.get(10)?,
+        rate_limit_seconds: row.get(11)?,
+        notes: row.get(12)?,
+        last_scraped_at: row.get(13)?,
+        created_at: row.get(14)?,
+        modified_at: row.get(15)?,
+    })
+}
+
+fn repair_resell_category_from_row(row: &rusqlite::Row<'_>) -> Result<RepairResellCategoryRecord> {
+    Ok(RepairResellCategoryRecord {
+        id: row.get(0)?,
+        key: row.get(1)?,
+        label: row.get(2)?,
+    })
+}
+
+fn repair_resell_keyword_flag_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<RepairResellKeywordFlagRecord> {
+    Ok(RepairResellKeywordFlagRecord {
+        id: row.get(0)?,
+        key: row.get(1)?,
+        label: row.get(2)?,
+        flag_type: row.get(3)?,
+        pattern: row.get(4)?,
+    })
+}
+
+fn repair_resell_listing_from_row(row: &rusqlite::Row<'_>) -> Result<RepairResellListingRecord> {
+    Ok(RepairResellListingRecord {
+        id: row.get(0)?,
+        source_id: row.get(1)?,
+        source_name: row.get(2)?,
+        source_key: row.get(3)?,
+        external_id: row.get(4)?,
+        canonical_url: row.get(5)?,
+        title: row.get(6)?,
+        normalized_title: row.get(7)?,
+        description_text: row.get(8)?,
+        source_category_text: row.get(9)?,
+        make: row.get(10)?,
+        model: row.get(11)?,
+        model_year: row.get(12)?,
+        lot_number: row.get(13)?,
+        condition_text: row.get(14)?,
+        location_text: row.get(15)?,
+        currency_code: row.get(16)?,
+        current_price_cents: row.get(17)?,
+        bid_count: row.get(18)?,
+        closing_at: row.get(19)?,
+        posted_at: row.get(20)?,
+        last_seen_at: row.get(21)?,
+        listing_status: row.get(22)?,
+        pickup_text: row.get(23)?,
+        inspection_text: row.get(24)?,
+        is_watchlisted: row.get::<_, i64>(25)? == 1,
+        created_at: row.get(26)?,
+        modified_at: row.get(27)?,
+        flags: Vec::new(),
+        categories: Vec::new(),
+    })
+}
+
+fn repair_resell_scrape_run_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<RepairResellScrapeRunRecord> {
+    Ok(RepairResellScrapeRunRecord {
+        id: row.get(0)?,
+        source_id: row.get(1)?,
+        started_at: row.get(2)?,
+        finished_at: row.get(3)?,
+        status: row.get(4)?,
+        listing_count: row.get(5)?,
+        new_listing_count: row.get(6)?,
+        updated_listing_count: row.get(7)?,
+        skipped_count: row.get(8)?,
+        error_text: row.get(9)?,
+        created_at: row.get(10)?,
+        modified_at: row.get(11)?,
+    })
+}
+
+fn repair_resell_travel_profile_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<RepairResellTravelProfileRecord> {
+    Ok(RepairResellTravelProfileRecord {
+        id: row.get(0)?,
+        name: row.get(1)?,
+        home_location_label: row.get(2)?,
+        vehicle_label: row.get(3)?,
+        fuel_l_per_100km: row.get(4)?,
+        fuel_price_cents_per_litre: row.get(5)?,
+        default_round_trip_km: row.get(6)?,
+        notes: row.get(7)?,
+        is_default: row.get::<_, i64>(8)? == 1,
+    })
+}
+
+fn repair_resell_deal_estimate_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<RepairResellDealEstimateRecord> {
+    Ok(RepairResellDealEstimateRecord {
+        id: row.get(0)?,
+        listing_id: row.get(1)?,
+        travel_profile_id: row.get(2)?,
+        estimate_label: row.get(3)?,
+        acquisition_price_cents: row.get(4)?,
+        buyer_premium_cents: row.get(5)?,
+        tax_cents: row.get(6)?,
+        travel_km: row.get(7)?,
+        fuel_cost_cents: row.get(8)?,
+        parts_cost_cents: row.get(9)?,
+        other_cost_cents: row.get(10)?,
+        expected_resale_low_cents: row.get(11)?,
+        expected_resale_high_cents: row.get(12)?,
+        expected_resale_target_cents: row.get(13)?,
+        desired_profit_cents: row.get(14)?,
+        risk_buffer_cents: row.get(15)?,
+        max_safe_bid_cents: row.get(16)?,
+        net_profit_low_cents: row.get(17)?,
+        net_profit_target_cents: row.get(18)?,
+        estimate_method: row.get(19)?,
+        confidence: row.get(20)?,
+        notes: row.get(21)?,
+        created_at: row.get(22)?,
+        modified_at: row.get(23)?,
+    })
+}
+
 fn smoking_event_from_row(row: &rusqlite::Row<'_>) -> Result<SmokingEventRecord> {
     Ok(SmokingEventRecord {
         id: row.get(0)?,
@@ -7592,6 +11639,42 @@ fn game_from_row(row: &rusqlite::Row<'_>) -> Result<GameRecord> {
         summary: row.get(3)?,
         created_at: row.get(4)?,
         updated_at: row.get(5)?,
+    })
+}
+
+fn game_setting_from_row(row: &rusqlite::Row<'_>) -> Result<GameSettingRecord> {
+    Ok(GameSettingRecord {
+        id: row.get(0)?,
+        game_id: row.get(1)?,
+        id_game: row.get(2)?,
+        setting_key: row.get(3)?,
+        setting_value_json: row.get(4)?,
+        schema_json: row.get(5)?,
+        created_at: row.get(6)?,
+        modified_at: row.get(7)?,
+    })
+}
+
+fn game_character_build_from_row(row: &rusqlite::Row<'_>) -> Result<GameCharacterBuildRecord> {
+    let is_active: i64 = row.get(14)?;
+    Ok(GameCharacterBuildRecord {
+        id: row.get(0)?,
+        game_id: row.get(1)?,
+        id_game: row.get(2)?,
+        title: row.get(3)?,
+        character_class: row.get(4)?,
+        ascendancy: row.get(5)?,
+        build_role: row.get(6)?,
+        status: row.get(7)?,
+        source_label: row.get(8)?,
+        source_url: row.get(9)?,
+        patch: row.get(10)?,
+        summary: row.get(11)?,
+        tags: row.get(12)?,
+        notes: row.get(13)?,
+        is_active: is_active != 0,
+        created_at: row.get(15)?,
+        updated_at: row.get(16)?,
     })
 }
 
@@ -7770,6 +11853,43 @@ fn game_runtime_part_from_row(row: &rusqlite::Row<'_>) -> Result<GameRuntimePart
     })
 }
 
+fn game_runtime_part_instance_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<GameRuntimePartInstanceRecord> {
+    Ok(GameRuntimePartInstanceRecord {
+        id: row.get(0)?,
+        game_id: row.get(1)?,
+        part_definition_id: row.get(2)?,
+        part_key: row.get(3)?,
+        asset_guid: row.get(4)?,
+        asset_name: row.get(5)?,
+        display_name: row.get(6)?,
+        full_display_name: row.get(7)?,
+        category: row.get(8)?,
+        source_export_id: row.get(9)?,
+        source_construction_id: row.get(10)?,
+        part_instance_key: row.get(11)?,
+        runtime_part_id: row.get(12)?,
+        runtime_part_index: row.get(13)?,
+        mass: row.get(14)?,
+        world_x: row.get(15)?,
+        world_y: row.get(16)?,
+        world_z: row.get(17)?,
+        local_x: row.get(18)?,
+        local_y: row.get(19)?,
+        local_z: row.get(20)?,
+        world_position_json: row.get(21)?,
+        local_position_json: row.get(22)?,
+        current_unit_size_json: row.get(23)?,
+        link_node_count: row.get(24)?,
+        behaviour_names_json: row.get(25)?,
+        dynamic_summary_json: row.get(26)?,
+        last_seen_at: row.get(27)?,
+        created_at: row.get(28)?,
+        updated_at: row.get(29)?,
+    })
+}
+
 fn game_runtime_part_alias_from_row(row: &rusqlite::Row<'_>) -> Result<GameRuntimePartAliasRecord> {
     Ok(GameRuntimePartAliasRecord {
         id: row.get(0)?,
@@ -7790,6 +11910,68 @@ fn game_runtime_part_alias_from_row(row: &rusqlite::Row<'_>) -> Result<GameRunti
         last_seen_at: row.get(15)?,
         created_at: row.get(16)?,
         updated_at: row.get(17)?,
+    })
+}
+
+fn game_runtime_part_metadata_value_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<GameRuntimePartMetadataValueRecord> {
+    Ok(GameRuntimePartMetadataValueRecord {
+        part_key: row.get(0)?,
+        source_area: row.get(1)?,
+        field_path: row.get(2)?,
+        value_type: row.get(3)?,
+        value_json: row.get(4)?,
+        source_export_id: row.get(5)?,
+        source_construction_id: row.get(6)?,
+        last_seen_at: row.get(7)?,
+    })
+}
+
+fn game_runtime_part_attachment_type_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<GameRuntimePartAttachmentTypeRecord> {
+    Ok(GameRuntimePartAttachmentTypeRecord {
+        part_key: row.get(0)?,
+        attachment_path: row.get(1)?,
+        type_name: row.get(2)?,
+        value_type: row.get(3)?,
+        attachment_json: row.get(4)?,
+        source_export_id: row.get(5)?,
+        source_construction_id: row.get(6)?,
+        last_seen_at: row.get(7)?,
+    })
+}
+
+fn game_runtime_part_setting_value_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<GameRuntimePartSettingValueRecord> {
+    Ok(GameRuntimePartSettingValueRecord {
+        part_key: row.get(0)?,
+        setting_key: row.get(1)?,
+        label: row.get(2)?,
+        setting_area: row.get(3)?,
+        value_type: row.get(4)?,
+        value_json: row.get(5)?,
+        source_export_id: row.get(6)?,
+        source_construction_id: row.get(7)?,
+        last_seen_at: row.get(8)?,
+    })
+}
+
+fn game_runtime_part_output_channel_value_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<GameRuntimePartOutputChannelValueRecord> {
+    Ok(GameRuntimePartOutputChannelValueRecord {
+        part_key: row.get(0)?,
+        channel_key: row.get(1)?,
+        label: row.get(2)?,
+        channel_area: row.get(3)?,
+        value_type: row.get(4)?,
+        value_json: row.get(5)?,
+        source_export_id: row.get(6)?,
+        source_construction_id: row.get(7)?,
+        last_seen_at: row.get(8)?,
     })
 }
 
@@ -7874,6 +12056,34 @@ fn game_screenshot_capture_request_from_row(
     })
 }
 
+fn gearblocks_part_render_profile_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<GearBlocksPartRenderProfileRecord> {
+    let is_validated: i64 = row.get(16)?;
+    Ok(GearBlocksPartRenderProfileRecord {
+        id: row.get(0)?,
+        game_id: row.get(1)?,
+        profile_key: row.get(2)?,
+        part_key: row.get(3)?,
+        part_name: row.get(4)?,
+        source_object_name: row.get(5)?,
+        renderer_names_json: row.get(6)?,
+        canonical_rotation_json: row.get(7)?,
+        camera_preset_json: row.get(8)?,
+        bounds_center_json: row.get(9)?,
+        bounds_size_json: row.get(10)?,
+        edge_settings_json: row.get(11)?,
+        latest_render_path: row.get(12)?,
+        latest_capture_id: row.get(13)?,
+        latest_status_json: row.get(14)?,
+        render_version: row.get(15)?,
+        is_validated: is_validated != 0,
+        notes: row.get(17)?,
+        created_at: row.get(18)?,
+        updated_at: row.get(19)?,
+    })
+}
+
 fn game_chat_conversation_from_row(row: &rusqlite::Row<'_>) -> Result<GameChatConversationRecord> {
     Ok(GameChatConversationRecord {
         id: row.get(0)?,
@@ -7896,13 +12106,14 @@ fn game_build_guide_from_row(row: &rusqlite::Row<'_>) -> Result<GameBuildGuideRe
         build_goal: row.get(5)?,
         scale_reference: row.get(6)?,
         geometry_notes: row.get(7)?,
-        checklist_json: row.get(8)?,
-        overlay_x: row.get(9)?,
-        overlay_y: row.get(10)?,
-        overlay_width: row.get(11)?,
-        overlay_height: row.get(12)?,
-        created_at: row.get(13)?,
-        updated_at: row.get(14)?,
+        glossary_text: row.get(8)?,
+        checklist_json: row.get(9)?,
+        overlay_x: row.get(10)?,
+        overlay_y: row.get(11)?,
+        overlay_width: row.get(12)?,
+        overlay_height: row.get(13)?,
+        created_at: row.get(14)?,
+        updated_at: row.get(15)?,
     })
 }
 
@@ -7968,6 +12179,40 @@ fn game_slug(name: &str) -> String {
     }
 }
 
+fn normalized_profile_key(value: &str) -> String {
+    let mut key = String::new();
+    let mut previous_was_separator = false;
+
+    for character in value.trim().chars() {
+        if character.is_ascii_alphanumeric() {
+            key.push(character.to_ascii_lowercase());
+            previous_was_separator = false;
+        } else if !previous_was_separator && !key.is_empty() {
+            key.push('-');
+            previous_was_separator = true;
+        }
+    }
+
+    while key.ends_with('-') {
+        key.pop();
+    }
+
+    if key.is_empty() {
+        "part-render-profile".to_string()
+    } else {
+        key
+    }
+}
+
+fn normalized_game_character_build_status(status: &str) -> &'static str {
+    match status.trim() {
+        "active" => "active",
+        "currently_playing" => "currently_playing",
+        "archived" => "archived",
+        _ => "planned",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -8003,6 +12248,7 @@ mod tests {
             "def_game",
             "obj_game",
             "obj_game_setting",
+            "obj_game_character_build",
             "obj_setting",
             "obj_scheduler",
             "n2n_planning_conversation_context",
@@ -8030,6 +12276,15 @@ mod tests {
             )
             .expect("Path of Exile 2 game row should be seeded");
         assert_eq!(path_of_exile_id_game, 2);
+
+        let spell_brigade_id_game: i64 = connection
+            .query_row(
+                "SELECT id_game FROM obj_game WHERE slug = 'the-spell-brigade'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("The Spell Brigade game row should be seeded");
+        assert_eq!(spell_brigade_id_game, 3);
 
         drop(connection);
         drop(database);

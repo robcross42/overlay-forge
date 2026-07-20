@@ -1,6 +1,8 @@
 # Overlay Forge Project History
 
-This file keeps milestone history in one compact reference. It replaces separate active `MILESTONE_*.md` files.
+This file archives the retired numbered milestone sequence in one compact reference. It replaces separate active `MILESTONE_*.md` files.
+
+Active planning and UI copy no longer use numbered milestones. Treat this file as historical reference only unless the user explicitly reintroduces milestone tracking.
 
 Historical milestone notes may mention old table names or old UI names. For current implementation work, prefer:
 
@@ -30,9 +32,9 @@ Historical milestone notes may mention old table names or old UI names. For curr
 | 12 - Project Markdown Context | Complete / Passed / Successful | Added project-level Markdown context loading from configured local roots. |
 | 13 - Project Workspace UI Consolidation | Complete / Passed / Successful | Consolidated Projects around the left navigation tree, focused chat surface, Project Edit, and right-hand context pane. |
 
-## Current Baseline Detail
+## Archived Baseline Detail
 
-Milestone 13 is the active stable baseline.
+The archived numbered sequence ended at Milestone 13.
 
 Current project behavior:
 
@@ -66,21 +68,27 @@ Status: Complete / Passed / Successful.
 
 Overlay Forge indexes documented GearBlocks construction runtime interface/member availability, stores availability metadata from runtime exports, and displays API attribute availability in catalog details. Default chat context excludes API values unless a future explicit include/snapshot control is added.
 
+### GearBlocks Build Guides
+
+Status: Complete / Passed / Successful.
+
+GearBlocks build guides can be imported from Markdown, generated from GearBlocks chat, persisted in SQLite, associated with chat prompt context, and displayed in an independent in-game overlay. Current polish items remain normal follow-up work, but the feature path is functionally validated.
+
 ### Smoking Cessation
 
-Status: Implemented / Pending Validation.
+Status: Complete / Passed / Successful.
 
 Smoking Cessation records cigarette events locally in SQLite, tracks current cigarette inventory, displays the `Nicoderm Step 1` patch marker started at `2026-06-21 15:00:00 EDT`, supports a configurable record-cigarette keybind, and keeps a narrow Markdown export current for external review.
 
 ### Scheduler Framework
 
-Status: Implemented / Pending Validation.
+Status: Complete / Passed / Successful.
 
 Scheduler adds local-first, backend-owned recurring work through explicit Rust handlers, scheduler rows, leases, and run history. Scheduler rows must not execute arbitrary commands or scripts.
 
 ### SQLite Naming Normalization
 
-Status: Implemented / Pending Validation.
+Status: Complete / Passed / Successful.
 
 SQLite persistence now follows:
 
@@ -93,9 +101,11 @@ n2n_ = many-to-many mappings
 
 ### Path of Exile 2 Game Module
 
-Status: Scaffolded / Pending Capability Buildout.
+Status: Build Planner Foundation Added / Pending Tree, Items, Gems, and Calculations.
 
-Path of Exile 2 is seeded as a Gaming module with frontend section targets for Home, Chats, Builds, Skill Tree, Items, Skill Gems, Support Gems, Loot Filter, and Trade. Add persistence only when a concrete capability requires it.
+Path of Exile 2 is seeded as a Gaming module with frontend section targets for Home, Chats, Builds, Skill Tree, Items, Skill Gems, Support Gems, Loot Filter, and Trade.
+
+The Builds section now uses generic local character build records in `obj_game_character_build` instead of relying on the earlier single JSON `current_build` setting. This is the first persistence foundation for replacing external Path of Building usage inside Overlay Forge. Passive tree snapshots, indexed items, gem links, and calculated values remain future capability layers.
 
 ## Historical Validation Pattern
 

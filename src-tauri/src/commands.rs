@@ -1,19 +1,36 @@
 use crate::db::{
-    BridgeFileDraftRecord, CalendarEventRecord, GameBuildGuidePartDraft, GameBuildGuidePartRecord,
-    GameBuildGuideRecord, GameBuildGuideStepDraft, GameBuildGuideStepRecord,
-    GameCatalogObjectRecord, GameChatConversationRecord, GameChatMessageRecord,
-    GameConstructionRecord, GameDataLocationRecord, GameRecord,
-    GameRuntimeConstructionExportRecord, GameRuntimePartAliasRecord,
-    GameRuntimePartApiMemberRecord, GameRuntimePartRecord, GameScreenshotCaptureRequestRecord,
-    GearBlocksApiCatalogRecord, NoteRecord, PlanningConversationContextRecord,
-    PlanningConversationRecord, PlanningMessageRecord, PlanningPromptPreviewRecord,
-    ProjectGitHubRepositoryRecord, ProjectMarkdownContextPayload, ProjectMarkdownContextRecord,
-    ProjectRecord, SchedulerRecord, SmokingCessationSettingsRecord, SmokingEventRecord, TaskRecord,
-    YouTubeReferenceRecord,
+    CalendarEventRecord, CalendarEventUpdateDraft, GameBuildGuideDraft,
+    GameBuildGuidePartDraft, GameBuildGuidePartRecord, GameBuildGuideRecord,
+    GameBuildGuideStepDraft, GameBuildGuideStepRecord, GameCatalogObjectDraft,
+    GameCatalogObjectRecord, GameCatalogReferenceDraft, GameCharacterBuildDraft,
+    GameCharacterBuildRecord, GameCharacterBuildUpdateDraft, GameChatConversationRecord,
+    GameChatMessageRecord, GameConstructionDraft, GameConstructionRecord, GameDataLocationRecord,
+    GameRecord, GameRuntimeConstructionExportDraft, GameRuntimeConstructionExportRecord,
+    GameRuntimePartAliasDraft, GameRuntimePartAliasRecord, GameRuntimePartApiAttributeObservation,
+    GameRuntimePartApiMemberObservation, GameRuntimePartApiMemberRecord,
+    GameRuntimePartAttachmentObservation, GameRuntimePartAttachmentTypeDraft, GameRuntimePartDraft,
+    GameRuntimePartIdentity, GameRuntimePartInstanceDraft, GameRuntimePartInstanceRecord,
+    GameRuntimePartMetadataValueDraft, GameRuntimePartOutputChannelValueDraft,
+    GameRuntimePartPropertyObservation, GameRuntimePartRecord, GameRuntimePartSettingValueDraft,
+    GameRuntimePartSource, GameRuntimePartValueObservation, GameScreenshotCaptureRequestDraft,
+    GameScreenshotCaptureRequestRecord, GameSettingRecord, GearBlocksApiCatalogRecord,
+    GearBlocksPartRenderProfileDraft, GearBlocksPartRenderProfileRecord, NoteRecord,
+    RepairResellCategoryRecord,
+    RepairResellDealEstimateRecord, RepairResellKeywordFlagRecord, RepairResellListingRecord,
+    RepairResellSourceRecord, RepairResellTravelProfileRecord, SchedulerRecord,
+    SmokingCessationSettingsRecord, SmokingEventRecord, TaskRecord, YouTubeReferenceRecord,
+    YouTubeReferenceUpdateDraft,
 };
-use crate::github;
+use crate::gearblocks_api_scraper::{scrape_official_gearblocks_api, GearBlocksApiImportResult};
+use crate::gearblocks_scene_context::GearBlocksSceneContextService;
 use crate::hotkeys;
+use crate::lifecycle;
 use crate::openai;
+use crate::repair_resell::{
+    self, RepairResellDealEstimateInput, RepairResellManualImportInput,
+    RepairResellRefreshResult, RepairResellWatchlistInput,
+};
+use crate::windows::{self, StandaloneWindowConfig, WindowKind, WindowManager};
 use crate::{AppState, GameBuildGuideOverlaySelection, GameChatOverlaySelection};
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::Engine;
@@ -21,7 +38,7 @@ use bson::{Bson, Document};
 use flate2::read::DeflateDecoder;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{BufReader, BufWriter, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
@@ -29,18 +46,24 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, State, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewWindow};
 
-static MANUAL_OVERLAY_DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);
 static GEARBLOCKS_RUNTIME_IMPORT_MONITOR_ACTIVE: AtomicBool = AtomicBool::new(false);
 static SCHEDULER_WORKER_ACTIVE: AtomicBool = AtomicBool::new(false);
 const ACTIVE_GAME_BUILD_GUIDE_OVERLAY_SETTING: &str = "active_game_build_guide_overlay_v1";
 const GEARBLOCKS_RUNTIME_INITIAL_TAIL_BYTES: u64 = 2 * 1024 * 1024;
 const GEARBLOCKS_RUNTIME_INCREMENTAL_READ_LIMIT_BYTES: u64 = 2 * 1024 * 1024;
+const BUILD_GUIDE_SOURCE_HTML_MAX_BYTES: u64 = 4 * 1024 * 1024;
+const BUILD_GUIDE_SOURCE_TEXT_MAX_CHARS: usize = 60_000;
+const BUILD_GUIDE_SOURCE_IMAGE_MAX_COUNT: usize = 24;
+const BUILD_GUIDE_SOURCE_IMAGE_MAX_BYTES: u64 = 10 * 1024 * 1024;
+const GEARBLOCKS_PART_RENDER_PROFILE_VERSION: i64 = 1;
+const GEARBLOCKS_ROTATION_SNAP_ANGLES: [f64; 10] = [
+    0.0, 40.0, 45.0, 60.0, 72.0, 90.0, 120.0, 135.0, 150.0, 157.5,
+];
 
 #[derive(Serialize)]
-pub struct MilestoneStatus {
-    milestone: String,
+pub struct AppStatus {
     hotkey: String,
     #[serde(rename = "databaseReady")]
     database_ready: bool,
@@ -66,12 +89,26 @@ pub struct KeybindRecord {
     pub keys: Vec<String>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CalendarEventUpdateInput {
+    pub id: i64,
+    pub title: String,
+    pub start_date: String,
+    pub start_time: String,
+    pub end_date: String,
+    pub end_time: String,
+    pub notes: String,
+}
+
 #[derive(Serialize)]
 pub struct GameBuildGuidePayload {
     pub guide: GameBuildGuideRecord,
     pub parts: Vec<GameBuildGuidePartRecord>,
     pub steps: Vec<GameBuildGuideStepRecord>,
     pub checklist: Vec<String>,
+    #[serde(rename = "imageReferenceCount")]
+    pub image_reference_count: usize,
 }
 
 #[derive(Serialize)]
@@ -82,6 +119,24 @@ pub struct GamePartCategoryRecord {
     #[serde(rename = "iconPath")]
     pub icon_path: String,
     pub count: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GameCharacterBuildInput {
+    pub game_id: i64,
+    pub title: String,
+    pub character_class: String,
+    pub ascendancy: String,
+    pub build_role: String,
+    pub status: String,
+    pub source_label: String,
+    pub source_url: String,
+    pub patch: String,
+    pub summary: String,
+    pub tags: String,
+    pub notes: String,
+    pub is_active: bool,
 }
 
 #[derive(Serialize)]
@@ -163,20 +218,25 @@ pub struct GearBlocksRuntimeExportRecord {
 }
 
 #[derive(Clone)]
-struct GearBlocksSceneDeltaRecord {
-    id: String,
-    emitted_at: String,
-    source_log_path: String,
-    document: serde_json::Value,
-}
-
-#[derive(Clone)]
 struct GearBlocksPartAliasLogRecord {
     part_instance_key: String,
     friendly_name: String,
     emitted_at: String,
     source_log_path: String,
     document: serde_json::Value,
+}
+
+struct BuildGuideSourceDocument {
+    url: String,
+    title: String,
+    text: String,
+    images: Vec<BuildGuideSourceImage>,
+}
+
+#[derive(Clone)]
+struct BuildGuideSourceImage {
+    url: String,
+    title: String,
 }
 
 #[derive(Serialize)]
@@ -211,6 +271,21 @@ pub struct GearBlocksMarkerCommandResult {
     pub command_directory: String,
     #[serde(rename = "statusDirectory")]
     pub status_directory: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GearBlocksPartRenderProfileInput {
+    pub game_id: i64,
+    pub capture_id: String,
+    pub profile_key: String,
+    pub part_name: String,
+    pub part_key: Option<String>,
+    pub canonical_rotation_x_degrees: Option<f64>,
+    pub canonical_rotation_y_degrees: Option<f64>,
+    pub canonical_rotation_z_degrees: Option<f64>,
+    pub is_validated: Option<bool>,
+    pub notes: Option<String>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -356,9 +431,8 @@ pub fn save_scratchpad(content: String, state: State<'_, AppState>) -> Result<()
 }
 
 #[tauri::command]
-pub fn get_milestone_status(state: State<'_, AppState>) -> Result<MilestoneStatus, String> {
-    Ok(MilestoneStatus {
-        milestone: "Milestone 13".to_string(),
+pub fn get_app_status(state: State<'_, AppState>) -> Result<AppStatus, String> {
+    Ok(AppStatus {
         hotkey: "Ctrl+Shift+Space / Ctrl+Shift+C".to_string(),
         database_ready: state.database.is_ready(),
     })
@@ -374,32 +448,33 @@ pub fn list_schedulers(state: State<'_, AppState>) -> Result<Vec<SchedulerRecord
 
 #[tauri::command]
 pub fn shutdown_app(app: AppHandle) {
+    lifecycle::request_shutdown();
     app.exit(0);
 }
 
 #[tauri::command]
 pub fn start_manual_overlay_drag(window: WebviewWindow) -> Result<(), String> {
-    manual_overlay_drag(window)
+    windows::start_manual_drag(window)
 }
 
 #[tauri::command]
 pub fn set_overlay_window_opacity(window: WebviewWindow, opacity: f64) -> Result<(), String> {
-    set_overlay_opacity(&window, opacity)
+    windows::set_overlay_opacity(&window, opacity)
 }
 
 #[tauri::command]
 pub fn focus_last_game_window(state: State<'_, AppState>) -> Result<bool, String> {
-    focus_last_game_window_impl(state)
+    windows::focus_last_game_window_from_state(state.inner())
 }
 
 #[tauri::command]
 pub fn is_overlay_forge_foreground(app: AppHandle) -> Result<bool, String> {
-    Ok(get_overlay_forge_foreground_window_label_impl(&app)?.is_some())
+    Ok(WindowManager::new(&app).foreground_label()?.is_some())
 }
 
 #[tauri::command]
 pub fn get_overlay_forge_foreground_window_label(app: AppHandle) -> Result<Option<String>, String> {
-    get_overlay_forge_foreground_window_label_impl(&app)
+    WindowManager::new(&app).foreground_label()
 }
 
 pub fn start_gearblocks_runtime_import_monitor(app: AppHandle) {
@@ -407,17 +482,25 @@ pub fn start_gearblocks_runtime_import_monitor(app: AppHandle) {
         return;
     }
 
-    thread::spawn(move || loop {
-        thread::sleep(Duration::from_millis(2500));
-        let state = app.state::<AppState>();
-        let games = state.database.list_games().unwrap_or_default();
-        for game in games.iter().filter(|game| game.slug == "gearblocks") {
-            if let Err(error) =
-                import_latest_gearblocks_runtime_exports_for_monitor(&state, game.id)
-            {
-                eprintln!("GearBlocks runtime import monitor failed: {error}");
+    thread::spawn(move || {
+        loop {
+            if lifecycle::sleep_until_shutdown(Duration::from_millis(2500)) {
+                break;
+            }
+            let state = app.state::<AppState>();
+            let games = state.database.list_games().unwrap_or_default();
+            for game in games.iter().filter(|game| game.slug == "gearblocks") {
+                if lifecycle::is_shutdown_requested() {
+                    break;
+                }
+                if let Err(error) =
+                    import_latest_gearblocks_runtime_exports_for_monitor(&state, game.id)
+                {
+                    eprintln!("GearBlocks runtime import monitor failed: {error}");
+                }
             }
         }
+        GEARBLOCKS_RUNTIME_IMPORT_MONITOR_ACTIVE.store(false, Ordering::SeqCst);
     });
 }
 
@@ -426,15 +509,23 @@ pub fn start_scheduler_worker(app: AppHandle) {
         return;
     }
 
-    thread::spawn(move || loop {
-        thread::sleep(Duration::from_secs(15));
-        let state = app.state::<AppState>();
-        let schedulers = state.database.list_due_schedulers(5).unwrap_or_default();
-        for scheduler in schedulers {
-            if let Err(error) = run_scheduler(&app, state.inner(), scheduler) {
-                eprintln!("Overlay Forge scheduler failed: {error}");
+    thread::spawn(move || {
+        loop {
+            if lifecycle::sleep_until_shutdown(Duration::from_secs(15)) {
+                break;
+            }
+            let state = app.state::<AppState>();
+            let schedulers = state.database.list_due_schedulers(5).unwrap_or_default();
+            for scheduler in schedulers {
+                if lifecycle::is_shutdown_requested() {
+                    break;
+                }
+                if let Err(error) = run_scheduler(&app, state.inner(), scheduler) {
+                    eprintln!("Overlay Forge scheduler failed: {error}");
+                }
             }
         }
+        SCHEDULER_WORKER_ACTIVE.store(false, Ordering::SeqCst);
     });
 }
 
@@ -531,14 +622,9 @@ fn show_game_chat_overlay_window(
     app: &AppHandle,
     selection: &GameChatOverlaySelection,
 ) -> Result<(), String> {
-    let window = app
-        .get_webview_window("game-chat")
-        .ok_or_else(|| "Game chat overlay window was not created at startup.".to_string())?;
-
-    window
-        .set_always_on_top(true)
-        .map_err(|error| error.to_string())?;
-    ensure_window_accepts_mouse_input(&window)?;
+    let window_manager = WindowManager::new(app);
+    let window = window_manager.required_window(WindowKind::GameChat)?;
+    window_manager.prepare_for_interaction(WindowKind::GameChat, &window)?;
     let state = app.state::<AppState>();
     if let Ok(conversation) = state
         .database
@@ -546,11 +632,11 @@ fn show_game_chat_overlay_window(
     {
         if let (Some(overlay_x), Some(overlay_y)) = (conversation.overlay_x, conversation.overlay_y)
         {
-            let _ = window.set_position(PhysicalPosition::new(overlay_x, overlay_y));
+            let _ = window_manager.set_position(WindowKind::GameChat, overlay_x, overlay_y);
         }
     }
     window.show().map_err(|error| error.to_string())?;
-    let _ = set_overlay_opacity(&window, 1.0);
+    let _ = windows::set_overlay_opacity(&window, windows::ACTIVE_WINDOW_OPACITY);
     window.set_focus().map_err(|error| error.to_string())?;
     let _ = app.emit("game-chat-overlay-selection-changed", selection.clone());
     let _ = app.emit("game-chat-overlay-focus-prompt", ());
@@ -560,18 +646,17 @@ fn show_game_chat_overlay_window(
 
 #[tauri::command]
 pub fn focus_game_chat_overlay_window(app: AppHandle) -> Result<bool, String> {
-    if app.get_webview_window("game-chat").is_none() {
+    if WindowManager::new(&app)
+        .window(WindowKind::GameChat)
+        .is_none()
+    {
         return Ok(false);
     }
 
     let app_for_window = app.clone();
     app.run_on_main_thread(move || {
-        if let Some(window) = app_for_window.get_webview_window("game-chat") {
-            let _ = ensure_window_accepts_mouse_input(&window);
-            let _ = window.show();
-            let _ = window.set_always_on_top(true);
-            let _ = set_overlay_opacity(&window, 1.0);
-            let _ = window.set_focus();
+        let window_manager = WindowManager::new(&app_for_window);
+        if window_manager.show_and_focus(WindowKind::GameChat).is_ok() {
             let _ = app_for_window.emit("game-chat-overlay-focus-prompt", ());
         }
     })
@@ -598,15 +683,13 @@ pub fn toggle_active_game_chat_overlay_window(app: &AppHandle) -> Result<bool, S
         return Ok(false);
     };
 
-    let window = app
-        .get_webview_window("game-chat")
-        .ok_or_else(|| "Game chat overlay window was not created at startup.".to_string())?;
-    if window.is_visible().map_err(|error| error.to_string())? {
-        window.hide().map_err(|error| error.to_string())?;
+    let window_manager = WindowManager::new(app);
+    if window_manager.is_visible(WindowKind::GameChat)? {
+        window_manager.hide(WindowKind::GameChat)?;
         return Ok(false);
     }
 
-    show_game_chat_overlay_window(&app, &selection)?;
+    show_game_chat_overlay_window(app, &selection)?;
     Ok(true)
 }
 
@@ -679,6 +762,51 @@ pub fn import_game_build_guide_markdown(
 }
 
 #[tauri::command]
+pub async fn import_game_build_guide_url(
+    game_id: i64,
+    guide_url: String,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<GameBuildGuidePayload, String> {
+    require_text(&guide_url, "Build guide URL")?;
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    if game.slug != "gearblocks" {
+        return Err(
+            "URL build-guide import is currently available for GearBlocks only.".to_string(),
+        );
+    }
+
+    let source = fetch_build_guide_source_document(&guide_url).await?;
+    import_latest_gearblocks_runtime_exports(state.inner(), game.id)?;
+    let custom_context = gearblocks_build_guide_import_prompt_context(&state, game.id)?;
+    let api_key = configured_openai_api_key(&state)?;
+    let generated_markdown = openai::create_game_build_guide_from_source_response(
+        &api_key,
+        &game,
+        &custom_context,
+        &source.url,
+        &source.title,
+        &source.text,
+    )
+    .await?;
+    let clean_markdown = clean_generated_build_guide_markdown(&generated_markdown);
+    let mut payload = save_and_import_generated_game_build_guide(
+        &app,
+        state.inner(),
+        &game,
+        &source.title,
+        &clean_markdown,
+    )?;
+    payload.image_reference_count =
+        import_build_guide_source_images(state.inner(), &game, &payload.guide, &source).await?;
+    let _ = app.emit("game-build-guides-changed", payload.guide.clone());
+    Ok(payload)
+}
+
+#[tauri::command]
 pub async fn create_game_build_guide_from_chat(
     conversation_id: i64,
     build_goal: String,
@@ -705,7 +833,7 @@ pub async fn create_game_build_guide_from_chat(
         .database
         .recent_game_chat_messages(conversation_id, 12)
         .map_err(|error| error.to_string())?;
-    let custom_context = game_custom_prompt_context(&state, &game)?;
+    let custom_context = game_custom_prompt_context(&state, &game, true)?;
     let api_key = configured_openai_api_key(&state)?;
     let generated_markdown = openai::create_game_build_guide_response(
         &api_key,
@@ -716,9 +844,27 @@ pub async fn create_game_build_guide_from_chat(
     )
     .await?;
     let clean_markdown = clean_generated_build_guide_markdown(&generated_markdown);
-    let parsed = parse_game_build_guide_markdown(&clean_markdown);
+    let payload = save_and_import_generated_game_build_guide(
+        &app,
+        state.inner(),
+        &game,
+        "GearBlocks build guide",
+        &clean_markdown,
+    )?;
+    let _ = app.emit("game-build-guides-changed", payload.guide.clone());
+    Ok(payload)
+}
+
+fn save_and_import_generated_game_build_guide(
+    app: &AppHandle,
+    state: &AppState,
+    game: &GameRecord,
+    fallback_title: &str,
+    clean_markdown: &str,
+) -> Result<GameBuildGuidePayload, String> {
+    let parsed = parse_game_build_guide_markdown(clean_markdown);
     let title = if parsed.title.trim().is_empty() {
-        "GearBlocks build guide"
+        fallback_title.trim()
     } else {
         parsed.title.trim()
     };
@@ -735,17 +881,15 @@ pub async fn create_game_build_guide_from_chat(
         unix_timestamp_label(),
         safe_filename_part(title)
     ));
-    fs::write(&guide_path, &clean_markdown)
+    fs::write(&guide_path, clean_markdown)
         .map_err(|error| format!("Could not save generated build guide: {error}"))?;
 
-    let payload = import_game_build_guide_markdown_content(
-        state.inner(),
+    import_game_build_guide_markdown_content(
+        state,
         game.id,
         &guide_path.to_string_lossy(),
-        &clean_markdown,
-    )?;
-    let _ = app.emit("game-build-guides-changed", payload.guide.clone());
-    Ok(payload)
+        clean_markdown,
+    )
 }
 
 fn import_game_build_guide_markdown_content(
@@ -758,22 +902,31 @@ fn import_game_build_guide_markdown_content(
         .database
         .get_game(game_id)
         .map_err(|error| error.to_string())?;
-    let parsed = parse_game_build_guide_markdown(&raw_markdown);
+    let parsed = parse_game_build_guide_markdown(raw_markdown);
     let checklist_json =
         serde_json::to_string(&parsed.checklist).map_err(|error| error.to_string())?;
     let guide = state
         .database
-        .create_game_build_guide(
-            game.id,
-            &parsed.title,
+        .create_game_build_guide(GameBuildGuideDraft {
+            game_id: game.id,
+            title: &parsed.title,
             source_path,
-            &raw_markdown,
-            &parsed.build_goal,
-            &parsed.scale_reference,
-            &parsed.geometry_notes,
-            &checklist_json,
-        )
+            raw_markdown,
+            build_goal: &parsed.build_goal,
+            scale_reference: &parsed.scale_reference,
+            geometry_notes: &parsed.geometry_notes,
+            glossary_text: &parsed.glossary_text,
+            checklist_json: &checklist_json,
+        })
         .map_err(|error| error.to_string())?;
+    let selection = GameBuildGuideOverlaySelection {
+        game_id: game.id,
+        guide_id: guide.id,
+    };
+    if let Ok(mut active_selection) = state.active_game_build_guide_overlay.lock() {
+        active_selection.replace(selection.clone());
+    }
+    persist_game_build_guide_overlay_selection(state, &selection);
     state
         .database
         .replace_game_build_guide_parts(guide.id, &parsed.parts)
@@ -792,6 +945,57 @@ pub fn get_game_build_guide(
     state: State<'_, AppState>,
 ) -> Result<GameBuildGuidePayload, String> {
     get_game_build_guide_payload_from_state(state.inner(), guide_id)
+}
+
+#[tauri::command]
+pub fn delete_game_build_guide(
+    guide_id: i64,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let guide = state
+        .database
+        .get_game_build_guide(guide_id)
+        .map_err(|error| error.to_string())?;
+    let stored_selection = stored_build_guide_overlay_selection(state.inner());
+    state
+        .database
+        .delete_game_build_guide(guide_id)
+        .map_err(|error| error.to_string())?;
+
+    let deleted_active_guide = {
+        let mut active_selection = state
+            .active_game_build_guide_overlay
+            .lock()
+            .map_err(|_| "Build guide overlay state is unavailable.".to_string())?;
+        if active_selection
+            .as_ref()
+            .map(|selection| selection.guide_id == guide.id)
+            .unwrap_or(false)
+        {
+            active_selection.take();
+            true
+        } else {
+            false
+        }
+    };
+
+    let deleted_stored_guide = stored_selection
+        .map(|selection| selection.guide_id == guide.id)
+        .unwrap_or(false);
+    if deleted_active_guide || deleted_stored_guide {
+        state
+            .database
+            .delete_app_setting(ACTIVE_GAME_BUILD_GUIDE_OVERLAY_SETTING)
+            .map_err(|error| error.to_string())?;
+        let app_for_window = app.clone();
+        app.run_on_main_thread(move || {
+            let _ = WindowManager::new(&app_for_window).hide(WindowKind::GameBuildGuide);
+        })
+        .map_err(|error| error.to_string())?;
+    }
+
+    Ok(())
 }
 
 fn get_game_build_guide_payload_from_state(
@@ -817,6 +1021,7 @@ fn get_game_build_guide_payload_from_state(
         parts,
         steps,
         checklist,
+        image_reference_count: 0,
     })
 }
 
@@ -868,30 +1073,27 @@ fn show_game_build_guide_overlay_window(
     app: &AppHandle,
     selection: &GameBuildGuideOverlaySelection,
 ) -> Result<(), String> {
-    let window = app
-        .get_webview_window("game-build-guide")
-        .ok_or_else(|| "Build guide overlay window was not created at startup.".to_string())?;
-
-    window
-        .set_always_on_top(true)
-        .map_err(|error| error.to_string())?;
-    ensure_window_accepts_mouse_input(&window)?;
+    let window_manager = WindowManager::new(app);
+    let window = window_manager.required_window(WindowKind::GameBuildGuide)?;
+    window_manager.prepare_for_interaction(WindowKind::GameBuildGuide, &window)?;
     let state = app.state::<AppState>();
     if let Ok(guide) = state.database.get_game_build_guide(selection.guide_id) {
         if let (Some(overlay_x), Some(overlay_y)) = (guide.overlay_x, guide.overlay_y) {
-            let _ = window.set_position(PhysicalPosition::new(overlay_x, overlay_y));
+            let _ = window_manager.set_position(WindowKind::GameBuildGuide, overlay_x, overlay_y);
         }
         if let (Some(overlay_width), Some(overlay_height)) =
             (guide.overlay_width, guide.overlay_height)
         {
-            let _ = window.set_size(tauri::PhysicalSize::new(
-                overlay_width.max(300) as u32,
-                overlay_height.max(360) as u32,
-            ));
+            let config = StandaloneWindowConfig::game_build_guide();
+            let _ = window_manager.set_size(
+                WindowKind::GameBuildGuide,
+                overlay_width.max(config.min_width as i32) as u32,
+                overlay_height.max(config.min_height as i32) as u32,
+            );
         }
     }
     window.show().map_err(|error| error.to_string())?;
-    let _ = set_overlay_opacity(&window, 1.0);
+    let _ = windows::set_overlay_opacity(&window, windows::ACTIVE_WINDOW_OPACITY);
     window.set_focus().map_err(|error| error.to_string())?;
     let _ = app.emit(
         "game-build-guide-overlay-selection-changed",
@@ -940,11 +1142,9 @@ pub fn toggle_active_game_build_guide_overlay_window(app: &AppHandle) -> Result<
         .replace(selection.clone());
     persist_game_build_guide_overlay_selection(state.inner(), &selection);
 
-    let window = app
-        .get_webview_window("game-build-guide")
-        .ok_or_else(|| "Build guide overlay window was not created at startup.".to_string())?;
-    if window.is_visible().map_err(|error| error.to_string())? {
-        window.hide().map_err(|error| error.to_string())?;
+    let window_manager = WindowManager::new(app);
+    if window_manager.is_visible(WindowKind::GameBuildGuide)? {
+        window_manager.hide(WindowKind::GameBuildGuide)?;
         return Ok(false);
     }
 
@@ -1013,25 +1213,467 @@ fn stored_build_guide_overlay_selection(
     Some(selection)
 }
 
+async fn fetch_build_guide_source_document(
+    guide_url: &str,
+) -> Result<BuildGuideSourceDocument, String> {
+    let url = validate_build_guide_source_url(guide_url)?;
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(20))
+        .user_agent("OverlayForge/0.9 GearBlocksBuildGuideImporter")
+        .build()
+        .map_err(|error| format!("Could not create URL import client: {error}"))?;
+    let response = client
+        .get(url.clone())
+        .send()
+        .await
+        .map_err(|error| format!("Could not fetch build guide URL: {error}"))?;
+    let status = response.status();
+    if !status.is_success() {
+        return Err(format!("Build guide URL returned status {status}."));
+    }
+    if response
+        .content_length()
+        .map(|length| length > BUILD_GUIDE_SOURCE_HTML_MAX_BYTES)
+        .unwrap_or(false)
+    {
+        return Err("Build guide page is too large to import.".to_string());
+    }
+
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|error| format!("Could not read build guide URL response: {error}"))?;
+    if bytes.len() as u64 > BUILD_GUIDE_SOURCE_HTML_MAX_BYTES {
+        return Err("Build guide page is too large to import.".to_string());
+    }
+
+    let html = String::from_utf8_lossy(&bytes);
+    let (title, text, images) = extract_steam_guide_source_text(&html, &url)?;
+    Ok(BuildGuideSourceDocument {
+        url: url.to_string(),
+        title,
+        text: truncate_to_char_limit(&text, BUILD_GUIDE_SOURCE_TEXT_MAX_CHARS),
+        images,
+    })
+}
+
+fn validate_build_guide_source_url(value: &str) -> Result<reqwest::Url, String> {
+    let url = reqwest::Url::parse(value.trim())
+        .map_err(|_| "Build guide URL must be a valid absolute URL.".to_string())?;
+    if url.scheme() != "https" {
+        return Err("Build guide URL must use https.".to_string());
+    }
+    let host = url
+        .host_str()
+        .map(|host| host.to_ascii_lowercase())
+        .unwrap_or_default();
+    if host != "steamcommunity.com" && host != "www.steamcommunity.com" {
+        return Err(
+            "Build guide URL import currently supports Steam Community sharedfiles URLs."
+                .to_string(),
+        );
+    }
+    if url.path().trim_end_matches('/') != "/sharedfiles/filedetails" {
+        return Err(
+            "Steam build guide URL must use /sharedfiles/filedetails with an id query parameter."
+                .to_string(),
+        );
+    }
+    let has_numeric_id = url.query_pairs().any(|(key, value)| {
+        key == "id" && !value.is_empty() && value.chars().all(|c| c.is_ascii_digit())
+    });
+    if !has_numeric_id {
+        return Err("Steam build guide URL must include a numeric id query parameter.".to_string());
+    }
+    Ok(url)
+}
+
+fn extract_steam_guide_source_text(
+    html: &str,
+    page_url: &reqwest::Url,
+) -> Result<(String, String, Vec<BuildGuideSourceImage>), String> {
+    let title = extract_steam_guide_title(html).unwrap_or_else(|| "Steam build guide".to_string());
+    let summary = extract_div_text_near_marker(html, "guideTopDescription").unwrap_or_default();
+    let body_markup = extract_between(
+        html,
+        "<div class=\"guide subSections\">",
+        "commentthread_area",
+    )
+    .ok_or_else(|| "Could not find Steam guide body in the fetched page.".to_string())?;
+    let images = extract_steam_guide_images(body_markup, page_url);
+    let body_markup = body_markup
+        .replace("<div class=\"subSectionTitle\">", "\n\n## ")
+        .replace("<div class=\"subSectionDesc\">", "\n");
+    let body_text = html_fragment_to_text(&body_markup);
+    if body_text.chars().count() < 120 {
+        return Err("Fetched Steam guide did not contain enough readable text.".to_string());
+    }
+
+    let mut sections = vec![format!("# {title}")];
+    if !summary.trim().is_empty() {
+        sections.push(format!("## Overview\n{}", summary.trim()));
+    }
+    sections.push(body_text);
+    Ok((title, sections.join("\n\n"), images))
+}
+
+fn extract_steam_guide_images(html: &str, page_url: &reqwest::Url) -> Vec<BuildGuideSourceImage> {
+    let mut images = Vec::new();
+    let mut remaining = html;
+    while let Some(start) = remaining.find("<img") {
+        remaining = &remaining[start + 4..];
+        let Some(end) = remaining.find('>') else {
+            break;
+        };
+        let tag = &remaining[..end];
+        remaining = &remaining[end + 1..];
+
+        let Some(source) = html_attribute(tag, "src") else {
+            continue;
+        };
+        let Ok(url) = page_url.join(&decode_html_entities(&source)) else {
+            continue;
+        };
+        if !is_allowed_guide_image_url(&url) {
+            continue;
+        }
+        let url_text = url.to_string();
+        if images
+            .iter()
+            .any(|image: &BuildGuideSourceImage| image.url == url_text)
+        {
+            continue;
+        }
+        let title = html_attribute(tag, "title")
+            .or_else(|| html_attribute(tag, "alt"))
+            .map(|value| decode_html_entities(&value))
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| format!("Guide image {}", images.len() + 1));
+        images.push(BuildGuideSourceImage {
+            url: url_text,
+            title,
+        });
+        if images.len() >= BUILD_GUIDE_SOURCE_IMAGE_MAX_COUNT {
+            break;
+        }
+    }
+    images
+}
+
+fn html_attribute(tag: &str, name: &str) -> Option<String> {
+    let prefix = format!("{name}=");
+    let start = tag.find(&prefix)? + prefix.len();
+    let quote = tag[start..].chars().next()?;
+    if quote != '"' && quote != '\'' {
+        return None;
+    }
+    let value_start = start + quote.len_utf8();
+    let value_end = tag[value_start..].find(quote)? + value_start;
+    Some(tag[value_start..value_end].to_string())
+}
+
+fn is_allowed_guide_image_url(url: &reqwest::Url) -> bool {
+    if url.scheme() != "https" {
+        return false;
+    }
+    let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
+    host == "images.steamusercontent.com"
+        || host.ends_with(".steamusercontent.com")
+        || host.ends_with(".steamstatic.com")
+        || host.ends_with(".akamaihd.net")
+}
+
+async fn import_build_guide_source_images(
+    state: &AppState,
+    game: &GameRecord,
+    guide: &GameBuildGuideRecord,
+    source: &BuildGuideSourceDocument,
+) -> Result<usize, String> {
+    if source.images.is_empty() {
+        return Ok(0);
+    }
+
+    let image_dir = overlay_workspace_root()?
+        .join("game-screenshots")
+        .join(&game.slug)
+        .join("build-guide-images")
+        .join(guide.id.to_string());
+    fs::create_dir_all(&image_dir)
+        .map_err(|error| format!("Could not create build guide image directory: {error}"))?;
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .user_agent("OverlayForge/0.9 GearBlocksBuildGuideImageImporter")
+        .build()
+        .map_err(|error| format!("Could not create image import client: {error}"))?;
+    let mut imported_count = 0;
+
+    for (index, image) in source
+        .images
+        .iter()
+        .take(BUILD_GUIDE_SOURCE_IMAGE_MAX_COUNT)
+        .enumerate()
+    {
+        match download_build_guide_source_image(&client, image, &image_dir, index + 1).await {
+            Ok(local_path) => {
+                let local_path_text = path_text(&local_path);
+                let title = format!("{} image {}", guide.title, index + 1);
+                let notes = format!(
+                    "Imported from build guide {} for guide id {}. Source image title: {}",
+                    source.url, guide.id, image.title
+                );
+                let tags = format!("gearblocks,build-guide,guide:{},guide-image", guide.id);
+                state
+                    .database
+                    .create_game_catalog_reference(GameCatalogReferenceDraft {
+                        game_id: game.id,
+                        object_id: None,
+                        title: &title,
+                        reference_type: "build_guide_image",
+                        url: &image.url,
+                        local_path: &local_path_text,
+                        notes: &notes,
+                        tags: &tags,
+                    })
+                    .map_err(|error| error.to_string())?;
+                imported_count += 1;
+            }
+            Err(error) => {
+                eprintln!("Could not import build guide image {}: {error}", image.url);
+            }
+        }
+    }
+
+    Ok(imported_count)
+}
+
+async fn download_build_guide_source_image(
+    client: &reqwest::Client,
+    image: &BuildGuideSourceImage,
+    image_dir: &Path,
+    index: usize,
+) -> Result<PathBuf, String> {
+    let url =
+        reqwest::Url::parse(&image.url).map_err(|_| "Guide image URL was invalid.".to_string())?;
+    if !is_allowed_guide_image_url(&url) {
+        return Err("Guide image URL is not from an allowed Steam image host.".to_string());
+    }
+
+    let response = client
+        .get(url)
+        .send()
+        .await
+        .map_err(|error| format!("Could not fetch guide image: {error}"))?;
+    let status = response.status();
+    if !status.is_success() {
+        return Err(format!("Guide image returned status {status}."));
+    }
+    if response
+        .content_length()
+        .map(|length| length > BUILD_GUIDE_SOURCE_IMAGE_MAX_BYTES)
+        .unwrap_or(false)
+    {
+        return Err("Guide image is too large to import.".to_string());
+    }
+
+    let content_type = response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|error| format!("Could not read guide image response: {error}"))?;
+    if bytes.len() as u64 > BUILD_GUIDE_SOURCE_IMAGE_MAX_BYTES {
+        return Err("Guide image is too large to import.".to_string());
+    }
+    let extension = guide_image_extension(&content_type, bytes.as_ref())
+        .ok_or_else(|| "Guide image is not a supported image type.".to_string())?;
+    let filename_title = safe_filename_part(&image.title);
+    let filename_stem = if filename_title.is_empty() {
+        format!("guide_image_{index:02}")
+    } else {
+        format!("{index:02}_{filename_title}")
+    };
+    let local_path = image_dir.join(format!("{filename_stem}.{extension}"));
+    fs::write(&local_path, &bytes)
+        .map_err(|error| format!("Could not save guide image: {error}"))?;
+    Ok(local_path)
+}
+
+fn guide_image_extension(content_type: &str, bytes: &[u8]) -> Option<&'static str> {
+    match content_type.split(';').next().unwrap_or_default().trim() {
+        "image/png" => Some("png"),
+        "image/jpeg" | "image/jpg" => Some("jpg"),
+        "image/webp" => Some("webp"),
+        "image/gif" => Some("gif"),
+        _ if bytes.starts_with(b"\x89PNG\r\n\x1a\n") => Some("png"),
+        _ if bytes.starts_with(&[0xff, 0xd8, 0xff]) => Some("jpg"),
+        _ if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") => Some("gif"),
+        _ if bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP" => {
+            Some("webp")
+        }
+        _ => None,
+    }
+}
+
+fn extract_steam_guide_title(html: &str) -> Option<String> {
+    extract_div_text_near_marker(html, "workshopItemTitle")
+        .or_else(|| {
+            extract_between(html, "<title>", "</title>").map(|title| {
+                html_fragment_to_text(title)
+                    .replace("Steam Community :: Guide ::", "")
+                    .trim()
+                    .to_string()
+            })
+        })
+        .filter(|title| !title.trim().is_empty())
+}
+
+fn extract_div_text_near_marker(html: &str, marker: &str) -> Option<String> {
+    let marker_index = html.find(marker)?;
+    let div_start = html[..marker_index].rfind("<div")?;
+    let open_end = html[marker_index..].find('>')? + marker_index;
+    if open_end < div_start {
+        return None;
+    }
+    let close = html[open_end + 1..].find("</div>")? + open_end + 1;
+    Some(html_fragment_to_text(&html[open_end + 1..close]))
+}
+
+fn extract_between<'a>(value: &'a str, start_marker: &str, end_marker: &str) -> Option<&'a str> {
+    let start = value.find(start_marker)? + start_marker.len();
+    let end = value[start..].find(end_marker)? + start;
+    Some(&value[start..end])
+}
+
+fn html_fragment_to_text(value: &str) -> String {
+    let mut output = String::new();
+    let mut chars = value.chars().peekable();
+    while let Some(character) = chars.next() {
+        if character != '<' {
+            output.push(character);
+            continue;
+        }
+
+        let mut tag = String::new();
+        for tag_character in chars.by_ref() {
+            if tag_character == '>' {
+                break;
+            }
+            tag.push(tag_character);
+        }
+        let tag_name = tag
+            .trim()
+            .trim_start_matches('/')
+            .split_whitespace()
+            .next()
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        if matches!(
+            tag_name.as_str(),
+            "br" | "div" | "p" | "li" | "ul" | "ol" | "hr" | "blockquote" | "h1" | "h2" | "h3"
+        ) {
+            output.push('\n');
+        } else {
+            output.push(' ');
+        }
+    }
+
+    decode_html_entities(&output)
+        .lines()
+        .map(|line| line.split_whitespace().collect::<Vec<_>>().join(" "))
+        .filter(|line| !line.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn decode_html_entities(value: &str) -> String {
+    let mut output = String::new();
+    let mut chars = value.chars().peekable();
+    while let Some(character) = chars.next() {
+        if character != '&' {
+            output.push(character);
+            continue;
+        }
+
+        let mut entity = String::new();
+        while let Some(next) = chars.peek().copied() {
+            if next == ';' || entity.len() > 12 {
+                break;
+            }
+            entity.push(next);
+            chars.next();
+        }
+        if chars.peek() == Some(&';') {
+            chars.next();
+        }
+
+        match decode_html_entity(&entity) {
+            Some(decoded) => output.push(decoded),
+            None => {
+                output.push('&');
+                output.push_str(&entity);
+                output.push(';');
+            }
+        }
+    }
+    output
+}
+
+fn decode_html_entity(entity: &str) -> Option<char> {
+    match entity {
+        "amp" => Some('&'),
+        "lt" => Some('<'),
+        "gt" => Some('>'),
+        "quot" => Some('"'),
+        "apos" | "#39" => Some('\''),
+        "nbsp" => Some(' '),
+        _ if entity.starts_with("#x") || entity.starts_with("#X") => {
+            u32::from_str_radix(&entity[2..], 16)
+                .ok()
+                .and_then(char::from_u32)
+        }
+        _ if entity.starts_with('#') => entity[1..].parse::<u32>().ok().and_then(char::from_u32),
+        _ => None,
+    }
+}
+
+fn truncate_to_char_limit(value: &str, limit: usize) -> String {
+    if value.chars().count() <= limit {
+        return value.to_string();
+    }
+    let mut truncated = value.chars().take(limit).collect::<String>();
+    truncated.push_str("\n\n[Source text truncated for prompt size.]");
+    truncated
+}
+
 struct ParsedGameBuildGuide {
     title: String,
     build_goal: String,
     scale_reference: String,
     geometry_notes: String,
+    glossary_text: String,
     checklist: Vec<String>,
     parts: Vec<GameBuildGuidePartDraft>,
     steps: Vec<GameBuildGuideStepDraft>,
 }
 
 fn parse_game_build_guide_markdown(markdown: &str) -> ParsedGameBuildGuide {
+    let parts = markdown_parts_tables(markdown);
+    let steps = markdown_assembly_steps(markdown, &parts);
     ParsedGameBuildGuide {
         title: first_markdown_heading(markdown).unwrap_or_else(|| "Build guide".to_string()),
         build_goal: markdown_section_text(markdown, "Build Goal"),
         scale_reference: markdown_section_text(markdown, "Scale Reference"),
         geometry_notes: markdown_section_text(markdown, "Current Chosen Geometry"),
+        glossary_text: markdown_section_text(markdown, "Glossary"),
         checklist: markdown_bullets_in_section(markdown, "First Test Checklist"),
-        parts: markdown_parts_tables(markdown),
-        steps: markdown_assembly_steps(markdown),
+        parts,
+        steps,
     }
 }
 
@@ -1154,7 +1796,7 @@ fn markdown_parts_tables(markdown: &str) -> Vec<GameBuildGuidePartDraft> {
         row_order += 1;
         parts.push(GameBuildGuidePartDraft {
             section: current_section.clone(),
-            quantity: columns.get(0).cloned().unwrap_or_default(),
+            quantity: columns.first().cloned().unwrap_or_default(),
             part_name,
             purpose: columns.get(2).cloned().unwrap_or_default(),
             row_order,
@@ -1164,7 +1806,10 @@ fn markdown_parts_tables(markdown: &str) -> Vec<GameBuildGuidePartDraft> {
     parts
 }
 
-fn markdown_assembly_steps(markdown: &str) -> Vec<GameBuildGuideStepDraft> {
+fn markdown_assembly_steps(
+    markdown: &str,
+    parts: &[GameBuildGuidePartDraft],
+) -> Vec<GameBuildGuideStepDraft> {
     let lines = collect_markdown_section(markdown, "Assembly Instructions");
     let mut steps = Vec::new();
     let mut current_number = 0_i64;
@@ -1181,6 +1826,7 @@ fn markdown_assembly_steps(markdown: &str) -> Vec<GameBuildGuideStepDraft> {
                 current_number,
                 &current_title,
                 &current_body,
+                parts,
             );
             current_body.clear();
             let (number, title) = split_numbered_heading(heading);
@@ -1201,6 +1847,7 @@ fn markdown_assembly_steps(markdown: &str) -> Vec<GameBuildGuideStepDraft> {
         current_number,
         &current_title,
         &current_body,
+        parts,
     );
     steps
 }
@@ -1239,24 +1886,120 @@ fn is_markdown_table_separator(value: &str) -> bool {
 fn push_build_guide_step(
     steps: &mut Vec<GameBuildGuideStepDraft>,
     row_order: &mut i64,
-    step_number: i64,
+    _step_number: i64,
     title: &str,
     body: &[String],
+    parts: &[GameBuildGuidePartDraft],
 ) {
     if title.trim().is_empty() && body.is_empty() {
         return;
     }
+    let body_text = body.join("\n").trim().to_string();
+    let mentioned_parts = build_guide_step_part_instance_labels(title, &body_text, parts);
+    if mentioned_parts.len() > 3 {
+        let connection_type = build_guide_step_connection_type(title, &body_text);
+        for chunk in mentioned_parts.chunks(3) {
+            *row_order += 1;
+            let part_text = chunk.join(", ");
+            let step_title = if title.trim().is_empty() {
+                part_text.clone()
+            } else {
+                format!("{} - {}", title.trim(), part_text)
+            };
+            steps.push(GameBuildGuideStepDraft {
+                step_number: *row_order,
+                title: step_title,
+                body: format!(
+                    "Place {part_text}.\nConnection: connect these parts using {connection_type}."
+                ),
+                row_order: *row_order,
+            });
+        }
+        return;
+    }
     *row_order += 1;
     steps.push(GameBuildGuideStepDraft {
-        step_number: if step_number > 0 {
-            step_number
-        } else {
-            *row_order
-        },
+        step_number: *row_order,
         title: title.trim().to_string(),
-        body: body.join("\n").trim().to_string(),
+        body: body_text,
         row_order: *row_order,
     });
+}
+
+fn build_guide_step_part_instance_labels(
+    title: &str,
+    body: &str,
+    parts: &[GameBuildGuidePartDraft],
+) -> Vec<String> {
+    let step_text = format!("{title}\n{body}").to_ascii_lowercase();
+    let mut labels = Vec::new();
+    for part in parts {
+        let part_name = part.part_name.trim();
+        if part_name.is_empty() {
+            continue;
+        }
+        if !step_text.contains(&part_name.to_ascii_lowercase()) {
+            continue;
+        }
+        for _ in 0..build_guide_part_quantity_count(&part.quantity) {
+            labels.push(part_name.to_string());
+        }
+    }
+    labels
+}
+
+fn build_guide_part_quantity_count(quantity: &str) -> usize {
+    let Some(start) = quantity.find(|character: char| character.is_ascii_digit()) else {
+        return 1;
+    };
+    let digits = quantity[start..]
+        .chars()
+        .take_while(|character| character.is_ascii_digit())
+        .collect::<String>();
+    digits
+        .parse::<usize>()
+        .ok()
+        .filter(|count| *count > 0)
+        .unwrap_or(1)
+}
+
+fn build_guide_step_connection_type(title: &str, body: &str) -> &'static str {
+    let text = format!("{title} {body}").to_ascii_lowercase();
+    if has_any_text(
+        &text,
+        &[
+            "crank",
+            "axle",
+            "shaft",
+            "gear",
+            "wheel",
+            "hub",
+            "drivetrain",
+        ],
+    ) {
+        return "rotary connections";
+    }
+    if has_any_text(
+        &text,
+        &[
+            "steering",
+            "suspension",
+            "spring",
+            "damper",
+            "knuckle",
+            "pivot",
+        ],
+    ) {
+        return "pivot/rotary connections";
+    }
+    if has_any_text(&text, &["align", "jig", "reference"]) {
+        return "aligned reference connections";
+    }
+    "static connections"
+}
+
+fn has_any_text(text: &str, values: &[&str]) -> bool {
+    values.iter().any(|value| text.contains(value))
 }
 
 fn split_numbered_heading(heading: &str) -> (Option<i64>, String) {
@@ -1267,6 +2010,41 @@ fn split_numbered_heading(heading: &str) -> (Option<i64>, String) {
     let number = number_text.trim().parse::<i64>().ok();
     let title = title.trim().to_string();
     (number, title)
+}
+
+#[cfg(test)]
+mod build_guide_parser_tests {
+    use super::*;
+
+    #[test]
+    fn imports_all_parsed_build_guide_steps() {
+        let markdown = r#"
+# Engine Guide
+
+## Assembly Instructions
+
+### 1. First
+Place Beam x3.
+
+### 2. Second
+Attach crank.
+
+### 3. Third
+Attach cylinder.
+
+### 4. Fourth
+Attach head.
+
+### 5. Fifth
+Attach starter.
+"#;
+
+        let parsed = parse_game_build_guide_markdown(markdown);
+
+        assert_eq!(parsed.steps.len(), 5);
+        assert_eq!(parsed.steps[0].title, "First");
+        assert_eq!(parsed.steps[4].title, "Fifth");
+    }
 }
 
 #[tauri::command]
@@ -1427,27 +2205,27 @@ pub fn create_calendar_event(
 
 #[tauri::command]
 pub fn update_calendar_event(
-    id: i64,
-    title: String,
-    start_date: String,
-    start_time: String,
-    end_date: String,
-    end_time: String,
-    notes: String,
+    input: CalendarEventUpdateInput,
     state: State<'_, AppState>,
 ) -> Result<CalendarEventRecord, String> {
-    validate_calendar_event(&title, &start_date, &start_time, &end_date, &end_time)?;
+    validate_calendar_event(
+        &input.title,
+        &input.start_date,
+        &input.start_time,
+        &input.end_date,
+        &input.end_time,
+    )?;
     state
         .database
-        .update_calendar_event(
-            id,
-            &title,
-            &start_date,
-            &start_time,
-            &end_date,
-            &end_time,
-            &notes,
-        )
+        .update_calendar_event(CalendarEventUpdateDraft {
+            id: input.id,
+            title: &input.title,
+            start_date: &input.start_date,
+            start_time: &input.start_time,
+            end_date: &input.end_date,
+            end_time: &input.end_time,
+            notes: &input.notes,
+        })
         .map_err(|error| error.to_string())
 }
 
@@ -1539,6 +2317,111 @@ pub fn export_smoking_cessation_chatgpt_context(
     Ok(SmokingCessationExportRecord {
         export_path: export_path.to_string_lossy().to_string(),
     })
+}
+
+#[tauri::command]
+pub fn list_repair_resell_sources(
+    state: State<'_, AppState>,
+) -> Result<Vec<RepairResellSourceRecord>, String> {
+    state
+        .database
+        .list_repair_resell_sources()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn update_repair_resell_source_enabled(
+    source_id: String,
+    enabled: bool,
+    state: State<'_, AppState>,
+) -> Result<RepairResellSourceRecord, String> {
+    state
+        .database
+        .update_repair_resell_source_enabled(&source_id, enabled)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn list_repair_resell_categories(
+    state: State<'_, AppState>,
+) -> Result<Vec<RepairResellCategoryRecord>, String> {
+    state
+        .database
+        .list_repair_resell_categories()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn list_repair_resell_keyword_flags(
+    state: State<'_, AppState>,
+) -> Result<Vec<RepairResellKeywordFlagRecord>, String> {
+    state
+        .database
+        .list_repair_resell_keyword_flags()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn list_repair_resell_travel_profiles(
+    state: State<'_, AppState>,
+) -> Result<Vec<RepairResellTravelProfileRecord>, String> {
+    state
+        .database
+        .list_repair_resell_travel_profiles()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn list_repair_resell_listings(
+    state: State<'_, AppState>,
+) -> Result<Vec<RepairResellListingRecord>, String> {
+    state
+        .database
+        .list_repair_resell_listings()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn manual_import_repair_resell_listing(
+    input: RepairResellManualImportInput,
+    state: State<'_, AppState>,
+) -> Result<RepairResellListingRecord, String> {
+    repair_resell::manual_import_listing(&state.database, input)
+}
+
+#[tauri::command]
+pub fn refresh_repair_resell_source(
+    source_id: String,
+    state: State<'_, AppState>,
+) -> Result<RepairResellRefreshResult, String> {
+    repair_resell::refresh_source(&state.database, source_id)
+}
+
+#[tauri::command]
+pub fn set_repair_resell_listing_watchlist(
+    input: RepairResellWatchlistInput,
+    state: State<'_, AppState>,
+) -> Result<RepairResellListingRecord, String> {
+    repair_resell::set_watchlist(&state.database, input)
+}
+
+#[tauri::command]
+pub fn list_repair_resell_deal_estimates(
+    listing_id: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<RepairResellDealEstimateRecord>, String> {
+    state
+        .database
+        .list_repair_resell_deal_estimates(&listing_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn save_repair_resell_deal_estimate(
+    input: RepairResellDealEstimateInput,
+    state: State<'_, AppState>,
+) -> Result<RepairResellDealEstimateRecord, String> {
+    repair_resell::save_deal_estimate(&state.database, input)
 }
 
 pub fn update_smoking_cessation_chatgpt_export(
@@ -1665,358 +2548,7 @@ fn append_smoking_count_table(content: &mut String, label: &str, counts: Vec<(St
 }
 
 fn markdown_table_cell(value: &str) -> String {
-    value
-        .replace('|', "\\|")
-        .replace('\r', " ")
-        .replace('\n', " ")
-}
-
-#[tauri::command]
-pub fn list_projects(state: State<'_, AppState>) -> Result<Vec<ProjectRecord>, String> {
-    state
-        .database
-        .list_projects()
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn create_project(
-    name: String,
-    description: String,
-    status: String,
-    state: State<'_, AppState>,
-) -> Result<ProjectRecord, String> {
-    validate_project(&name, &status)?;
-    state
-        .database
-        .create_project(&name, &description, &status)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn update_project(
-    id: i64,
-    name: String,
-    description: String,
-    status: String,
-    state: State<'_, AppState>,
-) -> Result<ProjectRecord, String> {
-    validate_project(&name, &status)?;
-    state
-        .database
-        .update_project(id, &name, &description, &status)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn delete_project(id: i64, state: State<'_, AppState>) -> Result<(), String> {
-    state
-        .database
-        .delete_project(id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn get_project_github_repository(
-    project_id: i64,
-    state: State<'_, AppState>,
-) -> Result<Option<ProjectGitHubRepositoryRecord>, String> {
-    state
-        .database
-        .get_project_github_repository(project_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn save_project_github_repository(
-    project_id: i64,
-    repository_full_name: String,
-    state: State<'_, AppState>,
-) -> Result<ProjectGitHubRepositoryRecord, String> {
-    let normalized = github::normalize_repository_full_name(&repository_full_name)?;
-    state
-        .database
-        .save_project_github_repository(project_id, &normalized)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn delete_project_github_repository(
-    project_id: i64,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    state
-        .database
-        .delete_project_github_repository(project_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub async fn fetch_project_github_metadata(
-    project_id: i64,
-    state: State<'_, AppState>,
-) -> Result<ProjectGitHubRepositoryRecord, String> {
-    let link = state
-        .database
-        .get_project_github_repository(project_id)
-        .map_err(|error| error.to_string())?
-        .ok_or_else(|| "Link a GitHub repository before fetching metadata.".to_string())?;
-
-    match github::fetch_repository_metadata(&link.repository_full_name).await {
-        Ok(metadata) => state
-            .database
-            .update_project_github_metadata(
-                project_id,
-                &metadata.repository_full_name,
-                &metadata.repository_url,
-                &metadata.default_branch,
-                &metadata.visibility,
-                "Fetched GitHub repository metadata successfully",
-            )
-            .map_err(|error| error.to_string()),
-        Err(error) => {
-            let _ = state
-                .database
-                .update_project_github_fetch_status(project_id, &error);
-            Err(error)
-        }
-    }
-}
-
-#[tauri::command]
-pub fn get_project_markdown_context(
-    project_id: i64,
-    state: State<'_, AppState>,
-) -> Result<Option<ProjectMarkdownContextRecord>, String> {
-    state
-        .database
-        .get_project_markdown_context(project_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn save_project_markdown_context(
-    project_id: i64,
-    root_path: String,
-    readme_path: String,
-    state: State<'_, AppState>,
-) -> Result<ProjectMarkdownContextRecord, String> {
-    require_text(&root_path, "Markdown context root")?;
-    state
-        .database
-        .save_project_markdown_context(project_id, &root_path, &readme_path)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn delete_project_markdown_context(
-    project_id: i64,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    state
-        .database
-        .delete_project_markdown_context(project_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn load_project_markdown_context(
-    project_id: i64,
-    state: State<'_, AppState>,
-) -> Result<ProjectMarkdownContextPayload, String> {
-    state
-        .database
-        .load_project_markdown_context(project_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn list_planning_conversations(
-    project_id: Option<i64>,
-    state: State<'_, AppState>,
-) -> Result<Vec<PlanningConversationRecord>, String> {
-    state
-        .database
-        .list_planning_conversations(project_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn create_planning_conversation(
-    project_id: i64,
-    title: Option<String>,
-    state: State<'_, AppState>,
-) -> Result<PlanningConversationRecord, String> {
-    state
-        .database
-        .create_planning_conversation(project_id, title.as_deref().unwrap_or_default())
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn list_planning_messages(
-    conversation_id: i64,
-    state: State<'_, AppState>,
-) -> Result<Vec<PlanningMessageRecord>, String> {
-    state
-        .database
-        .list_planning_messages(conversation_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub async fn send_planning_message(
-    conversation_id: i64,
-    content: String,
-    state: State<'_, AppState>,
-) -> Result<Vec<PlanningMessageRecord>, String> {
-    require_text(&content, "Message")?;
-    let conversation = state
-        .database
-        .get_planning_conversation(conversation_id)
-        .map_err(|error| error.to_string())?;
-    let project = state
-        .database
-        .get_project(conversation.project_id)
-        .map_err(|error| error.to_string())?;
-
-    state
-        .database
-        .create_planning_message(conversation_id, "user", &content)
-        .map_err(|error| error.to_string())?;
-
-    let recent_messages = state
-        .database
-        .recent_planning_messages(conversation_id, 20)
-        .map_err(|error| error.to_string())?;
-    let context_payload = state
-        .database
-        .planning_conversation_context_payload(conversation_id)
-        .map_err(|error| error.to_string())?;
-    let api_key = configured_openai_api_key(&state)?;
-    let assistant_content = openai::create_planning_response(
-        &api_key,
-        &project,
-        &recent_messages,
-        &context_payload.content,
-    )
-    .await?;
-
-    state
-        .database
-        .create_planning_message(conversation_id, "assistant", &assistant_content)
-        .map_err(|error| error.to_string())?;
-
-    state
-        .database
-        .list_planning_messages(conversation_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn delete_planning_conversation(
-    conversation_id: i64,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    state
-        .database
-        .delete_planning_conversation(conversation_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn list_planning_conversation_context(
-    conversation_id: i64,
-    state: State<'_, AppState>,
-) -> Result<Vec<PlanningConversationContextRecord>, String> {
-    state
-        .database
-        .list_planning_conversation_context(conversation_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn attach_planning_conversation_context(
-    conversation_id: i64,
-    context_type: String,
-    source_id: Option<i64>,
-    label: String,
-    state: State<'_, AppState>,
-) -> Result<PlanningConversationContextRecord, String> {
-    validate_context_type(&context_type)?;
-    require_text(&label, "Context label")?;
-    state
-        .database
-        .attach_planning_conversation_context(conversation_id, &context_type, source_id, &label)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn remove_planning_conversation_context(
-    id: i64,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    state
-        .database
-        .remove_planning_conversation_context(id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn preview_planning_chat_prompt(
-    conversation_id: i64,
-    draft_message: String,
-    state: State<'_, AppState>,
-) -> Result<PlanningPromptPreviewRecord, String> {
-    state
-        .database
-        .preview_planning_chat_prompt(
-            conversation_id,
-            &draft_message,
-            openai::PLANNING_SYSTEM_INSTRUCTION,
-        )
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn list_bridge_file_drafts(
-    project_id: i64,
-    state: State<'_, AppState>,
-) -> Result<Vec<BridgeFileDraftRecord>, String> {
-    state
-        .database
-        .list_bridge_file_drafts(project_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn get_bridge_file_draft(
-    id: i64,
-    state: State<'_, AppState>,
-) -> Result<BridgeFileDraftRecord, String> {
-    state
-        .database
-        .get_bridge_file_draft(id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn create_bridge_file_draft_from_conversation(
-    conversation_id: i64,
-    state: State<'_, AppState>,
-) -> Result<BridgeFileDraftRecord, String> {
-    state
-        .database
-        .create_bridge_file_draft_from_conversation(conversation_id)
-        .map_err(|error| error.to_string())
-}
-
-#[tauri::command]
-pub fn delete_bridge_file_draft(id: i64, state: State<'_, AppState>) -> Result<(), String> {
-    state
-        .database
-        .delete_bridge_file_draft(id)
-        .map_err(|error| error.to_string())
+    value.replace('|', "\\|").replace(['\r', '\n'], " ")
 }
 
 #[tauri::command]
@@ -2071,7 +2603,15 @@ pub fn update_youtube_reference(
     let video_id = extract_youtube_video_id(&url)?;
     state
         .database
-        .update_youtube_reference(id, &title, &url, &video_id, &channel_name, &notes, &tags)
+        .update_youtube_reference(YouTubeReferenceUpdateDraft {
+            id,
+            title: &title,
+            url: &url,
+            video_id: &video_id,
+            channel_name: &channel_name,
+            notes: &notes,
+            tags: &tags,
+        })
         .map_err(|error| error.to_string())
 }
 
@@ -2097,6 +2637,102 @@ pub fn list_games(state: State<'_, AppState>) -> Result<Vec<GameRecord>, String>
     state
         .database
         .list_games()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn get_game_setting(
+    game_id: i64,
+    setting_key: String,
+    state: State<'_, AppState>,
+) -> Result<Option<GameSettingRecord>, String> {
+    require_text(&setting_key, "Game setting key")?;
+    state
+        .database
+        .get_game_setting(game_id, &setting_key)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn list_game_character_builds(
+    game_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<GameCharacterBuildRecord>, String> {
+    state
+        .database
+        .list_game_character_builds(game_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn create_game_character_build(
+    input: GameCharacterBuildInput,
+    state: State<'_, AppState>,
+) -> Result<GameCharacterBuildRecord, String> {
+    require_text(&input.title, "Build title")?;
+    state
+        .database
+        .create_game_character_build(GameCharacterBuildDraft {
+            game_id: input.game_id,
+            title: &input.title,
+            character_class: &input.character_class,
+            ascendancy: &input.ascendancy,
+            build_role: &input.build_role,
+            status: &input.status,
+            source_label: &input.source_label,
+            source_url: &input.source_url,
+            patch: &input.patch,
+            summary: &input.summary,
+            tags: &input.tags,
+            notes: &input.notes,
+            is_active: input.is_active,
+        })
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn update_game_character_build(
+    id: i64,
+    input: GameCharacterBuildInput,
+    state: State<'_, AppState>,
+) -> Result<GameCharacterBuildRecord, String> {
+    require_text(&input.title, "Build title")?;
+    state
+        .database
+        .update_game_character_build(GameCharacterBuildUpdateDraft {
+            id,
+            title: &input.title,
+            character_class: &input.character_class,
+            ascendancy: &input.ascendancy,
+            build_role: &input.build_role,
+            status: &input.status,
+            source_label: &input.source_label,
+            source_url: &input.source_url,
+            patch: &input.patch,
+            summary: &input.summary,
+            tags: &input.tags,
+            notes: &input.notes,
+            is_active: input.is_active,
+        })
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn set_active_game_character_build(
+    id: i64,
+    state: State<'_, AppState>,
+) -> Result<GameCharacterBuildRecord, String> {
+    state
+        .database
+        .set_active_game_character_build(id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn delete_game_character_build(id: i64, state: State<'_, AppState>) -> Result<(), String> {
+    state
+        .database
+        .delete_game_character_build(id)
         .map_err(|error| error.to_string())
 }
 
@@ -2239,9 +2875,11 @@ pub fn sync_gearblocks_runtime_context(
         .map_err(|error| error.to_string())?;
     require_gearblocks_game(&game)?;
 
-    request_gearblocks_scene_export_from_game(state.inner())?;
-    let imported_count = import_latest_gearblocks_runtime_exports(&state, game.id)?
-        + reconcile_latest_gearblocks_runtime_exports(&state, game.id)?;
+    let requested_export = request_gearblocks_scene_export_from_game(state.inner())?;
+    let imported_count =
+        import_requested_gearblocks_runtime_export(&state, game.id, &requested_export)?
+            + import_latest_gearblocks_runtime_exports(&state, game.id)?
+            + reconcile_latest_gearblocks_runtime_exports(&state, game.id)?;
     sync_gearblocks_saved_constructions_for_game(&state, game.id)?;
 
     let fingerprint = gearblocks_runtime_context_fingerprint(&state, game.id)?;
@@ -2309,6 +2947,22 @@ pub fn import_gearblocks_runtime_context(
         runtime_part_count,
         construction_count,
     })
+}
+
+#[tauri::command]
+pub fn list_game_runtime_part_instances(
+    game_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<GameRuntimePartInstanceRecord>, String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    require_gearblocks_game(&game)?;
+    state
+        .database
+        .list_game_runtime_part_instances(game_id)
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -2417,6 +3071,190 @@ pub fn clear_gearblocks_markers(
     })
 }
 
+#[tauri::command]
+pub fn list_gearblocks_rotation_snap_angles() -> Vec<f64> {
+    GEARBLOCKS_ROTATION_SNAP_ANGLES.to_vec()
+}
+
+#[tauri::command]
+pub fn list_gearblocks_part_render_profiles(
+    game_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<GearBlocksPartRenderProfileRecord>, String> {
+    let game = state
+        .database
+        .get_game(game_id)
+        .map_err(|error| error.to_string())?;
+    require_gearblocks_game(&game)?;
+    state
+        .database
+        .list_gearblocks_part_render_profiles(game_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn save_gearblocks_part_render_profile_from_capture(
+    input: GearBlocksPartRenderProfileInput,
+    state: State<'_, AppState>,
+) -> Result<GearBlocksPartRenderProfileRecord, String> {
+    let game = state
+        .database
+        .get_game(input.game_id)
+        .map_err(|error| error.to_string())?;
+    require_gearblocks_game(&game)?;
+
+    let capture_id = sanitize_command_id(&input.capture_id);
+    if capture_id.trim().is_empty() {
+        return Err("Capture id is required.".to_string());
+    }
+
+    let status_path = gearblocks_plugin_status_directory()?.join(format!("{capture_id}.json"));
+    let status_text = fs::read_to_string(&status_path).map_err(|error| {
+        format!(
+            "Could not read GearBlocks part-preview status '{}': {error}",
+            status_path.display()
+        )
+    })?;
+    let status_json: serde_json::Value = serde_json::from_str(&status_text)
+        .map_err(|error| format!("Could not parse part-preview status JSON: {error}"))?;
+    if !status_json
+        .get("ok")
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false)
+    {
+        return Err("Cannot save a render profile from a failed preview capture.".to_string());
+    }
+
+    let status_id = status_json
+        .get("id")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or(&capture_id);
+    let part_name = if input.part_name.trim().is_empty() {
+        status_json
+            .get("label")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("GearBlocks part")
+            .to_string()
+    } else {
+        input.part_name.trim().to_string()
+    };
+    let canonical_rotation = json!({
+        "xDegrees": input.canonical_rotation_x_degrees.unwrap_or_else(|| status_number_path(&status_json, &["partRotation", "xDegrees"]).unwrap_or(0.0)),
+        "yDegrees": input.canonical_rotation_y_degrees.unwrap_or_else(|| status_number_path(&status_json, &["partRotation", "yDegrees"]).unwrap_or(0.0)),
+        "zDegrees": input.canonical_rotation_z_degrees.unwrap_or_else(|| status_number_path(&status_json, &["partRotation", "zDegrees"]).unwrap_or(0.0)),
+    });
+    let camera_preset = json!({
+        "yawDegrees": status_number_path(&status_json, &["cameraYawDegrees"]).unwrap_or(35.0),
+        "pitchDegrees": status_number_path(&status_json, &["cameraPitchDegrees"]).unwrap_or(28.0),
+        "width": status_number_path(&status_json, &["width"]).unwrap_or(1024.0),
+        "height": status_number_path(&status_json, &["height"]).unwrap_or(576.0),
+    });
+    let edge_settings = json!({
+        "edgeLineCount": status_number_path(&status_json, &["edgeLineCount"]).unwrap_or(0.0),
+        "edgeSkippedMeshCount": status_number_path(&status_json, &["edgeSkippedMeshCount"]).unwrap_or(0.0),
+    });
+    let renderer_names = status_json
+        .get("rendererNames")
+        .cloned()
+        .unwrap_or_else(|| serde_json::Value::Array(Vec::new()));
+    let bounds_center = status_json
+        .get("boundsCenter")
+        .cloned()
+        .unwrap_or_else(|| json!({}));
+    let bounds_size = status_json
+        .get("boundsSize")
+        .cloned()
+        .unwrap_or_else(|| json!({}));
+    let renderer_names_json = serde_json::to_string(&renderer_names)
+        .map_err(|error| format!("Could not serialize renderer names JSON: {error}"))?;
+    let canonical_rotation_json = serde_json::to_string(&canonical_rotation)
+        .map_err(|error| format!("Could not serialize canonical rotation JSON: {error}"))?;
+    let camera_preset_json = serde_json::to_string(&camera_preset)
+        .map_err(|error| format!("Could not serialize camera preset JSON: {error}"))?;
+    let bounds_center_json = serde_json::to_string(&bounds_center)
+        .map_err(|error| format!("Could not serialize bounds center JSON: {error}"))?;
+    let bounds_size_json = serde_json::to_string(&bounds_size)
+        .map_err(|error| format!("Could not serialize bounds size JSON: {error}"))?;
+    let edge_settings_json = serde_json::to_string(&edge_settings)
+        .map_err(|error| format!("Could not serialize edge settings JSON: {error}"))?;
+    let latest_status_json = serde_json::to_string_pretty(&status_json)
+        .map_err(|error| format!("Could not serialize latest status JSON: {error}"))?;
+
+    state
+        .database
+        .upsert_gearblocks_part_render_profile(GearBlocksPartRenderProfileDraft {
+            game_id: input.game_id,
+            profile_key: &input.profile_key,
+            part_key: input.part_key.as_deref().unwrap_or(""),
+            part_name: &part_name,
+            source_object_name: status_json
+                .get("sourceObjectName")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or(""),
+            renderer_names_json: &renderer_names_json,
+            canonical_rotation_json: &canonical_rotation_json,
+            camera_preset_json: &camera_preset_json,
+            bounds_center_json: &bounds_center_json,
+            bounds_size_json: &bounds_size_json,
+            edge_settings_json: &edge_settings_json,
+            latest_render_path: status_json
+                .get("renderPath")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or(""),
+            latest_capture_id: status_id,
+            latest_status_json: &latest_status_json,
+            render_version: GEARBLOCKS_PART_RENDER_PROFILE_VERSION,
+            is_validated: input.is_validated.unwrap_or(true),
+            notes: input.notes.as_deref().unwrap_or(""),
+        })
+        .map_err(|error| error.to_string())
+}
+
+pub fn create_gearblocks_test_part_preview_command() -> Result<PathBuf, String> {
+    let command_directory = gearblocks_plugin_command_directory()?;
+    let status_directory = gearblocks_plugin_status_directory()?;
+    let render_directory = gearblocks_plugin_render_directory()?;
+    let processed_directory = gearblocks_plugin_processed_directory()?;
+
+    fs::create_dir_all(&command_directory).map_err(|error| {
+        format!("Could not create GearBlocks preview command directory: {error}")
+    })?;
+    fs::create_dir_all(&status_directory).map_err(|error| {
+        format!("Could not create GearBlocks preview status directory: {error}")
+    })?;
+    fs::create_dir_all(&render_directory).map_err(|error| {
+        format!("Could not create GearBlocks preview render directory: {error}")
+    })?;
+
+    let id = next_test_part_preview_id(&[
+        command_directory.as_path(),
+        status_directory.as_path(),
+        render_directory.as_path(),
+        processed_directory.as_path(),
+    ]);
+    let command = json!({
+        "action": "capture_center_part_preview",
+        "id": id,
+        "label": "Test Part",
+        "width": 1024,
+        "height": 576,
+        "yawDegrees": 35,
+        "pitchDegrees": 28,
+        "partRotationXDegrees": 0,
+        "partRotationYDegrees": 0,
+        "partRotationZDegrees": 0,
+    });
+    let command_path = command_directory.join(format!("{id}.json"));
+    fs::write(
+        &command_path,
+        serde_json::to_string_pretty(&command)
+            .map_err(|error| format!("Could not serialize part preview command: {error}"))?,
+    )
+    .map_err(|error| format!("Could not write part preview command file: {error}"))?;
+
+    Ok(command_path)
+}
+
 fn sync_gearblocks_saved_constructions_for_game(
     state: &AppState,
     game_id: i64,
@@ -2452,25 +3290,25 @@ fn index_decoded_gearblocks_construction(
         serde_json::to_string_pretty(&decoded.document).map_err(|error| error.to_string())?;
     state
         .database
-        .upsert_game_construction(
+        .upsert_game_construction(GameConstructionDraft {
             game_id,
-            &decoded.name,
-            &decoded.folder_path,
-            &decoded.construction_path,
-            decoded.byte_size as i64,
-            decoded.decoded_byte_size as i64,
-            decoded.summary.composite_count as i64,
-            decoded.summary.part_count as i64,
-            decoded.summary.unique_asset_guid_count as i64,
-            decoded.summary.attachment_count as i64,
-            decoded.summary.link_count as i64,
-            decoded.summary.intersection_count as i64,
-            decoded.summary.is_frozen,
-            decoded.summary.is_invulnerable,
-            &summary_json,
-            &document_json,
-            indexed_at,
-        )
+            name: &decoded.name,
+            folder_path: &decoded.folder_path,
+            construction_path: &decoded.construction_path,
+            byte_size: decoded.byte_size as i64,
+            decoded_byte_size: decoded.decoded_byte_size as i64,
+            composite_count: decoded.summary.composite_count as i64,
+            part_count: decoded.summary.part_count as i64,
+            unique_asset_guid_count: decoded.summary.unique_asset_guid_count as i64,
+            attachment_count: decoded.summary.attachment_count as i64,
+            link_count: decoded.summary.link_count as i64,
+            intersection_count: decoded.summary.intersection_count as i64,
+            is_frozen: decoded.summary.is_frozen,
+            is_invulnerable: decoded.summary.is_invulnerable,
+            summary_json: &summary_json,
+            document_json: &document_json,
+            last_indexed_at: indexed_at,
+        })
         .map_err(|error| error.to_string())
 }
 
@@ -2612,8 +3450,15 @@ pub fn get_gearblocks_third_party_dependency_status(
     })
 }
 
-fn request_gearblocks_scene_export_from_game(state: &AppState) -> Result<(), String> {
-    if !focus_last_game_window_from_state(state)? {
+struct GearBlocksRequestedRuntimeExport {
+    log_path: PathBuf,
+    initial_length: u64,
+}
+
+fn request_gearblocks_scene_export_from_game(
+    state: &AppState,
+) -> Result<GearBlocksRequestedRuntimeExport, String> {
+    if !windows::focus_last_game_window_from_state(state)? {
         return Err(
             "No remembered GearBlocks window is available for scene export. Focus GearBlocks from Overlay Forge once, then refresh scene context again."
                 .to_string(),
@@ -2637,7 +3482,10 @@ fn request_gearblocks_scene_export_from_game(state: &AppState) -> Result<(), Str
                 .to_string(),
         );
     }
-    Ok(())
+    Ok(GearBlocksRequestedRuntimeExport {
+        log_path,
+        initial_length,
+    })
 }
 
 fn overlay_forge_scene_export_virtual_key() -> u16 {
@@ -2653,7 +3501,7 @@ fn wait_for_gearblocks_export_log_append(log_path: &Path, initial_length: u64) -
 
         if started_at
             .elapsed()
-            .map(|elapsed| elapsed >= Duration::from_secs(8))
+            .map(|elapsed| elapsed >= Duration::from_secs(60))
             .unwrap_or(true)
         {
             return false;
@@ -2902,6 +3750,17 @@ pub fn list_gearblocks_api_catalog(
     state
         .database
         .list_gearblocks_api_catalog()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn import_gearblocks_official_api_docs(
+    state: State<'_, AppState>,
+) -> Result<GearBlocksApiImportResult, String> {
+    let scrape = scrape_official_gearblocks_api()?;
+    state
+        .database
+        .import_gearblocks_api_catalog(&scrape)
         .map_err(|error| error.to_string())
 }
 
@@ -3286,19 +4145,19 @@ pub fn catalog_game_parts_from_screenshots(
 
         state
             .database
-            .upsert_game_catalog_object(
-                game.id,
-                seed.name,
-                "part",
-                seed.category,
-                resolved_category.category_icon,
-                &resolved_category.category_icon_path,
-                &description,
-                &notes,
-                &tags,
-                &resolved_category.source_path_text,
-                &resolved_category.source_path_text,
-            )
+            .upsert_game_catalog_object(GameCatalogObjectDraft {
+                game_id: game.id,
+                name: seed.name,
+                object_type: "part",
+                category: seed.category,
+                category_icon: resolved_category.category_icon,
+                category_icon_path: &resolved_category.category_icon_path,
+                description: &description,
+                notes: &notes,
+                tags: &tags,
+                thumbnail_path: &resolved_category.source_path_text,
+                source_screenshot_path: &resolved_category.source_path_text,
+            })
             .map_err(|error| error.to_string())?;
     }
 
@@ -3365,14 +4224,16 @@ pub fn create_game_screenshot_capture_request(
         app,
         window,
         state,
-        "visible-game-display",
-        "windows-gdi-bitblt-foreground-window",
-        "hide Overlay Forge before capture, then restore it",
-        "captured_windows_gdi",
-        "Captured through Windows GDI BitBlt from the foreground window after hiding Overlay Forge. Alpha was forced to 255 before PNG encoding.",
-        true,
-        false,
-        capture_foreground_window_to_png,
+        GameScreenshotCaptureOptions {
+            capture_scope: "visible-game-display",
+            method_source: "windows-gdi-bitblt-foreground-window",
+            overlay_handling: "hide Overlay Forge before capture, then restore it",
+            capture_status: "captured_windows_gdi",
+            notes: "Captured through Windows GDI BitBlt from the foreground window after hiding Overlay Forge. Alpha was forced to 255 before PNG encoding.",
+            restore_overlay: true,
+            restore_chat_overlay: false,
+            capture: capture_foreground_window_to_png,
+        },
     )
 }
 
@@ -3390,15 +4251,28 @@ pub fn create_game_chat_screenshot_capture(
         app,
         window,
         state,
-        "visible-game-display",
-        "windows-gdi-bitblt-foreground-window",
-        "hide Overlay Forge before capture and leave focus with the game",
-        "captured_windows_gdi_chat",
-        "Captured through Windows GDI BitBlt from the foreground window after hiding Overlay Forge. Alpha was forced to 255 before PNG encoding and the screenshot was attached to the current Gaming chat prompt.",
-        false,
-        true,
-        capture_foreground_window_to_png,
+        GameScreenshotCaptureOptions {
+            capture_scope: "visible-game-display",
+            method_source: "windows-gdi-bitblt-foreground-window",
+            overlay_handling: "hide Overlay Forge before capture and leave focus with the game",
+            capture_status: "captured_windows_gdi_chat",
+            notes: "Captured through Windows GDI BitBlt from the foreground window after hiding Overlay Forge. Alpha was forced to 255 before PNG encoding and the screenshot was attached to the current Gaming chat prompt.",
+            restore_overlay: false,
+            restore_chat_overlay: true,
+            capture: capture_foreground_window_to_png,
+        },
     )
+}
+
+struct GameScreenshotCaptureOptions {
+    capture_scope: &'static str,
+    method_source: &'static str,
+    overlay_handling: &'static str,
+    capture_status: &'static str,
+    notes: &'static str,
+    restore_overlay: bool,
+    restore_chat_overlay: bool,
+    capture: fn(&std::path::Path) -> Result<(), String>,
 }
 
 fn create_game_screenshot_capture(
@@ -3407,14 +4281,7 @@ fn create_game_screenshot_capture(
     app: AppHandle,
     window: WebviewWindow,
     state: State<'_, AppState>,
-    capture_scope: &str,
-    method_source: &str,
-    overlay_handling: &str,
-    capture_status: &str,
-    notes: &str,
-    restore_overlay: bool,
-    restore_chat_overlay: bool,
-    capture: fn(&std::path::Path) -> Result<(), String>,
+    options: GameScreenshotCaptureOptions,
 ) -> Result<GameScreenshotCaptureRequestRecord, String> {
     let game = state
         .database
@@ -3441,16 +4308,16 @@ fn create_game_screenshot_capture(
         "gameId": game.id,
         "gameName": game.name,
         "gameSlug": game.slug,
-        "captureScope": capture_scope,
+        "captureScope": options.capture_scope,
         "includeOverlay": false,
         "targetFilePath": target_file_path_text,
         "method": {
-            "source": method_source,
+            "source": options.method_source,
             "format": "png",
             "colorSpace": "sRGB",
             "forceAlpha": 255,
             "filenamePattern": "GameName_YYYYMMDD_HHMMSS_unique.png",
-            "overlayHandling": overlay_handling,
+            "overlayHandling": options.overlay_handling,
             "knownRisk": "GDI capture may still fail or produce black frames for some hardware-accelerated or protected game surfaces."
         }
     });
@@ -3462,9 +4329,9 @@ fn create_game_screenshot_capture(
     let hidden_overlay_windows = hide_overlay_windows_for_capture(&app)?;
     thread::sleep(Duration::from_millis(350));
 
-    let capture_result = capture(&target_file_path);
+    let capture_result = (options.capture)(&target_file_path);
 
-    if restore_overlay || capture_result.is_err() {
+    if options.restore_overlay || capture_result.is_err() {
         let _ = window.show();
         let _ = window.set_focus();
     }
@@ -3472,33 +4339,27 @@ fn create_game_screenshot_capture(
 
     capture_result?;
 
-    if restore_chat_overlay {
+    if options.restore_chat_overlay {
         restore_game_chat_overlay_after_capture(&app, &state)?;
     }
 
     state
         .database
-        .create_game_screenshot_capture_request(
-            game.id,
-            &title,
-            &target_file_path_text,
-            &request_id,
-            &request_file_path_text,
-            capture_status,
-            &timestamp_label,
-            notes,
-        )
+        .create_game_screenshot_capture_request(GameScreenshotCaptureRequestDraft {
+            game_id: game.id,
+            title: &title,
+            file_path: &target_file_path_text,
+            request_id: &request_id,
+            request_path: &request_file_path_text,
+            capture_status: options.capture_status,
+            captured_at: &timestamp_label,
+            notes: options.notes,
+        })
         .map_err(|error| error.to_string())
 }
 
-const OVERLAY_CAPTURE_WINDOW_LABELS: [&str; 3] = ["main", "game-chat", "game-build-guide"];
-
-fn is_standalone_overlay_window_label(label: &str) -> bool {
-    matches!(label, "game-chat" | "game-build-guide")
-}
-
 struct HiddenOverlayCaptureWindow {
-    label: &'static str,
+    kind: WindowKind,
     window: WebviewWindow,
     was_visible: bool,
 }
@@ -3507,9 +4368,10 @@ fn hide_overlay_windows_for_capture(
     app: &AppHandle,
 ) -> Result<Vec<HiddenOverlayCaptureWindow>, String> {
     let mut hidden_windows = Vec::new();
+    let window_manager = WindowManager::new(app);
 
-    for label in OVERLAY_CAPTURE_WINDOW_LABELS {
-        let Some(window) = app.get_webview_window(label) else {
+    for kind in windows::CAPTURE_WINDOW_KINDS {
+        let Some(window) = window_manager.window(kind) else {
             continue;
         };
         let was_visible = window.is_visible().map_err(|error| error.to_string())?;
@@ -3517,7 +4379,7 @@ fn hide_overlay_windows_for_capture(
             window.hide().map_err(|error| error.to_string())?;
         }
         hidden_windows.push(HiddenOverlayCaptureWindow {
-            label,
+            kind,
             window,
             was_visible,
         });
@@ -3531,18 +4393,22 @@ fn restore_previously_visible_overlay_windows(
     invoking_window_label: &str,
 ) {
     for hidden_window in hidden_windows {
-        if !hidden_window.was_visible || hidden_window.label == invoking_window_label {
+        if !hidden_window.was_visible || hidden_window.kind.label() == invoking_window_label {
             continue;
         }
-        let _ = hidden_window.window.set_always_on_top(true);
-        let _ = ensure_window_accepts_mouse_input(&hidden_window.window);
-        let opacity = if is_standalone_overlay_window_label(hidden_window.label) {
-            1.0
-        } else {
-            0.78
-        };
-        let _ = set_overlay_opacity(&hidden_window.window, opacity);
-        let _ = show_window_without_activation(&hidden_window.window);
+        let config = hidden_window.kind.runtime_config();
+        let _ = hidden_window
+            .window
+            .set_always_on_top(config.always_on_top);
+        let _ = windows::ensure_window_accepts_mouse_input(&hidden_window.window);
+        let _ = windows::set_overlay_opacity(
+            &hidden_window.window,
+            config.restore_opacity,
+        );
+        let _ = windows::show_window_without_activation(
+            &hidden_window.window,
+            config.always_on_top,
+        );
     }
 }
 
@@ -3550,17 +4416,12 @@ fn restore_game_chat_overlay_after_capture(
     app: &AppHandle,
     state: &State<'_, AppState>,
 ) -> Result<(), String> {
-    let Some(window) = app.get_webview_window("game-chat") else {
+    let window_manager = WindowManager::new(app);
+    if window_manager.window(WindowKind::GameChat).is_none() {
         return Ok(());
-    };
-
-    window
-        .set_always_on_top(true)
-        .map_err(|error| error.to_string())?;
-    ensure_window_accepts_mouse_input(&window)?;
-    let _ = set_overlay_opacity(&window, 1.0);
-    show_window_without_activation(&window)?;
-    let _ = focus_last_game_window_from_state(state.inner());
+    }
+    window_manager.show_without_activation(WindowKind::GameChat)?;
+    let _ = windows::focus_last_game_window_from_state(state.inner());
 
     Ok(())
 }
@@ -3604,9 +4465,11 @@ pub async fn send_game_chat_message(
     conversation_id: i64,
     content: String,
     screenshot_ids: Option<Vec<i64>>,
+    include_scene_diff: Option<bool>,
     state: State<'_, AppState>,
 ) -> Result<Vec<GameChatMessageRecord>, String> {
     require_text(&content, "Message")?;
+    let include_scene_diff = include_scene_diff.unwrap_or(false);
     let conversation = state
         .database
         .get_game_chat_conversation(conversation_id)
@@ -3615,10 +4478,6 @@ pub async fn send_game_chat_message(
         .database
         .get_game(conversation.game_id)
         .map_err(|error| error.to_string())?;
-
-    if game.slug == "gearblocks" {
-        import_latest_gearblocks_runtime_exports(&state, game.id)?;
-    }
 
     state
         .database
@@ -3634,7 +4493,7 @@ pub async fn send_game_chat_message(
         game.id,
         screenshot_ids.unwrap_or_default().as_slice(),
     )?;
-    let custom_context = game_custom_prompt_context(&state, &game)?;
+    let custom_context = game_custom_prompt_context(&state, &game, include_scene_diff)?;
     let api_key = configured_openai_api_key(&state)?;
     let assistant_content = openai::create_game_response(
         &api_key,
@@ -3659,24 +4518,53 @@ pub async fn send_game_chat_message(
 fn game_custom_prompt_context(
     state: &State<'_, AppState>,
     game: &GameRecord,
+    include_scene_diff: bool,
 ) -> Result<String, String> {
     match game.slug.as_str() {
-        "gearblocks" => gearblocks_prompt_context(state, game.id),
+        "gearblocks" => gearblocks_prompt_context(state, game.id, include_scene_diff),
         _ => Ok(String::new()),
     }
 }
 
-fn gearblocks_prompt_context(state: &State<'_, AppState>, game_id: i64) -> Result<String, String> {
+fn gearblocks_prompt_context(
+    state: &State<'_, AppState>,
+    game_id: i64,
+    include_scene_diff: bool,
+) -> Result<String, String> {
     let mut sections = vec![gearblocks_units_prompt_context()];
     if gearblocks_markers_enabled() {
         sections.push(gearblocks_marker_prompt_context());
     }
     sections.push(gearblocks_parts_catalog_prompt_context()?);
+    if let Some(build_guide_context) =
+        gearblocks_current_build_guide_prompt_context(state, game_id)?
+    {
+        sections.push(build_guide_context);
+    }
     if let Some(saved_context) = gearblocks_latest_saved_construction_context(state, game_id)? {
         sections.push(saved_context);
     }
-    import_latest_gearblocks_runtime_exports(state.inner(), game_id)?;
-    if let Some(runtime_context) = gearblocks_latest_runtime_understanding_context(state, game_id)?
+    if let Some(runtime_context) =
+        gearblocks_latest_runtime_understanding_context(state, game_id, include_scene_diff)?
+    {
+        sections.push(runtime_context);
+    }
+    Ok(sections.join("\n\n---\n\n"))
+}
+
+fn gearblocks_build_guide_import_prompt_context(
+    state: &State<'_, AppState>,
+    game_id: i64,
+) -> Result<String, String> {
+    let mut sections = vec![
+        gearblocks_units_prompt_context(),
+        gearblocks_parts_catalog_prompt_context()?,
+    ];
+    if let Some(saved_context) = gearblocks_latest_saved_construction_context(state, game_id)? {
+        sections.push(saved_context);
+    }
+    if let Some(runtime_context) =
+        gearblocks_latest_runtime_understanding_context(state, game_id, false)?
     {
         sections.push(runtime_context);
     }
@@ -3691,7 +4579,10 @@ fn gearblocks_units_prompt_context() -> String {
     [
         "# GearBlocks Scale And Units",
         "Use GearBlocks metric scale for build advice: 1 GearBlocks unit = 10 cm in real life. A 0.5 unit plate is 5 cm thick, and 16 units is 160 cm.",
+        "Use the user-tested player character height as 20 GearBlocks units / 20 blocks / 200 cm. Use this for cabins, roll cages, cockpit clearance, doors, standing clearance, ladders, steps, and other human-scale build features.",
         "When suggesting part movement, spacing, dimensions, or alignment, answer in centimeters and/or GearBlocks units such as 1 unit, 0.5 units, 16 units. Do not give imperial-distance suggestions such as inches or feet unless the user explicitly asks for imperial conversion.",
+        "GearBlocks coordinate axes: X controls width with Left (-X) and Right (+X); Y controls height with Down (-Y) and Up (+Y); Z controls depth with Backward (-Z) and Forward (+Z) in the game's building manipulators.",
+        "Standard vehicle orientation: for cars and car-like vehicles, always use the Z-axis for vehicle length. The front of the car points toward +Z, the rear points toward -Z, vehicle width runs on -X/+X, and vehicle height runs on -Y/+Y.",
         "Scale caveat: the developer noted that the player character, wheels, and other parts are slightly oversized to allow room for gears and other parts inside vehicles. Treat those parts as gameplay-clearance exceptions rather than strict real-world scale references.",
     ]
     .join("\n")
@@ -3706,6 +4597,135 @@ fn gearblocks_marker_prompt_context() -> String {
         "Keep marker counts small, normally 1-5. Explain the marker purpose in normal prose before the block. Do not include markers when coordinates are uncertain; ask for a fresh scene export or screenshot instead.",
     ]
     .join("\n")
+}
+
+fn gearblocks_current_build_guide_prompt_context(
+    state: &State<'_, AppState>,
+    game_id: i64,
+) -> Result<Option<String>, String> {
+    let guide = active_or_latest_game_build_guide(state.inner(), game_id)?
+        .filter(|guide| guide.game_id == game_id);
+    let Some(guide) = guide else {
+        return Ok(None);
+    };
+
+    let parts = state
+        .database
+        .list_game_build_guide_parts(guide.id)
+        .map_err(|error| error.to_string())?;
+    let steps = state
+        .database
+        .list_game_build_guide_steps(guide.id)
+        .map_err(|error| error.to_string())?;
+    let checklist = serde_json::from_str::<Vec<String>>(&guide.checklist_json).unwrap_or_default();
+
+    let mut sections = vec![
+        "# Current GearBlocks Build Guide".to_string(),
+        "Treat this guide as the active build plan for this chat session. Use it when answering follow-up questions, explaining terminology, checking progress, or suggesting next steps. Keep advice relative to the guide's reference parts, jigs, and subassemblies rather than absolute world coordinates.".to_string(),
+        format!("Title: {}", guide.title),
+    ];
+    if !guide.build_goal.trim().is_empty() {
+        sections.push(format!("## Build Goal\n{}", guide.build_goal.trim()));
+    }
+
+    if !parts.is_empty() {
+        let mut rows = parts
+            .iter()
+            .take(80)
+            .map(|part| {
+                format!(
+                    "- [{}] {} x{}: {}",
+                    if part.section.trim().is_empty() {
+                        "Parts"
+                    } else {
+                        part.section.trim()
+                    },
+                    part.part_name.trim(),
+                    if part.quantity.trim().is_empty() {
+                        "?"
+                    } else {
+                        part.quantity.trim()
+                    },
+                    part.purpose.trim()
+                )
+            })
+            .collect::<Vec<_>>();
+        if parts.len() > rows.len() {
+            rows.push(format!(
+                "- {} additional build-guide part row(s) omitted from prompt context for size.",
+                parts.len() - rows.len()
+            ));
+        }
+        sections.push(format!("## Build Guide Parts\n{}", rows.join("\n")));
+    }
+
+    if !steps.is_empty() {
+        let mut rows = steps
+            .iter()
+            .take(30)
+            .map(|step| {
+                format!(
+                    "### {}. {}\n{}",
+                    step.step_number,
+                    step.title.trim(),
+                    step.body.trim()
+                )
+            })
+            .collect::<Vec<_>>();
+        if steps.len() > rows.len() {
+            rows.push(format!(
+                "{} additional build-guide step(s) omitted from prompt context for size.",
+                steps.len() - rows.len()
+            ));
+        }
+        sections.push(format!("## Build Guide Steps\n{}", rows.join("\n")));
+    }
+
+    if !checklist.is_empty() {
+        sections.push(format!(
+            "## First Test Checklist\n{}",
+            checklist
+                .iter()
+                .take(30)
+                .map(|item| format!("- {item}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        ));
+    }
+
+    if !guide.glossary_text.trim().is_empty() {
+        sections.push(format!("## Glossary\n{}", guide.glossary_text.trim()));
+    } else {
+        sections.push("## Glossary\nNo glossary was parsed for this guide. When using real-life terms, define them in terms of exact GearBlocks parts or relative subassemblies before relying on them.".to_string());
+    }
+
+    Ok(Some(sections.join("\n\n")))
+}
+
+fn active_or_latest_game_build_guide(
+    state: &AppState,
+    game_id: i64,
+) -> Result<Option<GameBuildGuideRecord>, String> {
+    let active_selection = state
+        .active_game_build_guide_overlay
+        .lock()
+        .ok()
+        .and_then(|selection| selection.clone())
+        .or_else(|| stored_build_guide_overlay_selection(state))
+        .filter(|selection| selection.game_id == game_id);
+
+    if let Some(selection) = active_selection {
+        if let Ok(guide) = state.database.get_game_build_guide(selection.guide_id) {
+            if guide.game_id == game_id {
+                return Ok(Some(guide));
+            }
+        }
+    }
+
+    state
+        .database
+        .latest_game_build_guide(game_id)
+        .map_err(|error| error.to_string())
 }
 
 fn gearblocks_latest_saved_construction_context(
@@ -4049,22 +5069,6 @@ fn validate_calendar_event(
     Ok(())
 }
 
-fn validate_project(name: &str, status: &str) -> Result<(), String> {
-    require_text(name, "Project name")?;
-    match status.trim() {
-        "ACTIVE" | "ARCHIVED" => Ok(()),
-        _ => Err("Project status must be ACTIVE or ARCHIVED".to_string()),
-    }
-}
-
-fn validate_context_type(context_type: &str) -> Result<(), String> {
-    match context_type.trim() {
-        "project" | "github_repository" | "note" | "task" | "calendar_event"
-        | "youtube_reference" | "scratchpad" => Ok(()),
-        _ => Err("Unsupported context type".to_string()),
-    }
-}
-
 fn extract_youtube_video_id(url: &str) -> Result<String, String> {
     let trimmed = url.trim();
     if trimmed.is_empty() {
@@ -4123,216 +5127,7 @@ fn validate_youtube_video_id(value: &str) -> Result<String, String> {
     Ok(video_id.to_string())
 }
 
-#[cfg(target_os = "windows")]
-fn manual_overlay_drag(window: WebviewWindow) -> Result<(), String> {
-    if MANUAL_OVERLAY_DRAG_ACTIVE.swap(true, Ordering::SeqCst) {
-        return Ok(());
-    }
-
-    thread::spawn(move || {
-        let _ = manual_overlay_drag_loop(window);
-        MANUAL_OVERLAY_DRAG_ACTIVE.store(false, Ordering::SeqCst);
-    });
-
-    Ok(())
-}
-
-#[cfg(target_os = "windows")]
-fn manual_overlay_drag_loop(window: WebviewWindow) -> Result<(), String> {
-    use std::mem;
-    use windows_sys::Win32::Foundation::POINT;
-    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
-    use windows_sys::Win32::UI::WindowsAndMessaging::GetCursorPos;
-
-    let started_at = std::time::Instant::now();
-    let start_window_position = window.outer_position().map_err(|error| error.to_string())?;
-    let start_cursor = unsafe {
-        let mut point: POINT = mem::zeroed();
-        if GetCursorPos(&mut point) == 0 {
-            return Err("Could not read the mouse position.".to_string());
-        }
-        point
-    };
-
-    loop {
-        let left_button_down =
-            unsafe { (GetAsyncKeyState(VK_LBUTTON as i32) & 0x8000u16 as i16) != 0 };
-        if !left_button_down {
-            break;
-        }
-
-        let cursor = unsafe {
-            let mut point: POINT = mem::zeroed();
-            if GetCursorPos(&mut point) == 0 {
-                break;
-            }
-            point
-        };
-        let next_x = start_window_position.x + (cursor.x - start_cursor.x);
-        let next_y = start_window_position.y + (cursor.y - start_cursor.y);
-        let _ = window.set_position(PhysicalPosition::new(next_x, next_y));
-        if started_at.elapsed() > Duration::from_secs(8) {
-            break;
-        }
-        thread::sleep(Duration::from_millis(8));
-    }
-
-    Ok(())
-}
-
-#[cfg(not(target_os = "windows"))]
-fn manual_overlay_drag(_window: WebviewWindow) -> Result<(), String> {
-    Err("Manual no-snap overlay drag is only available on Windows.".to_string())
-}
-
-#[cfg(target_os = "windows")]
-fn focus_last_game_window_impl(state: State<'_, AppState>) -> Result<bool, String> {
-    focus_last_game_window_from_state(state.inner())
-}
-
-#[cfg(target_os = "windows")]
-fn focus_last_game_window_from_state(state: &AppState) -> Result<bool, String> {
-    use windows_sys::Win32::Foundation::HWND;
-    use windows_sys::Win32::UI::WindowsAndMessaging::{IsWindow, SetForegroundWindow};
-
-    let hwnd = state
-        .last_game_window
-        .lock()
-        .map_err(|_| "Last game window state is unavailable.".to_string())?
-        .unwrap_or_default();
-    if hwnd == 0 {
-        return Ok(false);
-    }
-
-    let hwnd = hwnd as HWND;
-    unsafe {
-        if IsWindow(hwnd) == 0 {
-            return Ok(false);
-        }
-        Ok(SetForegroundWindow(hwnd) != 0)
-    }
-}
-
-#[cfg(not(target_os = "windows"))]
-fn focus_last_game_window_impl(_state: State<'_, AppState>) -> Result<bool, String> {
-    Ok(false)
-}
-
-#[cfg(not(target_os = "windows"))]
-fn focus_last_game_window_from_state(_state: &AppState) -> Result<bool, String> {
-    Ok(false)
-}
-
-#[cfg(target_os = "windows")]
-fn get_overlay_forge_foreground_window_label_impl(
-    app: &AppHandle,
-) -> Result<Option<String>, String> {
-    use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
-
-    let foreground = unsafe { GetForegroundWindow() };
-    if foreground.is_null() {
-        return Ok(None);
-    }
-
-    for window in app.webview_windows().values() {
-        let hwnd = window.hwnd().map_err(|error| error.to_string())?.0
-            as windows_sys::Win32::Foundation::HWND;
-        if foreground == hwnd {
-            return Ok(Some(window.label().to_string()));
-        }
-    }
-
-    Ok(None)
-}
-
-#[cfg(not(target_os = "windows"))]
-fn get_overlay_forge_foreground_window_label_impl(
-    _app: &AppHandle,
-) -> Result<Option<String>, String> {
-    Ok(Some("main".to_string()))
-}
-
-#[cfg(target_os = "windows")]
-fn show_window_without_activation(window: &WebviewWindow) -> Result<(), String> {
-    use windows_sys::Win32::Foundation::HWND;
-    use windows_sys::Win32::UI::WindowsAndMessaging::{
-        SetWindowPos, ShowWindow, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
-        SWP_SHOWWINDOW, SW_SHOWNOACTIVATE,
-    };
-
-    let hwnd = window.hwnd().map_err(|error| error.to_string())?;
-    unsafe {
-        ShowWindow(hwnd.0 as HWND, SW_SHOWNOACTIVATE);
-        SetWindowPos(
-            hwnd.0 as HWND,
-            HWND_TOPMOST,
-            0,
-            0,
-            0,
-            0,
-            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW,
-        );
-    }
-    Ok(())
-}
-
-#[cfg(target_os = "windows")]
-fn ensure_window_accepts_mouse_input(window: &WebviewWindow) -> Result<(), String> {
-    use windows_sys::Win32::UI::WindowsAndMessaging::{
-        GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_NOACTIVATE, WS_EX_TRANSPARENT,
-    };
-
-    let hwnd =
-        window.hwnd().map_err(|error| error.to_string())?.0 as windows_sys::Win32::Foundation::HWND;
-    unsafe {
-        let style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-        let next_style = style & !(WS_EX_TRANSPARENT as isize) & !(WS_EX_NOACTIVATE as isize);
-        if next_style != style {
-            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, next_style);
-        }
-    }
-
-    Ok(())
-}
-
-#[cfg(not(target_os = "windows"))]
-fn ensure_window_accepts_mouse_input(_window: &WebviewWindow) -> Result<(), String> {
-    Ok(())
-}
-
-#[cfg(not(target_os = "windows"))]
-fn show_window_without_activation(window: &WebviewWindow) -> Result<(), String> {
-    window.show().map_err(|error| error.to_string())
-}
-
-#[cfg(target_os = "windows")]
-fn set_overlay_opacity(window: &WebviewWindow, opacity: f64) -> Result<(), String> {
-    use windows_sys::Win32::UI::WindowsAndMessaging::{
-        GetWindowLongPtrW, SetLayeredWindowAttributes, SetWindowLongPtrW, GWL_EXSTYLE, LWA_ALPHA,
-        WS_EX_LAYERED,
-    };
-
-    let hwnd =
-        window.hwnd().map_err(|error| error.to_string())?.0 as windows_sys::Win32::Foundation::HWND;
-    let alpha = (opacity.clamp(0.2, 1.0) * 255.0).round() as u8;
-
-    unsafe {
-        let style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED as isize);
-        if SetLayeredWindowAttributes(hwnd, 0, alpha, LWA_ALPHA) == 0 {
-            return Err("Could not set overlay window opacity.".to_string());
-        }
-    }
-
-    Ok(())
-}
-
-#[cfg(not(target_os = "windows"))]
-fn set_overlay_opacity(_window: &WebviewWindow, _opacity: f64) -> Result<(), String> {
-    Ok(())
-}
-
-fn open_external_url(url: &str) -> Result<(), String> {
+pub(crate) fn open_external_url(url: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     let result = std::process::Command::new("rundll32")
         .args(["url.dll,FileProtocolHandler", url])
@@ -4346,7 +5141,7 @@ fn open_external_url(url: &str) -> Result<(), String> {
 
     result
         .map(|_| ())
-        .map_err(|error| format!("Could not open YouTube URL externally: {error}"))
+        .map_err(|error| format!("Could not open URL externally: {error}"))
 }
 
 fn require_text(value: &str, field_name: &str) -> Result<(), String> {
@@ -4450,6 +5245,63 @@ fn gearblocks_plugin_command_directory() -> Result<PathBuf, String> {
 
 fn gearblocks_plugin_status_directory() -> Result<PathBuf, String> {
     Ok(gearblocks_plugin_root()?.join("status"))
+}
+
+fn gearblocks_plugin_render_directory() -> Result<PathBuf, String> {
+    Ok(gearblocks_plugin_root()?.join("renders"))
+}
+
+fn gearblocks_plugin_processed_directory() -> Result<PathBuf, String> {
+    Ok(gearblocks_plugin_root()?.join("processed"))
+}
+
+fn sanitize_command_id(value: &str) -> String {
+    value
+        .trim()
+        .chars()
+        .filter(|character| {
+            character.is_ascii_alphanumeric()
+                || *character == '-'
+                || *character == '_'
+                || *character == '.'
+        })
+        .collect()
+}
+
+fn status_number_path(value: &serde_json::Value, path: &[&str]) -> Option<f64> {
+    let mut current = value;
+    for segment in path {
+        current = current.get(*segment)?;
+    }
+    current
+        .as_f64()
+        .or_else(|| current.as_i64().map(|number| number as f64))
+        .or_else(|| current.as_u64().map(|number| number as f64))
+}
+
+fn next_test_part_preview_id(directories: &[&Path]) -> String {
+    let next_number = directories
+        .iter()
+        .filter_map(|directory| fs::read_dir(directory).ok())
+        .flat_map(|entries| entries.filter_map(Result::ok))
+        .filter_map(|entry| {
+            entry
+                .path()
+                .file_stem()
+                .and_then(|stem| stem.to_str())
+                .and_then(test_part_preview_number)
+        })
+        .max()
+        .unwrap_or(0)
+        + 1;
+    format!("test-part-preview-{next_number}")
+}
+
+fn test_part_preview_number(value: &str) -> Option<u64> {
+    value
+        .strip_prefix("test-part-preview-")
+        .and_then(|suffix| suffix.split('.').next())
+        .and_then(|suffix| suffix.parse::<u64>().ok())
 }
 
 fn gearblocks_game_install_root(state: &AppState, game_id: i64) -> Option<PathBuf> {
@@ -4740,52 +5592,12 @@ fn parse_gearblocks_runtime_exports_from_log(
     Ok(parse_gearblocks_runtime_exports_from_text(log_path, &text).exports)
 }
 
-fn parse_gearblocks_scene_deltas_from_log(
-    log_path: &Path,
-) -> Result<Vec<GearBlocksSceneDeltaRecord>, String> {
-    let text = fs::read_to_string(log_path)
-        .map_err(|error| format!("Could not read GearBlocks runtime export log: {error}"))?;
-    Ok(parse_gearblocks_scene_deltas_from_text(log_path, &text))
-}
-
 fn parse_gearblocks_part_aliases_from_log(
     log_path: &Path,
 ) -> Result<Vec<GearBlocksPartAliasLogRecord>, String> {
     let text = fs::read_to_string(log_path)
         .map_err(|error| format!("Could not read GearBlocks runtime export log: {error}"))?;
     Ok(parse_gearblocks_part_aliases_from_text(log_path, &text))
-}
-
-fn parse_gearblocks_scene_deltas_from_text(
-    log_path: &Path,
-    text: &str,
-) -> Vec<GearBlocksSceneDeltaRecord> {
-    const DELTA_MARKER: &str = "[OverlayForgeSceneDelta]";
-    let mut deltas = Vec::new();
-    let source_log_path = log_path.to_string_lossy().to_string();
-
-    for line in text.lines() {
-        let Some(index) = line.find(DELTA_MARKER) else {
-            continue;
-        };
-        let payload = &line[index + DELTA_MARKER.len()..];
-        let Ok(document) = serde_json::from_str::<serde_json::Value>(payload) else {
-            continue;
-        };
-        let id = json_string(document.get("id"));
-        let emitted_at = json_string(document.get("emittedAt"));
-        if id.is_empty() || emitted_at.is_empty() {
-            continue;
-        }
-        deltas.push(GearBlocksSceneDeltaRecord {
-            id,
-            emitted_at,
-            source_log_path: source_log_path.clone(),
-            document,
-        });
-    }
-
-    deltas
 }
 
 fn parse_gearblocks_part_aliases_from_text(
@@ -4962,12 +5774,14 @@ fn hydrate_gearblocks_api_attribute_refs(document: &mut serde_json::Value) {
 }
 
 struct GearBlocksRuntimePart<'a> {
+    part_json: &'a serde_json::Value,
     id: i64,
     index: i64,
     instance_key: String,
     name: String,
     friendly_name: Option<String>,
     category: String,
+    parent_construction_id: String,
     system: &'static str,
     purpose: &'static str,
     behaviours: Vec<String>,
@@ -4983,7 +5797,23 @@ struct GearBlocksRuntimePart<'a> {
 fn gearblocks_latest_runtime_understanding_context(
     state: &AppState,
     game_id: i64,
+    include_scene_diff: bool,
 ) -> Result<Option<String>, String> {
+    let scene_context_service = GearBlocksSceneContextService::new(&state.database);
+    if let Some(mut context) = scene_context_service.render_current_scene_context(game_id)? {
+        if include_scene_diff {
+            if let Some(diff_summary) = state
+                .database
+                .get_app_setting(&gearblocks_runtime_scene_diff_key(game_id))
+                .map_err(|error| error.to_string())?
+            {
+                context.push_str("\n\n");
+                context.push_str(&diff_summary);
+            }
+        }
+        return Ok(Some(context));
+    }
+
     let Some(latest) = state
         .database
         .latest_game_runtime_construction_export(game_id)
@@ -4991,6 +5821,10 @@ fn gearblocks_latest_runtime_understanding_context(
     else {
         return Ok(None);
     };
+    if latest.document_json.trim() == "{}" {
+        return Ok(None);
+    }
+
     let document = serde_json::from_str::<serde_json::Value>(&latest.document_json)
         .map_err(|error| format!("Latest GearBlocks runtime export JSON is invalid: {error}"))?;
     let export = GearBlocksRuntimeExportRecord {
@@ -5007,13 +5841,15 @@ fn gearblocks_latest_runtime_understanding_context(
         .map_err(|error| error.to_string())?;
 
     let mut context = gearblocks_runtime_understanding_context(&export, &aliases);
-    if let Some(diff_summary) = state
-        .database
-        .get_app_setting(&gearblocks_runtime_scene_diff_key(game_id))
-        .map_err(|error| error.to_string())?
-    {
-        context.push_str("\n\n");
-        context.push_str(&diff_summary);
+    if include_scene_diff {
+        if let Some(diff_summary) = state
+            .database
+            .get_app_setting(&gearblocks_runtime_scene_diff_key(game_id))
+            .map_err(|error| error.to_string())?
+        {
+            context.push_str("\n\n");
+            context.push_str(&diff_summary);
+        }
     }
 
     Ok(Some(context))
@@ -5070,12 +5906,17 @@ fn gearblocks_runtime_understanding_context(
         let is_functional = !is_structural || !behaviours.is_empty() || link_node_count > 0;
 
         parts.push(GearBlocksRuntimePart {
+            part_json: part,
             id: json_i64(part.get("id")),
             index: json_i64(part.get("index")),
             friendly_name: alias_map.get(&instance_key).cloned(),
             instance_key,
             name,
             category,
+            parent_construction_id: part
+                .get("parentConstructionId")
+                .map(json_value_to_string)
+                .unwrap_or_default(),
             system,
             purpose,
             behaviours,
@@ -5122,6 +5963,9 @@ fn gearblocks_runtime_understanding_context(
     ));
     sections.push(gearblocks_part_aliases_section(&parts, aliases));
     sections.push(gearblocks_marker_coordinate_reference_section(&parts));
+    sections.push(gearblocks_construction_groups_section(&parts));
+    sections.push(gearblocks_build_guide_api_context_section());
+    sections.push(gearblocks_build_guide_runtime_details_section(&parts));
     sections.push(gearblocks_structural_bounds_section(&parts));
     sections.push(gearblocks_functional_parts_section(&parts));
 
@@ -5129,26 +5973,24 @@ fn gearblocks_runtime_understanding_context(
 }
 
 fn gearblocks_runtime_scene_diff_summary(
-    previous: Option<&GameRuntimeConstructionExportRecord>,
+    previous_parts: &[GameRuntimePartInstanceRecord],
     current: &GearBlocksRuntimeExportRecord,
 ) -> Result<String, String> {
     let current_parts = gearblocks_runtime_part_count_map(&current.document);
-    let Some(previous) = previous else {
+    if previous_parts.is_empty() {
         return Ok(format!(
             "## Runtime Scene Change Since Previous Export\nNo previous runtime scene export was indexed. Current scene snapshot contains {} part key(s) across {} runtime part(s).",
             current_parts.len(),
             gearblocks_runtime_document_part_count(&current.document)
         ));
-    };
+    }
 
-    let previous_document = serde_json::from_str::<serde_json::Value>(&previous.document_json)
-        .map_err(|error| format!("Previous GearBlocks runtime export JSON is invalid: {error}"))?;
-    let previous_parts = gearblocks_runtime_part_count_map(&previous_document);
+    let previous_part_counts = gearblocks_runtime_part_count_map_from_instances(previous_parts);
     let mut added = Vec::new();
     let mut removed = Vec::new();
 
     for (key, current_part) in &current_parts {
-        let previous_count = previous_parts
+        let previous_count = previous_part_counts
             .get(key)
             .map(|part| part.count)
             .unwrap_or_default();
@@ -5161,7 +6003,7 @@ fn gearblocks_runtime_scene_diff_summary(
         }
     }
 
-    for (key, previous_part) in &previous_parts {
+    for (key, previous_part) in &previous_part_counts {
         let current_count = current_parts
             .get(key)
             .map(|part| part.count)
@@ -5177,7 +6019,7 @@ fn gearblocks_runtime_scene_diff_summary(
 
     added.sort();
     removed.sort();
-    let previous_total = gearblocks_runtime_document_part_count(&previous_document);
+    let previous_total = previous_parts.len();
     let current_total = gearblocks_runtime_document_part_count(&current.document);
     let mut lines = vec![format!(
         "Runtime scene part count changed by {:+} ({} -> {}).",
@@ -5246,6 +6088,33 @@ fn gearblocks_runtime_part_count_map(
     counts
 }
 
+fn gearblocks_runtime_part_count_map_from_instances(
+    parts: &[GameRuntimePartInstanceRecord],
+) -> HashMap<String, GearBlocksRuntimePartCount> {
+    let mut counts: HashMap<String, GearBlocksRuntimePartCount> = HashMap::new();
+    for part in parts {
+        let key = part.part_key.trim();
+        if key.is_empty() {
+            continue;
+        }
+        let name = if part.full_display_name.trim().is_empty() {
+            part.display_name.clone()
+        } else {
+            part.full_display_name.clone()
+        };
+        let label = if part.category.trim().is_empty() {
+            name
+        } else {
+            format!("{}: {}", part.category, name)
+        };
+        counts
+            .entry(key.to_string())
+            .and_modify(|entry| entry.count += 1)
+            .or_insert(GearBlocksRuntimePartCount { label, count: 1 });
+    }
+    counts
+}
+
 fn gearblocks_runtime_document_part_count(document: &serde_json::Value) -> usize {
     document
         .get("parts")
@@ -5268,36 +6137,34 @@ fn persist_runtime_export(
     export: &GearBlocksRuntimeExportRecord,
     indexed_at: &str,
 ) -> Result<GameRuntimeConstructionExportRecord, String> {
-    let document_json =
-        serde_json::to_string_pretty(&export.document).map_err(|error| error.to_string())?;
     state
         .database
-        .upsert_game_runtime_construction_export(
+        .upsert_game_runtime_construction_export(GameRuntimeConstructionExportDraft {
             game_id,
-            &export.id,
-            &export.name,
-            &json_string(export.document.get("exportKind")),
-            &export.intended_path,
-            &export.source_log_path,
-            export.byte_size as i64,
-            &export
+            export_id: &export.id,
+            name: &export.name,
+            export_kind: &json_string(export.document.get("exportKind")),
+            intended_path: &export.intended_path,
+            source_log_path: &export.source_log_path,
+            byte_size: export.byte_size as i64,
+            construction_id: &export
                 .document
                 .get("id")
                 .map(json_value_to_string)
                 .unwrap_or_default(),
-            export
+            exported_at: export
                 .document
                 .get("exportedAt")
                 .and_then(|value| value.as_str())
                 .unwrap_or_default(),
-            json_i64(export.document.get("numParts")),
-            json_f64(export.document.get("mass")),
-            json_optional_bool(export.document.get("isFrozen")),
-            json_optional_bool(export.document.get("isInvulnerable")),
-            json_optional_bool(export.document.get("isPlayerCharacter")),
-            &document_json,
-            indexed_at,
-        )
+            part_count: json_i64(export.document.get("numParts")),
+            mass: json_f64(export.document.get("mass")),
+            is_frozen: json_optional_bool(export.document.get("isFrozen")),
+            is_invulnerable: json_optional_bool(export.document.get("isInvulnerable")),
+            is_player_character: json_optional_bool(export.document.get("isPlayerCharacter")),
+            document_json: "{}",
+            last_indexed_at: indexed_at,
+        })
         .map_err(|error| error.to_string())
 }
 
@@ -5323,6 +6190,7 @@ fn import_runtime_export_parts(
         .and_then(|value| value.as_str())
         .unwrap_or_default()
         .to_string();
+    let mut instance_drafts = Vec::new();
 
     for part in parts {
         let part_key = runtime_part_key(&part);
@@ -5338,29 +6206,75 @@ fn import_runtime_export_parts(
         let local_position = part.get("localPosition").and_then(json_vector3);
         let world_position_json = compact_json_or_empty_object(part.get("position"))?;
         let local_position_json = compact_json_or_empty_object(part.get("localPosition"))?;
+        let current_unit_size_json =
+            compact_json_or_empty_object(part.get("currentUnitSize").or_else(|| {
+                part.get("resizable")
+                    .and_then(|value| value.get("currentUnitSize"))
+            }))?;
+        let link_node_count = part
+            .get("linkNodes")
+            .and_then(serde_json::Value::as_array)
+            .map(|items| items.len() as i64)
+            .unwrap_or_default();
+        let behaviour_names_json = gearblocks_part_behaviour_names_json(&part)?;
+        let dynamic_summary_json = gearblocks_part_dynamic_summary_json(&part)?;
+        let part_instance_key = gearblocks_part_instance_key(&part)
+            .unwrap_or_else(|| format!("{}:{}", export.id, json_i64(part.get("index"))));
+        let part_source_construction_id = part
+            .get("parentConstructionId")
+            .map(json_value_to_string)
+            .filter(|value| !value.trim().is_empty())
+            .unwrap_or_else(|| source_construction_id.clone());
         let properties_json =
             serde_json::to_string_pretty(&part).map_err(|error| error.to_string())?;
         state
             .database
-            .upsert_game_runtime_part(
-                game_id,
-                &part_key,
-                &asset_guid,
-                &asset_name,
-                &display_name,
-                &full_display_name,
-                &category,
-                json_f64(part.get("mass")),
+            .upsert_game_runtime_part(GameRuntimePartDraft {
+                identity: GameRuntimePartIdentity {
+                    game_id,
+                    part_key: &part_key,
+                    asset_guid: &asset_guid,
+                    asset_name: &asset_name,
+                    display_name: &display_name,
+                    full_display_name: &full_display_name,
+                    category: &category,
+                },
+                mass: json_f64(part.get("mass")),
                 world_position,
                 local_position,
-                &world_position_json,
-                &local_position_json,
-                &properties_json,
-                &export.id,
-                &source_construction_id,
-                &last_seen_at,
-            )
+                world_position_json: &world_position_json,
+                local_position_json: &local_position_json,
+                properties_json: &properties_json,
+                source: GameRuntimePartSource {
+                    source_export_id: &export.id,
+                    source_construction_id: &part_source_construction_id,
+                    seen_at: &last_seen_at,
+                },
+            })
             .map_err(|error| error.to_string())?;
+        instance_drafts.push(GameRuntimePartInstanceDraft {
+            part_key: part_key.clone(),
+            asset_guid: asset_guid.clone(),
+            asset_name: asset_name.clone(),
+            display_name: display_name.clone(),
+            full_display_name: full_display_name.clone(),
+            category: category.clone(),
+            source_export_id: export.id.clone(),
+            source_construction_id: part_source_construction_id.clone(),
+            part_instance_key,
+            runtime_part_id: json_i64(part.get("id")),
+            runtime_part_index: json_i64(part.get("index")),
+            mass: json_f64(part.get("mass")),
+            world_position,
+            local_position,
+            world_position_json: world_position_json.clone(),
+            local_position_json: local_position_json.clone(),
+            current_unit_size_json,
+            link_node_count,
+            behaviour_names_json,
+            dynamic_summary_json,
+            last_seen_at: last_seen_at.clone(),
+        });
 
         let context = RuntimePartIndexContext {
             game_id,
@@ -5377,6 +6291,15 @@ fn import_runtime_export_parts(
         index_runtime_part_discovery(state, &context, &part)?;
     }
 
+    state
+        .database
+        .replace_game_runtime_part_instances(game_id, &instance_drafts)
+        .map_err(|error| error.to_string())?;
+    state
+        .database
+        .clear_game_runtime_export_documents(game_id)
+        .map_err(|error| error.to_string())?;
+
     Ok(())
 }
 
@@ -5391,6 +6314,28 @@ struct RuntimePartIndexContext {
     source_export_id: String,
     source_construction_id: String,
     seen_at: String,
+}
+
+impl RuntimePartIndexContext {
+    fn identity(&self) -> GameRuntimePartIdentity<'_> {
+        GameRuntimePartIdentity {
+            game_id: self.game_id,
+            part_key: &self.part_key,
+            asset_guid: &self.asset_guid,
+            asset_name: &self.asset_name,
+            display_name: &self.display_name,
+            full_display_name: &self.full_display_name,
+            category: &self.category,
+        }
+    }
+
+    fn source(&self) -> GameRuntimePartSource<'_> {
+        GameRuntimePartSource {
+            source_export_id: &self.source_export_id,
+            source_construction_id: &self.source_construction_id,
+            seen_at: &self.seen_at,
+        }
+    }
 }
 
 fn index_runtime_part_discovery(
@@ -5410,35 +6355,25 @@ fn index_runtime_part_discovery(
             }
             state
                 .database
-                .upsert_game_runtime_part_api_attribute(
-                    context.game_id,
-                    &context.part_key,
-                    &context.asset_guid,
-                    &context.asset_name,
-                    &context.display_name,
-                    &context.full_display_name,
-                    &context.category,
-                    &interface_name,
-                    &attribute_name,
-                    &json_string(attribute.get("valueType")),
-                    &json_string(attribute.get("availability")),
-                    &context.source_export_id,
-                    &context.source_construction_id,
-                    &context.seen_at,
-                )
+                .upsert_game_runtime_part_api_attribute(GameRuntimePartApiAttributeObservation {
+                    identity: context.identity(),
+                    interface_name: &interface_name,
+                    attribute_name: &attribute_name,
+                    value_type: &json_string(attribute.get("valueType")),
+                    availability: &json_string(attribute.get("availability")),
+                    source: context.source(),
+                })
                 .map_err(|error| error.to_string())?;
             state
                 .database
-                .upsert_game_runtime_part_api_member(
-                    context.game_id,
-                    &context.part_key,
-                    &interface_name,
-                    &attribute_name,
-                    &json_string(attribute.get("availability")),
-                    &context.source_export_id,
-                    &context.source_construction_id,
-                    &context.seen_at,
-                )
+                .upsert_game_runtime_part_api_member(GameRuntimePartApiMemberObservation {
+                    game_id: context.game_id,
+                    part_key: &context.part_key,
+                    interface_name: &interface_name,
+                    attribute_name: &attribute_name,
+                    availability: &json_string(attribute.get("availability")),
+                    source: context.source(),
+                })
                 .map_err(|error| error.to_string())?;
         }
     }
@@ -5448,21 +6383,25 @@ fn index_runtime_part_discovery(
     for (field_path, value) in value_fields {
         state
             .database
-            .upsert_game_runtime_part_value(
-                context.game_id,
-                &context.part_key,
-                &context.asset_guid,
-                &context.asset_name,
-                &context.display_name,
-                &context.full_display_name,
-                &context.category,
-                &field_path,
-                json_type_label(value),
-                &value.to_string(),
-                &context.source_export_id,
-                &context.source_construction_id,
-                &context.seen_at,
-            )
+            .upsert_game_runtime_part_metadata_value(GameRuntimePartMetadataValueDraft {
+                game_id: context.game_id,
+                part_key: &context.part_key,
+                source_area: "value",
+                field_path: &field_path,
+                value_type: json_type_label(value),
+                value_json: &value.to_string(),
+                source: context.source(),
+            })
+            .map_err(|error| error.to_string())?;
+        state
+            .database
+            .upsert_game_runtime_part_value(GameRuntimePartValueObservation {
+                identity: context.identity(),
+                field_path: &field_path,
+                value_type: json_type_label(value),
+                value_json: &value.to_string(),
+                source: context.source(),
+            })
             .map_err(|error| error.to_string())?;
     }
 
@@ -5475,21 +6414,25 @@ fn index_runtime_part_discovery(
         for (property_path, value) in property_values {
             state
                 .database
-                .upsert_game_runtime_part_property(
-                    context.game_id,
-                    &context.part_key,
-                    &context.asset_guid,
-                    &context.asset_name,
-                    &context.display_name,
-                    &context.full_display_name,
-                    &context.category,
-                    &property_path,
-                    json_type_label(value),
-                    &value.to_string(),
-                    &context.source_export_id,
-                    &context.source_construction_id,
-                    &context.seen_at,
-                )
+                .upsert_game_runtime_part_metadata_value(GameRuntimePartMetadataValueDraft {
+                    game_id: context.game_id,
+                    part_key: &context.part_key,
+                    source_area: "property",
+                    field_path: &property_path,
+                    value_type: json_type_label(value),
+                    value_json: &value.to_string(),
+                    source: context.source(),
+                })
+                .map_err(|error| error.to_string())?;
+            state
+                .database
+                .upsert_game_runtime_part_property(GameRuntimePartPropertyObservation {
+                    identity: context.identity(),
+                    property_path: &property_path,
+                    value_type: json_type_label(value),
+                    value_json: &value.to_string(),
+                    source: context.source(),
+                })
                 .map_err(|error| error.to_string())?;
         }
     }
@@ -5500,26 +6443,243 @@ fn index_runtime_part_discovery(
         for (attachment_path, value) in attachment_values {
             state
                 .database
-                .upsert_game_runtime_part_attachment(
-                    context.game_id,
-                    &context.part_key,
-                    &context.asset_guid,
-                    &context.asset_name,
-                    &context.display_name,
-                    &context.full_display_name,
-                    &context.category,
-                    &attachment_path,
-                    json_type_label(value),
-                    &value.to_string(),
-                    &context.source_export_id,
-                    &context.source_construction_id,
-                    &context.seen_at,
-                )
+                .upsert_game_runtime_part_attachment_type(GameRuntimePartAttachmentTypeDraft {
+                    game_id: context.game_id,
+                    part_key: &context.part_key,
+                    attachment_path: &attachment_path,
+                    type_name: &gearblocks_attachment_type_name(&attachment_path, value),
+                    value_type: json_type_label(value),
+                    attachment_json: &value.to_string(),
+                    source: context.source(),
+                })
+                .map_err(|error| error.to_string())?;
+            state
+                .database
+                .upsert_game_runtime_part_attachment(GameRuntimePartAttachmentObservation {
+                    identity: context.identity(),
+                    attachment_path: &attachment_path,
+                    value_type: json_type_label(value),
+                    attachment_json: &value.to_string(),
+                    source: context.source(),
+                })
                 .map_err(|error| error.to_string())?;
         }
     }
 
+    for setting in gearblocks_part_setting_values(part) {
+        state
+            .database
+            .upsert_game_runtime_part_setting_value(GameRuntimePartSettingValueDraft {
+                game_id: context.game_id,
+                part_key: &context.part_key,
+                setting_key: &setting.key,
+                label: &setting.label,
+                setting_area: &setting.area,
+                value_type: json_type_label(setting.value),
+                value_json: &setting.value.to_string(),
+                source: context.source(),
+            })
+            .map_err(|error| error.to_string())?;
+    }
+
+    for channel in gearblocks_part_output_channel_values(part) {
+        state
+            .database
+            .upsert_game_runtime_part_output_channel_value(GameRuntimePartOutputChannelValueDraft {
+                game_id: context.game_id,
+                part_key: &context.part_key,
+                channel_key: &channel.key,
+                label: &channel.label,
+                channel_area: &channel.area,
+                value_type: json_type_label(channel.value),
+                value_json: &channel.value.to_string(),
+                source: context.source(),
+            })
+            .map_err(|error| error.to_string())?;
+    }
+
     Ok(())
+}
+
+fn gearblocks_part_behaviour_names_json(part: &serde_json::Value) -> Result<String, String> {
+    let names = part
+        .get("behaviours")
+        .and_then(serde_json::Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| item.get("name").and_then(serde_json::Value::as_str))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    serde_json::to_string(&names).map_err(|error| error.to_string())
+}
+
+fn gearblocks_part_dynamic_summary_json(part: &serde_json::Value) -> Result<String, String> {
+    let mut summary = serde_json::Map::new();
+    for key in [
+        "paint",
+        "properties",
+        "attachments",
+        "linkNodes",
+        "tweakables",
+        "resizable",
+        "behaviours",
+        "behaviourByName",
+        "currentUnitSize",
+    ] {
+        if let Some(value) = part.get(key) {
+            summary.insert(key.to_string(), value.clone());
+        }
+    }
+    serde_json::to_string(&serde_json::Value::Object(summary)).map_err(|error| error.to_string())
+}
+
+struct GearBlocksObservedValue<'a> {
+    key: String,
+    label: String,
+    area: String,
+    value: &'a serde_json::Value,
+}
+
+fn gearblocks_attachment_type_name(path: &str, value: &serde_json::Value) -> String {
+    if let Some(object) = value.as_object() {
+        for key in ["typeName", "type", "attachmentType", "name"] {
+            if let Some(text) = object.get(key).and_then(serde_json::Value::as_str) {
+                if !text.trim().is_empty() {
+                    return text.trim().to_string();
+                }
+            }
+        }
+    }
+    path.to_string()
+}
+
+fn gearblocks_part_setting_values(part: &serde_json::Value) -> Vec<GearBlocksObservedValue<'_>> {
+    let mut values = Vec::new();
+    if let Some(tweakables) = part.get("tweakables") {
+        collect_named_setting_values(tweakables, "tweakables", "tweakable", &mut values);
+    }
+    if let Some(resizable) = part.get("resizable") {
+        collect_named_setting_values(resizable, "resizable", "resizable", &mut values);
+    }
+    if let Some(behaviours) = part.get("behaviours").and_then(serde_json::Value::as_array) {
+        for (index, behaviour) in behaviours.iter().enumerate() {
+            let name = json_string(behaviour.get("name"));
+            let base = if name.is_empty() {
+                format!("behaviours[{index}]")
+            } else {
+                format!("behaviours.{name}")
+            };
+            collect_named_setting_values(behaviour, &base, "behaviour", &mut values);
+        }
+    }
+    values
+}
+
+fn collect_named_setting_values<'a>(
+    value: &'a serde_json::Value,
+    path: &str,
+    area: &str,
+    values: &mut Vec<GearBlocksObservedValue<'a>>,
+) {
+    match value {
+        serde_json::Value::Object(object) => {
+            if let Some(setting_value) = object.get("value") {
+                let label = ["label", "name", "displayName", "key"]
+                    .iter()
+                    .find_map(|key| object.get(*key).and_then(serde_json::Value::as_str))
+                    .unwrap_or(path)
+                    .to_string();
+                values.push(GearBlocksObservedValue {
+                    key: path.to_string(),
+                    label,
+                    area: area.to_string(),
+                    value: setting_value,
+                });
+            }
+            for (key, child) in object {
+                let next_path = json_path_child(path, key);
+                if key == "value" {
+                    continue;
+                }
+                if matches!(
+                    key.as_str(),
+                    "currentUnitSize"
+                        | "resizeStep"
+                        | "isActivated"
+                        | "isControlBound"
+                        | "isControlOverridden"
+                        | "controlInfo"
+                        | "currentRotationSpeed"
+                        | "crankAngle"
+                        | "timingAngle"
+                ) {
+                    values.push(GearBlocksObservedValue {
+                        key: next_path.clone(),
+                        label: key.clone(),
+                        area: area.to_string(),
+                        value: child,
+                    });
+                }
+                collect_named_setting_values(child, &next_path, area, values);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for (index, child) in items.iter().enumerate() {
+                collect_named_setting_values(child, &json_path_index(path, index), area, values);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn gearblocks_part_output_channel_values(
+    part: &serde_json::Value,
+) -> Vec<GearBlocksObservedValue<'_>> {
+    let mut values = Vec::new();
+    collect_output_channel_values(part, "", &mut values);
+    values
+}
+
+fn collect_output_channel_values<'a>(
+    value: &'a serde_json::Value,
+    path: &str,
+    values: &mut Vec<GearBlocksObservedValue<'a>>,
+) {
+    match value {
+        serde_json::Value::Object(object) => {
+            for (key, child) in object {
+                let next_path = json_path_child(path, key);
+                let normalized = key.to_ascii_lowercase();
+                if matches!(
+                    normalized.as_str(),
+                    "output"
+                        | "outputs"
+                        | "outputchannel"
+                        | "outputchannels"
+                        | "channel"
+                        | "channels"
+                        | "controlinfo"
+                        | "controlbinding"
+                ) {
+                    values.push(GearBlocksObservedValue {
+                        key: next_path.clone(),
+                        label: key.clone(),
+                        area: "output/control".to_string(),
+                        value: child,
+                    });
+                }
+                collect_output_channel_values(child, &next_path, values);
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for (index, child) in items.iter().enumerate() {
+                collect_output_channel_values(child, &json_path_index(path, index), values);
+            }
+        }
+        _ => {}
+    }
 }
 
 fn collect_named_value_fields<'a>(
@@ -5682,6 +6842,48 @@ fn reconcile_latest_gearblocks_runtime_exports(
     Ok(imported_count)
 }
 
+fn import_requested_gearblocks_runtime_export(
+    state: &AppState,
+    game_id: i64,
+    request: &GearBlocksRequestedRuntimeExport,
+) -> Result<usize, String> {
+    let metadata = fs::metadata(&request.log_path)
+        .map_err(|error| format!("Could not read GearBlocks runtime log metadata: {error}"))?;
+    if metadata.len() <= request.initial_length {
+        return Ok(0);
+    }
+
+    let mut file = File::open(&request.log_path)
+        .map_err(|error| format!("Could not open GearBlocks runtime export log: {error}"))?;
+    file.seek(SeekFrom::Start(request.initial_length))
+        .map_err(|error| format!("Could not seek GearBlocks runtime export log: {error}"))?;
+    let mut text = String::new();
+    file.read_to_string(&mut text).map_err(|error| {
+        format!("Could not read requested GearBlocks runtime export log additions: {error}")
+    })?;
+
+    let parse_result = parse_gearblocks_runtime_exports_from_text(&request.log_path, &text);
+    let part_aliases = parse_gearblocks_part_aliases_from_text(&request.log_path, &text);
+    let mut imported_count =
+        persist_newer_gearblocks_runtime_exports(state, game_id, &parse_result.exports, false)?;
+    imported_count += persist_gearblocks_part_aliases(state, game_id, &part_aliases)?;
+
+    let consumed_offset = if parse_result.consumed_bytes > 0 {
+        request.initial_length + parse_result.consumed_bytes as u64
+    } else {
+        metadata.len()
+    };
+    save_gearblocks_runtime_log_cursor(
+        state,
+        game_id,
+        &request.log_path,
+        consumed_offset.min(metadata.len()),
+        &metadata,
+    )?;
+
+    Ok(imported_count)
+}
+
 fn import_new_gearblocks_runtime_exports_from_log(
     state: &AppState,
     game_id: i64,
@@ -5702,7 +6904,14 @@ fn import_new_gearblocks_runtime_exports_from_log(
         return Ok(0);
     }
 
-    let initial_offset = if cursor.is_none() {
+    let log_path_text = log_path.to_string_lossy().to_string();
+    let cursor_matches_path = cursor
+        .as_ref()
+        .is_some_and(|cursor| cursor.path == log_path_text);
+    let cursor_is_rotated = cursor
+        .as_ref()
+        .is_some_and(|cursor| cursor.path == log_path_text && metadata.len() < cursor.offset);
+    let initial_offset = if cursor.is_none() || !cursor_matches_path {
         metadata
             .len()
             .saturating_sub(GEARBLOCKS_RUNTIME_INITIAL_TAIL_BYTES)
@@ -5711,20 +6920,23 @@ fn import_new_gearblocks_runtime_exports_from_log(
     };
     let mut offset = cursor
         .as_ref()
-        .filter(|cursor| {
-            cursor.path == log_path.to_string_lossy() && metadata.len() >= cursor.offset
-        })
+        .filter(|cursor| cursor.path == log_path_text && metadata.len() >= cursor.offset)
         .map(|cursor| cursor.offset)
         .unwrap_or(initial_offset);
-    if metadata.len().saturating_sub(offset) > GEARBLOCKS_RUNTIME_INCREMENTAL_READ_LIMIT_BYTES {
+    if !cursor_is_rotated
+        && metadata.len().saturating_sub(offset) > GEARBLOCKS_RUNTIME_INCREMENTAL_READ_LIMIT_BYTES
+    {
         offset = metadata
             .len()
             .saturating_sub(GEARBLOCKS_RUNTIME_INCREMENTAL_READ_LIMIT_BYTES);
     }
 
     if offset >= metadata.len() {
+        let imported_count = recover_missed_gearblocks_runtime_exports_from_log(
+            state, game_id, log_path, &metadata,
+        )?;
         save_gearblocks_runtime_log_cursor(state, game_id, log_path, offset, &metadata)?;
-        return Ok(0);
+        return Ok(imported_count);
     }
 
     let mut file = File::open(log_path)
@@ -5737,11 +6949,9 @@ fn import_new_gearblocks_runtime_exports_from_log(
     })?;
 
     let parse_result = parse_gearblocks_runtime_exports_from_text(log_path, &text);
-    let scene_deltas = parse_gearblocks_scene_deltas_from_text(log_path, &text);
     let part_aliases = parse_gearblocks_part_aliases_from_text(log_path, &text);
     let mut imported_count =
         persist_newer_gearblocks_runtime_exports(state, game_id, &parse_result.exports, false)?;
-    imported_count += persist_gearblocks_scene_deltas(state, game_id, &scene_deltas)?;
     imported_count += persist_gearblocks_part_aliases(state, game_id, &part_aliases)?;
 
     if parse_result.consumed_bytes > 0 {
@@ -5754,6 +6964,31 @@ fn import_new_gearblocks_runtime_exports_from_log(
     Ok(imported_count)
 }
 
+fn recover_missed_gearblocks_runtime_exports_from_log(
+    state: &AppState,
+    game_id: i64,
+    log_path: &Path,
+    metadata: &fs::Metadata,
+) -> Result<usize, String> {
+    let file_signature = format!("{}:{}", metadata.len(), file_modified_timestamp(metadata));
+    let recovery_key = gearblocks_runtime_log_recovery_key(game_id, log_path);
+    let already_checked = state
+        .database
+        .get_app_setting(&recovery_key)
+        .map_err(|error| error.to_string())?
+        .is_some_and(|value| value == file_signature);
+    if already_checked {
+        return Ok(0);
+    }
+
+    let imported_count = reconcile_gearblocks_runtime_exports_from_log(state, game_id, log_path)?;
+    state
+        .database
+        .save_app_setting(&recovery_key, &file_signature)
+        .map_err(|error| error.to_string())?;
+    Ok(imported_count)
+}
+
 fn reconcile_gearblocks_runtime_exports_from_log(
     state: &AppState,
     game_id: i64,
@@ -5762,8 +6997,6 @@ fn reconcile_gearblocks_runtime_exports_from_log(
     let exports = parse_gearblocks_runtime_exports_from_log(log_path)?;
     let mut imported_count =
         persist_newer_gearblocks_runtime_exports(state, game_id, &exports, true)?;
-    let deltas = parse_gearblocks_scene_deltas_from_log(log_path)?;
-    imported_count += persist_gearblocks_scene_deltas(state, game_id, &deltas)?;
     let part_aliases = parse_gearblocks_part_aliases_from_log(log_path)?;
     imported_count += persist_gearblocks_part_aliases(state, game_id, &part_aliases)?;
     Ok(imported_count)
@@ -5779,6 +7012,10 @@ fn persist_newer_gearblocks_runtime_exports(
     let mut previous_export = state
         .database
         .latest_game_runtime_construction_export(game_id)
+        .map_err(|error| error.to_string())?;
+    let mut previous_parts = state
+        .database
+        .list_game_runtime_part_instances(game_id)
         .map_err(|error| error.to_string())?;
     let latest_exported_at = previous_export
         .as_ref()
@@ -5805,7 +7042,7 @@ fn persist_newer_gearblocks_runtime_exports(
             continue;
         }
 
-        let diff_summary = gearblocks_runtime_scene_diff_summary(previous_export.as_ref(), export)?;
+        let diff_summary = gearblocks_runtime_scene_diff_summary(&previous_parts, export)?;
         let persisted = persist_runtime_export(state, game_id, export, &indexed_at)?;
         import_runtime_export_parts(state, game_id, export)?;
         state
@@ -5813,67 +7050,10 @@ fn persist_newer_gearblocks_runtime_exports(
             .save_app_setting(&gearblocks_runtime_scene_diff_key(game_id), &diff_summary)
             .map_err(|error| error.to_string())?;
         previous_export = Some(persisted);
-        imported_count += 1;
-    }
-
-    Ok(imported_count)
-}
-
-fn persist_gearblocks_scene_deltas(
-    state: &AppState,
-    game_id: i64,
-    deltas: &[GearBlocksSceneDeltaRecord],
-) -> Result<usize, String> {
-    let mut sorted_deltas = deltas.to_vec();
-    sorted_deltas.sort_by(|left, right| {
-        left.emitted_at
-            .cmp(&right.emitted_at)
-            .then(left.id.cmp(&right.id))
-    });
-
-    let mut imported_count = 0usize;
-    let indexed_at = unix_timestamp_label();
-    let mut previous_export = state
-        .database
-        .latest_game_runtime_construction_export(game_id)
-        .map_err(|error| error.to_string())?;
-
-    for delta in sorted_deltas {
-        let Some(previous) = previous_export.as_ref() else {
-            continue;
-        };
-        if !previous.exported_at.is_empty() && delta.emitted_at < previous.exported_at {
-            continue;
-        }
-
-        let mut document = serde_json::from_str::<serde_json::Value>(&previous.document_json)
-            .map_err(|error| {
-                format!("Latest GearBlocks runtime export JSON is invalid: {error}")
-            })?;
-        if gearblocks_delta_already_applied(&document, &delta.id) {
-            continue;
-        }
-        if !apply_gearblocks_scene_delta_to_document(&mut document, &delta)? {
-            continue;
-        }
-
-        let export = GearBlocksRuntimeExportRecord {
-            id: format!("scene_delta_{}", safe_filename_part(&delta.id)),
-            name: format!("scene_delta_{}.json", safe_filename_part(&delta.id)),
-            intended_path: format!("{}#{}", delta.source_log_path, delta.id),
-            source_log_path: delta.source_log_path.clone(),
-            byte_size: document.to_string().len(),
-            document,
-        };
-        let diff_summary =
-            gearblocks_runtime_scene_diff_summary(previous_export.as_ref(), &export)?;
-        let persisted = persist_runtime_export(state, game_id, &export, &indexed_at)?;
-        import_runtime_export_parts(state, game_id, &export)?;
-        state
+        previous_parts = state
             .database
-            .save_app_setting(&gearblocks_runtime_scene_diff_key(game_id), &diff_summary)
+            .list_game_runtime_part_instances(game_id)
             .map_err(|error| error.to_string())?;
-        previous_export = Some(persisted);
         imported_count += 1;
     }
 
@@ -5901,167 +7081,28 @@ fn persist_gearblocks_part_aliases(
             serde_json::to_string_pretty(&alias.document).map_err(|error| error.to_string())?;
         state
             .database
-            .upsert_game_runtime_part_alias(
+            .upsert_game_runtime_part_alias(GameRuntimePartAliasDraft {
                 game_id,
-                &alias.part_instance_key,
-                &alias.friendly_name,
-                &json_string(alias.document.get("assetGuid")),
-                &json_string(alias.document.get("assetName")),
-                &json_string(alias.document.get("displayName")),
-                &json_string(alias.document.get("fullDisplayName")),
-                &json_string(alias.document.get("category")),
-                &alias.source_log_path,
-                &source_construction_id,
-                &world_position_json,
-                &local_position_json,
-                &current_unit_size_json,
-                &payload_json,
-                &alias.emitted_at,
-            )
+                part_instance_key: &alias.part_instance_key,
+                friendly_name: &alias.friendly_name,
+                asset_guid: &json_string(alias.document.get("assetGuid")),
+                asset_name: &json_string(alias.document.get("assetName")),
+                display_name: &json_string(alias.document.get("displayName")),
+                full_display_name: &json_string(alias.document.get("fullDisplayName")),
+                category: &json_string(alias.document.get("category")),
+                source_log_path: &alias.source_log_path,
+                source_construction_id: &source_construction_id,
+                world_position_json: &world_position_json,
+                local_position_json: &local_position_json,
+                current_unit_size_json: &current_unit_size_json,
+                payload_json: &payload_json,
+                last_seen_at: &alias.emitted_at,
+            })
             .map_err(|error| error.to_string())?;
         imported_count += 1;
     }
 
     Ok(imported_count)
-}
-
-fn gearblocks_delta_already_applied(document: &serde_json::Value, delta_id: &str) -> bool {
-    document
-        .get("appliedDeltaIds")
-        .and_then(serde_json::Value::as_array)
-        .is_some_and(|items| {
-            items
-                .iter()
-                .any(|item| item.as_str().is_some_and(|value| value == delta_id))
-        })
-}
-
-fn apply_gearblocks_scene_delta_to_document(
-    document: &mut serde_json::Value,
-    delta: &GearBlocksSceneDeltaRecord,
-) -> Result<bool, String> {
-    let part_count = {
-        let Some(parts) = document
-            .get_mut("parts")
-            .and_then(serde_json::Value::as_array_mut)
-        else {
-            return Ok(false);
-        };
-
-        let mut by_key = parts
-            .iter()
-            .enumerate()
-            .filter_map(|(index, part)| gearblocks_part_instance_key(part).map(|key| (key, index)))
-            .collect::<HashMap<_, _>>();
-        let mut changed = false;
-
-        for removed in delta
-            .document
-            .get("removed")
-            .and_then(serde_json::Value::as_array)
-            .into_iter()
-            .flatten()
-        {
-            let key = json_string(removed.get("key"));
-            if key.is_empty() {
-                continue;
-            }
-            if let Some(index) = by_key.remove(&key) {
-                parts.remove(index);
-                by_key = parts
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(index, part)| {
-                        gearblocks_part_instance_key(part).map(|key| (key, index))
-                    })
-                    .collect::<HashMap<_, _>>();
-                changed = true;
-            }
-        }
-
-        for part in delta
-            .document
-            .get("added")
-            .and_then(serde_json::Value::as_array)
-            .into_iter()
-            .flatten()
-            .chain(
-                delta
-                    .document
-                    .get("updated")
-                    .and_then(serde_json::Value::as_array)
-                    .into_iter()
-                    .flatten(),
-            )
-        {
-            if gearblocks_part_is_player_character(part) {
-                continue;
-            }
-            let Some(key) = gearblocks_part_instance_key(part) else {
-                continue;
-            };
-            if let Some(index) = by_key.get(&key).copied() {
-                parts[index] = part.clone();
-            } else {
-                parts.push(part.clone());
-                by_key.insert(key, parts.len() - 1);
-            }
-            changed = true;
-        }
-
-        if !changed {
-            return Ok(false);
-        }
-
-        parts.sort_by(|left, right| {
-            json_i64(left.get("index"))
-                .cmp(&json_i64(right.get("index")))
-                .then(
-                    gearblocks_part_instance_key(left)
-                        .unwrap_or_default()
-                        .cmp(&gearblocks_part_instance_key(right).unwrap_or_default()),
-                )
-        });
-
-        parts.len()
-    };
-
-    if let Some(object) = document.as_object_mut() {
-        object.insert(
-            "exportedAt".to_string(),
-            serde_json::Value::String(delta.emitted_at.clone()),
-        );
-        object.insert(
-            "exportKind".to_string(),
-            serde_json::Value::String("sceneDeltaPatch".to_string()),
-        );
-        object.insert("numParts".to_string(), json!(part_count));
-        object.insert(
-            "lastDeltaId".to_string(),
-            serde_json::Value::String(delta.id.clone()),
-        );
-        let mut applied = object
-            .get("appliedDeltaIds")
-            .and_then(serde_json::Value::as_array)
-            .cloned()
-            .unwrap_or_default();
-        applied.push(serde_json::Value::String(delta.id.clone()));
-        let mut seen = HashSet::new();
-        let deduped = applied
-            .into_iter()
-            .filter(|value| {
-                value
-                    .as_str()
-                    .is_some_and(|text| seen.insert(text.to_string()))
-            })
-            .collect::<Vec<_>>();
-        object.insert(
-            "appliedDeltaIds".to_string(),
-            serde_json::Value::Array(deduped),
-        );
-    }
-
-    Ok(true)
 }
 
 fn gearblocks_part_instance_key(part: &serde_json::Value) -> Option<String> {
@@ -6089,18 +7130,20 @@ fn gearblocks_part_instance_key(part: &serde_json::Value) -> Option<String> {
     None
 }
 
-fn gearblocks_part_is_player_character(part: &serde_json::Value) -> bool {
-    part.get("parentConstructionIsPlayerCharacter")
-        .and_then(serde_json::Value::as_bool)
-        .unwrap_or(false)
-}
-
 fn gearblocks_runtime_log_cursor_key(game_id: i64, log_path: &Path) -> String {
     let file_name = log_path
         .file_name()
         .and_then(|value| value.to_str())
         .unwrap_or("Player.log");
     format!("gearblocks.runtime_log_cursor.{game_id}.{file_name}")
+}
+
+fn gearblocks_runtime_log_recovery_key(game_id: i64, log_path: &Path) -> String {
+    let file_name = log_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("Player.log");
+    format!("gearblocks.runtime_log_recovery_checked.{game_id}.{file_name}")
 }
 
 fn save_gearblocks_runtime_log_cursor(
@@ -6381,6 +7424,17 @@ fn gearblocks_part_label(part: &GearBlocksRuntimePart<'_>) -> String {
     }
 }
 
+fn gearblocks_part_reference(part: &GearBlocksRuntimePart<'_>) -> String {
+    if part.parent_construction_id.trim().is_empty() {
+        format!("#{} idx {}", part.id, part.index)
+    } else {
+        format!(
+            "construction {} / #{} idx {}",
+            part.parent_construction_id, part.id, part.index
+        )
+    }
+}
+
 fn gearblocks_part_aliases_section(
     parts: &[GearBlocksRuntimePart<'_>],
     aliases: &[GameRuntimePartAliasRecord],
@@ -6477,9 +7531,8 @@ fn gearblocks_marker_coordinate_reference_section(parts: &[GearBlocksRuntimePart
             .map(|(x, y, z)| format!(" size=({x:.2},{y:.2},{z:.2})"))
             .unwrap_or_default();
         lines.push(format!(
-            "- #{} idx {} [{} / {}] {}: {} {}{}",
-            part.id,
-            part.index,
+            "- {} [{} / {}] {}: {} {}{}",
+            gearblocks_part_reference(part),
             part.system,
             part.category,
             gearblocks_part_label(part),
@@ -6501,9 +7554,496 @@ fn gearblocks_marker_coordinate_reference_section(parts: &[GearBlocksRuntimePart
             .to_string()
     } else {
         format!(
-            "## Runtime Coordinate Reference\nCoordinates are GearBlocks units; 1 unit equals 10 cm. Use coordinates for spatial reasoning, measurements, and part identification. Do not request or emit Overlay Forge marker blocks; in-game visual markers are disabled for now.\n{}",
+            "## Runtime Coordinate Reference\nCoordinates are GearBlocks units; 1 unit equals 10 cm. X controls width with Left (-X) and Right (+X); Y controls height with Down (-Y) and Up (+Y); Z controls depth with Backward (-Z) and Forward (+Z) in the game's building manipulators. For cars and car-like vehicles, always use Z for length with the front toward +Z and rear toward -Z. Use coordinates for spatial reasoning, measurements, and part identification. Do not request or emit Overlay Forge marker blocks; in-game visual markers are disabled for now.\n{}",
             lines.join("\n")
         )
+    }
+}
+
+fn gearblocks_construction_groups_section(parts: &[GearBlocksRuntimePart<'_>]) -> String {
+    let mut groups: HashMap<String, Vec<&GearBlocksRuntimePart<'_>>> = HashMap::new();
+    for part in parts
+        .iter()
+        .filter(|part| !part.parent_construction_id.trim().is_empty())
+    {
+        groups
+            .entry(part.parent_construction_id.clone())
+            .or_default()
+            .push(part);
+    }
+
+    if groups.is_empty() {
+        return "## Runtime Construction Groups\nNo parent construction groups were exposed in the latest runtime export.".to_string();
+    }
+
+    let mut rows = groups.into_iter().collect::<Vec<_>>();
+    rows.sort_by(|left, right| {
+        left.0
+            .parse::<i64>()
+            .ok()
+            .cmp(&right.0.parse::<i64>().ok())
+            .then(left.0.cmp(&right.0))
+    });
+
+    let mut lines = Vec::new();
+    for (construction_id, mut group_parts) in rows.into_iter().take(120) {
+        group_parts.sort_by(|left, right| {
+            left.index
+                .cmp(&right.index)
+                .then(left.id.cmp(&right.id))
+                .then(left.name.cmp(&right.name))
+        });
+
+        let mut inventory: HashMap<String, Vec<String>> = HashMap::new();
+        for part in &group_parts {
+            inventory
+                .entry(part.name.clone())
+                .or_default()
+                .push(format!("#{} idx {}", part.id, part.index));
+        }
+        let mut inventory_rows = inventory.into_iter().collect::<Vec<_>>();
+        inventory_rows
+            .sort_by(|left, right| right.1.len().cmp(&left.1.len()).then(left.0.cmp(&right.0)));
+
+        let inventory_text = inventory_rows
+            .into_iter()
+            .take(10)
+            .map(|(name, refs)| {
+                let total_count = refs.len();
+                let visible_refs = refs.into_iter().take(24).collect::<Vec<_>>();
+                let suffix = if total_count > visible_refs.len() {
+                    format!(", ... {} more", total_count - visible_refs.len())
+                } else {
+                    String::new()
+                };
+                format!(
+                    "{} x{} [{}{}]",
+                    name,
+                    total_count,
+                    visible_refs.join(", "),
+                    suffix
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("; ");
+
+        lines.push(format!(
+            "- construction {}: {} part(s); {}",
+            construction_id,
+            group_parts.len(),
+            inventory_text
+        ));
+    }
+
+    format!(
+        "## Runtime Construction Groups\nUse this section to reason about parts that are attached into the same GearBlocks construction. Part `#id` values can repeat across different parent constructions, so disambiguate with construction id, index, and coordinates before saying a part is missing.\n{}",
+        lines.join("\n")
+    )
+}
+
+fn gearblocks_build_guide_api_context_section() -> String {
+    [
+        "## Build Guide API Context",
+        "Use these exported GearBlocks API surfaces when explaining build guides and current scene state:",
+        "- `IPart`: part identity, category, mass, visibility/collision/selectability, world position, local position, orientation, and current unit size.",
+        "- `IPartPaint` and `IPartProperties`: paint target colour, paintability, material name, strength, density, and material swap capability.",
+        "- `IPartAttachments`, `IAttachment`, `ILinkNode`, and `ILink`: owned/associated attachments, attached parts, attachment type names, locked state, joint/interior flags, link-node type names, link availability, and connection positions.",
+        "- `ITweakables`, `IResizable`, and `IControllablePartBehaviour`: configurable settings such as tweakable labels/values, resize step, current unit size, control bindings, activation state, direction/inversion options, and RPM/limit settings when the game exposes them.",
+        "- `IEngineCrank`, `IEngineDrivenCrank`, `IEngineCylinder`, and `IEngineHead`: combustion-engine relationships, including crank, driven crank, crank shaft, linked cylinders, cylinder head, crank angle, timing angle, and current rotation speed.",
+        "If a requested value is absent, say it was not exposed in the latest export rather than guessing.",
+    ]
+    .join("\n")
+}
+
+fn gearblocks_build_guide_runtime_details_section(parts: &[GearBlocksRuntimePart<'_>]) -> String {
+    let mut sorted_parts = parts.iter().collect::<Vec<_>>();
+    sorted_parts.sort_by(|left, right| {
+        left.index
+            .cmp(&right.index)
+            .then(left.name.cmp(&right.name))
+            .then(left.category.cmp(&right.category))
+    });
+
+    let mut lines = Vec::new();
+    for part in sorted_parts {
+        let mut details = Vec::new();
+        if let Some(summary) = gearblocks_part_material_paint_summary(part.part_json) {
+            details.push(summary);
+        }
+        if let Some(summary) = gearblocks_part_attachment_summary(part.part_json) {
+            details.push(summary);
+        }
+        if let Some(summary) = gearblocks_part_link_node_summary(part.part_json) {
+            details.push(summary);
+        }
+        if let Some(summary) = gearblocks_part_tweakable_summary(part.part_json) {
+            details.push(summary);
+        }
+        if let Some(summary) = gearblocks_part_behaviour_detail_summary(part.part_json) {
+            details.push(summary);
+        }
+
+        if details.is_empty() {
+            continue;
+        }
+
+        lines.push(format!(
+            "- #{} idx {} [{} / {}] {}: {}",
+            part.id,
+            part.index,
+            part.system,
+            part.category,
+            gearblocks_part_label(part),
+            details.join("; ")
+        ));
+
+        if lines.len() >= 180 {
+            break;
+        }
+    }
+
+    if parts.len() > lines.len() {
+        let detailed_count = parts
+            .iter()
+            .filter(|part| {
+                gearblocks_part_material_paint_summary(part.part_json).is_some()
+                    || gearblocks_part_attachment_summary(part.part_json).is_some()
+                    || gearblocks_part_link_node_summary(part.part_json).is_some()
+                    || gearblocks_part_tweakable_summary(part.part_json).is_some()
+                    || gearblocks_part_behaviour_detail_summary(part.part_json).is_some()
+            })
+            .count();
+        if detailed_count > lines.len() {
+            lines.push(format!(
+                "- {} additional detailed part row(s) omitted from prompt context for size.",
+                detailed_count - lines.len()
+            ));
+        }
+    }
+
+    if lines.is_empty() {
+        "## Build Guide Runtime Details\nNo paint, attachment, link-node, tweakable, or engine detail values were exposed in the latest runtime export.".to_string()
+    } else {
+        format!(
+            "## Build Guide Runtime Details\nThese details come from the latest full runtime export. Use them to keep build-guide advice grounded in current paint/materials, attachment types, configurable settings, and engine connections.\n{}",
+            lines.join("\n")
+        )
+    }
+}
+
+fn gearblocks_part_material_paint_summary(part: &serde_json::Value) -> Option<String> {
+    let mut items = Vec::new();
+    if let Some(paint) = part.get("paint") {
+        for key in ["targetColour", "color", "colour"] {
+            let value = json_string(paint.get(key));
+            if !value.is_empty() {
+                items.push(format!("{key}={value}"));
+            }
+        }
+    }
+    if let Some(properties) = part.get("properties") {
+        let material = json_string(properties.get("materialName"));
+        if !material.is_empty() {
+            items.push(format!("material={material}"));
+        }
+        for key in ["density", "strength", "mass"] {
+            if let Some(value) = properties.get(key).and_then(serde_json::Value::as_f64) {
+                items.push(format!("{key}={value:.2}"));
+            }
+        }
+        for key in ["isPaintable", "isSwappable"] {
+            if let Some(value) = properties.get(key).and_then(serde_json::Value::as_bool) {
+                items.push(format!("{key}={value}"));
+            }
+        }
+    }
+    for key in ["isPaintable", "isMaterialSwappable"] {
+        if let Some(value) = part.get(key).and_then(serde_json::Value::as_bool) {
+            items.push(format!("{key}={value}"));
+        }
+    }
+    (!items.is_empty()).then(|| format!("paint/material {}", items.join(", ")))
+}
+
+fn gearblocks_part_attachment_summary(part: &serde_json::Value) -> Option<String> {
+    let attachments = part.get("attachments")?;
+    let mut items = Vec::new();
+    if let Some(count) = attachments
+        .get("ownedCount")
+        .and_then(serde_json::Value::as_i64)
+    {
+        items.push(format!("owned={count}"));
+    }
+    if let Some(count) = attachments
+        .get("associatedCount")
+        .and_then(serde_json::Value::as_i64)
+    {
+        items.push(format!("associated={count}"));
+    }
+    for group in ["owned", "associated"] {
+        if let Some(values) = attachments.get(group).and_then(serde_json::Value::as_array) {
+            let group_items = values
+                .iter()
+                .take(4)
+                .filter_map(gearblocks_attachment_item_summary)
+                .collect::<Vec<_>>();
+            if !group_items.is_empty() {
+                items.push(format!("{group}=[{}]", group_items.join(" | ")));
+            }
+        }
+    }
+    if let Some(attached_parts) = attachments
+        .get("attachedParts")
+        .and_then(serde_json::Value::as_array)
+    {
+        let refs = attached_parts
+            .iter()
+            .take(6)
+            .map(gearblocks_runtime_ref_label)
+            .filter(|value| !value.is_empty())
+            .collect::<Vec<_>>();
+        if !refs.is_empty() {
+            items.push(format!("attachedParts=[{}]", refs.join(", ")));
+        }
+    }
+    (!items.is_empty()).then(|| format!("attachments {}", items.join(", ")))
+}
+
+fn gearblocks_attachment_item_summary(value: &serde_json::Value) -> Option<String> {
+    let mut items = Vec::new();
+    for key in ["typeName", "type"] {
+        let text = json_string(value.get(key));
+        if !text.is_empty() {
+            items.push(format!("{key}={text}"));
+        }
+    }
+    for key in ["isLocked", "isInterior", "isJointAttachment"] {
+        if let Some(flag) = value.get(key).and_then(serde_json::Value::as_bool) {
+            items.push(format!("{key}={flag}"));
+        }
+    }
+    if let Some(owner) = value.get("ownerPart") {
+        let label = gearblocks_runtime_ref_label(owner);
+        if !label.is_empty() {
+            items.push(format!("owner={label}"));
+        }
+    }
+    if let Some(connected) = value.get("connectedPart") {
+        let label = gearblocks_runtime_ref_label(connected);
+        if !label.is_empty() {
+            items.push(format!("connected={label}"));
+        }
+    }
+    for key in ["ownerPosition", "connectedPosition"] {
+        if let Some(position) = value.get(key).and_then(gearblocks_vector_label) {
+            items.push(format!("{key}={position}"));
+        }
+    }
+    (!items.is_empty()).then(|| items.join(" "))
+}
+
+fn gearblocks_part_link_node_summary(part: &serde_json::Value) -> Option<String> {
+    let link_nodes = part.get("linkNodes")?.as_array()?;
+    if link_nodes.is_empty() {
+        return None;
+    }
+    let items = link_nodes
+        .iter()
+        .take(6)
+        .map(|node| {
+            let mut values = Vec::new();
+            let type_name = json_string(node.get("typeName"));
+            if !type_name.is_empty() {
+                values.push(format!("type={type_name}"));
+            }
+            for key in [
+                "hasLinks",
+                "linkFromAvailable",
+                "linkToAvailable",
+                "isTypeHidden",
+            ] {
+                if let Some(flag) = node.get(key).and_then(serde_json::Value::as_bool) {
+                    values.push(format!("{key}={flag}"));
+                }
+            }
+            if let Some(position) = node.get("position").and_then(gearblocks_vector_label) {
+                values.push(format!("world={position}"));
+            }
+            if let Some(position) = node.get("localPosition").and_then(gearblocks_vector_label) {
+                values.push(format!("local={position}"));
+            }
+            values.join(" ")
+        })
+        .filter(|value| !value.is_empty())
+        .collect::<Vec<_>>();
+    (!items.is_empty()).then(|| format!("linkNodes {}", items.join(" | ")))
+}
+
+fn gearblocks_part_tweakable_summary(part: &serde_json::Value) -> Option<String> {
+    let tweakables = part.get("tweakables")?;
+    let mut items = Vec::new();
+    if let Some(count) = tweakables
+        .get("numTweakables")
+        .and_then(serde_json::Value::as_i64)
+    {
+        items.push(format!("count={count}"));
+    }
+    if let Some(values) = tweakables
+        .get("tweakables")
+        .and_then(serde_json::Value::as_array)
+    {
+        let visible = values
+            .iter()
+            .take(12)
+            .map(gearblocks_compact_json_value)
+            .filter(|value| !value.is_empty())
+            .collect::<Vec<_>>();
+        if !visible.is_empty() {
+            items.push(format!("values=[{}]", visible.join(", ")));
+        }
+    }
+    if let Some(flag) = tweakables
+        .get("syncTweakablesAvailable")
+        .and_then(serde_json::Value::as_bool)
+    {
+        items.push(format!("syncAvailable={flag}"));
+    }
+    (!items.is_empty()).then(|| format!("tweakables {}", items.join(", ")))
+}
+
+fn gearblocks_part_behaviour_detail_summary(part: &serde_json::Value) -> Option<String> {
+    let behaviours = part.get("behaviours")?.as_array()?;
+    let items = behaviours
+        .iter()
+        .take(10)
+        .map(gearblocks_behaviour_item_summary)
+        .filter(|value| !value.is_empty())
+        .collect::<Vec<_>>();
+    (!items.is_empty()).then(|| format!("behaviours {}", items.join(" | ")))
+}
+
+fn gearblocks_behaviour_item_summary(behaviour: &serde_json::Value) -> String {
+    let mut items = Vec::new();
+    let name = json_string(behaviour.get("name"));
+    if !name.is_empty() {
+        items.push(name);
+    }
+    for key in [
+        "isTweakable",
+        "isActivatable",
+        "isActivated",
+        "isControllable",
+        "isControlBound",
+        "isControlOverridden",
+        "onlyControlWhenPlayerLocked",
+    ] {
+        if let Some(flag) = behaviour.get(key).and_then(serde_json::Value::as_bool) {
+            items.push(format!("{key}={flag}"));
+        }
+    }
+    let control_info = json_string(behaviour.get("controlInfo"));
+    if !control_info.is_empty() {
+        items.push(format!("control={control_info}"));
+    }
+    for key in [
+        "capacityRemaining",
+        "capacityUsed",
+        "numLinkedCylinders",
+        "currentRotationSpeed",
+        "crankAngle",
+        "timingAngle",
+    ] {
+        if let Some(value) = behaviour.get(key) {
+            let text = gearblocks_compact_json_value(value);
+            if !text.is_empty() && text != "null" {
+                items.push(format!("{key}={text}"));
+            }
+        }
+    }
+    for key in ["drivenCrank", "crankShaft", "crank", "head", "cylinder"] {
+        if let Some(reference) = behaviour.get(key) {
+            let label = gearblocks_runtime_ref_label(reference);
+            if !label.is_empty() {
+                items.push(format!("{key}={label}"));
+            }
+        }
+    }
+    if let Some(linked) = behaviour
+        .get("linkedCylinders")
+        .and_then(serde_json::Value::as_array)
+    {
+        let refs = linked
+            .iter()
+            .take(8)
+            .map(gearblocks_runtime_ref_label)
+            .filter(|value| !value.is_empty())
+            .collect::<Vec<_>>();
+        if !refs.is_empty() {
+            items.push(format!("linkedCylinders=[{}]", refs.join(", ")));
+        }
+    }
+    items.join(" ")
+}
+
+fn gearblocks_runtime_ref_label(value: &serde_json::Value) -> String {
+    if value.is_null() {
+        return String::new();
+    }
+    let mut label = json_string(value.get("name"));
+    if label.is_empty() {
+        label = json_string(value.get("assetName"));
+    }
+    if label.is_empty() {
+        label = json_string(value.get("type"));
+    }
+    if label.is_empty() {
+        label = json_string(value.get("typeName"));
+    }
+    let id = value
+        .get("id")
+        .and_then(serde_json::Value::as_i64)
+        .map(|id| format!("id={id}"));
+    let index = value
+        .get("index")
+        .and_then(serde_json::Value::as_i64)
+        .map(|index| format!("idx={index}"));
+    match (label.is_empty(), id, index) {
+        (true, None, None) => String::new(),
+        (true, id, index) => [id, index]
+            .into_iter()
+            .flatten()
+            .collect::<Vec<_>>()
+            .join("/"),
+        (false, None, None) => label,
+        (false, id, index) => format!(
+            "{} ({})",
+            label,
+            [id, index]
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>()
+                .join("/")
+        ),
+    }
+}
+
+fn gearblocks_vector_label(value: &serde_json::Value) -> Option<String> {
+    json_vector3(value).map(|(x, y, z)| format!("({x:.2},{y:.2},{z:.2})"))
+}
+
+fn gearblocks_compact_json_value(value: &serde_json::Value) -> String {
+    let text = match value {
+        serde_json::Value::String(text) => text.trim().to_string(),
+        serde_json::Value::Number(_) | serde_json::Value::Bool(_) | serde_json::Value::Null => {
+            value.to_string()
+        }
+        serde_json::Value::Array(_) | serde_json::Value::Object(_) => value.to_string(),
+    };
+    if text.len() > 120 {
+        let truncated = text.chars().take(120).collect::<String>();
+        format!("{truncated}...")
+    } else {
+        text
     }
 }
 
@@ -6964,10 +8504,7 @@ fn safe_filename_part(value: &str) -> String {
     let mut previous_was_separator = false;
 
     for character in value.trim().chars() {
-        if character.is_ascii_alphanumeric() {
-            output.push(character);
-            previous_was_separator = false;
-        } else if matches!(character, '-' | '_') {
+        if character.is_ascii_alphanumeric() || matches!(character, '-' | '_') {
             output.push(character);
             previous_was_separator = false;
         } else if !previous_was_separator && !output.is_empty() {

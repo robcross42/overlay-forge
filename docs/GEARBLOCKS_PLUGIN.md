@@ -2,13 +2,13 @@
 
 ## Status
 
-GearBlocks BepInEx plugin work is currently backlog.
+GearBlocks direct BepInEx plugin work is active for Unity-side part preview rendering.
 
-The source templates and command code remain in the repository, but active GearBlocks chat should not request marker placement, emit `overlay-forge-markers` blocks, or require BepInEx/GearLib installation while marker rendering is paused.
+Marker rendering remains paused. Active GearBlocks chat should not request marker placement, emit `overlay-forge-markers` blocks, or require GearLib installation while marker rendering is paused.
 
 ## Direct Overlay Forge BepInEx Plugin
 
-Overlay Forge owns a direct GearBlocks BepInEx plugin template for future in-game features that are not practical through GearBlocks Lua alone.
+Overlay Forge owns a direct GearBlocks BepInEx plugin template for in-game features that are not practical through GearBlocks Lua alone.
 
 Source template:
 
@@ -26,13 +26,55 @@ Do not commit copied reference DLLs, BepInEx DLLs, GearBlocks interop DLLs, Unit
 
 ## Backlog Purpose
 
-The first direct plugin experiment was a file-backed command channel for temporary visual markers.
+The current direct plugin experiment is a file-backed Unity runtime bridge.
+
+The active command captures a centered part preview PNG from the object under the active camera crosshair:
+
+```json
+{
+  "action": "capture_center_part_preview",
+  "id": "beam-x3-preview",
+  "label": "Beam x3",
+  "width": 1024,
+  "height": 576,
+  "yawDegrees": 35,
+  "pitchDegrees": 28,
+  "partRotationXDegrees": 0,
+  "partRotationYDegrees": 0,
+  "partRotationZDegrees": 0
+}
+```
+
+The plugin raycasts from the center of the active camera, clones the hit object's renderers into an isolated Unity preview layer, applies optional part rotation around the captured preview center, renders only the part/object on a neutral background with thin dark crease/boundary edges for low-contrast faces, and writes:
+
+```text
+<GearBlocks persistent data>\OverlayForgePlugin\renders\<id>.png
+<GearBlocks persistent data>\OverlayForgePlugin\status\<id>.json
+```
+
+`yawDegrees` and `pitchDegrees` control the preview camera view. `partRotationXDegrees`, `partRotationYDegrees`, and `partRotationZDegrees` rotate the cloned part/object itself and can be any degree value, including full 360-degree sweeps on each axis.
+
+The status JSON includes the render path, source object name, label, renderer names/count, edge-line counts, camera view angles, part rotation angles, output dimensions, source bounds, and timestamp.
+
+Overlay Forge can persist a successful status capture as a GearBlocks part render profile through `save_gearblocks_part_render_profile_from_capture`. The profile stores the canonical orientation, source/renderer diagnostics, framing metadata, edge metadata, latest status JSON, and latest render cache path in SQLite while leaving generated PNG files under `OverlayForgePlugin\renders`.
+
+Profiles are intended to support on-demand rotated render requests. Overlay Forge should keep one validated canonical profile per part shape, then request or cache only the specific rotations needed by a build guide instead of pre-rendering every rotation combination.
+
+Individual part preview images intentionally do not include grid planes, axis markers, orientation labels, or rotation guidance. They may include object-edge definition so white or low-contrast parts remain readable. If Unity marks a mesh as non-readable, the plugin skips edge extraction for that mesh and still renders the part material. Build-step image generation owns grid and axis display when composing one or more part previews into a placement diagram.
+
+Preview fallback selection ignores huge environment renderers such as boundary indicators so missed part hierarchy lookups fail clearly instead of producing blank-looking boundary captures.
+
+During the current part-preview iteration loop, Overlay Forge routes the configured Mouse5 shortcut action to this command instead of screenshot capture. Each press writes the next available test command id, such as `test-part-preview-1`, `test-part-preview-2`, and so on. Finalized part captures will use stable part-specific ids later.
+
+Current gap: the active command still starts from the live part under the camera center. A future targetless render command needs either a stable way to re-find a saved source object in the loaded scene, a GearBlocks/Unity path to spawn a part by asset identity into a hidden preview scene, or a cache-on-demand workflow that asks the user to target the part only when a missing profile or rotation is needed.
+
+The earlier direct plugin experiment was a file-backed command channel for temporary visual markers.
 
 Overlay Forge writes command JSON files. The plugin polls those commands from inside GearBlocks.
 
 If marker work resumes, this remains the likely path for AI-directed temporary block or surface references because the Lua script API is not expected to provide enough control over surface hit points, world-space drawing, or runtime-only marker objects.
 
-Current active behavior: marker commands are not prompted, surfaced, or sent from GearBlocks chat.
+Current active marker behavior: marker commands are not prompted, surfaced, or sent from GearBlocks chat.
 
 ## Runtime Command Folder
 
@@ -132,6 +174,7 @@ The ignored workspace `libs` folder must contain required local GearBlocks/BepIn
 
 ```text
 UnityEngine.IMGUIModule.dll
+UnityEngine.ImageConversionModule.dll
 ```
 
 For a standard BepInEx install, this can be copied from:

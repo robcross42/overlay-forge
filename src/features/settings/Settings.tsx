@@ -8,6 +8,7 @@ import {
   saveOpenAiApiKey
 } from "../../services/settings";
 import type { ApiKeyStatus, KeybindRecord } from "../../services/settings";
+import { formatUnknownError as formatError } from "../../utils/errors";
 
 type CaptureTarget = {
   action: string;
@@ -418,8 +419,4 @@ function validateKeybind(value: string) {
 
 function isPrintableKey(key: string) {
   return /^[A-Z0-9]$/.test(key) || key === "Space" || /^[,./;'[\]\\`=-]$/.test(key);
-}
-
-function formatError(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
 }

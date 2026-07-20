@@ -14,6 +14,53 @@ export type GameInput = {
   summary: string;
 };
 
+export type GameSetting = {
+  id: number;
+  gameId: number;
+  idGame: number;
+  settingKey: string;
+  settingValueJson: string;
+  schemaJson: string;
+  createdAt: string;
+  modifiedAt: string;
+};
+
+export type GameCharacterBuild = {
+  id: number;
+  gameId: number;
+  idGame: number;
+  title: string;
+  characterClass: string;
+  ascendancy: string;
+  buildRole: string;
+  status: string;
+  sourceLabel: string;
+  sourceUrl: string;
+  patch: string;
+  summary: string;
+  tags: string;
+  notes: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GameCharacterBuildInput = {
+  gameId: number;
+  title: string;
+  characterClass: string;
+  ascendancy: string;
+  buildRole: string;
+  status: string;
+  sourceLabel: string;
+  sourceUrl: string;
+  patch: string;
+  summary: string;
+  tags: string;
+  notes: string;
+  isActive: boolean;
+};
+
 export type GameScreenshotCaptureRequest = {
   id: number;
   gameId: number;
@@ -155,6 +202,42 @@ export type GameRuntimeConstructionExport = {
   updatedAt: string;
 };
 
+export type GearBlocksPartRenderProfile = {
+  id: number;
+  gameId: number;
+  profileKey: string;
+  partKey: string;
+  partName: string;
+  sourceObjectName: string;
+  rendererNamesJson: string;
+  canonicalRotationJson: string;
+  cameraPresetJson: string;
+  boundsCenterJson: string;
+  boundsSizeJson: string;
+  edgeSettingsJson: string;
+  latestRenderPath: string;
+  latestCaptureId: string;
+  latestStatusJson: string;
+  renderVersion: number;
+  isValidated: boolean;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type GearBlocksPartRenderProfileInput = {
+  gameId: number;
+  captureId: string;
+  profileKey: string;
+  partName: string;
+  partKey?: string;
+  canonicalRotationXDegrees?: number;
+  canonicalRotationYDegrees?: number;
+  canonicalRotationZDegrees?: number;
+  isValidated?: boolean;
+  notes?: string;
+};
+
 export type GearBlocksApiType = {
   id: number;
   namespace: string;
@@ -222,6 +305,17 @@ export type GearBlocksApiCatalog = {
   members: GearBlocksApiMember[];
   parameters: GearBlocksApiParameter[];
   enumValues: GearBlocksApiEnumValue[];
+};
+
+export type GearBlocksApiImportResult = {
+  source: string;
+  sourceVersion: string;
+  docsRoot: string;
+  fetchedPages: number;
+  importedTypeCount: number;
+  importedMemberCount: number;
+  importedParameterCount: number;
+  importedEnumValueCount: number;
 };
 
 export type GameRuntimePartApiMember = {
@@ -303,6 +397,39 @@ export type GameRuntimePart = {
   updatedAt: string;
 };
 
+export type GameRuntimePartInstance = {
+  id: number;
+  gameId: number;
+  partDefinitionId: number;
+  partKey: string;
+  assetGuid: string;
+  assetName: string;
+  displayName: string;
+  fullDisplayName: string;
+  category: string;
+  sourceExportId: string;
+  sourceConstructionId: string;
+  partInstanceKey: string;
+  runtimePartId: number;
+  runtimePartIndex: number;
+  mass: number;
+  worldX: number | null;
+  worldY: number | null;
+  worldZ: number | null;
+  localX: number | null;
+  localY: number | null;
+  localZ: number | null;
+  worldPositionJson: string;
+  localPositionJson: string;
+  currentUnitSizeJson: string;
+  linkNodeCount: number;
+  behaviourNamesJson: string;
+  dynamicSummaryJson: string;
+  lastSeenAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type GameCatalogObject = {
   id: number;
   gameId: number;
@@ -361,6 +488,7 @@ export type GameBuildGuide = {
   buildGoal: string;
   scaleReference: string;
   geometryNotes: string;
+  glossaryText: string;
   checklistJson: string;
   overlayX: number | null;
   overlayY: number | null;
@@ -398,6 +526,7 @@ export type GameBuildGuidePayload = {
   parts: GameBuildGuidePart[];
   steps: GameBuildGuideStep[];
   checklist: string[];
+  imageReferenceCount: number;
 };
 
 export type GameBuildGuideOverlaySelection = {
@@ -411,6 +540,30 @@ export function listGames() {
 
 export function createGame(input: GameInput) {
   return invoke<Game>("create_game", input);
+}
+
+export function getGameSetting(gameId: number, settingKey: string) {
+  return invoke<GameSetting | null>("get_game_setting", { gameId, settingKey });
+}
+
+export function listGameCharacterBuilds(gameId: number) {
+  return invoke<GameCharacterBuild[]>("list_game_character_builds", { gameId });
+}
+
+export function createGameCharacterBuild(input: GameCharacterBuildInput) {
+  return invoke<GameCharacterBuild>("create_game_character_build", { input });
+}
+
+export function updateGameCharacterBuild(id: number, input: GameCharacterBuildInput) {
+  return invoke<GameCharacterBuild>("update_game_character_build", { id, input });
+}
+
+export function setActiveGameCharacterBuild(id: number) {
+  return invoke<GameCharacterBuild>("set_active_game_character_build", { id });
+}
+
+export function deleteGameCharacterBuild(id: number) {
+  return invoke<void>("delete_game_character_build", { id });
 }
 
 export function deleteGame(id: number) {
@@ -502,6 +655,10 @@ export function listGearBlocksApiCatalog() {
   return invoke<GearBlocksApiCatalog>("list_gearblocks_api_catalog");
 }
 
+export function importGearBlocksOfficialApiDocs() {
+  return invoke<GearBlocksApiImportResult>("import_gearblocks_official_api_docs");
+}
+
 export function importGearBlocksRuntimePartIndex(gameId: number) {
   return invoke<GameRuntimePart[]>("import_gearblocks_runtime_part_index", { gameId });
 }
@@ -522,11 +679,34 @@ export function listGameRuntimeParts(gameId: number) {
   return invoke<GameRuntimePart[]>("list_game_runtime_parts", { gameId });
 }
 
+export function listGameRuntimePartInstances(gameId: number) {
+  return invoke<GameRuntimePartInstance[]>("list_game_runtime_part_instances", { gameId });
+}
+
 export function listGameRuntimePartApiMembers(gameId: number, partId: number) {
   return invoke<GameRuntimePartApiMember[]>("list_game_runtime_part_api_members", {
     gameId,
     partId
   });
+}
+
+export function listGearBlocksRotationSnapAngles() {
+  return invoke<number[]>("list_gearblocks_rotation_snap_angles");
+}
+
+export function listGearBlocksPartRenderProfiles(gameId: number) {
+  return invoke<GearBlocksPartRenderProfile[]>("list_gearblocks_part_render_profiles", {
+    gameId
+  });
+}
+
+export function saveGearBlocksPartRenderProfileFromCapture(
+  input: GearBlocksPartRenderProfileInput
+) {
+  return invoke<GearBlocksPartRenderProfile>(
+    "save_gearblocks_part_render_profile_from_capture",
+    { input }
+  );
 }
 
 export function setGameRuntimePartDisplayImage(
@@ -620,6 +800,13 @@ export function importGameBuildGuideMarkdown(gameId: number, markdownPath: strin
   });
 }
 
+export function importGameBuildGuideUrl(gameId: number, guideUrl: string) {
+  return invoke<GameBuildGuidePayload>("import_game_build_guide_url", {
+    gameId,
+    guideUrl
+  });
+}
+
 export function createGameBuildGuideFromChat(conversationId: number, buildGoal: string) {
   return invoke<GameBuildGuidePayload>("create_game_build_guide_from_chat", {
     conversationId,
@@ -629,6 +816,10 @@ export function createGameBuildGuideFromChat(conversationId: number, buildGoal: 
 
 export function getGameBuildGuide(guideId: number) {
   return invoke<GameBuildGuidePayload>("get_game_build_guide", { guideId });
+}
+
+export function deleteGameBuildGuide(guideId: number) {
+  return invoke<void>("delete_game_build_guide", { guideId });
 }
 
 export function openGameBuildGuideOverlayWindow(gameId: number, guideId: number) {
@@ -664,12 +855,14 @@ export function listGameChatMessages(conversationId: number) {
 export function sendGameChatMessage(
   conversationId: number,
   content: string,
-  screenshotIds: number[] = []
+  screenshotIds: number[] = [],
+  includeSceneDiff = false
 ) {
   return invoke<GameChatMessage[]>("send_game_chat_message", {
     conversationId,
     content,
-    screenshotIds
+    screenshotIds,
+    includeSceneDiff
   });
 }
 

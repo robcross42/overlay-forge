@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createNote, deleteNote, listNotes, updateNote } from "../../services/notes";
 import type { Note } from "../../services/notes";
+import { formatUnknownError as formatError } from "../../utils/errors";
 
 type NoteMode = "idle" | "create" | "view" | "edit";
 
@@ -162,8 +163,4 @@ export function Notes() {
       </div>
     </section>
   );
-}
-
-function formatError(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
 }

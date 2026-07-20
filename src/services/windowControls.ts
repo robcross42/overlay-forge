@@ -46,8 +46,7 @@ export async function applyStandaloneOverlayFocusState(window: TauriWindow = ove
       getOverlayForgeForegroundWindowLabel().catch(() => null)
     ]);
     const overlayIsForeground =
-      currentWindowFocused ||
-      (foregroundOverlayLabel !== null && foregroundOverlayLabel !== window.label);
+      currentWindowFocused || foregroundOverlayLabel === window.label;
 
     document.documentElement.classList.toggle("standalone-overlay-focused", overlayIsForeground);
     document.documentElement.classList.toggle("standalone-overlay-unfocused", !overlayIsForeground);

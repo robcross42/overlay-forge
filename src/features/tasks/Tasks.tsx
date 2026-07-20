@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createTask, deleteTask, listTasks, updateTask } from "../../services/tasks";
 import type { Task } from "../../services/tasks";
+import { formatUnknownError as formatError } from "../../utils/errors";
 
 const emptyTask = {
   title: "",
@@ -212,8 +213,4 @@ function showNativePicker(input: HTMLInputElement) {
 
 function formatDeadline(deadline: string) {
   return deadline.replace("T", " ");
-}
-
-function formatError(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
 }

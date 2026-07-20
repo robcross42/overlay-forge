@@ -24,6 +24,9 @@ The stack-specific model is:
 - Rust uses structs, impl blocks, enums, traits, services, repositories, and modules rather than Java-style inheritance.
 - Tauri command handlers stay thin and delegate business logic to services, repositories, or domain methods.
 - SQLite access and row mapping should be centralized by persisted domain concept.
+- Long command, service, and repository argument lists should be converted into typed request, draft, options, or parameter structs when the values describe one domain operation.
+- Repeated frontend helpers such as unknown-error formatting, timestamp labels, local storage keys, Markdown cleanup, and command payload normalization should live in shared utilities or domain helpers.
+- Large source files should be split by domain boundary before they become dumping grounds for unrelated behavior.
 
 For non-trivial code changes, implementation notes should identify the domain concept involved, the reusable abstraction added or reused, duplicate logic removed, regression risk reduced, and tests added or updated. If no abstraction is needed, the implementation note should explain why.
 
@@ -44,6 +47,8 @@ src/
 Feature modules should keep UI state local where possible and call backend-owned Tauri commands for persistence, filesystem access, secret-backed requests, game capture, runtime import, and other privileged operations.
 
 React components should remain function components with hooks unless a specific task documents why a class component is needed. Components should not own backend business rules, persistence rules, or Tauri window lifecycle behavior.
+
+Shared frontend utility behavior belongs under focused utility or service modules rather than being redefined inside feature components.
 
 ## UI Consistency Rules
 
@@ -69,26 +74,25 @@ The Tauri backend owns:
 - Task CRUD commands.
 - Note CRUD commands.
 - Calendar event CRUD commands.
-- Project CRUD commands.
-- Planning conversation and message CRUD commands.
 - Backend-only OpenAI Responses API request handling.
-- Project-scoped GitHub repository link commands.
-- Backend-only GitHub repository metadata fetch handling.
 - YouTube reference CRUD commands.
 - YouTube URL validation and external-open handling.
-- Planning conversation context attachment commands.
-- Prompt Preview commands.
-- Project Markdown context configuration and loading.
+- Media Library repositories, progress rules, TMDB requests, availability caching, and safe external-open handling.
 - Gaming and screenshot capture commands.
 - GearBlocks saved construction decoding and runtime import.
 - GearBlocks API catalog and runtime API availability indexing.
 - Game build guide import, persistence, and overlay-window commands.
 - Smoking Cessation event and settings commands.
+- Repair Resell source registry, manual import, conservative public refresh, listing persistence, keyword/category rules, watchlist, and manual deal estimates.
 - Scheduler commands and backend worker dispatch.
 - Global hotkey registration.
 - Window show/hide behavior.
 
+The former Projects module command surface has been removed. Legacy project, planning conversation, bridge draft, project Markdown, and project GitHub SQLite tables remain in the database layer only to preserve old local data.
+
 Backend command handlers should receive input, validate it, call a service, repository, or domain method, and return typed results. They should not manually construct complex domain objects inline, duplicate defaults, duplicate SQLite access logic, or own large procedural feature implementations.
+
+Broad backend cleanup should include `cargo clippy --all-targets` when practical. Clear no-risk Clippy warnings should be fixed immediately. Larger warnings, such as high-arity persistence methods that need typed parameter structs, should be captured as explicit refactor work rather than suppressed silently.
 
 ## Persistence Boundary
 
@@ -106,6 +110,8 @@ New persistence should follow the current naming convention:
 Avoid table-per-game settings. Use `obj_game_setting` or a normalized feature table keyed by `game_id` and `id_game`.
 
 Do not scatter SQL row mapping across unrelated files. Each persisted domain concept should have one canonical mapping path between database rows, domain objects, database insert/update payloads, and frontend DTOs where needed.
+
+SQLite access should surface recoverable infrastructure failures through `Result` values. Repository methods should not panic on normal database lock or mapping failures.
 
 Generated screenshots, manifests, runtime game data, copied DLLs, plugin build output, and local workspaces should remain ignored by git.
 
@@ -137,13 +143,15 @@ WindowStateRepository
   SQLite-backed persistence for size, position, visibility, and related state
 ```
 
+The primary `Main` overlay is transient: it is not always-on-top and hides when it loses focus. Standalone `GameChat` and `GameBuildGuide` windows remain always-on-top and must not inherit the main window's focus-loss behavior.
+
 `WindowKind` should be an enum, not scattered string labels. `StandaloneWindowConfig` and `OverlayWindowConfig` should compose `BaseWindowConfig` rather than model Java-style inheritance.
 
 Before changing window behavior, inspect all existing creation paths. If more than one file constructs windows, sets default options, generates labels, restores geometry, or handles standalone-window configuration, consolidate the shared path before applying the feature or fix.
 
 ## OpenAI Boundary
 
-Project Chat calls the OpenAI Responses API from the Rust/Tauri backend. React invokes local Tauri commands only and never reads `OPENAI_API_KEY`.
+Game chat and build-guide features call the OpenAI Responses API from the Rust/Tauri backend. React invokes local Tauri commands only and never reads `OPENAI_API_KEY`.
 
 Model selection, request shape, and assistant instructions should stay centralized in backend OpenAI service code so frontend components do not leak API details or secrets.
 
@@ -153,55 +161,20 @@ Codex implementation happens directly in VS Code against the repository.
 
 Overlay Forge repository docs should provide project context, constraints, and validation expectations. The app should not automate VS Code/Codex implementation workflows unless the user explicitly scopes a future feature for that.
 
-## GitHub Boundary
+## Retired Projects Data Boundary
 
-GitHub repository metadata fetches are backend-owned.
+The former Projects module is retired. Its frontend feature folder, planning-chat UI, project services, project-scoped GitHub service, and active Tauri command registration have been removed.
 
-React invokes local Tauri commands and never receives `GITHUB_TOKEN`. The token is read from the Rust process environment, is not stored in SQLite, and is not passed into frontend state.
+Retained legacy SQLite data includes:
 
-SQLite stores repository linkage and fetched metadata/status only:
-
-```text
-project_id
-repository_full_name
-repository_url
-default_branch
-visibility
-last_fetched_at
-last_fetch_status
-```
-
-The existing GitHub integration is project-scoped. Do not add write operations, branch creation, commit creation, pull request creation, issue management, repository file browsing, GitHub Actions integration, OAuth, or multi-account behavior unless explicitly requested.
-
-## Project Context Boundary
-
-Manual context attachments are conversation-scoped links to existing local app records.
-
-Supported source types:
-
-- Project details.
+- Project records.
+- Planning conversations and messages.
+- Conversation context attachment links.
+- Bridge file drafts.
+- Project Markdown context configuration.
 - Project GitHub repository metadata.
-- Notes.
-- Tasks.
-- Calendar events.
-- YouTube references.
-- Scratchpad content.
 
-The attachment layer stores links only. Removing an attachment removes only the link and must not delete the source record.
-
-## Prompt Preview Boundary
-
-Prompt Preview is scoped to selected-project Chat. It uses existing local project, conversation, draft message, and attached context data to show a read-only preview of the intended prompt/context package.
-
-Prompt Preview must not call OpenAI, mutate chat history, send messages, rewrite prompts, or change model request paths.
-
-## Project Markdown Context Boundary
-
-A selected project can store a configured local documentation root and README path in SQLite.
-
-The backend reads a fresh copy of `README.md`, known local documentation paths, and explicit Markdown references found in README whenever context is loaded.
-
-Markdown resolution is constrained to the configured local project root. Unsafe path traversal, absolute paths, external URLs, missing files, unreadable files, non-Markdown files, and files resolving outside the root must be skipped or warned about instead of crashing the app.
+Do not restore commands, UI, GitHub token usage, project chat, prompt preview, bridge drafts, or Markdown context loading without an explicit future design.
 
 ## YouTube Boundary
 
@@ -220,6 +193,24 @@ Screenshot image bytes are stored as PNG files under `game-screenshots/`. SQLite
 Game build guides are imported from user-selected Markdown files into normalized SQLite rows. The independent build-guide overlay window is shell-owned like the game chat overlay: Rust/Tauri stores the active guide selection, applies persisted bounds, and exposes a keybind-driven show/hide path. The overlay renders narrow, stacked rows rather than wide tables so it can stay pinned to the left or right side of the screen during gameplay.
 
 See `docs/GAMING_SCREENSHOTS.md` for capture behavior.
+
+## Media Library Boundary
+
+Media Library is a shell-hosted feature with a focused Rust domain boundary:
+
+- `MediaMetadataProvider` isolates provider-specific request and response mapping.
+- `TmdbMediaMetadataProvider` owns authenticated TMDB API v3 requests.
+- `MediaCatalogService` owns search, import, normalization, and refresh orchestration.
+- `MediaLibraryService` owns local entries, queue order, tags, settings, and user fields.
+- `MediaProgressService` owns movie and episodic progress plus automatic status transitions.
+- `MediaAvailabilityService` owns cached provider snapshots, manual links, preferred-link resolution, and safe external targets.
+- `MediaRepository` owns canonical SQLite row mapping and cross-table transactions.
+
+React calls typed Tauri commands only. It does not access the TMDB token, send viewing history to TMDB, own progress transitions, or perform remote catalogue requests.
+
+SQLite remains authoritative for notes, ratings, favourites, tags, Watch Next order, manual links, and viewing history. Provider refresh can update normalized catalogue metadata and provider cache only. Refresh must preserve all user-owned state and previous provider rows on temporary failure.
+
+TMDB image paths are converted only to official `image.tmdb.org` URLs in the media UI. The module does not act as a general URL image proxy. See `docs/MEDIA_LIBRARY.md`.
 
 ## GearBlocks Boundary
 
@@ -247,6 +238,16 @@ Smoking Cessation is a local-first core feature module. The React feature reads 
 The module may render a narrow Markdown export under app data for personal context review, but SQLite remains the source of truth.
 
 See `docs/SMOKING_CESSATION.md`.
+
+## Repair Resell Boundary
+
+Repair Resell is a local-first utility module for tracking buy -> repair/refurbish -> resell candidates. React renders filters, source controls, manual import, watchlist toggles, and estimate forms. Persistence, source refresh, keyword/category rules, listing snapshots, and deal calculations are backend-owned through Tauri commands.
+
+SQLite stores the source registry, search profiles, listings, snapshots, deterministic keyword/category mappings, watchlist entries, travel profiles, and manual estimates. The scraper layer is allowlist/source-record based, manually triggered, uses normal HTTP fetch for public sources only, and falls back to manual import when a source is disabled, private, login-gated, or unstable.
+
+The module does not perform LLM analysis, OpenAI calls, credentialed scraping, account login, browser automation, bidding, buying, seller messaging, payment, or checkout workflows.
+
+Future pickup planning, repair knowledge-base, inventory, parts, sales, analytics, and restoration-learning features should continue through backend services and SQLite repositories rather than moving business rules into React. See `docs/REPAIR_RESELL.md` for the module vision.
 
 ## Scheduler Boundary
 

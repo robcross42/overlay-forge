@@ -3,7 +3,8 @@ use std::error::Error;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use crate::{commands, AppState};
+use crate::windows::{WindowKind, WindowManager};
+use crate::{commands, lifecycle, AppState};
 use serde::{Deserialize, Serialize};
 use tauri::{App, Emitter, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
@@ -12,12 +13,9 @@ const KEYBINDS_SETTING_KEY: &str = "keybinds_v1";
 const TOGGLE_OVERLAY_ACTION: &str = "toggle_overlay";
 const TOGGLE_OVERLAY_WAS_VISIBLE_ACTION: &str = "toggle_overlay_was_visible";
 const TOGGLE_OVERLAY_WAS_HIDDEN_ACTION: &str = "toggle_overlay_was_hidden";
-const MAIN_WINDOW_LABEL: &str = "main";
-const GAME_CHAT_WINDOW_LABEL: &str = "game-chat";
-const GAME_BUILD_GUIDE_WINDOW_LABEL: &str = "game-build-guide";
 const GAME_CHAT_OVERLAY_ACTION: &str = "game_chat_overlay";
 const GAME_CHAT_OVERLAY_WAS_HIDDEN_ACTION: &str = "game_chat_overlay_was_hidden";
-const GAME_CHAT_SCREENSHOT_CAPTURE_ACTION: &str = "game_chat_region_capture";
+const GAME_PART_PREVIEW_CAPTURE_ACTION: &str = "game_chat_region_capture";
 const GAME_BUILD_GUIDE_OVERLAY_ACTION: &str = "game_build_guide_overlay";
 const RECORD_SMOKING_EVENT_ACTION: &str = "record_smoking_event";
 
@@ -55,13 +53,8 @@ pub fn register_toggle_hotkey(app: &mut App) -> Result<(), Box<dyn Error>> {
                             GAME_CHAT_OVERLAY_ACTION => {
                                 trigger_game_chat_overlay_shortcut(app);
                             }
-                            GAME_CHAT_SCREENSHOT_CAPTURE_ACTION => {
-                                remember_foreground_window_as_game(app);
-                                set_pending_shortcut_action(
-                                    app,
-                                    GAME_CHAT_SCREENSHOT_CAPTURE_ACTION,
-                                );
-                                let _ = app.emit("game-chat-screenshot-capture-requested", ());
+                            GAME_PART_PREVIEW_CAPTURE_ACTION => {
+                                trigger_gearblocks_part_preview_shortcut(app);
                             }
                             GAME_BUILD_GUIDE_OVERLAY_ACTION => {
                                 trigger_game_build_guide_overlay_shortcut(app);
@@ -94,8 +87,8 @@ pub fn default_keybinds() -> Vec<KeybindConfig> {
             keys: vec!["Ctrl".to_string(), "Shift".to_string(), "C".to_string()],
         },
         KeybindConfig {
-            action: GAME_CHAT_SCREENSHOT_CAPTURE_ACTION.to_string(),
-            label: "Capture Screenshot For Gaming Chat".to_string(),
+            action: GAME_PART_PREVIEW_CAPTURE_ACTION.to_string(),
+            label: "Capture GearBlocks Test Part Preview".to_string(),
             keys: Vec::new(),
         },
         KeybindConfig {
@@ -206,8 +199,8 @@ fn resolve_shortcut_action(app: &tauri::AppHandle, shortcut: &Shortcut) -> Resul
 }
 
 fn toggle_overlay_window(app: &tauri::AppHandle) {
-    let was_visible = app
-        .get_webview_window(MAIN_WINDOW_LABEL)
+    let was_visible = WindowManager::new(app)
+        .window(WindowKind::Main)
         .and_then(|window| window.is_visible().ok())
         .unwrap_or(false);
     let action = if was_visible {
@@ -239,6 +232,9 @@ fn start_mouse_shortcut_monitor(app: tauri::AppHandle) {
         let mut active_shortcuts = HashSet::<String>::new();
 
         loop {
+            if lifecycle::is_shutdown_requested() {
+                break;
+            }
             if last_refresh.elapsed() >= Duration::from_millis(500) {
                 cached_keybinds = load_keybinds(&app).unwrap_or_default();
                 last_refresh = Instant::now();
@@ -260,7 +256,9 @@ fn start_mouse_shortcut_monitor(app: tauri::AppHandle) {
             }
 
             active_shortcuts = currently_pressed;
-            std::thread::sleep(Duration::from_millis(25));
+            if lifecycle::sleep_until_shutdown(Duration::from_millis(25)) {
+                break;
+            }
         }
     });
 }
@@ -272,14 +270,25 @@ fn trigger_shortcut_action(app: &tauri::AppHandle, action: &str) {
     match action {
         TOGGLE_OVERLAY_ACTION => toggle_overlay_window(app),
         GAME_CHAT_OVERLAY_ACTION => trigger_game_chat_overlay_shortcut(app),
-        GAME_CHAT_SCREENSHOT_CAPTURE_ACTION => {
-            remember_foreground_window_as_game(app);
-            set_pending_shortcut_action(app, GAME_CHAT_SCREENSHOT_CAPTURE_ACTION);
-            let _ = app.emit("game-chat-screenshot-capture-requested", ());
-        }
+        GAME_PART_PREVIEW_CAPTURE_ACTION => trigger_gearblocks_part_preview_shortcut(app),
         GAME_BUILD_GUIDE_OVERLAY_ACTION => trigger_game_build_guide_overlay_shortcut(app),
         RECORD_SMOKING_EVENT_ACTION => record_smoking_event_from_shortcut(app),
         _ => {}
+    }
+}
+
+fn trigger_gearblocks_part_preview_shortcut(app: &tauri::AppHandle) {
+    WindowManager::new(app).remember_foreground_window_as_game();
+    match commands::create_gearblocks_test_part_preview_command() {
+        Ok(path) => {
+            eprintln!(
+                "GearBlocks test part preview command written: {}",
+                path.to_string_lossy()
+            );
+        }
+        Err(error) => {
+            eprintln!("Could not write GearBlocks test part preview command: {error}");
+        }
     }
 }
 
@@ -304,8 +313,9 @@ fn record_smoking_event_from_shortcut(app: &tauri::AppHandle) {
 }
 
 fn trigger_game_chat_overlay_shortcut(app: &tauri::AppHandle) {
-    let chat_was_visible = app
-        .get_webview_window(GAME_CHAT_WINDOW_LABEL)
+    let window_manager = WindowManager::new(app);
+    let chat_was_visible = window_manager
+        .window(WindowKind::GameChat)
         .and_then(|window| window.is_visible().ok())
         .unwrap_or(false);
     let has_active_chat_context = app
@@ -314,9 +324,9 @@ fn trigger_game_chat_overlay_shortcut(app: &tauri::AppHandle) {
         .lock()
         .map(|selection| selection.is_some())
         .unwrap_or(false);
-    let chat_is_foreground = is_window_foreground(app, GAME_CHAT_WINDOW_LABEL);
+    let chat_is_foreground = window_manager.is_foreground(WindowKind::GameChat);
     if !chat_is_foreground {
-        remember_foreground_window_as_game(app);
+        window_manager.remember_foreground_window_as_game();
     }
 
     if has_active_chat_context {
@@ -345,12 +355,12 @@ fn trigger_game_chat_overlay_shortcut(app: &tauri::AppHandle) {
 }
 
 fn trigger_game_build_guide_overlay_shortcut(app: &tauri::AppHandle) {
-    let build_guide_was_visible = app
-        .get_webview_window(GAME_BUILD_GUIDE_WINDOW_LABEL)
-        .and_then(|window| window.is_visible().ok())
+    let window_manager = WindowManager::new(app);
+    let build_guide_was_visible = window_manager
+        .is_visible(WindowKind::GameBuildGuide)
         .unwrap_or(false);
-    if !is_window_foreground(app, GAME_BUILD_GUIDE_WINDOW_LABEL) {
-        remember_foreground_window_as_game(app);
+    if !window_manager.is_foreground(WindowKind::GameBuildGuide) {
+        window_manager.remember_foreground_window_as_game();
     }
     match commands::toggle_active_game_build_guide_overlay_window(app) {
         Ok(true) => {}
@@ -369,65 +379,8 @@ fn trigger_game_build_guide_overlay_shortcut(app: &tauri::AppHandle) {
     }
 }
 
-#[cfg(windows)]
-fn is_window_foreground(app: &tauri::AppHandle, label: &str) -> bool {
-    use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
-
-    let Some(window) = app.get_webview_window(label) else {
-        return false;
-    };
-    let Ok(hwnd) = window.hwnd() else {
-        return false;
-    };
-    unsafe { GetForegroundWindow() == hwnd.0 as windows_sys::Win32::Foundation::HWND }
-}
-
-#[cfg(not(windows))]
-fn is_window_foreground(_app: &tauri::AppHandle, _label: &str) -> bool {
-    false
-}
-
-#[cfg(windows)]
-fn remember_foreground_window_as_game(app: &tauri::AppHandle) {
-    use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
-
-    let foreground = unsafe { GetForegroundWindow() };
-    if foreground.is_null() {
-        return;
-    }
-
-    for label in [
-        MAIN_WINDOW_LABEL,
-        GAME_CHAT_WINDOW_LABEL,
-        GAME_BUILD_GUIDE_WINDOW_LABEL,
-    ] {
-        if let Some(window) = app.get_webview_window(label) {
-            if let Ok(hwnd) = window.hwnd() {
-                if foreground == hwnd.0 as windows_sys::Win32::Foundation::HWND {
-                    return;
-                }
-            }
-        }
-    }
-
-    let state = app.state::<AppState>();
-    match state.last_game_window.lock() {
-        Ok(mut last_game_window) => {
-            *last_game_window = Some(foreground as isize);
-        }
-        Err(_) => {}
-    };
-}
-
-#[cfg(not(windows))]
-fn remember_foreground_window_as_game(_app: &tauri::AppHandle) {}
-
 fn wake_overlay_window(app: &tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window(MAIN_WINDOW_LABEL) {
-        let _ = window.show();
-        let _ = window.set_always_on_top(true);
-        let _ = window.set_focus();
-    }
+    let _ = WindowManager::new(app).show_and_focus(WindowKind::Main);
 }
 
 fn merge_with_defaults(keybinds: Vec<KeybindConfig>) -> Vec<KeybindConfig> {
@@ -467,7 +420,7 @@ fn validate_keybinds(keybinds: &[KeybindConfig]) -> Result<(), String> {
         if ![
             TOGGLE_OVERLAY_ACTION,
             GAME_CHAT_OVERLAY_ACTION,
-            GAME_CHAT_SCREENSHOT_CAPTURE_ACTION,
+            GAME_PART_PREVIEW_CAPTURE_ACTION,
             GAME_BUILD_GUIDE_OVERLAY_ACTION,
             RECORD_SMOKING_EVENT_ACTION,
         ]

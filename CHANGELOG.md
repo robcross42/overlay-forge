@@ -20,6 +20,314 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.10.0 - 2026-07-20
+
+### 2026-07-20
+
+#### Added
+
+- 14:26:25 EDT - Added the local-first Media Library module with backend-owned TMDB catalogue search, manual entries, movie and episodic progress, Watch Next ordering, tags, Canadian provider availability, manual streaming links, settings, and required attribution.
+- 14:26:25 EDT - Added normalized SQLite media title, library entry, season, episode, progress, provider snapshot, availability, streaming link, tag, mapping, and settings tables with transactional refresh preservation.
+
+#### Changed
+
+- 17:08:45 EDT - Changed all project version metadata to `0.10.0` for the Media Library and accumulated post-0.9 capability release cut.
+
+#### Fixed
+
+- 16:38:47 EDT - Fixed Media Library navigation buttons rendering with native browser styles by replacing the retired workspace-tab dependency with shared module-tab styling also used by Repair Resell.
+
+#### Documentation
+
+- 14:26:25 EDT - Added the Media Library guide and updated project architecture, data model, feature scope, deferred scope, validation, README capability, and backend credential documentation.
+- 16:12:36 EDT - Deferred backend-owned movie and episode streaming deep links, including TMDB-to-provider mapping, Canadian SQLite caching, clickable provider icons, manual-link fallback, and the no-fabrication/no-scraping boundary.
+
+#### Validation
+
+- 14:30:40 EDT - Validated Media Library with `npm run check`, full Rust tests (13 passed), media-specific Rust tests (8 passed), `cargo clippy --all-targets --no-deps`, Rust formatting, and `git diff --check`; Clippy reports only the 15 documented pre-existing high-arity warnings.
+- 15:37:13 EDT - Validated the Media Library merge with current `develop` using `npm run build`, `cargo build`, full Rust tests (16 passed), media-only `rustfmt --check`, `cargo clippy --all-targets`, and `git diff --check`; Clippy reports one pre-existing Repair Resell high-arity warning, while repository-wide `cargo fmt --check` remains blocked by pre-existing formatting drift in the merged upstream changes.
+- 16:38:47 EDT - Validated shared Media Library and Repair Resell module-tab styling with `npm run build` and `git diff --check`.
+- 16:43:37 EDT - User completed the full Media Library manual acceptance checklist successfully after confirming the module-tab styling fix; the native-styled navigation buttons were the only discovered defect.
+- 17:15:25 EDT - Validated the `0.10.0` release metadata with `npm run build`, `cargo build`, and `git diff --check`; the repository stop script released the running debug executable before the successful Rust build.
+
+### 2026-07-11
+
+#### Added
+
+- 18:41:54 EDT - Added The Spell Brigade as a seeded Gaming module with shared chats and screenshots plus Wizards, Spells, Upgrades, Synergies, and Runs planning scaffolds.
+- 18:51:50 EDT - Added a game-context picker as the first Gaming workspace toolbar control so games can be switched without expanding the left navigation tree.
+
+#### Changed
+
+- 18:41:54 EDT - Centralized supported game-module section metadata so Path of Exile 2 and The Spell Brigade use the same module navigation and home-scaffold abstraction.
+- 19:00:45 EDT - Changed the primary Overlay Forge window to be non-topmost and hide on focus loss while preserving always-on-top behavior for standalone game chat and build-guide windows.
+
+#### Documentation
+
+- 18:41:54 EDT - Documented The Spell Brigade module scope, current scaffold, persistence definition, and deferred game-specific data integrations.
+- 18:51:50 EDT - Documented the toolbar game picker as the primary direct path into The Spell Brigade.
+- 19:00:45 EDT - Documented the primary-window focus-loss boundary and its manual regression check.
+
+#### Validation
+
+- 18:41:54 EDT - Validated The Spell Brigade module with `npm run build`, `npm run cargo:build`, `npm run cargo:test`, `npm run cargo:clippy`, and `git diff --check`.
+- 18:51:50 EDT - Validated the Gaming toolbar game-context picker with `npm run build` and `git diff --check`.
+- 19:00:45 EDT - Validated the primary-window focus behavior with `npm run cargo:build`, `npm run cargo:test`, `npm run build`, Windows HWND visibility/topmost inspection, and `git diff --check`; the main window was non-topmost and hid after focus moved, while standalone window policies remained topmost in runtime inspection and unit tests.
+
+### 2026-07-02
+
+#### Added
+
+- 04:18:02 EDT - Added the Repair Resell module with SQLite-backed sources, search profiles, listing imports, snapshots, deterministic keyword/category flags, watchlist toggles, conservative manual source refresh, and manual deal estimates.
+
+#### Changed
+
+- 05:04:12 EDT - Collapsed the Repair Resell tab to a button-only UI shell while leaving the underlying data model and stored records untouched.
+- 05:05:49 EDT - Changed the main overlay shell so the left navigation pane starts collapsed by default on app launch.
+- 05:09:31 EDT - Unwired Scratchpad, Tasks, and Notes from the main shell navigation/render path while keeping their existing code and data paths intact.
+- 05:13:33 EDT - Removed the former Projects module from the active shell, frontend feature/service layer, project chat UI, project-scoped GitHub helper, and registered Tauri command surface while preserving legacy SQLite data.
+
+#### Documentation
+
+- 04:18:02 EDT - Documented the Repair Resell local-first boundary, scraper safety limits, SQLite table family, and deferred LLM/inventory/repair/sales work.
+- 04:34:15 EDT - Documented the Repair Resell future vision around restoration-funded learning, multi-item auction pickups, pickup economics, parts harvesting, trailer-enabled hauling, return-load opportunities, and repair knowledge-base history.
+- 04:44:22 EDT - Archived the legacy numbered progress model into project history, removed it from active documentation surfaces, and replaced app status wording with neutral current-state language.
+- 05:09:31 EDT - Marked Scratchpad, Tasks, Notes, and Calendar for later organizer consolidation review.
+- 05:13:33 EDT - Documented the retired Projects module boundary and added future review items for restore, replacement, migration, export, or deletion decisions.
+
+### 2026-06-29
+
+#### Changed
+
+- 00:59:10 EDT - Changed generated build-guide diagram backgrounds to use barely visible gray transparency.
+- 13:53:41 EDT - Removed the standalone build-guide overlay titlebar so guide content uses the full window height.
+- 13:57:19 EDT - Changed the standalone build-guide overlay so empty guide space, including the toolbar gap left of the zoom buttons, can drag the window.
+- 14:04:33 EDT - Added explicit GearBlocks X/Y/Z coordinate rules and visible X, Y, and Z axis markers to generated build-guide diagrams.
+- 14:06:56 EDT - Defined the standard GearBlocks car orientation as length on the Z-axis, front toward +Z, rear toward -Z, width on X, and height on Y.
+- 14:19:04 EDT - Added a build-guide overlay action that saves a Step 1 review HTML snapshot with the rendered diagram, caption text, step body, placement cues, and related parts.
+- 14:21:35 EDT - Added visible build-guide toolbar feedback for Step 1 review snapshot export success and failure states.
+- 14:26:11 EDT - Changed Step 1 review HTML snapshots to override captured app overflow styles so exported review files can scroll.
+- 14:38:07 EDT - Moved build-guide diagram axis markers to the far-left grid corner and reduced them to one displayed direction per axis.
+- 14:39:31 EDT - Added a Codex workflow rule to reopen edited local dev/review HTML files in the default browser after changes.
+- 14:56:24 EDT - Changed build-guide Step 1 visuals to promote a named structural anchor such as `Beam x3` before other parts and number each rendered part label by placement order.
+- 15:00:35 EDT - Limited GearBlocks build-guide imports to the first three parsed assembly steps for the current Step 1 review loop while preserving full raw Markdown.
+- 15:08:01 EDT - Changed GearBlocks build-guide import buttons to show animated `Importing.`, `Importing..`, and `Importing...` labels on the active import action.
+- 15:09:39 EDT - Changed the build-guide review export action to save a 3-step HTML review containing diagrams, captions, bodies, placement cues, and related parts for each imported step.
+- 15:24:34 EDT - Changed GearBlocks build-guide display text to strip redundant size-class parentheticals from visual labels, captions, placement cues, and 3-step review snapshots while preserving functional descriptors and tooth counts.
+- 16:02:07 EDT - Added a direct GearBlocks BepInEx Unity part-preview renderer command that captures the camera-center hit object into an isolated PNG under `OverlayForgePlugin\renders`.
+- 16:39:30 EDT - Changed the configured Mouse5 preview-loop shortcut to write incrementing GearBlocks BepInEx `capture_center_part_preview` test commands such as `test-part-preview-1` instead of triggering screenshot capture.
+- 16:43:38 EDT - Changed GearBlocks BepInEx part-preview captures to add dark crease and boundary edges so white or low-contrast part faces remain readable.
+- 16:59:59 EDT - Changed GearBlocks BepInEx part-preview edge rendering to use thinner adaptive edge lines and a stricter crease threshold.
+- 17:08:22 EDT - Added explicit GearBlocks BepInEx part-preview object rotation fields for X, Y, and Z degree sweeps while keeping camera yaw and pitch separate.
+- 17:30:43 EDT - Added persisted GearBlocks part render profiles, rotation snap-angle constants, Tauri commands for saving profiles from BepInEx preview status captures, and frontend quaternion transform helpers for build-guide rotation composition.
+- 18:44:12 EDT - Removed the temporary GearBlocks build-guide three-step import cap and added a build-guide overlay phase-2 workflow with a full staging manifest, latest-export import trigger, runtime instance count, and full build-review snapshot export.
+- 19:03:47 EDT - Added a GearBlocks build-guide manifest expansion helper that turns high-level combustion-engine guide rows into exact staged part instances with paint slots, relative placement hints, rotation hints, and size/config notes.
+- 19:23:50 EDT - Changed GearBlocks build-guide staging manifests so paint slots are assigned only to duplicated paintable parts; unique paintable parts now show no paint needed.
+- 19:31:41 EDT - Changed GearBlocks build-guide staging manifests to list duplicated paintable parts first by duplicate count, then solo paintable parts, duplicated unpaintable parts, and solo unpaintable parts.
+- 19:43:42 EDT - Changed the GearBlocks build-guide overlay to start without stale Latest Export data, add an in-guide Export All action, remove compact summary/status pills, remove scale and geometry panels, and move Glossary to the bottom.
+- 20:03:39 EDT - Changed GearBlocks build-guide staging manifests so paint slot numbers restart at slot 1 for each duplicated part type.
+- 20:17:17 EDT - Changed GearBlocks build-guide staging manifests to split slash-separated part names and include Corner 90 Pipe in the combustion-engine intake-manifold expansion.
+- 20:52:29 EDT - Changed GearBlocks build-guide staging instructions to allow temporary white jig blocks for initial attachment while excluding them from final build design.
+- 21:27:55 EDT - Changed GearBlocks combustion-engine staging manifest `Beam x3` uprights to use `90,0,0` rotation instead of `0,0,90`.
+- 21:43:38 EDT - Changed the GearBlocks build-guide staging manifest display to show only render-placement fields: Type, Name, Paint, and Rotation.
+
+#### Fixed
+
+- 16:13:15 EDT - Fixed the GearBlocks BepInEx part-preview renderer to fall back from non-renderable physics composite hit roots to the nearest enabled Unity renderer at the raycast hit point.
+- 16:17:53 EDT - Fixed the GearBlocks BepInEx part-preview renderer fallback to always use the nearest enabled Unity renderer when collider hierarchy lookup fails, with selection diagnostics in the status JSON.
+- 16:23:32 EDT - Fixed the GearBlocks BepInEx part-preview renderer discovery to scan all loaded Unity renderers and remove the strict MeshRenderer/SkinnedMeshRenderer filter that excluded GearBlocks visual meshes.
+- 16:31:54 EDT - Changed GearBlocks BepInEx part-preview captures to render only the isolated part/object on a neutral background, leaving grid and axis composition to build-step images.
+- 16:59:59 EDT - Fixed GearBlocks BepInEx part-preview fallback selection so huge environment renderers such as the boundary indicator are ignored, crank sub-renderer hits can promote to a reasonable parent part group, and non-readable Unity meshes skip edge extraction without mesh-access errors.
+- 21:33:58 EDT - Fixed the GearBlocks build-guide overlay so unfocused-window translucency applies to gray backgrounds instead of reducing guide text readability.
+
+#### Documentation
+
+- 19:43:42 EDT - Documented the GearBlocks build-guide Export All workflow and the simplified Build Info view.
+- 20:10:03 EDT - Documented the 32 default GearBlocks paint palette slots for build-guide staging references.
+- 20:17:17 EDT - Documented that combustion-engine staging manifests can use parts from multiple GearBlocks categories, including Pipes.
+- 20:52:29 EDT - Documented that temporary white jig blocks are placement aids only and must not be counted as build-guide parts.
+- 21:27:55 EDT - Documented observed GearBlocks `Beam x3` rotation behavior for build-guide staging.
+- 21:43:38 EDT - Documented that the build-guide staging list is for render capture and shows only part type, instance name, paint slot, and rotation.
+
+#### Validation
+
+- 00:59:10 EDT - Validated the generated diagram background transparency update with `npm run build` and `git diff --check`.
+- 13:53:41 EDT - Validated the build-guide overlay titlebar removal with `npm run build` and `git diff --check`.
+- 13:57:19 EDT - Validated the build-guide empty-space drag behavior with `npm run build` and `git diff --check`.
+- 14:04:33 EDT - Validated GearBlocks coordinate-axis rules and build-guide diagram axis markers with `cargo fmt --manifest-path src-tauri\Cargo.toml`, `npm run build`, `npm run cargo:build`, and `git diff --check`.
+- 14:06:56 EDT - Validated the GearBlocks standard car-orientation rule with `npm run cargo:build` and `git diff --check`.
+- 14:19:04 EDT - Validated the Step 1 review snapshot export with `npm run build` and `git diff --check`.
+- 14:21:35 EDT - Validated Step 1 review snapshot toolbar feedback with `npm run build` and `git diff --check`.
+- 14:26:11 EDT - Validated scrollable Step 1 review snapshot exports with `npm run build` and `git diff --check`.
+- 14:38:07 EDT - Validated far-corner single-direction build-guide axis markers with `npm run build` and `git diff --check`.
+- 14:39:31 EDT - Validated the local dev HTML browser-refresh workflow rule with `git diff --check`.
+- 14:56:24 EDT - Validated Step 1 structural-anchor promotion and numbered part labels with `npm run build` and `git diff --check`.
+- 15:00:35 EDT - Validated the GearBlocks three-step import cap with `npm run cargo:test`, `npm run cargo:build`, `npm run build`, and `git diff --check`.
+- 15:08:01 EDT - Validated GearBlocks build-guide import button progress labels with `npm run build` and `git diff --check`.
+- 15:09:39 EDT - Validated the 3-step build-guide review HTML export with `npm run build` and `git diff --check`.
+- 15:24:34 EDT - Validated GearBlocks build-guide size-parenthetical display cleanup with `npm run build`, a cleaned local 3-step review HTML text check, and `git diff --check`.
+- 16:02:07 EDT - Validated the direct GearBlocks BepInEx part-preview renderer with `dotnet build gearblocks-bepinex-workspace\OverlayForgeGearBlocksPlugin\OverlayForgeGearBlocksPlugin.csproj` and `git diff --check`; install/run validation was skipped because GearBlocks was running.
+- 16:13:15 EDT - Validated the GearBlocks BepInEx non-renderable hit-root fallback with `dotnet build gearblocks-bepinex-workspace\OverlayForgeGearBlocksPlugin\OverlayForgeGearBlocksPlugin.csproj`.
+- 16:17:53 EDT - Validated the GearBlocks BepInEx nearest-renderer preview fallback with `dotnet build gearblocks-bepinex-workspace\OverlayForgeGearBlocksPlugin\OverlayForgeGearBlocksPlugin.csproj`.
+- 16:23:32 EDT - Validated the GearBlocks BepInEx all-loaded-renderers preview discovery with `dotnet build gearblocks-bepinex-workspace\OverlayForgeGearBlocksPlugin\OverlayForgeGearBlocksPlugin.csproj`.
+- 16:31:54 EDT - Validated the GearBlocks BepInEx neutral-background part-only preview change with `dotnet build gearblocks-bepinex-workspace\OverlayForgeGearBlocksPlugin\OverlayForgeGearBlocksPlugin.csproj`.
+- 16:39:30 EDT - Validated the Mouse5 GearBlocks part-preview command shortcut with `cargo fmt --manifest-path src-tauri\Cargo.toml`, `npm run cargo:build`, and `git diff --check`.
+- 16:43:38 EDT - Validated the GearBlocks BepInEx part-preview edge overlay with `dotnet build gearblocks-bepinex-workspace\OverlayForgeGearBlocksPlugin\OverlayForgeGearBlocksPlugin.csproj`, installed the rebuilt DLL into the local GearBlocks BepInEx plugin folder while GearBlocks was closed, and ran `git diff --check`.
+- 16:59:59 EDT - Validated the GearBlocks BepInEx part-preview selection and edge-safety fixes with `dotnet build gearblocks-bepinex-workspace\OverlayForgeGearBlocksPlugin\OverlayForgeGearBlocksPlugin.csproj`; install/run validation was skipped because GearBlocks process `9380` was running.
+- 17:08:22 EDT - Validated GearBlocks BepInEx part-preview rotation command support with `dotnet build gearblocks-bepinex-workspace\OverlayForgeGearBlocksPlugin\OverlayForgeGearBlocksPlugin.csproj`, `cargo fmt --manifest-path src-tauri\Cargo.toml`, and `npm run cargo:build`, then installed the rebuilt DLL into the local GearBlocks BepInEx plugin folder while GearBlocks was closed.
+- 17:31:38 EDT - Validated GearBlocks part render profiles and rotation transform helpers with `cargo fmt --manifest-path src-tauri\Cargo.toml`, `npm run cargo:build`, `npm run cargo:test`, `npm run build`, and `git diff --check`.
+- 18:45:15 EDT - Validated the full GearBlocks build-guide import and phase-2 latest-export workflow with `cargo fmt --manifest-path src-tauri\Cargo.toml`, `npm run cargo:build`, `npm run cargo:test`, `npm run build`, and `git diff --check`.
+- 19:04:30 EDT - Validated GearBlocks build-guide manifest expansion with `npm run build` and `git diff --check`.
+- 19:23:50 EDT - Validated duplicate-only GearBlocks staging-manifest paint slots with `npm run build` and `git diff --check`.
+- 19:31:41 EDT - Validated GearBlocks staging-manifest list ordering with `npm run build` and `git diff --check`.
+- 19:45:20 EDT - Validated the GearBlocks build-guide Export All and simplified info view changes with `cargo fmt --manifest-path src-tauri\Cargo.toml`, `npm run build`, `npm run cargo:build`, and `git diff --check`.
+- 20:04:06 EDT - Validated per-part-type GearBlocks staging-manifest paint slots with `npm run build` and `git diff --check`.
+- 20:10:03 EDT - Validated GearBlocks default paint palette documentation with `git diff --check`.
+- 20:17:17 EDT - Validated GearBlocks slash-separated pipe staging manifest parsing with `npm run build` and `git diff --check`.
+- 20:52:29 EDT - Validated temporary white jig block staging guidance with `npm run build` and `git diff --check`.
+- 21:28:14 EDT - Validated GearBlocks `Beam x3` upright rotation correction with `npm run build` and `git diff --check`.
+- 21:34:18 EDT - Validated GearBlocks build-guide unfocused background translucency styling with `npm run build` and `git diff --check`.
+- 21:44:00 EDT - Validated GearBlocks render-focused staging manifest columns with `npm run build` and `git diff --check`.
+
+### 2026-06-28
+
+#### Changed
+
+- 11:28:32 EDT - Changed the GearBlocks build-guide overlay into a step-focused view with a static Overlay Forge-generated isometric placement diagram, step navigation, current-step instructions, and related placement parts.
+- 12:48:56 EDT - Changed the GearBlocks build-guide overlay to separate Build Info from Build Steps, with Build Steps showing generated isometric diagrams and detailed placement/attachment captions only.
+- 21:04:32 EDT - Changed GearBlocks build-guide diagrams to use semi-realistic procedural catalog profiles for combustion-engine parts, including a composite cylinder-and-axle rendering for `Engine Rear (Driven) Crank x2 & Axle`.
+- 22:58:17 EDT - Added generic local game character build records and changed the Path of Exile 2 Builds section to list, edit, activate, and delete POE2 build records from SQLite.
+
+#### Fixed
+
+- 12:24:13 EDT - Fixed Tauri shutdown lifecycle handling so background GearBlocks import, scheduler, and mouse-shortcut worker loops stop before continuing to access app state during process exit.
+
+#### Documentation
+
+- 11:28:32 EDT - Documented that GearBlocks build-guide visuals are rendered in Overlay Forge from parsed guide steps and part rows without requiring GearBlocks script windows, BepInEx, or a persisted visual-step table.
+- 12:48:56 EDT - Documented the Build Info and Build Steps view split for GearBlocks build-guide overlays.
+- 21:04:32 EDT - Documented GearBlocks build-guide procedural part profiles for catalog parts whose dimensions should not be interpreted as generic boxes.
+- 22:58:17 EDT - Documented the Path of Exile 2 build-planner foundation, `obj_game_character_build`, and the boundary that passive tree, item, gem, and calculation layers remain future work.
+
+#### Validation
+
+- 11:31:38 EDT - Validated the GearBlocks static isometric build-step overlay with `npm run build` and `git diff --check`.
+- 12:24:13 EDT - Validated the Tauri shutdown lifecycle fix with `npm run cargo:build`.
+- 12:48:56 EDT - Validated the GearBlocks build-guide view split with `npm run build`.
+- 21:04:32 EDT - Validated GearBlocks build-guide procedural part profiles with `npm run build`.
+- 22:59:10 EDT - Validated the Path of Exile 2 local build-record foundation with `cargo fmt --manifest-path src-tauri\Cargo.toml`, `npm run build`, `npm run cargo:build`, `npm run cargo:test`, `npm run cargo:clippy`, and `git diff --check`.
+
+### 2026-06-26
+
+#### Changed
+
+- 01:49:27 EDT - Changed GearBlocks runtime sync so automatic scene-delta monitoring is disabled and GearBlocks chat submission requests/imports a rich full-scene export before prompt context is assembled.
+- 02:10:56 EDT - Added the Mobalytics Ice Shot Deadeye leveling guide as the currently played Path of Exile 2 build and surfaced it in the POE2 Builds section.
+- 21:56:15 EDT - Changed GearBlocks runtime export storage so successful imports populate normalized part definition and latest scene instance rows instead of retaining raw full-scene export JSON in SQLite.
+- 21:58:50 EDT - Cleaned the local SQLite database by backing up the pre-cleanup file, backfilling latest GearBlocks runtime part instances, clearing historical raw runtime export JSON, checkpointing WAL, and vacuuming the database.
+- 22:07:42 EDT - Added normalized GearBlocks definition and value tables for runtime metadata fields, attachment types, part settings, and output/control channels.
+- 22:23:44 EDT - Changed GearBlocks chat prompt context to use a backend scene-context service that reads normalized SQLite scene rows and definition/value tables before falling back to legacy raw export JSON.
+- 22:51:22 EDT - Changed GearBlocks chat Send / Enter to use the latest normalized SQLite scene context without requesting a runtime export, log import, or scene diff.
+- 22:51:22 EDT - Added a short GearBlocks chat `Diff` action that explicitly refreshes the runtime scene, computes the latest scene diff, and includes that diff in the prompt.
+- 23:20:50 EDT - Changed the GearBlocks chat diff action to include the latest stored scene diff without requesting a new runtime export or parsing logs.
+- 23:20:50 EDT - Changed GearBlocks chat input buttons to compact `G`, `D↑`, and `↑` labels in a shared action strip so controls reserve space instead of overlapping.
+
+#### Fixed
+
+- 00:00:07 EDT - Fixed GearBlocks chat context for repeated structural parts by adding parent construction group summaries and duplicate-safe construction/id/index references to runtime prompt context.
+- 21:23:23 EDT - Fixed GearBlocks chat submission so prompts are persisted before prompt-time scene refresh and scene-refresh failures are passed to chat as context warnings instead of aborting the response.
+- 21:33:47 EDT - Fixed the standalone game chat overlay layout so the message area fills expanded empty space while the screenshot summary and prompt composer stay pinned to the bottom.
+
+#### Documentation
+
+- 00:00:07 EDT - Documented parent construction groups as part of GearBlocks semantic runtime context and troubleshooting for repeated part IDs.
+- 00:59:03 EDT - Documented the user-tested GearBlocks player character height as 20 units / 20 blocks / 200 cm for human-scale build design.
+- 01:49:27 EDT - Documented the GearBlocks prompt-time full-scene export workflow that replaces passive scene-delta monitoring.
+- 02:10:56 EDT - Documented the Path of Exile 2 current-build setting stored in `obj_game_setting`.
+- 21:56:15 EDT - Documented normalized GearBlocks runtime export storage, `def_gearblocks_part`, and latest-scene runtime part instances.
+- 22:07:42 EDT - Documented GearBlocks metadata, attachment, setting, and output/control channel definition tables.
+- 22:23:44 EDT - Documented the GearBlocks DB-backed chat scene-context path and deferred the optional derived scene-facts cache.
+- 22:51:22 EDT - Documented that normal GearBlocks chat sends use DB scene context and the `Diff` action is the explicit scene-refresh/diff path.
+- 23:20:50 EDT - Documented that the `D↑` chat action includes the latest stored scene diff and manual scene refresh is responsible for computing a fresh diff.
+
+#### Validation
+
+- 00:01:27 EDT - Validated GearBlocks parent construction group prompt context with `npm run build`, `npm run cargo:build`, `npm run cargo:test`, and `git diff --check`.
+- 00:59:52 EDT - Validated GearBlocks player-character height prompt context with `npm run build`, `npm run cargo:build`, and `git diff --check`.
+- 01:51:29 EDT - Validated GearBlocks prompt-time rich export sync with `npm run build`, `npm run cargo:build`, `npm run cargo:test`, `git diff --check`, and installed-script delta-monitor checks.
+- 02:15:07 EDT - Validated the Path of Exile 2 current-build setting and Builds display with `npm run build`, `npm run cargo:build`, and `npm run cargo:test`.
+- 21:23:23 EDT - Validated GearBlocks chat submission hardening with `npm run build`, `npm run cargo:build`, and `npm run cargo:test`.
+- 21:33:47 EDT - Validated the standalone game chat overlay layout fix with `npm run build`.
+- 21:56:15 EDT - Validated normalized GearBlocks runtime export storage with `npm run cargo:build`, `npm run build`, `npm run cargo:test`, and `git diff --check`.
+- 21:58:50 EDT - Verified the local SQLite cleanup left zero raw runtime export payload rows, retained 1,465 runtime export manifest rows, backfilled 55 latest runtime part instance rows, and reduced `overlay-forge.sqlite3` to 49,303,552 bytes.
+- 22:07:42 EDT - Validated GearBlocks metadata definition tables with `cargo fmt --manifest-path src-tauri/Cargo.toml`, `npm run build`, `npm run cargo:test`, `npm run cargo:build`, and `git diff --check`.
+- 22:23:44 EDT - Validated GearBlocks DB-backed chat scene context with `cargo fmt --manifest-path src-tauri/Cargo.toml`, `npm run cargo:build`, `npm run build`, `npm run cargo:test`, `npm run cargo:clippy`, and `git diff --check`.
+- 22:51:22 EDT - Validated GearBlocks chat diff gating with `cargo fmt --manifest-path src-tauri/Cargo.toml`, `npm run cargo:build`, `npm run build`, `npm run cargo:test`, and `git diff --check`.
+- 23:20:50 EDT - Validated GearBlocks stored-diff chat sends and compact chat controls with `cargo fmt --manifest-path src-tauri/Cargo.toml`, `npm run cargo:build`, `npm run build`, `npm run cargo:test`, and `git diff --check`.
+- 23:29:13 EDT - Validated all uncommitted Overlay Forge work with `cargo fmt --manifest-path src-tauri\Cargo.toml`, `npm run build`, `npm run cargo:build`, `npm run cargo:test`, `npm run cargo:clippy`, and `git diff --check`.
+
+### 2026-06-25
+
+#### Fixed
+
+- 23:37:43 EDT - Fixed GearBlocks runtime log imports after `Player.log` rotation so completed full-scene exports near the beginning of a replacement log are recovered instead of being skipped by the incremental tail-read limit.
+
+#### Documentation
+
+- 23:37:43 EDT - Documented GearBlocks runtime export recovery behavior for successful in-game exports that were missed after log rotation.
+
+#### Validation
+
+- 23:38:54 EDT - Validated GearBlocks runtime log rotation recovery with `npm run build`, `npm run cargo:build`, `npm run cargo:test`, and `git diff --check`.
+
+### 2026-06-24
+
+#### Changed
+
+- 19:26:50 EDT - Expanded GearBlocks runtime export and chat context so build-guide reasoning can use paint/material details, attachment and link-node types, tweakables, resizable settings, controllable state, engine relationships, and per-part coordinates from the latest export or scene delta.
+
+#### Documentation
+
+- 19:26:50 EDT - Documented the GearBlocks API surfaces that support build-guide context and clarified which live runtime values are included for chat.
+
+#### Validation
+
+- 19:27:56 EDT - Validated GearBlocks build-guide runtime detail exports with `npm run build`, `npm run cargo:build`, `npm run cargo:test`, and `git diff --check`.
+
+## 0.9.0 - 2026-06-24
+
+### 2026-06-24
+
+#### Changed
+
+- 19:00:46 EDT - Changed project version metadata to `0.9.0` for the stable build-guide release cut.
+- 18:23:14 EDT - Associated GearBlocks chat context with the active/latest build guide and changed generated build guides to include glossary and relative-placement instructions.
+- 14:52:37 EDT - Tightened the GearBlocks Builder script window with compact numeric fields, small Back/Snap buttons, top-row builder toggles, and a smaller default Builder window size.
+- 13:44:03 EDT - Added an explicit GearBlocks API screen import that indexes the official Doxygen API docs into the local normalized API catalog.
+- 13:05:09 EDT - Changed standalone overlay scrollbars, prompt/message borders, and build-guide section outlines to use the same focus-aware transparency contract as standalone window backgrounds.
+- 12:52:35 EDT - Refactored backend overlay window lifecycle handling into a Rust window domain module with `WindowKind`, composed config structs, and `WindowManager`.
+- 12:52:35 EDT - Changed SQLite connection locking to return a repository error instead of panicking on a poisoned database mutex.
+- 12:52:35 EDT - Centralized repeated frontend unknown-error formatting and screenshot timestamp label helpers under shared utility modules.
+- 12:52:35 EDT - Added root `npm` validation scripts for backend build, backend tests, Clippy, and combined frontend/backend checks.
+
+#### Fixed
+
+- 16:46:30 EDT - Fixed Ctrl+Shift+G build-guide overlay hiding by routing visibility checks and hides through native-aware window manager fallbacks.
+- 16:31:46 EDT - Fixed GearBlocks Builder script button and checkbox text disappearing by removing compact font property writes from script controls.
+- 13:23:54 EDT - Fixed build-guide standalone overlay focus detection by adding the build-guide window to the default Tauri capability scope so it can read its own focused state.
+- 13:21:21 EDT - Fixed standalone overlay focus styling so a build-guide window only becomes opaque when that build-guide window itself has focus, not when chat or the main Overlay Forge window has focus.
+
+#### Documentation
+
+- 13:33:39 EDT - Tightened Codex reasoning preflight rules to explicitly stop before any tool use or context gathering when Low reasoning should escalate to Medium, and documented the observed Low-to-Medium enforcement failure.
+- 12:52:35 EDT - Updated architecture and validation rules with shared utility guidance, high-arity typed-parameter guidance, Clippy review expectations, and large-module cleanup guardrails.
+- 12:52:35 EDT - Added high-arity repository/command refactors and large backend module splitting to deferred architecture cleanup.
+
+#### Validation
+
+- 19:03:00 EDT - Validated the `0.9.0` stable build-guide release cut with `npm run build`, `npm run cargo:build`, `npm run cargo:test`, and `git diff --check`.
+- 12:53:33 EDT - Validated architecture cleanup with `npm run check`, `npm run cargo:test`, `npm run cargo:clippy`, and `git diff --check`; Clippy now reports only documented high-arity refactor warnings.
+
 ## 0.8.0 - 2026-06-24
 
 ### 2026-06-24
