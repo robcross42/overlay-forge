@@ -4262,7 +4262,7 @@ fn validate_youtube_video_id(value: &str) -> Result<String, String> {
     Ok(video_id.to_string())
 }
 
-fn open_external_url(url: &str) -> Result<(), String> {
+pub(crate) fn open_external_url(url: &str) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     let result = std::process::Command::new("rundll32")
         .args(["url.dll,FileProtocolHandler", url])
@@ -4276,7 +4276,7 @@ fn open_external_url(url: &str) -> Result<(), String> {
 
     result
         .map(|_| ())
-        .map_err(|error| format!("Could not open YouTube URL externally: {error}"))
+        .map_err(|error| format!("Could not open URL externally: {error}"))
 }
 
 fn require_text(value: &str, field_name: &str) -> Result<(), String> {

@@ -25,6 +25,7 @@ Milestone 13 remains the foundational project baseline. The current stable app r
 - Backend-owned OpenAI Responses API use through `OPENAI_API_KEY`.
 - Project-scoped GitHub repository metadata through backend-owned `GITHUB_TOKEN`.
 - User-curated YouTube references.
+- Local-first Media Library with TMDB catalogue search, viewing progress, Watch Next, tags, and Canadian provider availability.
 - Manual conversation context attachments.
 - Prompt Preview.
 - Local Markdown implementation request drafts.
@@ -58,6 +59,7 @@ Milestone 13 remains the foundational project baseline. The current stable app r
 | `docs/GEARBLOCKS_PLUGIN.md` | BepInEx, GearLib, and marker plugin boundaries. |
 | `docs/GEARBLOCKS_PARTS_CATALOG.md` | Validated GearBlocks parts vocabulary. |
 | `docs/SMOKING_CESSATION.md` | Smoking Cessation module scope. |
+| `docs/MEDIA_LIBRARY.md` | Media Library scope, TMDB boundary, progress, and persistence. |
 
 ## Development
 
@@ -154,7 +156,13 @@ GitHub repository metadata fetches use:
 GITHUB_TOKEN
 ```
 
-Both tokens are read only by the Rust/Tauri backend. They are not stored in SQLite and are not exposed to React/frontend code.
+Media Library catalogue and metadata requests use:
+
+```text
+TMDB_API_READ_ACCESS_TOKEN
+```
+
+All credentials are read only by the Rust/Tauri backend. They are not stored in SQLite and are not exposed to React/frontend code.
 
 ## Current Workflow
 

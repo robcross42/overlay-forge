@@ -29,6 +29,7 @@ Do not run broader validation than needed for a small change unless the request 
 | BepInEx plugin | plugin build plus install/run check where possible |
 | Scheduler | backend build plus startup/interval/run-history behavior review |
 | Smoking Cessation | frontend/backend builds plus event/keybind/export behavior review |
+| Media Library | frontend/backend builds plus missing-token, progress, refresh-preservation, queue, and URL checks |
 
 For broad cleanup and architecture work, run `npm run cargo:clippy` as a review pass. Fix clear no-risk warnings immediately. Record larger warnings as explicit refactor work when they require changing public command shapes, repository APIs, or multiple call sites.
 
@@ -245,6 +246,30 @@ Pass criteria:
 ```text
 The screenshot PNG, capture manifest, screenshot metadata row, and matching local-path reference rows are removed.
 ```
+
+## Media Library Validation
+
+Validate without `TMDB_API_READ_ACCESS_TOKEN`:
+
+```text
+Open Media Library, browse/edit local entries, then open Catalogue Search.
+```
+
+Pass criteria:
+
+```text
+Local data remains usable and catalogue search shows a readable missing-credential error.
+```
+
+With a valid token, validate movie and series searches, excluding people; add each result twice and confirm the second add is reported as already saved.
+
+Validate movie watched/unwatched state and watched-date editing. For a series, validate individual episode toggles, season/series bulk operations, mark-watched-through, next episode, completion, unwatch-after-completion, and specials settings.
+
+Validate metadata refresh after editing notes, rating, favourite, tags, queue order, progress, and a preferred manual link. All user-owned values must remain. A failed provider refresh must retain cached availability and display a stale/error state.
+
+Validate Watch Next add/remove/up/down behavior and restart persistence. Exercise local type, status, favourite, tag, unwatched, provider, and queue filters while offline.
+
+Validate that `file:`, `javascript:`, and other non-HTTP(S) manual links are rejected. Delete a title and confirm only its locally owned metadata, progress, availability, links, and mappings are removed.
 
 ## GearBlocks Validation
 

@@ -20,6 +20,21 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+### 2026-07-20
+
+#### Added
+
+- 14:26:25 EDT - Added the local-first Media Library module with backend-owned TMDB catalogue search, manual entries, movie and episodic progress, Watch Next ordering, tags, Canadian provider availability, manual streaming links, settings, and required attribution.
+- 14:26:25 EDT - Added normalized SQLite media title, library entry, season, episode, progress, provider snapshot, availability, streaming link, tag, mapping, and settings tables with transactional refresh preservation.
+
+#### Documentation
+
+- 14:26:25 EDT - Added the Media Library guide and updated project architecture, data model, feature scope, deferred scope, validation, README capability, and backend credential documentation.
+
+#### Validation
+
+- 14:30:40 EDT - Validated Media Library with `npm run check`, full Rust tests (13 passed), media-specific Rust tests (8 passed), `cargo clippy --all-targets --no-deps`, Rust formatting, and `git diff --check`; Clippy reports only the 15 documented pre-existing high-arity warnings.
+
 ## 0.9.0 - 2026-06-24
 
 ### 2026-06-24

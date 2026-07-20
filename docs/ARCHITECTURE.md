@@ -81,6 +81,7 @@ The Tauri backend owns:
 - Backend-only GitHub repository metadata fetch handling.
 - YouTube reference CRUD commands.
 - YouTube URL validation and external-open handling.
+- Media Library repositories, progress rules, TMDB requests, availability caching, and safe external-open handling.
 - Planning conversation context attachment commands.
 - Prompt Preview commands.
 - Project Markdown context configuration and loading.
@@ -229,6 +230,24 @@ Screenshot image bytes are stored as PNG files under `game-screenshots/`. SQLite
 Game build guides are imported from user-selected Markdown files into normalized SQLite rows. The independent build-guide overlay window is shell-owned like the game chat overlay: Rust/Tauri stores the active guide selection, applies persisted bounds, and exposes a keybind-driven show/hide path. The overlay renders narrow, stacked rows rather than wide tables so it can stay pinned to the left or right side of the screen during gameplay.
 
 See `docs/GAMING_SCREENSHOTS.md` for capture behavior.
+
+## Media Library Boundary
+
+Media Library is a shell-hosted feature with a focused Rust domain boundary:
+
+- `MediaMetadataProvider` isolates provider-specific request and response mapping.
+- `TmdbMediaMetadataProvider` owns authenticated TMDB API v3 requests.
+- `MediaCatalogService` owns search, import, normalization, and refresh orchestration.
+- `MediaLibraryService` owns local entries, queue order, tags, settings, and user fields.
+- `MediaProgressService` owns movie and episodic progress plus automatic status transitions.
+- `MediaAvailabilityService` owns cached provider snapshots, manual links, preferred-link resolution, and safe external targets.
+- `MediaRepository` owns canonical SQLite row mapping and cross-table transactions.
+
+React calls typed Tauri commands only. It does not access the TMDB token, send viewing history to TMDB, own progress transitions, or perform remote catalogue requests.
+
+SQLite remains authoritative for notes, ratings, favourites, tags, Watch Next order, manual links, and viewing history. Provider refresh can update normalized catalogue metadata and provider cache only. Refresh must preserve all user-owned state and previous provider rows on temporary failure.
+
+TMDB image paths are converted only to official `image.tmdb.org` URLs in the media UI. The module does not act as a general URL image proxy. See `docs/MEDIA_LIBRARY.md`.
 
 ## GearBlocks Boundary
 

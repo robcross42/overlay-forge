@@ -4,6 +4,7 @@ mod gearblocks_api;
 mod gearblocks_api_scraper;
 mod github;
 mod hotkeys;
+mod media;
 mod openai;
 mod windows;
 
@@ -51,6 +52,16 @@ use commands::{
     update_task, update_youtube_reference,
 };
 use db::AppDatabase;
+use media::commands::{
+    add_catalog_media_to_library, add_media_to_watch_next, create_manual_media_entry,
+    create_media_streaming_link, create_media_tag, delete_media_library_entry,
+    delete_media_streaming_link, delete_media_tag, get_media_library_detail, get_media_settings,
+    list_media_library, list_media_streaming_links, list_media_tags, mark_episodes_watched_through,
+    move_media_watch_next_item, open_media_streaming_target, refresh_media_metadata,
+    remove_media_from_watch_next, search_media_catalog, set_episode_watched, set_media_entry_tags,
+    set_movie_watched, set_preferred_media_streaming_link, set_season_watched, set_series_watched,
+    update_media_library_entry, update_media_settings, update_media_streaming_link,
+};
 use serde::{Deserialize, Serialize};
 use tauri::{Manager, WindowEvent};
 use windows::{OverlayWindowConfig, StandaloneWindowConfig, WindowManager};
@@ -275,6 +286,34 @@ pub fn run() {
             update_youtube_reference,
             delete_youtube_reference,
             open_youtube_reference,
+            search_media_catalog,
+            add_catalog_media_to_library,
+            create_manual_media_entry,
+            list_media_library,
+            get_media_library_detail,
+            update_media_library_entry,
+            delete_media_library_entry,
+            refresh_media_metadata,
+            set_movie_watched,
+            set_episode_watched,
+            set_season_watched,
+            set_series_watched,
+            mark_episodes_watched_through,
+            add_media_to_watch_next,
+            remove_media_from_watch_next,
+            move_media_watch_next_item,
+            list_media_tags,
+            create_media_tag,
+            delete_media_tag,
+            set_media_entry_tags,
+            list_media_streaming_links,
+            create_media_streaming_link,
+            update_media_streaming_link,
+            delete_media_streaming_link,
+            set_preferred_media_streaming_link,
+            open_media_streaming_target,
+            get_media_settings,
+            update_media_settings,
             list_smoking_events,
             record_smoking_event,
             delete_smoking_event,

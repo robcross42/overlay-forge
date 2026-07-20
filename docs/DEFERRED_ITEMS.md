@@ -69,6 +69,26 @@ This file centralizes deferred work. Items listed here are not approved scope un
 - Channel scraping.
 - Background metadata crawler.
 
+## Media Library
+
+- Trakt, Plex, Jellyfin, Kodi, and streaming-account sync.
+- Browser-history or service-history import.
+- Automatic playback detection and partial playback position.
+- Multiple profiles, cloud sync, social sharing, and household watch state.
+- Recommendation engine and `Not interested` suppression.
+- Provider price comparison and leaving-soon detection.
+- New-release notifications, scheduled metadata refresh, calendar integration, and desktop notifications.
+- Direct provider deep links beyond user-owned manual links.
+- JustWatch or streaming-service scraping.
+- Torrent, download, or piracy-related functionality.
+- Trailer playback and expanded cast/crew browsing.
+- Custom lists beyond Watch Next and tags.
+- Rewatch history and rewatch counts.
+- Manual season and episode editing.
+- CSV, Trakt, IMDb, TV Time, Letterboxd, or other service import.
+- Export beyond a future basic local backup format.
+- Spoiler-protected episode notes.
+
 ## Sync And Import
 
 - External/cloud sync.
