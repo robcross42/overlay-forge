@@ -96,4 +96,4 @@ Migrations are idempotent and non-destructive. Deleting a library entry removes 
 
 ## Current Limitations
 
-Manual series use series-level status only; a manual season and episode editor is deferred. Partial playback, rewatch history, imports, exports, recommendations, account sync, background refresh, deep provider integrations, notifications, and service scraping are also deferred.
+Manual series use series-level status only; a manual season and episode editor is deferred. Music-specific library records, YouTube music-video/live-performance references, authorized MP3 acquisition, local music collection indexing, partial playback, rewatch history, imports, exports, recommendations, account sync, background refresh, deep provider integrations, user-initiated YouTube full-movie candidate discovery, notifications, and service scraping are also deferred.

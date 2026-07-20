@@ -20,6 +20,13 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+### 2026-07-20
+
+#### Documentation
+
+- 17:34:04 EDT - Deferred backend-owned YouTube full-movie candidate discovery for Media Library titles, including API-only search, official-source preference, completeness/authorization caution, validated direct links, stale-result handling, and *Ghosts of Mars* as an initial user-reported manual validation case.
+- 18:29:32 EDT - Deferred a music-specific library for artists, releases, tracks, YouTube music-video/live-performance references, authorized direct MP3 acquisition, and local collection indexing, while explicitly excluding YouTube audio extraction, DRM bypass, and unauthorized downloading or rehosting.
+
 ## 0.10.0 - 2026-07-20
 
 ### 2026-07-20

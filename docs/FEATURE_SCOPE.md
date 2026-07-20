@@ -96,7 +96,7 @@ Media Library is local-first. Current scope:
 
 TMDB credentials remain backend-only. Local viewing history and personal fields must not be sent to TMDB.
 
-Current exclusions include account/service sync, automatic playback detection, partial playback, recommendations, background refresh, notifications, provider scraping, direct provider deep-link fabrication, imports/exports, and manual season/episode editing.
+Current exclusions include account/service sync, automatic playback detection, partial playback, recommendations, background refresh, notifications, provider scraping, direct provider deep-link fabrication, music-library records and local collection indexing, external media acquisition, imports/exports, and manual season/episode editing.
 
 ## GearBlocks Boundary
 
