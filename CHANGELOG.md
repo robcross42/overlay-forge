@@ -20,12 +20,18 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.10.0 - 2026-07-20
+
 ### 2026-07-20
 
 #### Added
 
 - 14:26:25 EDT - Added the local-first Media Library module with backend-owned TMDB catalogue search, manual entries, movie and episodic progress, Watch Next ordering, tags, Canadian provider availability, manual streaming links, settings, and required attribution.
 - 14:26:25 EDT - Added normalized SQLite media title, library entry, season, episode, progress, provider snapshot, availability, streaming link, tag, mapping, and settings tables with transactional refresh preservation.
+
+#### Changed
+
+- 17:08:45 EDT - Changed all project version metadata to `0.10.0` for the Media Library and accumulated post-0.9 capability release cut.
 
 #### Fixed
 
@@ -42,6 +48,7 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 - 15:37:13 EDT - Validated the Media Library merge with current `develop` using `npm run build`, `cargo build`, full Rust tests (16 passed), media-only `rustfmt --check`, `cargo clippy --all-targets`, and `git diff --check`; Clippy reports one pre-existing Repair Resell high-arity warning, while repository-wide `cargo fmt --check` remains blocked by pre-existing formatting drift in the merged upstream changes.
 - 16:38:47 EDT - Validated shared Media Library and Repair Resell module-tab styling with `npm run build` and `git diff --check`.
 - 16:43:37 EDT - User completed the full Media Library manual acceptance checklist successfully after confirming the module-tab styling fix; the native-styled navigation buttons were the only discovered defect.
+- 17:15:25 EDT - Validated the `0.10.0` release metadata with `npm run build`, `cargo build`, and `git diff --check`; the repository stop script released the running debug executable before the successful Rust build.
 
 ### 2026-07-11
 

@@ -7,7 +7,7 @@ The active coding workflow is direct Codex chat in VS Code. Repository Markdown 
 ## Current Status
 
 ```text
-Current stable app release: 0.9.0
+Current stable app release: 0.10.0
 Status: Active local-first desktop command hub
 ```
 
