@@ -2923,6 +2923,7 @@ impl AppDatabase {
             ",
             [],
         )?;
+        crate::media::repository::migrate_schema(&connection)?;
         Self::seed_gearblocks_api_catalog(&connection)?;
 
         Ok(Self {
@@ -2935,7 +2936,7 @@ impl AppDatabase {
         self.ready
     }
 
-    fn connection(&self) -> Result<MutexGuard<'_, Connection>> {
+    pub(crate) fn connection(&self) -> Result<MutexGuard<'_, Connection>> {
         self.connection
             .lock()
             .map_err(|_| rusqlite::Error::InvalidQuery)

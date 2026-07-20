@@ -81,6 +81,23 @@ Current validated behavior:
 
 Avoid clipboard captures, `Win+Shift+S`, Snipping Tool dependency, HDR output, wide-gamut output, and alpha-dependent image files for the long-term capture target.
 
+## Media Library Boundary
+
+Media Library is local-first. Current scope:
+
+- Movie and episodic-series library entries.
+- Backend-owned TMDB search and explicit metadata refresh.
+- Manual movie and series entries.
+- Local notes, rating, favourite, priority, tags, and Watch Next ordering.
+- Movie, episode, season, series, and watched-through progress operations.
+- Specials-aware automatic completion.
+- Cached regional provider availability and user-owned manual links.
+- Offline local search, filtering, editing, and progress.
+
+TMDB credentials remain backend-only. Local viewing history and personal fields must not be sent to TMDB.
+
+Current exclusions include account/service sync, automatic playback detection, partial playback, recommendations, background refresh, notifications, provider scraping, direct provider deep-link fabrication, imports/exports, and manual season/episode editing.
+
 ## GearBlocks Boundary
 
 GearBlocks support is local-first and should use the safest available data path for the requested task.

@@ -6,6 +6,7 @@ import { WindowResizeHandles, WindowTitlebar } from "../components/WindowControl
 import { Calendar } from "../features/calendar/Calendar";
 import { Cessation } from "../features/cessation/Cessation";
 import { Gaming } from "../features/gaming/Gaming";
+import { MediaLibrary } from "../features/media/MediaLibrary";
 import { RepairResell } from "../features/repair-resell/RepairResell";
 import { Settings } from "../features/settings/Settings";
 import { YouTube } from "../features/youtube/YouTube";
@@ -30,6 +31,7 @@ import {
 type ComponentId =
   | "calendar"
   | "cessation"
+  | "media"
   | "repair-resell"
   | "gaming"
   | "youtube"
@@ -39,8 +41,9 @@ const navItems = [
   { id: "calendar", label: "Calendar" },
   { id: "cessation", label: "Cessation" },
   { id: "repair-resell", label: "Repair Resell" },
-  { id: "gaming", label: "Gaming" },
   { id: "youtube", label: "YouTube" },
+  { id: "media", label: "Media Library" },
+  { id: "gaming", label: "Gaming" },
   { id: "settings", label: "Settings" }
 ] satisfies Array<{ id: ComponentId; label: string }>;
 
@@ -645,6 +648,7 @@ export default function App() {
               />
             )}
           {activeComponent === "youtube" && <YouTube />}
+          {activeComponent === "media" && <MediaLibrary />}
           {activeComponent === "settings" && <Settings />}
         </ComponentHost>
         </section>

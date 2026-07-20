@@ -50,6 +50,23 @@ function Write-NewLogLines {
     $script:printedLineCount = $lines.Count
 }
 
+function Add-DevLogLine {
+    param([string]$Value)
+
+    for ($attempt = 1; $attempt -le 10; $attempt++) {
+        try {
+            $Value | Add-Content -Path $logPath
+            return
+        } catch [System.IO.IOException] {
+            if ($attempt -eq 10) {
+                Write-Warning "Could not append to the dev log because another process still has it open: $logPath"
+                return
+            }
+            Start-Sleep -Milliseconds 200
+        }
+    }
+}
+
 try {
     while (-not $process.HasExited) {
         Write-NewLogLines
@@ -61,8 +78,8 @@ try {
     if ($process -and -not $process.HasExited) {
         $process.Kill()
     }
-    "" | Add-Content -Path $logPath
-    "Finished: $(Get-Date -Format o)" | Add-Content -Path $logPath
+    Add-DevLogLine ""
+    Add-DevLogLine "Finished: $(Get-Date -Format o)"
     Write-Host "Overlay Forge tauri dev log saved: $logPath"
 }
 

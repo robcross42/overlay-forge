@@ -202,6 +202,206 @@ Local user-curated YouTube references. The backend parses and stores `video_id` 
 
 No YouTube API key, account login, scraping, transcript retrieval, recommendations, downloads, or account sync data is stored.
 
+## Media Library Tables
+
+### `obj_media_title`
+
+Normalized cached catalogue metadata:
+
+```text
+id
+source_key
+external_id
+external_media_type
+content_type
+title
+original_title
+overview
+original_language
+release_date
+first_air_date
+last_air_date
+runtime_minutes
+episode_runtime_minutes
+external_status
+series_type
+poster_path
+backdrop_path
+homepage_url
+total_seasons
+total_episodes
+metadata_json
+metadata_refreshed_at
+created_at
+updated_at
+```
+
+`content_type` is `MOVIE` or `SERIES`. TMDB identity is unique by source, provider media type, and external ID. Manual rows have a null external ID and may share titles. Refresh updates this table without replacing user state.
+
+### `obj_media_library_entry`
+
+```text
+id
+media_title_id
+library_status
+is_favorite
+personal_rating
+notes
+priority
+queue_position
+new_episodes_count
+added_at
+started_at
+completed_at
+last_watched_at
+created_at
+updated_at
+```
+
+One user-owned entry exists per media title. Status is `PLANNED`, `WATCHING`, `COMPLETED`, `ON_HOLD`, or `DROPPED`. Rating is nullable and constrained to `1.0` through `10.0`. Queue positions are unique and normalized after removal.
+
+### `obj_media_season`
+
+```text
+id
+media_title_id
+external_id
+season_number
+name
+overview
+air_date
+poster_path
+episode_count
+is_present_in_source
+metadata_json
+metadata_refreshed_at
+created_at
+updated_at
+```
+
+Season number is unique per title. Refresh upserts provider rows and marks missing rows absent rather than deleting progress-bearing metadata.
+
+### `obj_media_episode`
+
+```text
+id
+media_title_id
+season_id
+external_id
+season_number
+episode_number
+name
+overview
+air_date
+runtime_minutes
+still_path
+is_present_in_source
+metadata_json
+metadata_refreshed_at
+created_at
+updated_at
+```
+
+Episode coordinates are unique by title, season number, and episode number. Non-null external IDs are also unique per title. Season `0` is preserved.
+
+### `obj_media_episode_progress`
+
+```text
+id
+episode_id
+is_watched
+watched_at
+notes
+created_at
+updated_at
+```
+
+One user-owned progress row exists per episode. Watched rows receive a local timestamp; making an episode unwatched clears it.
+
+### `obj_media_provider_snapshot`
+
+```text
+id
+media_title_id
+region_code
+source_key
+source_link_url
+refreshed_at
+last_refresh_status
+last_refresh_error
+created_at
+updated_at
+```
+
+One provider snapshot exists per title and region. Failed refreshes update status/error while retaining the previous successful source link and child availability rows.
+
+### `obj_media_provider_availability`
+
+```text
+id
+snapshot_id
+provider_external_id
+provider_name
+provider_logo_path
+monetization_type
+display_priority
+created_at
+updated_at
+```
+
+Allowed monetization types are `FLATRATE`, `FREE`, `ADS`, `RENT`, and `BUY`. Successful refresh replaces rows transactionally.
+
+### `obj_media_streaming_link`
+
+```text
+id
+media_library_entry_id
+provider_name
+url
+link_type
+is_preferred
+notes
+created_at
+updated_at
+```
+
+Manual links are user-owned and accept only `http` or `https` through service validation. Link types are `STREAM`, `RENT`, `BUY`, and `OTHER`. A partial unique index permits at most one preferred link per entry.
+
+### `obj_media_tag`
+
+```text
+id
+name
+created_at
+updated_at
+```
+
+Tag names are trimmed and case-insensitively unique.
+
+### `n2n_media_library_entry_tag`
+
+```text
+id
+media_library_entry_id
+media_tag_id
+created_at
+```
+
+The entry/tag pair is unique. Removing a mapping or media entry does not delete the shared tag definition.
+
+### `obj_media_setting`
+
+```text
+id
+region_code
+metadata_language
+include_specials_in_completion
+created_at
+updated_at
+```
+
+Singleton row `id = 1` defaults to `CA`, `en-CA`, and specials excluded. Updating specials behavior recalculates series status through the canonical progress path.
+
 ## Gaming Tables
 
 ### `def_game`

@@ -23,6 +23,7 @@ Overlay Forge is now maintained as an evolving local-first command hub. Current 
 - Scratchpad, Tasks, and Notes code/data retained for later organizer consolidation review.
 - Backend-owned OpenAI Responses API use through `OPENAI_API_KEY`.
 - User-curated YouTube references.
+- Local-first Media Library with TMDB catalogue search, viewing progress, Watch Next, tags, and Canadian provider availability.
 - Gaming workspace and screenshot capture.
 - GearBlocks save decoding, runtime export import, parts catalog, script tooling, and backlog BepInEx plugin templates.
 - GearBlocks build guide import, chat-generated guide creation, in-game build guide overlay, and active guide chat context.
@@ -55,6 +56,7 @@ Overlay Forge is now maintained as an evolving local-first command hub. Current 
 | `docs/GEARBLOCKS_PLUGIN.md` | BepInEx, GearLib, and marker plugin boundaries. |
 | `docs/GEARBLOCKS_PARTS_CATALOG.md` | Validated GearBlocks parts vocabulary. |
 | `docs/SMOKING_CESSATION.md` | Smoking Cessation module scope. |
+| `docs/MEDIA_LIBRARY.md` | Media Library scope, TMDB boundary, progress, and persistence. |
 | `docs/REPAIR_RESELL.md` | Repair Resell restoration, pickup, and learning-path vision. |
 | `docs/THE_SPELL_BRIGADE.md` | The Spell Brigade module scope and planning scaffold. |
 
@@ -153,7 +155,13 @@ GitHub repository metadata fetches use:
 GITHUB_TOKEN
 ```
 
-Both tokens are read only by the Rust/Tauri backend. They are not stored in SQLite and are not exposed to React/frontend code.
+Media Library catalogue and metadata requests use:
+
+```text
+TMDB_API_READ_ACCESS_TOKEN
+```
+
+All credentials are read only by the Rust/Tauri backend. They are not stored in SQLite and are not exposed to React/frontend code.
 
 ## Current Workflow
 

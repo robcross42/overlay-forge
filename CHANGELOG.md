@@ -20,6 +20,29 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+### 2026-07-20
+
+#### Added
+
+- 14:26:25 EDT - Added the local-first Media Library module with backend-owned TMDB catalogue search, manual entries, movie and episodic progress, Watch Next ordering, tags, Canadian provider availability, manual streaming links, settings, and required attribution.
+- 14:26:25 EDT - Added normalized SQLite media title, library entry, season, episode, progress, provider snapshot, availability, streaming link, tag, mapping, and settings tables with transactional refresh preservation.
+
+#### Fixed
+
+- 16:38:47 EDT - Fixed Media Library navigation buttons rendering with native browser styles by replacing the retired workspace-tab dependency with shared module-tab styling also used by Repair Resell.
+
+#### Documentation
+
+- 14:26:25 EDT - Added the Media Library guide and updated project architecture, data model, feature scope, deferred scope, validation, README capability, and backend credential documentation.
+- 16:12:36 EDT - Deferred backend-owned movie and episode streaming deep links, including TMDB-to-provider mapping, Canadian SQLite caching, clickable provider icons, manual-link fallback, and the no-fabrication/no-scraping boundary.
+
+#### Validation
+
+- 14:30:40 EDT - Validated Media Library with `npm run check`, full Rust tests (13 passed), media-specific Rust tests (8 passed), `cargo clippy --all-targets --no-deps`, Rust formatting, and `git diff --check`; Clippy reports only the 15 documented pre-existing high-arity warnings.
+- 15:37:13 EDT - Validated the Media Library merge with current `develop` using `npm run build`, `cargo build`, full Rust tests (16 passed), media-only `rustfmt --check`, `cargo clippy --all-targets`, and `git diff --check`; Clippy reports one pre-existing Repair Resell high-arity warning, while repository-wide `cargo fmt --check` remains blocked by pre-existing formatting drift in the merged upstream changes.
+- 16:38:47 EDT - Validated shared Media Library and Repair Resell module-tab styling with `npm run build` and `git diff --check`.
+- 16:43:37 EDT - User completed the full Media Library manual acceptance checklist successfully after confirming the module-tab styling fix; the native-styled navigation buttons were the only discovered defect.
+
 ### 2026-07-11
 
 #### Added
