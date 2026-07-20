@@ -9,11 +9,11 @@ export function RepairResell() {
 
   return (
     <section aria-label="Repair Resell" className="feature-panel repair-resell-panel">
-      <div className="repair-resell-tabs button-only">
+      <div className="module-tabs repair-resell-tabs button-only">
         {tabs.map((tab) => (
           <button
             aria-pressed={activeTab === tab}
-            className={activeTab === tab ? "active" : ""}
+            className={activeTab === tab ? "module-tab active" : "module-tab"}
             key={tab}
             onClick={() => setActiveTab(tab)}
             type="button"

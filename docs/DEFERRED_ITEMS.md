@@ -83,7 +83,9 @@ This file centralizes deferred work. Items listed here are not approved scope un
 - Recommendation engine and `Not interested` suppression.
 - Provider price comparison and leaving-soon detection.
 - New-release notifications, scheduled metadata refresh, calendar integration, and desktop notifications.
-- Direct provider deep links beyond user-owned manual links.
+- Add a backend-owned streaming-link provider integration for dynamic movie, season, and episode deep links; evaluate the Streaming Availability API first because it can resolve existing TMDB IDs and return region-specific provider links.
+- Cache Canadian provider icons and direct links in normalized SQLite rows keyed to movies or exact season/episode coordinates, while preserving user-owned manual links as overrides and fallbacks.
+- Render a clickable provider icon beside a movie or episode only when the provider response contains a validated HTTPS deep link; do not fabricate provider URLs, scrape streaming services, automate account login, or infer Netflix content IDs from TMDB IDs.
 - JustWatch or streaming-service scraping.
 - Torrent, download, or piracy-related functionality.
 - Trailer playback and expanded cast/crew browsing.

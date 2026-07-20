@@ -23,14 +23,17 @@
   min-height: 0;
 }
 
-.repair-resell-tabs {
+.module-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.repair-resell-tabs {
   padding: 18px;
 }
 
-.repair-resell-tabs button {
+.module-tab {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 7px 10px;
@@ -41,7 +44,7 @@
   font-weight: 800;
 }
 
-.repair-resell-tabs button.active {
+.module-tab.active {
   border-color: rgba(79, 208, 165, 0.42);
   background: rgba(79, 208, 165, 0.12);
   color: var(--text);

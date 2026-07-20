@@ -150,7 +150,7 @@ export function MediaLibrary() {
         />
       ) : (
         <div className="media-module-body">
-          <nav className="workspace-tabs media-tabs" aria-label="Media Library sections">
+          <nav className="module-tabs media-tabs" aria-label="Media Library sections">
             {(
               [
                 ["home", "Home"],
@@ -160,7 +160,8 @@ export function MediaLibrary() {
               ] as Array<[MediaView, string]>
             ).map(([id, label]) => (
               <button
-                className={view === id ? "workspace-tab active" : "workspace-tab"}
+                aria-pressed={view === id}
+                className={view === id ? "module-tab active" : "module-tab"}
                 key={id}
                 onClick={() => setView(id)}
                 type="button"
