@@ -1,6 +1,6 @@
 # Overlay Forge Markdown Restructure Manifest
 
-This generated set replaces separate active milestone files with a smaller repo-facing documentation structure.
+This generated set replaces separate active progress-tracker files with a smaller repo-facing documentation structure.
 
 ## Files
 
@@ -28,11 +28,11 @@ MANIFEST.md
 
 ## Merge Decisions
 
-- `README.md` is now a compact repository entry point instead of a milestone archive.
+- `README.md` is now a compact repository entry point instead of an archive.
 - `CHANGELOG.md` keeps date/time-stamped history and now follows semantic versioning.
 - Root instructions live in `AGENTS.md`.
 - VS Code reminder content lives in `.vscode/CODEX_INSTRUCTIONS.md`.
-- Milestone history is consolidated into `docs/PROJECT_HISTORY.md`.
+- Early project history is consolidated into `docs/PROJECT_HISTORY.md`.
 - Current behavior and baseline live in `docs/PROJECT_OVERVIEW.md`.
 - Current architecture and module ownership live in `docs/ARCHITECTURE.md`.
 - Current schema and persistence rules live in `docs/DATA_MODEL.md`.
@@ -43,7 +43,7 @@ MANIFEST.md
 
 ## Files Not Retained As Active Docs
 
-The old one-file-per-milestone structure is not retained as active documentation. Its useful content is merged into:
+The old one-file-per-checkpoint structure is not retained as active documentation. Its useful content is merged into:
 
 - `docs/PROJECT_HISTORY.md`
 - `docs/VALIDATION.md`

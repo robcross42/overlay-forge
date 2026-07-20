@@ -12,7 +12,7 @@ Repository Markdown is context. It is not a separate external transfer system.
 
 - `AGENTS.md`
 - `docs/PROJECT_OVERVIEW.md`
-- `docs/PROJECT_HISTORY.md` when milestone context matters
+- `docs/PROJECT_HISTORY.md` when archived project history matters
 - `docs/ARCHITECTURE.md` for architecture
 - `docs/DATA_MODEL.md` for SQLite or migrations
 - `docs/FEATURE_SCOPE.md` and `docs/DEFERRED_ITEMS.md` for scope

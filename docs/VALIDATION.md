@@ -23,7 +23,6 @@ Do not run broader validation than needed for a small change unless the request 
 | Frontend + backend behavior | `npm run check` |
 | SQLite migrations | both builds plus migration review |
 | OpenAI request path | backend build plus chat-send manual check if possible |
-| GitHub integration | backend build plus missing-token and valid-token behavior review if possible |
 | Screenshot capture | frontend/backend builds plus manual capture/delete flow |
 | GearBlocks script exporter | build/type-check plus in-game load/export/import check where possible |
 | BepInEx plugin | plugin build plus install/run check where possible |
@@ -48,13 +47,23 @@ Overlay appears using existing hotkey behavior.
 ```
 
 ```text
-Switch between Scratchpad, Tasks, Notes, Calendar, Projects, YouTube, and Gaming.
+Click a different application while the primary overlay is focused.
 ```
 
 Pass criteria:
 
 ```text
-Each module loads without disrupting persisted data.
+The primary overlay hides and does not remain always-on-top. Standalone game chat and build-guide windows retain their existing always-on-top behavior.
+```
+
+```text
+Switch between Calendar, Cessation, Repair Resell, Gaming, YouTube, and Settings.
+```
+
+Pass criteria:
+
+```text
+Each active module loads without disrupting persisted data.
 ```
 
 ```text
@@ -67,141 +76,9 @@ Pass criteria:
 Persisted records restore correctly.
 ```
 
-## Projects And Chat Validation
+## Retired Projects Module
 
-Validate:
-
-```text
-Expand Projects in the left navigation tree.
-```
-
-Pass criteria:
-
-```text
-Projects show saved project rows and conversation child rows.
-```
-
-Validate:
-
-```text
-Select a conversation child row.
-```
-
-Pass criteria:
-
-```text
-The focused chat surface opens directly and gives most of the main panel to messages and input.
-```
-
-Validate:
-
-```text
-Open the project row ... menu.
-```
-
-Pass criteria:
-
-```text
-Overview, New Chat, References, Edit, and Delete actions are available.
-```
-
-Validate:
-
-```text
-Click New Chat from the project row ... menu.
-```
-
-Pass criteria:
-
-```text
-The focused chat surface opens a new-conversation area and does not auto-select an existing conversation.
-```
-
-Validate:
-
-```text
-Open and collapse the right-hand chat pane.
-```
-
-Pass criteria:
-
-```text
-Context references and local implementation request drafts appear in the right-hand pane, and collapsing the pane gives the chat surface more horizontal space.
-```
-
-Validate:
-
-```text
-Open Project Edit.
-```
-
-Pass criteria:
-
-```text
-Project details, GitHub integration, local Markdown root, README path, and local repo/context configuration are available in a clean edit screen.
-```
-
-Validate:
-
-```text
-Send a project chat message.
-```
-
-Pass criteria:
-
-```text
-Existing chat send behavior works and includes project Markdown context when configured.
-```
-
-## Project Markdown Context Validation
-
-Validate:
-
-```text
-Configure a local Markdown documentation root for the selected project.
-```
-
-Pass criteria:
-
-```text
-The project stores the configured root without affecting other projects.
-```
-
-Validate:
-
-```text
-Open or start a project chat where the configured root contains README.md.
-```
-
-Pass criteria:
-
-```text
-README.md is loaded freshly from the configured local root.
-```
-
-Validate:
-
-```text
-Use a README.md that references Markdown files inside the configured project root.
-```
-
-Pass criteria:
-
-```text
-Referenced Markdown files are resolved and included when they remain inside the configured project root.
-```
-
-Validate:
-
-```text
-Use a README.md that references a missing file or a file outside the configured root.
-```
-
-Pass criteria:
-
-```text
-The app shows a readable warning and does not crash.
-```
+The former Projects module has no active manual validation path. Legacy SQLite rows are preserved for data safety only.
 
 ## Gaming Screenshot Validation
 

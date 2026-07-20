@@ -23,10 +23,9 @@ export function createCalendarEvent(input: CalendarEventInput) {
 }
 
 export function updateCalendarEvent(id: number, input: CalendarEventInput) {
-  return invoke<CalendarEvent>("update_calendar_event", { id, ...input });
+  return invoke<CalendarEvent>("update_calendar_event", { input: { id, ...input } });
 }
 
 export function deleteCalendarEvent(id: number) {
   return invoke<void>("delete_calendar_event", { id });
 }
-

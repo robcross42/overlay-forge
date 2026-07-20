@@ -1,12 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 
-export type MilestoneStatus = {
-  milestone: string;
+export type AppStatus = {
   hotkey: string;
   databaseReady: boolean;
 };
 
-export function getMilestoneStatus() {
-  return invoke<MilestoneStatus>("get_milestone_status");
+export function getAppStatus() {
+  return invoke<AppStatus>("get_app_status");
 }
-

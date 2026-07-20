@@ -2,54 +2,65 @@ mod commands;
 mod db;
 mod gearblocks_api;
 mod gearblocks_api_scraper;
-mod github;
+mod gearblocks_scene_context;
 mod hotkeys;
 mod media;
+mod lifecycle;
 mod openai;
+mod repair_resell;
 mod windows;
 
 use std::sync::Mutex;
 
 use commands::{
-    attach_planning_conversation_context, catalog_game_parts_from_screenshots,
-    clear_game_runtime_part_images_for_category, clear_gearblocks_markers, clear_openai_api_key,
-    consume_pending_shortcut_action, create_bridge_file_draft_from_conversation,
+    catalog_game_parts_from_screenshots, clear_game_runtime_part_images_for_category,
+    clear_gearblocks_markers, clear_openai_api_key, consume_pending_shortcut_action,
     create_calendar_event, create_game, create_game_build_guide_from_chat,
-    create_game_chat_conversation, create_game_chat_screenshot_capture,
-    create_game_screenshot_capture_request, create_note, create_planning_conversation,
-    create_project, create_task, create_youtube_reference, decode_gearblocks_construction_file,
-    decode_gearblocks_construction_folder, delete_bridge_file_draft, delete_calendar_event,
-    delete_game, delete_game_chat_conversation, delete_game_data_location, delete_game_screenshot,
-    delete_note, delete_planning_conversation, delete_project, delete_project_github_repository,
-    delete_project_markdown_context, delete_smoking_event, delete_task, delete_youtube_reference,
-    export_smoking_cessation_chatgpt_context, fetch_project_github_metadata,
-    focus_game_chat_overlay_window, focus_last_game_window, get_active_game_build_guide_overlay,
-    get_active_game_chat_overlay, get_bridge_file_draft, get_game_build_guide,
-    get_gearblocks_third_party_dependency_status, get_milestone_status, get_openai_api_key_status,
-    get_overlay_forge_foreground_window_label, get_project_github_repository,
-    get_project_markdown_context, get_scratchpad, get_smoking_cessation_settings,
-    get_youtube_reference, import_game_build_guide_markdown,
-    import_gearblocks_catalog_screenshot_images, import_gearblocks_official_api_docs,
-    import_gearblocks_runtime_context, import_gearblocks_runtime_part_index,
-    install_gearblocks_lua_exporter, is_overlay_forge_foreground, list_bridge_file_drafts,
-    list_calendar_events, list_game_build_guides, list_game_catalog_objects,
+    create_game_character_build, create_game_chat_conversation,
+    create_game_chat_screenshot_capture, create_game_screenshot_capture_request, create_note,
+    create_task, create_youtube_reference,
+    decode_gearblocks_construction_file, decode_gearblocks_construction_folder,
+    delete_calendar_event, delete_game, delete_game_build_guide,
+    delete_game_character_build, delete_game_chat_conversation, delete_game_data_location,
+    delete_game_screenshot, delete_note, delete_smoking_event, delete_task,
+    delete_youtube_reference, export_smoking_cessation_chatgpt_context,
+    focus_game_chat_overlay_window, focus_last_game_window,
+    get_active_game_build_guide_overlay, get_active_game_chat_overlay,
+    get_app_status, get_game_build_guide, get_game_setting,
+    get_gearblocks_third_party_dependency_status, get_openai_api_key_status,
+    get_overlay_forge_foreground_window_label,
+    get_scratchpad, get_smoking_cessation_settings, get_youtube_reference,
+    import_game_build_guide_markdown,
+    import_game_build_guide_url, import_gearblocks_catalog_screenshot_images,
+    import_gearblocks_official_api_docs, import_gearblocks_runtime_context,
+    import_gearblocks_runtime_part_index, install_gearblocks_lua_exporter,
+    is_overlay_forge_foreground, list_calendar_events,
+    list_game_build_guides, list_game_catalog_objects, list_game_character_builds,
     list_game_chat_conversations, list_game_chat_messages, list_game_constructions,
     list_game_data_locations, list_game_part_categories, list_game_runtime_part_api_members,
-    list_game_runtime_parts, list_game_screenshots, list_games, list_gearblocks_api_catalog,
-    list_gearblocks_construction_files, list_gearblocks_runtime_exports, list_keybinds, list_notes,
-    list_planning_conversation_context, list_planning_conversations, list_planning_messages,
-    list_projects, list_schedulers, list_smoking_events, list_tasks, list_youtube_references,
-    load_project_markdown_context, open_game_build_guide_overlay_window,
-    open_game_chat_overlay_window, open_youtube_reference, preview_planning_chat_prompt,
-    record_smoking_event, remove_planning_conversation_context, reset_keybinds,
-    save_game_data_location, save_keybinds, save_openai_api_key, save_project_github_repository,
-    save_project_markdown_context, save_scratchpad, send_game_chat_message,
-    send_gearblocks_marker_commands, send_planning_message, set_game_runtime_part_display_image,
-    set_overlay_window_opacity, shutdown_app, start_manual_overlay_drag, start_scheduler_worker,
-    sync_gearblocks_runtime_context, sync_gearblocks_saved_constructions,
-    toggle_game_build_guide_overlay_window, toggle_game_chat_overlay_window, update_calendar_event,
-    update_game_runtime_part_notes, update_note, update_project, update_smoking_cigarette_count,
-    update_task, update_youtube_reference,
+    list_game_runtime_part_instances, list_game_runtime_parts, list_game_screenshots, list_games,
+    list_gearblocks_api_catalog, list_gearblocks_construction_files,
+    list_gearblocks_part_render_profiles, list_gearblocks_rotation_snap_angles,
+    list_gearblocks_runtime_exports, list_keybinds, list_notes,
+    list_repair_resell_categories, list_repair_resell_deal_estimates,
+    list_repair_resell_keyword_flags, list_repair_resell_listings,
+    list_repair_resell_sources, list_repair_resell_travel_profiles, list_schedulers,
+    list_smoking_events, list_tasks, list_youtube_references,
+    manual_import_repair_resell_listing, open_game_build_guide_overlay_window,
+    open_game_chat_overlay_window, open_youtube_reference,
+    record_smoking_event, refresh_repair_resell_source,
+    reset_keybinds, save_game_data_location, save_gearblocks_part_render_profile_from_capture,
+    save_keybinds, save_openai_api_key,
+    save_repair_resell_deal_estimate, set_repair_resell_listing_watchlist,
+    save_scratchpad, send_game_chat_message, send_gearblocks_marker_commands,
+    set_active_game_character_build,
+    set_game_runtime_part_display_image, set_overlay_window_opacity, shutdown_app,
+    start_manual_overlay_drag, start_scheduler_worker, sync_gearblocks_runtime_context,
+    sync_gearblocks_saved_constructions, toggle_game_build_guide_overlay_window,
+    toggle_game_chat_overlay_window, update_calendar_event, update_game_character_build,
+    update_game_runtime_part_notes, update_note, update_repair_resell_source_enabled,
+    update_smoking_cigarette_count, update_task,
+    update_youtube_reference,
 };
 use db::AppDatabase;
 use media::commands::{
@@ -63,7 +74,7 @@ use media::commands::{
     update_media_library_entry, update_media_settings, update_media_streaming_link,
 };
 use serde::{Deserialize, Serialize};
-use tauri::{Manager, WindowEvent};
+use tauri::{Manager, RunEvent, WindowEvent};
 use windows::{OverlayWindowConfig, StandaloneWindowConfig, WindowManager};
 
 #[derive(Clone, Serialize)]
@@ -91,7 +102,9 @@ pub struct AppState {
 }
 
 pub fn run() {
-    tauri::Builder::default()
+    lifecycle::reset_shutdown();
+
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             if let Err(error) = terminate_existing_overlay_forge_instances() {
@@ -130,6 +143,9 @@ pub fn run() {
             let main_window_config = OverlayWindowConfig::main();
             window_manager
                 .configure_runtime(main_window_config.base.kind)
+                .map_err(std::io::Error::other)?;
+            window_manager
+                .register_focus_loss_behavior(main_window_config.base.kind)
                 .map_err(std::io::Error::other)?;
             let game_chat_window_config = StandaloneWindowConfig::game_chat();
             if let Some(window) = window_manager.window(game_chat_window_config.base.kind) {
@@ -224,7 +240,7 @@ pub fn run() {
             list_keybinds,
             save_keybinds,
             reset_keybinds,
-            get_milestone_status,
+            get_app_status,
             list_schedulers,
             shutdown_app,
             start_manual_overlay_drag,
@@ -236,10 +252,13 @@ pub fn run() {
             focus_game_chat_overlay_window,
             toggle_game_chat_overlay_window,
             get_active_game_chat_overlay,
+            get_game_setting,
             list_game_build_guides,
             create_game_build_guide_from_chat,
             import_game_build_guide_markdown,
+            import_game_build_guide_url,
             get_game_build_guide,
+            delete_game_build_guide,
             open_game_build_guide_overlay_window,
             toggle_game_build_guide_overlay_window,
             get_active_game_build_guide_overlay,
@@ -255,31 +274,6 @@ pub fn run() {
             create_calendar_event,
             update_calendar_event,
             delete_calendar_event,
-            list_projects,
-            create_project,
-            update_project,
-            delete_project,
-            get_project_github_repository,
-            save_project_github_repository,
-            delete_project_github_repository,
-            fetch_project_github_metadata,
-            get_project_markdown_context,
-            save_project_markdown_context,
-            delete_project_markdown_context,
-            load_project_markdown_context,
-            list_planning_conversations,
-            create_planning_conversation,
-            list_planning_messages,
-            send_planning_message,
-            delete_planning_conversation,
-            list_planning_conversation_context,
-            attach_planning_conversation_context,
-            remove_planning_conversation_context,
-            preview_planning_chat_prompt,
-            list_bridge_file_drafts,
-            get_bridge_file_draft,
-            create_bridge_file_draft_from_conversation,
-            delete_bridge_file_draft,
             list_youtube_references,
             get_youtube_reference,
             create_youtube_reference,
@@ -320,9 +314,25 @@ pub fn run() {
             get_smoking_cessation_settings,
             update_smoking_cigarette_count,
             export_smoking_cessation_chatgpt_context,
+            list_repair_resell_sources,
+            update_repair_resell_source_enabled,
+            list_repair_resell_categories,
+            list_repair_resell_keyword_flags,
+            list_repair_resell_travel_profiles,
+            list_repair_resell_listings,
+            manual_import_repair_resell_listing,
+            refresh_repair_resell_source,
+            set_repair_resell_listing_watchlist,
+            list_repair_resell_deal_estimates,
+            save_repair_resell_deal_estimate,
             list_games,
             create_game,
             delete_game,
+            list_game_character_builds,
+            create_game_character_build,
+            update_game_character_build,
+            set_active_game_character_build,
+            delete_game_character_build,
             list_game_data_locations,
             save_game_data_location,
             delete_game_data_location,
@@ -342,6 +352,10 @@ pub fn run() {
             import_gearblocks_official_api_docs,
             import_gearblocks_runtime_part_index,
             import_gearblocks_catalog_screenshot_images,
+            list_gearblocks_rotation_snap_angles,
+            list_gearblocks_part_render_profiles,
+            save_gearblocks_part_render_profile_from_capture,
+            list_game_runtime_part_instances,
             list_game_runtime_parts,
             list_game_runtime_part_api_members,
             set_game_runtime_part_display_image,
@@ -360,8 +374,13 @@ pub fn run() {
             send_game_chat_message,
             delete_game_chat_conversation
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Overlay Forge");
+        .build(tauri::generate_context!())
+        .expect("error while building Overlay Forge");
+
+    app.run(|_app_handle, event| match event {
+        RunEvent::ExitRequested { .. } | RunEvent::Exit => lifecycle::request_shutdown(),
+        _ => {}
+    });
 }
 
 #[cfg(target_os = "windows")]

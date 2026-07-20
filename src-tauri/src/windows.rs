@@ -34,7 +34,8 @@ impl WindowKind {
     pub const fn runtime_config(self) -> BaseWindowConfig {
         BaseWindowConfig {
             kind: self,
-            always_on_top: true,
+            always_on_top: self.is_standalone(),
+            hide_on_focus_loss: matches!(self, Self::Main),
             restore_opacity: if self.is_standalone() {
                 ACTIVE_WINDOW_OPACITY
             } else {
@@ -48,6 +49,7 @@ impl WindowKind {
 pub struct BaseWindowConfig {
     pub kind: WindowKind,
     pub always_on_top: bool,
+    pub hide_on_focus_loss: bool,
     pub restore_opacity: f64,
 }
 
@@ -83,8 +85,8 @@ impl StandaloneWindowConfig {
     pub const fn game_build_guide() -> Self {
         Self {
             base: WindowKind::GameBuildGuide.runtime_config(),
-            min_width: 300,
-            min_height: 360,
+            min_width: 700,
+            min_height: 520,
         }
     }
 }
@@ -120,17 +122,36 @@ impl<'a> WindowManager<'a> {
     pub fn configure_runtime(&self, kind: WindowKind) -> Result<(), String> {
         let config = kind.runtime_config();
         let window = self.required_window(config.kind)?;
-        if config.always_on_top {
-            window
-                .set_always_on_top(true)
-                .map_err(|error| error.to_string())?;
+        window
+            .set_always_on_top(config.always_on_top)
+            .map_err(|error| error.to_string())?;
+        Ok(())
+    }
+
+    pub fn register_focus_loss_behavior(&self, kind: WindowKind) -> Result<(), String> {
+        let config = kind.runtime_config();
+        if !config.hide_on_focus_loss {
+            return Ok(());
         }
+
+        let window = self.required_window(kind)?;
+        let app = self.app.clone();
+        window.on_window_event(move |event| {
+            if matches!(event, tauri::WindowEvent::Focused(false)) {
+                if let Err(error) = WindowManager::new(&app).hide(kind) {
+                    eprintln!(
+                        "Could not hide '{}' after focus loss: {error}",
+                        kind.label()
+                    );
+                }
+            }
+        });
         Ok(())
     }
 
     pub fn show_and_focus(&self, kind: WindowKind) -> Result<WebviewWindow, String> {
         let window = self.required_window(kind)?;
-        self.prepare_for_interaction(&window)?;
+        self.prepare_for_interaction(kind, &window)?;
         window.show().map_err(|error| error.to_string())?;
         let _ = set_overlay_opacity(&window, ACTIVE_WINDOW_OPACITY);
         window.set_focus().map_err(|error| error.to_string())?;
@@ -139,9 +160,10 @@ impl<'a> WindowManager<'a> {
 
     pub fn show_without_activation(&self, kind: WindowKind) -> Result<WebviewWindow, String> {
         let window = self.required_window(kind)?;
-        self.prepare_for_interaction(&window)?;
-        let _ = set_overlay_opacity(&window, kind.runtime_config().restore_opacity);
-        show_window_without_activation(&window)?;
+        let config = kind.runtime_config();
+        self.prepare_for_interaction(kind, &window)?;
+        let _ = set_overlay_opacity(&window, config.restore_opacity);
+        show_window_without_activation(&window, config.always_on_top)?;
         Ok(window)
     }
 
@@ -155,9 +177,13 @@ impl<'a> WindowManager<'a> {
         window_is_visible(&window)
     }
 
-    pub fn prepare_for_interaction(&self, window: &WebviewWindow) -> Result<(), String> {
+    pub fn prepare_for_interaction(
+        &self,
+        kind: WindowKind,
+        window: &WebviewWindow,
+    ) -> Result<(), String> {
         window
-            .set_always_on_top(true)
+            .set_always_on_top(kind.runtime_config().always_on_top)
             .map_err(|error| error.to_string())?;
         ensure_window_accepts_mouse_input(window)
     }
@@ -359,11 +385,14 @@ pub fn remember_foreground_window_as_game(app: &AppHandle) {
 pub fn remember_foreground_window_as_game(_app: &AppHandle) {}
 
 #[cfg(target_os = "windows")]
-pub fn show_window_without_activation(window: &WebviewWindow) -> Result<(), String> {
+pub fn show_window_without_activation(
+    window: &WebviewWindow,
+    always_on_top: bool,
+) -> Result<(), String> {
     use windows_sys::Win32::Foundation::HWND;
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        SetWindowPos, ShowWindow, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
-        SWP_SHOWWINDOW, SW_SHOWNOACTIVATE,
+        SetWindowPos, ShowWindow, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE,
+        SWP_NOSIZE, SWP_SHOWWINDOW, SW_SHOWNOACTIVATE,
     };
 
     let hwnd = window.hwnd().map_err(|error| error.to_string())?;
@@ -371,7 +400,11 @@ pub fn show_window_without_activation(window: &WebviewWindow) -> Result<(), Stri
         ShowWindow(hwnd.0 as HWND, SW_SHOWNOACTIVATE);
         SetWindowPos(
             hwnd.0 as HWND,
-            HWND_TOPMOST,
+            if always_on_top {
+                HWND_TOPMOST
+            } else {
+                HWND_NOTOPMOST
+            },
             0,
             0,
             0,
@@ -383,7 +416,10 @@ pub fn show_window_without_activation(window: &WebviewWindow) -> Result<(), Stri
 }
 
 #[cfg(not(target_os = "windows"))]
-pub fn show_window_without_activation(window: &WebviewWindow) -> Result<(), String> {
+pub fn show_window_without_activation(
+    window: &WebviewWindow,
+    _always_on_top: bool,
+) -> Result<(), String> {
     window.show().map_err(|error| error.to_string())
 }
 
@@ -473,4 +509,27 @@ pub fn set_overlay_opacity(window: &WebviewWindow, opacity: f64) -> Result<(), S
 #[cfg(not(target_os = "windows"))]
 pub fn set_overlay_opacity(_window: &WebviewWindow, _opacity: f64) -> Result<(), String> {
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::WindowKind;
+
+    #[test]
+    fn main_window_is_transient_and_not_always_on_top() {
+        let config = WindowKind::Main.runtime_config();
+
+        assert!(!config.always_on_top);
+        assert!(config.hide_on_focus_loss);
+    }
+
+    #[test]
+    fn standalone_windows_remain_always_on_top_and_visible_after_focus_loss() {
+        for kind in [WindowKind::GameChat, WindowKind::GameBuildGuide] {
+            let config = kind.runtime_config();
+
+            assert!(config.always_on_top);
+            assert!(!config.hide_on_focus_loss);
+        }
+    }
 }

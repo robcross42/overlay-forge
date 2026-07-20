@@ -316,15 +316,19 @@ export function ChatWorkspace<TConversation extends ChatConversation, TMessage e
                 placeholder={inputPlaceholder}
                 value={draft}
               />
-              {inputActionSlot}
-              <button
-                className="primary-button"
-                disabled={!selectedConversation || isSending || draft.trim().length === 0}
-                onClick={() => onSendMessage()}
-                type="button"
-              >
-                Send
-              </button>
+              <div className="chat-input-actions">
+                {inputActionSlot}
+                <button
+                  aria-label="Send message"
+                  className="primary-button chat-send-button"
+                  disabled={!selectedConversation || isSending || draft.trim().length === 0}
+                  onClick={() => onSendMessage()}
+                  title="Send"
+                  type="button"
+                >
+                  ↑
+                </button>
+              </div>
             </form>
 
             {!chatOverlayMode && contextSlot}

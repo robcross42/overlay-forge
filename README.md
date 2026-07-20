@@ -1,18 +1,17 @@
 # Overlay Forge
 
-Overlay Forge is a local-first Tauri desktop overlay for planning, notes, tasks, calendar items, project chat, game context, and focused utility modules.
+Overlay Forge is a local-first Tauri desktop overlay for planning, calendar items, game context, and focused utility modules.
 
 The active coding workflow is direct Codex chat in VS Code. Repository Markdown files provide local context and implementation rules for that workflow.
 
-## Current Baseline
+## Current Status
 
 ```text
 Current stable app release: 0.9.0
-Milestone 13 - Project Workspace UI Consolidation
-Status: Complete / Passed / Successful
+Status: Active local-first desktop command hub
 ```
 
-Milestone 13 remains the foundational project baseline. The current stable app release builds on that baseline with functional GearBlocks build guides, chat-to-guide generation, official API indexing, and standalone overlay-window behavior.
+Overlay Forge is now maintained as an evolving local-first command hub. Current stable capabilities include functional GearBlocks build guides, chat-to-guide generation, official API indexing, standalone overlay-window behavior, Smoking Cessation tracking, and Repair Resell planning.
 
 ## Core Capabilities
 
@@ -20,23 +19,21 @@ Milestone 13 remains the foundational project baseline. The current stable app r
 - React + TypeScript frontend.
 - Rust/Tauri backend command layer.
 - SQLite local persistence.
-- Scratchpad, Tasks, Notes, and Calendar.
-- Local Projects and project-scoped chat.
+- Calendar as the visible main-shell organizer surface.
+- Scratchpad, Tasks, and Notes code/data retained for later organizer consolidation review.
 - Backend-owned OpenAI Responses API use through `OPENAI_API_KEY`.
-- Project-scoped GitHub repository metadata through backend-owned `GITHUB_TOKEN`.
 - User-curated YouTube references.
 - Local-first Media Library with TMDB catalogue search, viewing progress, Watch Next, tags, and Canadian provider availability.
-- Manual conversation context attachments.
-- Prompt Preview.
-- Local Markdown implementation request drafts.
-- Project-level local Markdown context.
 - Gaming workspace and screenshot capture.
 - GearBlocks save decoding, runtime export import, parts catalog, script tooling, and backlog BepInEx plugin templates.
 - GearBlocks build guide import, chat-generated guide creation, in-game build guide overlay, and active guide chat context.
 - Smoking Cessation module.
+- Repair Resell module for local listing tracking, source registry, watchlist, deterministic flags, and manual deal estimates.
 - Scheduler framework.
 - SQLite naming normalization.
 - Path of Exile 2 game module scaffold.
+- The Spell Brigade game module scaffold for wizard, spell, upgrade, synergy, and run planning.
+- Former Projects module removed from active code; legacy project/planning SQLite rows are retained for data preservation and future review.
 
 ## Documentation Map
 
@@ -46,8 +43,8 @@ Milestone 13 remains the foundational project baseline. The current stable app r
 | `.vscode/CODEX_INSTRUCTIONS.md` | VS Code quick reference. |
 | `CHANGELOG.md` | Date/time-stamped change history. |
 | `docs/VERSIONING.md` | Semantic versioning and changelog rules. |
-| `docs/PROJECT_OVERVIEW.md` | Current project direction and baseline. |
-| `docs/PROJECT_HISTORY.md` | Condensed milestone history. |
+| `docs/PROJECT_OVERVIEW.md` | Current project direction and active shape. |
+| `docs/PROJECT_HISTORY.md` | Archived early project history. |
 | `docs/ARCHITECTURE.md` | Frontend/backend/module ownership. |
 | `docs/DATA_MODEL.md` | SQLite schema and naming conventions. |
 | `docs/FEATURE_SCOPE.md` | Scope boundaries and guardrails. |
@@ -60,6 +57,8 @@ Milestone 13 remains the foundational project baseline. The current stable app r
 | `docs/GEARBLOCKS_PARTS_CATALOG.md` | Validated GearBlocks parts vocabulary. |
 | `docs/SMOKING_CESSATION.md` | Smoking Cessation module scope. |
 | `docs/MEDIA_LIBRARY.md` | Media Library scope, TMDB boundary, progress, and persistence. |
+| `docs/REPAIR_RESELL.md` | Repair Resell restoration, pickup, and learning-path vision. |
+| `docs/THE_SPELL_BRIGADE.md` | The Spell Brigade module scope and planning scaffold. |
 
 ## Development
 

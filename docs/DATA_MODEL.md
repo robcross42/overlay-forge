@@ -70,7 +70,9 @@ updated_at
 
 Simple local event list. Recurrence, invites, and external calendar sync are deferred.
 
-## Project Tables
+## Legacy Project Tables
+
+The former Projects module has been removed from active code. These tables are retained so existing local databases remain readable and no user data is destroyed. Future work must explicitly decide whether to restore, migrate, export, or delete these records.
 
 ### `obj_project`
 
@@ -414,7 +416,7 @@ created_at
 modified_at
 ```
 
-Static game definitions. `GearBlocks` is seeded with `id_game = 1`. `Path of Exile 2` is seeded with `id_game = 2`.
+Static game definitions. `GearBlocks` is seeded with `id_game = 1`, `Path of Exile 2` with `id_game = 2`, and `The Spell Brigade` with `id_game = 3`.
 
 ### `obj_game`
 
@@ -443,7 +445,44 @@ created_at
 modified_at
 ```
 
-Generic per-game settings. This avoids table-per-game settings growth.
+Generic per-game settings. This avoids table-per-game settings growth for loose preferences and compatibility values.
+
+Legacy Path of Exile 2 seeded setting:
+
+```text
+setting_key = current_build
+setting_value_json = currently played build metadata, source URL, class, ascendancy, tags, and status
+```
+
+Path of Exile 2 character builds now use `obj_game_character_build` for editable build records. The `current_build` setting remains compatibility data from the earlier scaffold.
+
+### `obj_game_character_build`
+
+```text
+id
+game_id
+id_game
+title
+character_class
+ascendancy
+build_role
+status
+source_label
+source_url
+patch
+summary
+tags
+notes
+is_active
+created_at
+updated_at
+```
+
+Game-scoped local character build records. This table is intentionally generic so Path of Exile 2 build planning can add passive tree snapshots, items, gems, and calculated values without creating a table-per-game settings model.
+
+Only one build per game should have `is_active = 1`. Current status values are `planned`, `currently_playing`, `active`, and `archived`.
+
+Path of Exile 2 seeds the original Mobalytics Ice Shot Deadeye leveling guide as an active build record when no POE2 build records exist.
 
 ### `obj_game_data_location`
 
@@ -497,6 +536,8 @@ updated_at
 ```
 
 Game-scoped reference records. `object_id` is optional so references can belong to a whole game or a specific catalog object.
+
+GearBlocks Steam guide image imports use `reference_type = build_guide_image`, store the original image URL in `url`, and store the downloaded local file path in `local_path`. The image bytes remain outside SQLite.
 
 ### `obj_game_catalog_screenshot`
 
@@ -573,6 +614,84 @@ updated_at
 
 GearBlocks runtime construction export index populated from Overlay Forge Lua exporter records reconstructed from `Player.log` / `Player-prev.log`.
 
+Successful runtime imports treat the raw export JSON as an ingest artifact. After import, `document_json` is stored as an empty object and the reusable data is read from normalized runtime tables. The manifest row keeps export identity, source log, timestamps, counts, and status fields only.
+
+### `def_gearblocks_part`
+
+```text
+id
+part_key
+asset_guid
+asset_name
+display_name
+full_display_name
+category
+first_seen_at
+last_seen_at
+created_at
+updated_at
+```
+
+Canonical GearBlocks part definitions observed from runtime exports. `part_key` is the stable lookup key used by runtime instance rows.
+
+### `obj_gearblocks_part_render_profile`
+
+```text
+id
+game_id
+profile_key
+part_key
+part_name
+source_object_name
+renderer_names_json
+canonical_rotation_json
+camera_preset_json
+bounds_center_json
+bounds_size_json
+edge_settings_json
+latest_render_path
+latest_capture_id
+latest_status_json
+render_version
+is_validated
+notes
+created_at
+updated_at
+```
+
+Validated GearBlocks part-preview render profiles. A profile records the canonical zero orientation, selected Unity source/renderers, framing metadata, edge metadata, latest preview status JSON, and latest rendered PNG path for a part. The PNG remains a cache/output artifact outside SQLite; the profile is the reusable persisted definition used for future rotated preview requests.
+
+### `obj_game_runtime_part_instance`
+
+```text
+id
+game_id
+part_definition_id
+source_export_id
+source_construction_id
+part_instance_key
+runtime_part_id
+runtime_part_index
+mass
+world_x
+world_y
+world_z
+local_x
+local_y
+local_z
+world_position_json
+local_position_json
+current_unit_size_json
+link_node_count
+behaviour_names_json
+dynamic_summary_json
+last_seen_at
+created_at
+updated_at
+```
+
+Latest GearBlocks runtime scene part instances. This table preserves repeated physical parts in the current scene and maps each instance back to `def_gearblocks_part` instead of relying on raw full-scene export JSON.
+
 ### `obj_game_runtime_part`
 
 ```text
@@ -605,6 +724,8 @@ updated_at
 ```
 
 GearBlocks runtime part index. `part_key` prefers `AssetGUID`, falls back to `AssetName`, then to category plus display name.
+
+`properties_json` stores the full latest exported runtime part payload, including world/local coordinates, paint/material data, attachment and link-node details, tweakables, behaviours, and engine relationship fields when the GearBlocks runtime API exposes them.
 
 ### `obj_game_runtime_part_alias`
 
@@ -727,6 +848,143 @@ updated_at
 ```
 
 Runtime attachment index populated from direct entries under each part's `attachments` field.
+
+### `def_gearblocks_part_metadata_item`
+
+```text
+id
+source_area
+field_path
+value_type
+first_seen_at
+last_seen_at
+created_at
+updated_at
+```
+
+Reusable GearBlocks metadata field definitions observed from runtime exports. `source_area` separates generic value fields, part properties, and future metadata families while `field_path` stores the stable path.
+
+### `obj_game_runtime_part_metadata_value`
+
+```text
+id
+game_id
+part_key
+metadata_item_id
+value_type
+value_json
+source_export_id
+source_construction_id
+first_seen_at
+last_seen_at
+created_at
+updated_at
+```
+
+Current observed values for GearBlocks metadata definitions mapped back to game runtime parts.
+
+### `def_gearblocks_attachment_type`
+
+```text
+id
+attachment_path
+type_name
+value_type
+first_seen_at
+last_seen_at
+created_at
+updated_at
+```
+
+Reusable GearBlocks attachment type definitions observed from runtime exports.
+
+### `n2n_game_runtime_part_attachment_type`
+
+```text
+id
+game_id
+part_key
+attachment_type_id
+attachment_json
+source_export_id
+source_construction_id
+first_seen_at
+last_seen_at
+created_at
+updated_at
+```
+
+Runtime mapping between observed parts and reusable GearBlocks attachment type definitions.
+
+### `def_gearblocks_part_setting`
+
+```text
+id
+setting_key
+label
+setting_area
+value_type
+first_seen_at
+last_seen_at
+created_at
+updated_at
+```
+
+Reusable GearBlocks tweakable, resizable, and behaviour setting definitions observed from runtime exports.
+
+### `obj_game_runtime_part_setting_value`
+
+```text
+id
+game_id
+part_key
+setting_id
+value_type
+value_json
+source_export_id
+source_construction_id
+first_seen_at
+last_seen_at
+created_at
+updated_at
+```
+
+Runtime setting values mapped to reusable GearBlocks part setting definitions.
+
+### `def_gearblocks_part_output_channel`
+
+```text
+id
+channel_key
+label
+channel_area
+value_type
+first_seen_at
+last_seen_at
+created_at
+updated_at
+```
+
+Reusable GearBlocks output and control channel definitions observed from runtime exports.
+
+### `obj_game_runtime_part_output_channel_value`
+
+```text
+id
+game_id
+part_key
+output_channel_id
+value_type
+value_json
+source_export_id
+source_construction_id
+first_seen_at
+last_seen_at
+created_at
+updated_at
+```
+
+Runtime output/control channel values mapped to reusable GearBlocks output channel definitions.
 
 ### `def_gearblocks_api_type`
 
@@ -872,7 +1130,7 @@ created_at
 updated_at
 ```
 
-Game-scoped Markdown build guide imports. The raw Markdown is preserved for future parsing improvements while current UI rendering uses structured summary fields, parsed glossary text, parsed part rows, parsed assembly steps, and first-test checklist rows. Overlay bounds are nullable and restore the independent build-guide overlay position and size.
+Game-scoped Markdown build guide imports. The raw Markdown is preserved for future parsing improvements while current UI rendering uses structured summary fields, parsed glossary text, parsed part rows, parsed assembly steps, and first-test checklist rows. GearBlocks imports preserve all parsed assembly step rows so the overlay can produce a complete staging manifest and full step review. Overlay bounds are nullable and restore the independent build-guide overlay position and size.
 
 ### `obj_game_build_guide_part`
 
@@ -903,7 +1161,7 @@ created_at
 updated_at
 ```
 
-Parsed numbered assembly instructions for in-game reference. Automated construction, validation against live scene state, and direct GearBlocks API execution are deferred.
+Parsed numbered assembly instructions for in-game reference. The current GearBlocks two-phase workflow imports the latest runtime export before rendering the step view, but persisted step-to-runtime-instance matching remains future work. Automated construction and direct GearBlocks API execution are deferred.
 
 ## Smoking Cessation Tables
 
@@ -1000,6 +1258,63 @@ modified_at
 ```
 
 Run history for scheduled events.
+
+## Repair Resell Tables
+
+Repair Resell tables use table-specific text primary keys named `id_<tablename>` and include `created_at` plus `modified_at`.
+
+### Definition Tables
+
+```text
+def_resell_source_kind
+def_resell_category
+def_resell_keyword_flag
+```
+
+These seed source kinds, item categories, and deterministic keyword flag rules for opportunity, risk, and interest-brand detection.
+
+### Source And Search Tables
+
+```text
+obj_resell_source
+obj_resell_search_profile
+n2n_resell_source_search_profile
+obj_resell_scrape_run
+```
+
+Sources are allowlisted local records with `scrape_mode` values of `public_http`, `manual_import`, or `disabled`. Refresh runs are manually triggered and record success, skipped, or failed outcomes.
+
+### Listing Tables
+
+```text
+obj_resell_listing
+obj_resell_listing_snapshot
+obj_resell_listing_image
+n2n_resell_listing_category
+n2n_resell_listing_keyword_flag
+obj_resell_watchlist_entry
+```
+
+Listings are canonical rows keyed by source/external id or canonical URL. Snapshots preserve price/status/content history for each import or refresh. Images are metadata rows only; image bytes should stay outside SQLite if image download support is added later.
+
+### Estimate Tables
+
+```text
+obj_resell_travel_profile
+obj_resell_deal_estimate
+```
+
+Travel profiles store fuel/distance assumptions. Deal estimates are manual MVP records with deterministic max-safe-bid and net-profit calculations stored alongside user-entered costs and resale assumptions.
+
+### Future Repair Resell Data Direction
+
+Future Repair Resell schema work should preserve room for:
+
+- Multi-item pickup plans that group listings/lots by source, region, pickup window, route, vehicle, trailer, and total load economics.
+- Donor/parts-harvesting relationships between purchased machines, repaired items, part-out inventory, and remaining resale parts.
+- Repair knowledge records for symptoms, diagnosis, root cause, parts, cost, time, photos, manuals, videos, lessons learned, and final outcome.
+- Model/brand/engine-family/failure-mode history that can be matched back to future listings.
+- Learning progression and skill-area history from bicycles and small engines toward larger machines, engine rebuilding, and vehicle restoration.
 
 ## Migration Notes
 

@@ -20,30 +20,33 @@ public class Plugin : BasePlugin
     public override void Load()
     {
         Log = base.Log;
-        ClassInjector.RegisterTypeInIl2Cpp<OverlayForgeMarkerBridge>();
+        ClassInjector.RegisterTypeInIl2Cpp<OverlayForgeRuntimeBridge>();
 
-        GameObject bridgeObject = new GameObject("Overlay Forge Marker Bridge");
+        GameObject bridgeObject = new GameObject("Overlay Forge Runtime Bridge");
         UnityEngine.Object.DontDestroyOnLoad(bridgeObject);
         bridgeObject.hideFlags = HideFlags.HideAndDontSave;
-        bridgeObject.AddComponent<OverlayForgeMarkerBridge>();
+        bridgeObject.AddComponent<OverlayForgeRuntimeBridge>();
 
         Log.LogInfo($"Plugin {MyPluginInfo.PLUGIN_GUID} loaded.");
     }
 }
 
-public class OverlayForgeMarkerBridge : MonoBehaviour
+public class OverlayForgeRuntimeBridge : MonoBehaviour
 {
     private const float PollIntervalSeconds = 0.25f;
     private const float DefaultMarkerDurationSeconds = 20f;
     private const float DefaultMarkerSize = 4.0f;
+    private const int DefaultPreviewWidth = 1024;
+    private const int DefaultPreviewHeight = 576;
 
     private readonly List<MarkerHandle> markers = new List<MarkerHandle>();
     private string commandDirectory = string.Empty;
     private string processedDirectory = string.Empty;
     private string statusDirectory = string.Empty;
+    private string renderDirectory = string.Empty;
     private float pollTimer;
 
-    public OverlayForgeMarkerBridge(IntPtr ptr) : base(ptr)
+    public OverlayForgeRuntimeBridge(IntPtr ptr) : base(ptr)
     {
     }
 
@@ -53,13 +56,15 @@ public class OverlayForgeMarkerBridge : MonoBehaviour
         commandDirectory = Path.Combine(root, "commands");
         processedDirectory = Path.Combine(root, "processed");
         statusDirectory = Path.Combine(root, "status");
+        renderDirectory = Path.Combine(root, "renders");
 
         Directory.CreateDirectory(commandDirectory);
         Directory.CreateDirectory(processedDirectory);
         Directory.CreateDirectory(statusDirectory);
+        Directory.CreateDirectory(renderDirectory);
 
         Plugin.Log.LogInfo($"Overlay Forge command directory: {commandDirectory}");
-        WriteStatus("startup", true, "Overlay Forge GearBlocks plugin ready.");
+        WriteStatus("startup", true, "Overlay Forge GearBlocks runtime bridge ready.");
     }
 
     private void Update()
@@ -108,6 +113,13 @@ public class OverlayForgeMarkerBridge : MonoBehaviour
             float x = ExtractFloat(commandText, "x", 0f);
             float y = ExtractFloat(commandText, "y", 0f);
             float z = ExtractFloat(commandText, "z", 0f);
+            int width = ExtractInt(commandText, "width", DefaultPreviewWidth);
+            int height = ExtractInt(commandText, "height", DefaultPreviewHeight);
+            float yawDegrees = ExtractFloat(commandText, "yawDegrees", 35f);
+            float pitchDegrees = ExtractFloat(commandText, "pitchDegrees", 28f);
+            float partRotationXDegrees = ExtractFloat(commandText, "partRotationXDegrees", ExtractFloat(commandText, "partPitchDegrees", 0f));
+            float partRotationYDegrees = ExtractFloat(commandText, "partRotationYDegrees", ExtractFloat(commandText, "partYawDegrees", 0f));
+            float partRotationZDegrees = ExtractFloat(commandText, "partRotationZDegrees", ExtractFloat(commandText, "partRollDegrees", 0f));
 
             commandId = string.IsNullOrWhiteSpace(parsedId) ? commandId : parsedId;
 
@@ -127,6 +139,21 @@ public class OverlayForgeMarkerBridge : MonoBehaviour
                     break;
                 case "ping":
                     WriteStatus(commandId, true, "Pong.");
+                    break;
+                case "capture_center_part_preview":
+                    PartPreviewResult result = PartPreviewRenderer.CaptureCenterPartPreview(
+                        commandId,
+                        label,
+                        renderDirectory,
+                        width,
+                        height,
+                        yawDegrees,
+                        pitchDegrees,
+                        partRotationXDegrees,
+                        partRotationYDegrees,
+                        partRotationZDegrees
+                    );
+                    WritePartPreviewStatus(commandId, result);
                     break;
                 default:
                     throw new InvalidOperationException($"Unsupported command action '{action}'.");
@@ -389,6 +416,22 @@ public class OverlayForgeMarkerBridge : MonoBehaviour
             : fallback;
     }
 
+    private static int ExtractInt(string json, string propertyName, int fallback)
+    {
+        Match match = Regex.Match(
+            json,
+            $"\"{Regex.Escape(propertyName)}\"\\s*:\\s*(-?[0-9]+)",
+            RegexOptions.IgnoreCase
+        );
+
+        if (!match.Success)
+            return fallback;
+
+        return int.TryParse(match.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int value)
+            ? value
+            : fallback;
+    }
+
     private static string UnescapeJsonString(string value)
     {
         return value
@@ -396,6 +439,51 @@ public class OverlayForgeMarkerBridge : MonoBehaviour
             .Replace("\\\\", "\\")
             .Replace("\\r", "\r")
             .Replace("\\n", "\n");
+    }
+
+    private void WritePartPreviewStatus(string commandId, PartPreviewResult result)
+    {
+        if (string.IsNullOrWhiteSpace(statusDirectory))
+            return;
+
+        Directory.CreateDirectory(statusDirectory);
+        string statusPath = Path.Combine(statusDirectory, $"{SanitizeFileName(commandId)}.json");
+        File.WriteAllText(statusPath,
+            "{\n" +
+            $"  \"id\": \"{EscapeJson(commandId)}\",\n" +
+            "  \"ok\": true,\n" +
+            "  \"message\": \"Part preview captured.\",\n" +
+            $"  \"renderPath\": \"{EscapeJson(result.RenderPath)}\",\n" +
+            $"  \"sourceObjectName\": \"{EscapeJson(result.SourceObjectName)}\",\n" +
+            $"  \"label\": \"{EscapeJson(result.Label)}\",\n" +
+            $"  \"selectionMode\": \"{EscapeJson(result.SelectionMode)}\",\n" +
+            $"  \"selectionDistance\": {FormatFloat(result.SelectionDistance)},\n" +
+            $"  \"rendererCount\": {result.RendererCount},\n" +
+            $"  \"edgeLineCount\": {result.EdgeLineCount},\n" +
+            $"  \"edgeSkippedMeshCount\": {result.EdgeSkippedMeshCount},\n" +
+            $"  \"width\": {result.Width},\n" +
+            $"  \"height\": {result.Height},\n" +
+            $"  \"cameraYawDegrees\": {FormatFloat(result.CameraYawDegrees)},\n" +
+            $"  \"cameraPitchDegrees\": {FormatFloat(result.CameraPitchDegrees)},\n" +
+            $"  \"partRotation\": {{ \"xDegrees\": {FormatFloat(result.PartRotationXDegrees)}, \"yDegrees\": {FormatFloat(result.PartRotationYDegrees)}, \"zDegrees\": {FormatFloat(result.PartRotationZDegrees)} }},\n" +
+            $"  \"rendererNames\": {FormatStringArray(result.RendererNames)},\n" +
+            $"  \"boundsCenter\": {{ \"x\": {FormatFloat(result.SourceBounds.center.x)}, \"y\": {FormatFloat(result.SourceBounds.center.y)}, \"z\": {FormatFloat(result.SourceBounds.center.z)} }},\n" +
+            $"  \"boundsSize\": {{ \"x\": {FormatFloat(result.SourceBounds.size.x)}, \"y\": {FormatFloat(result.SourceBounds.size.y)}, \"z\": {FormatFloat(result.SourceBounds.size.z)} }},\n" +
+            $"  \"writtenAtUtc\": \"{DateTimeOffset.UtcNow:O}\"\n" +
+            "}\n");
+    }
+
+    private static string FormatStringArray(IEnumerable<string> values)
+    {
+        if (values == null)
+            return "[]";
+
+        return "[" + string.Join(", ", values.Select(value => $"\"{EscapeJson(value)}\"")) + "]";
+    }
+
+    private static string FormatFloat(float value)
+    {
+        return value.ToString("0.###", CultureInfo.InvariantCulture);
     }
 
     private sealed class MarkerHandle
