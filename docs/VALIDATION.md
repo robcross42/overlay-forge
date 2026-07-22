@@ -28,7 +28,7 @@ Do not run broader validation than needed for a small change unless the request 
 | BepInEx plugin | plugin build plus install/run check where possible |
 | Scheduler | backend build plus startup/interval/run-history behavior review |
 | Smoking Cessation | frontend/backend builds plus event/keybind/export behavior review |
-| Media Library | frontend/backend builds plus missing-token, progress, refresh-preservation, queue, and URL checks |
+| Media Library | frontend/backend builds plus migration, provider fixtures, missing-token, progress, refresh-preservation, separate queues, and URL checks |
 
 For broad cleanup and architecture work, run `npm run cargo:clippy` as a review pass. Fix clear no-risk warnings immediately. Record larger warnings as explicit refactor work when they require changing public command shapes, repository APIs, or multiple call sites.
 
@@ -147,6 +147,40 @@ Validate metadata refresh after editing notes, rating, favourite, tags, queue or
 Validate Watch Next add/remove/up/down behavior and restart persistence. Exercise local type, status, favourite, tag, unwatched, provider, and queue filters while offline.
 
 Validate that `file:`, `javascript:`, and other non-HTTP(S) manual links are rejected. Delete a title and confirm only its locally owned metadata, progress, availability, links, and mappings are removed.
+
+### Books Automated Checks
+
+Run:
+
+```powershell
+npm run check
+npm run cargo:test
+npm run cargo:clippy
+cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
+git diff --check
+```
+
+Book tests must cover the populated pre-book table rebuild, preserved IDs/foreign keys/TMDB identities, idempotence, ISBN checksums, provider fixture normalization, Hardcover GraphQL errors, exact-match merging, Open Library throttle intervals, manual books without credentials, refresh preservation, provider-failure isolation, typed progress, preferred edition, Read Next isolation, and HTTP(S)-only links. Provider unit tests use fixtures and do not call live services.
+
+### Books Manual Matrix
+
+1. With no `GOOGLE_BOOKS_API_KEY` and no `HARDCOVER_API_TOKEN`, confirm manual book creation and Open Library search remain usable.
+2. With Google configured and Hardcover absent, confirm Google search/add succeeds, Open Library exact-ISBN enrichment is optional, and Settings reports Hardcover as optional/unconfigured.
+3. Search with General, Title, Author, and ISBN. Invalid ISBN checksums must fail before a remote request. Add an exact duplicate and confirm the existing entry is returned.
+4. Simulate or observe each provider failure independently. A Google failure should permit Open Library fallback; Open Library or Hardcover failure must not block a successful Google add.
+5. Create/edit a manual book and edition. Set preferred edition, ownership, format, notes, rating, favourite, tags, and Read Next order; restart and confirm persistence.
+6. Exercise page, percent, audiobook-minute, and chapter progress; mark read and reset; verify On Hold and Did Not Finish are not overwritten automatically.
+7. Refresh after editing all user-owned fields. Confirm progress, dates, preferred edition, ownership, queue, manual links, series overrides, notes, rating, favourite, and tags remain unchanged.
+8. Open provider and user links. Reject `file:`, `javascript:`, whitespace-bearing, and malformed URLs. Confirm unapproved cover hosts render a placeholder.
+9. Filter the all-media Library to `BOOK`, then confirm Books rows use reading labels/progress and never display streaming-provider logos.
+10. Reopen existing movie/series entries and exercise Watch Next to confirm the BOOK migration and Read Next did not regress video data.
+
+Pass criteria:
+
+```text
+Books remain fully local-first, exact matching is conservative, optional providers fail independently,
+user state survives refresh/restart, and movie/series behavior is unchanged.
+```
 
 ## GearBlocks Validation
 

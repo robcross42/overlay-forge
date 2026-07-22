@@ -205,12 +205,17 @@ Media Library is a shell-hosted feature with a focused Rust domain boundary:
 - `MediaProgressService` owns movie and episodic progress plus automatic status transitions.
 - `MediaAvailabilityService` owns cached provider snapshots, manual links, preferred-link resolution, and safe external targets.
 - `MediaRepository` owns canonical SQLite row mapping and cross-table transactions.
+- `BookMetadataProvider` isolates string-ID book providers from the numeric, video-specific TMDB contract.
+- `BookProviderCoordinator` owns Google Books primary search, Open Library fallback/enrichment, optional Hardcover enrichment, exact matching, and partial-provider warnings.
+- `BookMetadataMerger` centralizes non-empty metadata precedence and exact-identity edition merging.
+- `BookCatalogService`, `BookLibraryService`, and `BookProgressService` own book import/refresh, local book state, and reading transitions.
+- `BookRepository` owns work/edition/source/author/reader/link/series mapping and book-only Read Next normalization.
 
-React calls typed Tauri commands only. It does not access the TMDB token, send viewing history to TMDB, own progress transitions, or perform remote catalogue requests.
+React calls typed Tauri commands only. It does not access provider credentials, send viewing or reading history to providers, own progress transitions, or perform remote catalogue requests.
 
-SQLite remains authoritative for notes, ratings, favourites, tags, Watch Next order, manual links, and viewing history. Provider refresh can update normalized catalogue metadata and provider cache only. Refresh must preserve all user-owned state and previous provider rows on temporary failure.
+SQLite remains authoritative for notes, ratings, favourites, tags, Watch Next/Read Next order, preferred editions, ownership, manual links, and viewing/reading history. Provider refresh can update normalized catalogue metadata and provider cache only. Refresh must preserve all user-owned state and previous provider payloads on temporary failure.
 
-TMDB image paths are converted only to official `image.tmdb.org` URLs in the media UI. The module does not act as a general URL image proxy. See `docs/MEDIA_LIBRARY.md`.
+TMDB image paths are converted only to official `image.tmdb.org` URLs. Book covers initially allow HTTPS from `books.google.com`, `books.googleusercontent.com`, and `covers.openlibrary.org`; Hardcover images remain disabled pending a verified stable host. The module is not a general URL image proxy. See `docs/MEDIA_LIBRARY.md`.
 
 ## GearBlocks Boundary
 

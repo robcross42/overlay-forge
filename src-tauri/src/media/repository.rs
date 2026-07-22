@@ -232,7 +232,8 @@ pub(crate) fn migrate_schema(connection: &Connection) -> SqlResult<()> {
         CREATE INDEX IF NOT EXISTS idx_media_tag_mapping_tag
             ON n2n_media_library_entry_tag (media_tag_id);
         ",
-    )
+    )?;
+    super::books::repository::migrate_schema(connection)
 }
 
 pub struct MediaRepository<'a> {
@@ -862,7 +863,7 @@ impl<'a> MediaRepository<'a> {
             }
             "PROGRESS" => format!("progress_percent {direction}, title.title COLLATE NOCASE ASC"),
             "RELEASE_DATE" => format!(
-                "CASE WHEN title.content_type = 'MOVIE' THEN title.release_date
+                "CASE WHEN title.content_type IN ('MOVIE','BOOK') THEN title.release_date
                       ELSE title.first_air_date END {direction}"
             ),
             "WATCH_NEXT" => {
@@ -946,6 +947,15 @@ impl<'a> MediaRepository<'a> {
         } else {
             Vec::new()
         };
+        let book_detail = if entry.content_type == MediaContentType::Book {
+            super::books::repository::load_media_book_detail(
+                &connection,
+                entry.id,
+                entry.media_title_id,
+            )?
+        } else {
+            None
+        };
         Ok(MediaLibraryDetail {
             entry,
             seasons,
@@ -954,6 +964,7 @@ impl<'a> MediaRepository<'a> {
             provider_snapshot,
             providers,
             settings,
+            book_detail,
         })
     }
 
@@ -1087,6 +1098,11 @@ impl<'a> MediaRepository<'a> {
             [row.media_title_id],
             |db_row| Ok(db_row.get::<_, i64>(0)? != 0),
         )?;
+        let book_summary = if content_type == MediaContentType::Book {
+            super::books::repository::load_media_book_summary(connection, row.id)?
+        } else {
+            None
+        };
         Ok(MediaLibrarySummary {
             id: row.id,
             media_title_id: row.media_title_id,
@@ -1138,6 +1154,7 @@ impl<'a> MediaRepository<'a> {
             new_episodes_count: row.new_episodes_count,
             subscription_providers,
             availability_is_stale,
+            book_summary,
         })
     }
 
@@ -1780,12 +1797,18 @@ impl<'a> MediaRepository<'a> {
         let mut connection = self.database.connection()?;
         let transaction = connection.transaction()?;
         let exists: bool = transaction.query_row(
-            "SELECT EXISTS(SELECT 1 FROM obj_media_library_entry WHERE id = ?1)",
+            "SELECT EXISTS(
+                SELECT 1 FROM obj_media_library_entry entry
+                JOIN obj_media_title title ON title.id = entry.media_title_id
+                WHERE entry.id = ?1 AND title.content_type <> 'BOOK'
+            )",
             [entry_id],
             |row| Ok(row.get::<_, i64>(0)? != 0),
         )?;
         if !exists {
-            return Err(MediaError::not_found("Media library entry was not found."));
+            return Err(MediaError::validation(
+                "Books use the separate Read Next queue.",
+            ));
         }
         let position = Self::next_queue_position(&transaction)?;
         transaction.execute(

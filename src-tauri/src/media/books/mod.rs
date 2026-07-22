@@ -1,6 +1,9 @@
-pub mod books;
 pub mod commands;
 pub mod domain;
+pub mod google_books;
+pub mod hardcover;
+pub mod merge;
+pub mod open_library;
 pub mod provider;
 pub mod repository;
 pub mod service;

@@ -47,7 +47,7 @@ impl TmdbMediaMetadataProvider {
 
         let client = Client::builder()
             .timeout(Duration::from_secs(15))
-            .user_agent("Overlay Forge/0.9 media-library")
+            .user_agent("Overlay Forge/0.11 media-library")
             .build()
             .map_err(|error| {
                 MediaError::new(
