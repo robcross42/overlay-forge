@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { BookAuthor, BookEdition, BookMediaSummary, BookProgressSummary } from "./mediaBooks";
 
-export type MediaContentType = "MOVIE" | "SERIES";
+export type MediaContentType = "MOVIE" | "SERIES" | "BOOK";
 export type MediaLibraryStatus = "PLANNED" | "WATCHING" | "COMPLETED" | "ON_HOLD" | "DROPPED";
 export type MediaSort =
   | "TITLE"
@@ -81,6 +82,7 @@ export type MediaLibrarySummary = {
   newEpisodesCount: number;
   subscriptionProviders: MediaProviderSummary[];
   availabilityIsStale: boolean;
+  bookSummary: BookMediaSummary | null;
 };
 
 export type MediaEpisode = {
@@ -166,6 +168,11 @@ export type MediaLibraryDetail = {
   providerSnapshot: MediaProviderSnapshot | null;
   providers: MediaProviderAvailability[];
   settings: MediaSettings;
+  bookDetail: {
+    progress: BookProgressSummary;
+    preferredEdition: BookEdition | null;
+    authors: BookAuthor[];
+  } | null;
 };
 
 export type MediaLibraryFilter = {

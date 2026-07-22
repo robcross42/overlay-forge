@@ -85,18 +85,20 @@ Avoid clipboard captures, `Win+Shift+S`, Snipping Tool dependency, HDR output, w
 
 Media Library is local-first. Current scope:
 
-- Movie and episodic-series library entries.
-- Backend-owned TMDB search and explicit metadata refresh.
-- Manual movie and series entries.
-- Local notes, rating, favourite, priority, tags, and Watch Next ordering.
-- Movie, episode, season, series, and watched-through progress operations.
+- Movie, episodic-series, and book library entries.
+- Backend-owned TMDB video search plus Google Books/Open Library book search and explicit metadata refresh.
+- Optional read-only Hardcover exact-ISBN enrichment.
+- Manual movie, series, book, and book-edition entries.
+- Local notes, rating, favourite, priority, tags, Watch Next, and book-only Read Next ordering.
+- Movie, episode, season, series, watched-through, and typed reading-progress operations.
+- Book works, editions, authors, preferred edition/format, ownership, links, and series overrides.
 - Specials-aware automatic completion.
 - Cached regional provider availability and user-owned manual links.
 - Offline local search, filtering, editing, and progress.
 
-TMDB credentials remain backend-only. Local viewing history and personal fields must not be sent to TMDB.
+TMDB, Google Books, and Hardcover credentials remain backend-only. Local viewing/reading history and personal fields must not be sent to any metadata provider. Open Library uses public APIs only and optionally receives a configured contact identity.
 
-Current exclusions include account/service sync, automatic playback detection, partial playback, recommendations, background refresh, notifications, provider scraping, direct provider deep-link fabrication, music-library records and local collection indexing, external media acquisition, imports/exports, and manual season/episode editing.
+Current exclusions include account/service sync, automatic playback detection, recommendations, background refresh, notifications, provider scraping, direct provider deep-link fabrication, music-library records and local collection indexing, external media acquisition, book file parsing/management, imports/exports, and manual season/episode editing.
 
 ## GearBlocks Boundary
 

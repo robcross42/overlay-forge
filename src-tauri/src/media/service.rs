@@ -116,6 +116,11 @@ impl<'a> MediaLibraryService<'a> {
         &self,
         input: &CreateManualMediaInput,
     ) -> Result<MediaLibraryDetail, MediaError> {
+        if input.content_type == super::domain::MediaContentType::Book {
+            return Err(MediaError::validation(
+                "Use the Books section to create a manual book entry.",
+            ));
+        }
         if input.title.trim().is_empty() {
             return Err(MediaError::validation("A title is required."));
         }

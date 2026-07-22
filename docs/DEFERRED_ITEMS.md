@@ -76,6 +76,31 @@ This file centralizes deferred work. Items listed here are not approved scope un
 
 ## Media Library
 
+### Books
+
+- Google Bookshelf synchronization.
+- Hardcover account, list, progress, journal, or profile synchronization.
+- Open Library account/list synchronization.
+- Goodreads integration.
+- Amazon Product Advertising API integration.
+- Barcode or ISBN camera scanning.
+- Bulk CSV, Goodreads, StoryGraph, or LibraryThing import.
+- Multi-profile or household reading state and cloud sync.
+- Social sharing and book recommendations.
+- Automatic series-release notifications and scheduled metadata refresh.
+- Reading reminders, Calendar integration, and desktop notifications.
+- Reading-session history, charts, speed prediction, and reread counts.
+- Quotes and highlights.
+- Ebook or audiobook file management and embedded playback.
+- EPUB/PDF parsing.
+- Kindle, Kobo, or Audible account integration.
+- Library-card integration and automated borrow/hold placement.
+- Book price tracking.
+- Arbitrary book-provider scraping.
+- Automatic low-confidence work merging.
+- Full manual provider-identity merge UI.
+- Automatic cover downloading/caching unless remote loading proves unreliable.
+
 - Trakt, Plex, Jellyfin, Kodi, and streaming-account sync.
 - Browser-history or service-history import.
 - Automatic playback detection and partial playback position.

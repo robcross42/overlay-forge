@@ -236,7 +236,7 @@ created_at
 updated_at
 ```
 
-`content_type` is `MOVIE` or `SERIES`. TMDB identity is unique by source, provider media type, and external ID. Manual rows have a null external ID and may share titles. Refresh updates this table without replacing user state.
+`content_type` is `MOVIE`, `SERIES`, or `BOOK`. TMDB identity remains unique by source, provider media type, and numeric external ID. Provider-backed books use `source_key='book'`, `external_media_type='book'`, and a null numeric `external_id`; their string identities live in `obj_media_book_source_record`. Manual rows have a null external ID. The idempotent BOOK migration rebuilds only this check constraint, preserves rows/IDs/indexes, verifies foreign keys before commit, and rolls back on failure.
 
 ### `obj_media_library_entry`
 
@@ -401,6 +401,75 @@ updated_at
 ```
 
 Singleton row `id = 1` defaults to `CA`, `en-CA`, and specials excluded. Updating specials behavior recalculates series status through the canonical progress path.
+
+### `obj_media_book_work`
+
+```text
+id, media_title_id, subtitle, primary_author_text, first_publish_year,
+subjects_json, canonical_cover_url, community_rating, community_rating_count,
+metadata_refreshed_at, created_at, updated_at
+```
+
+One row exists per book title. Provider community rating never populates the user's personal rating.
+
+### `obj_media_book_edition`
+
+```text
+id, media_title_id, title, subtitle, format, isbn_10, isbn_13, publisher,
+published_date, language, page_count, audio_duration_minutes, cover_url,
+is_ebook, access_viewability, is_present_in_source,
+metadata_refreshed_at, created_at, updated_at
+```
+
+Formats are `HARDCOVER`, `PAPERBACK`, `EBOOK`, `AUDIOBOOK`, `OTHER`, or `UNKNOWN`. Non-empty normalized ISBN-10 and ISBN-13 values have partial unique indexes. Counts/durations must be positive. Refresh marks missing provider editions absent instead of deleting progress-referenced rows.
+
+### `obj_media_book_source_record`
+
+```text
+id, media_title_id, edition_id, source_key, entity_type, external_id,
+source_url, metadata_json, refreshed_at, last_refresh_status,
+last_refresh_error, created_at, updated_at
+```
+
+Provider string identities are unique by source/entity/external ID. Sources are `google_books`, `open_library`, `hardcover`, or `manual`; entities are `WORK`, `EDITION`, or `BOOK`. Refresh failures retain the prior payload and update only that source's status/error. Credentials and authorization headers are never stored.
+
+### `obj_media_book_author` and `n2n_media_book_work_author`
+
+```text
+obj_media_book_author: id, name, sort_name, created_at, updated_at
+n2n_media_book_work_author: id, media_title_id, author_id, role, position, created_at, updated_at
+```
+
+Roles are `AUTHOR`, `EDITOR`, `NARRATOR`, `TRANSLATOR`, or `OTHER`. Mapping order is preserved. Names alone are not treated as globally unique provider identities.
+
+### `obj_media_book_reader_state`
+
+```text
+id, media_library_entry_id, preferred_edition_id, ownership_status,
+preferred_format, progress_unit, progress_value, progress_total_override,
+current_chapter, reading_queue_position, last_progress_at, created_at, updated_at
+```
+
+One user-owned row exists per book entry. Ownership is `NONE`, `OWNED`, `BORROWED`, or `WISHLIST`; units are `PAGE`, `PERCENT`, `MINUTE`, or `CHAPTER`. Read Next positions are unique and separate from video `queue_position`. Preferred editions must belong to the same work. Provider refresh never replaces this row.
+
+### `obj_media_book_link`
+
+```text
+id, media_title_id, edition_id, source_key, link_type, url, region_code,
+is_user_owned, is_preferred, refreshed_at, created_at, updated_at
+```
+
+Types are `INFO`, `PREVIEW`, `READ`, `BORROW`, `BUY`, or `OTHER`. URLs must be HTTP(S). Provider refresh replaces only its non-user rows; user-owned links survive. A partial unique index allows one preferred user link per title.
+
+### `obj_media_book_series` and `obj_media_book_series_member`
+
+```text
+obj_media_book_series: id, name, created_at, updated_at
+obj_media_book_series_member: id, series_id, media_title_id, position_text,
+position_sort, is_primary, source_key, is_user_override, created_at, updated_at
+```
+
+Text positions preserve provider forms such as `0.5` or `1-2`; numeric sort is nullable. User overrides win over provider refresh and a book may belong to multiple series.
 
 ## Gaming Tables
 

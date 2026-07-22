@@ -362,7 +362,9 @@
 
 .media-toolbar,
 .media-detail-nav,
+.media-detail-toolbar,
 .media-detail-actions,
+.media-action-row,
 .media-section-heading,
 .media-card-title-row,
 .media-check-row {
@@ -376,9 +378,28 @@
 }
 
 .media-detail-nav,
+.media-detail-toolbar,
 .media-section-heading,
 .media-card-title-row {
   justify-content: space-between;
+}
+
+.media-detail-toolbar > div,
+.media-action-row,
+.media-catalogue-selector {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.media-catalogue-selector {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.media-catalogue-selector .module-tab {
+  flex: 0 1 auto;
 }
 
 .media-detail-actions.wrap,
@@ -562,6 +583,81 @@
 .media-inline-error {
   margin: 0;
   color: var(--error);
+}
+
+.media-inline-warning {
+  margin: 0;
+  color: var(--warn);
+}
+
+.book-search-toolbar > select {
+  flex: 0 1 150px !important;
+}
+
+.book-filter-grid {
+  grid-template-columns: repeat(3, minmax(140px, 1fr));
+}
+
+.book-cover {
+  object-position: center;
+}
+
+.media-form-card.nested {
+  margin-top: 2px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.book-edition-list,
+.book-link-list {
+  display: grid;
+  gap: 9px;
+}
+
+.book-edition-list > article {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 9px;
+  border: 1px solid rgba(139, 155, 173, 0.16);
+  border-radius: 7px;
+}
+
+.book-edition-list .book-cover {
+  width: 54px;
+  height: 78px;
+}
+
+.book-edition-list p {
+  margin: 4px 0 0;
+}
+
+.book-link-list > div,
+.book-series-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 7px;
+  border: 1px solid rgba(139, 155, 173, 0.16);
+  border-radius: 7px;
+}
+
+.book-link-list > div > :first-child,
+.book-series-row > :first-child {
+  margin-right: auto;
+}
+
+.media-provider-status-grid {
+  display: grid;
+  grid-template-columns: minmax(130px, auto) minmax(0, 1fr);
+  gap: 8px 16px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.media-provider-status-grid strong {
+  color: var(--text);
 }
 
 .media-form-grid,
@@ -853,6 +949,24 @@
   .media-episode > .compact-button {
     grid-column: 2;
     justify-self: start;
+  }
+
+  .book-search-toolbar,
+  .media-detail-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .book-search-toolbar > select {
+    flex-basis: auto !important;
+  }
+
+  .book-edition-list > article {
+    grid-template-columns: 46px minmax(0, 1fr);
+  }
+
+  .book-edition-list > article > button {
+    grid-column: 1 / -1;
   }
 }
 
