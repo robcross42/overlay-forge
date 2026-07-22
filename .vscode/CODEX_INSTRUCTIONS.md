@@ -31,4 +31,4 @@ Use only the validation needed for the actual change when the task is narrow.
 
 ## Versioning Reminder
 
-Do not bump a minor version for a new chat, work session, or date. Use `## Unreleased` until the user intentionally cuts a semantic version. Keep changelog entries timestamped.
+Do not bump a minor version for a new chat, work session, or date. Use `## Unreleased` until the user intentionally cuts a semantic version. Keep changelog entries timestamped, and update the current stable version in `docs/PROJECT_OVERVIEW.md` whenever a release is cut.

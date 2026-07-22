@@ -171,6 +171,7 @@ For broad cleanup or architecture work, run `npm run build`, `cargo build`, `car
 ## Documentation Rules
 
 - Update docs when behavior, scope, validation, or persistence changes.
+- When cutting a release, update the current stable version in `docs/PROJECT_OVERVIEW.md` alongside the changelog and project version metadata.
 - Keep active documentation compact and task-facing.
 - Put historical release/checkpoint details in `docs/PROJECT_HISTORY.md`, not separate active tracker files.
 - Put deferred items in `docs/DEFERRED_ITEMS.md`.
@@ -186,6 +187,7 @@ For broad cleanup or architecture work, run `npm run build`, `cargo build`, `car
 - Use `PATCH` for fixes, documentation-only changes, validation updates, small UX refinements, and internal refactors.
 - Use `MINOR` for substantial new user-visible capabilities.
 - Use `MAJOR` for incompatible or breaking release changes.
+- Keep `docs/PROJECT_OVERVIEW.md` on the latest released version; do not advance it for work that remains under `## Unreleased`.
 - Read `docs/VERSIONING.md` before changing version metadata or changelog structure.
 
 ## Validation Rules
