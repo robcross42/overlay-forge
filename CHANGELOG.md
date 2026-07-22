@@ -20,6 +20,38 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.11.0 - 2026-07-22
+
+### 2026-07-20
+
+#### Added
+
+- 19:39:50 EDT - Added a dedicated local-first Books section to Media Library with work/edition modeling, manual books and editions, preferred editions, ownership, Read Next, content-aware reading statuses, page/percent/minute/chapter progress, series overrides, and safe user/provider links.
+- 19:39:50 EDT - Added backend-owned Google Books primary search, Open Library fallback/enrichment with documented request identification and throttling, and optional read-only Hardcover exact-ISBN enrichment with partial-provider failure isolation.
+- 19:39:50 EDT - Added normalized book work, edition, source identity, author, reader state, link, and series SQLite tables plus fixture-backed provider, ISBN, matching, progress, queue, URL, migration, refresh-preservation, and provider-failure tests.
+
+#### Changed
+
+- 19:39:50 EDT - Changed `obj_media_title.content_type` to accept `BOOK` through an idempotent transaction-safe table rebuild that preserves IDs, existing TMDB identities, indexes, and foreign keys.
+- 19:39:50 EDT - Changed all project version metadata from `0.10.0` to `0.11.0` for the Books capability release.
+
+#### Documentation
+
+- 17:34:04 EDT - Deferred backend-owned YouTube full-movie candidate discovery for Media Library titles, including API-only search, official-source preference, completeness/authorization caution, validated direct links, stale-result handling, and *Ghosts of Mars* as an initial user-reported manual validation case.
+- 18:29:32 EDT - Deferred a music-specific library for artists, releases, tracks, YouTube music-video/live-performance references, authorized direct MP3 acquisition, and local collection indexing, while explicitly excluding YouTube audio extraction, DRM bypass, and unauthorized downloading or rehosting.
+- 19:39:50 EDT - Documented Books architecture, provider/security boundaries, exact matching, progress rules, SQLite ownership, validation matrix, environment configuration, and deferred integrations.
+
+#### Validation
+
+- 20:32:05 EDT - Validated 0.11.0 with `npm run check`, all 43 Rust tests, `cargo clippy --all-targets`, touched-Rust formatting, `git diff --check`, and a logged Tauri desktop startup that completed the live database migration; provider behavior is fixture-tested because Google Books, Hardcover, and Open Library identification environment values were not configured in the validation shell.
+
+### 2026-07-22
+
+#### Validation
+
+- 03:51:01 EDT - User confirmed the full 0.11.0 validation and manual acceptance work complete for release.
+- 03:54:18 EDT - Revalidated the release with `npm.cmd run check`, all 43 Rust tests, `npm.cmd run cargo:clippy`, touched-Rust `rustfmt --check`, and `git diff --check`; Clippy reports only the documented pre-existing Repair Resell high-arity warning, while repository-wide formatting remains deferred for untouched legacy Rust files.
+
 ## 0.10.0 - 2026-07-20
 
 ### 2026-07-20

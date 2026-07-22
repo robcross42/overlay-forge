@@ -21,8 +21,14 @@ import type {
 import { formatUnknownError } from "../../utils/errors";
 import { MediaCatalogSearch, Poster, StatusOptions } from "./MediaCatalogSearch";
 import { MediaDetail } from "./MediaDetail";
+import { BookCatalogSearch } from "./books/BookCatalogSearch";
+import { BooksView } from "./books/BooksView";
+import { bookProgressLabel, mediaStatusLabel } from "./books/bookPresentation";
+import type { BookLibraryDetail } from "../../services/mediaBooks";
+import { getBookProviderStatus, openBookDataSource } from "../../services/mediaBooks";
+import type { BookProviderStatus } from "../../services/mediaBooks";
 
-type MediaView = "home" | "library" | "catalogue" | "settings";
+type MediaView = "home" | "library" | "books" | "catalogue" | "settings";
 
 export function MediaLibrary() {
   const [view, setView] = useState<MediaView>("home");
@@ -35,6 +41,8 @@ export function MediaLibrary() {
   const [settings, setSettings] = useState<MediaSettings | null>(null);
   const [selectedDetail, setSelectedDetail] = useState<MediaLibraryDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [catalogueKind, setCatalogueKind] = useState<"video" | "books">("video");
+  const [bookEntryId, setBookEntryId] = useState<number | null>(null);
 
   const reportStatus = useCallback((message: string, isError = false) => {
     setStatus(message);
@@ -85,6 +93,13 @@ export function MediaLibrary() {
   }, [filter, reportStatus, view]);
 
   async function openDetail(entryId: number) {
+    const item = [...homeItems, ...libraryItems].find((candidate) => candidate.id === entryId);
+    if (item?.contentType === "BOOK") {
+      setBookEntryId(entryId);
+      setView("books");
+      reportStatus(`${item.title} selected.`);
+      return;
+    }
     setIsLoading(true);
     try {
       const detail = await getMediaLibraryDetail(entryId);
@@ -117,6 +132,12 @@ export function MediaLibrary() {
 
   function handleAdded(detail: MediaLibraryDetail) {
     setSelectedDetail(detail);
+    void refreshLists();
+  }
+
+  function handleBookAdded(detail: BookLibraryDetail) {
+    setBookEntryId(detail.item.entryId);
+    setView("books");
     void refreshLists();
   }
 
@@ -155,6 +176,7 @@ export function MediaLibrary() {
               [
                 ["home", "Home"],
                 ["library", "Library"],
+                ["books", "Books"],
                 ["catalogue", "Catalogue Search"],
                 ["settings", "Settings"]
               ] as Array<[MediaView, string]>
@@ -190,8 +212,30 @@ export function MediaLibrary() {
                 tags={tags}
               />
             )}
+            {view === "books" && (
+              <BooksView
+                allTags={tags}
+                initialEntryId={bookEntryId}
+                onSearch={() => {
+                  setCatalogueKind("books");
+                  setView("catalogue");
+                }}
+                onStatus={reportStatus}
+                onTagsChanged={setTags}
+              />
+            )}
             {view === "catalogue" && (
-              <MediaCatalogSearch onAdded={handleAdded} onStatus={reportStatus} />
+              <>
+                <div className="media-catalogue-selector" role="group" aria-label="Catalogue type">
+                  <button className={catalogueKind === "video" ? "module-tab active" : "module-tab"} onClick={() => setCatalogueKind("video")} type="button">Movies &amp; Series</button>
+                  <button className={catalogueKind === "books" ? "module-tab active" : "module-tab"} onClick={() => setCatalogueKind("books")} type="button">Books</button>
+                </div>
+                {catalogueKind === "video" ? (
+                  <MediaCatalogSearch onAdded={handleAdded} onStatus={reportStatus} />
+                ) : (
+                  <BookCatalogSearch onAdded={handleBookAdded} onStatus={reportStatus} />
+                )}
+              </>
             )}
             {view === "settings" && settings && (
               <MediaSettingsView
@@ -208,7 +252,6 @@ export function MediaLibrary() {
     </section>
   );
 }
-
 function MediaHome({
   items,
   onOpen,
@@ -228,6 +271,17 @@ function MediaHome({
   const recentlyWatched = [...items]
     .filter((item) => item.lastWatchedAt)
     .sort((left, right) => right.lastWatchedAt.localeCompare(left.lastWatchedAt))
+    .slice(0, 6);
+  const continueReading = items
+    .filter((item) => item.contentType === "BOOK" && item.libraryStatus === "WATCHING")
+    .slice(0, 6);
+  const readNext = [...items]
+    .filter((item) => item.contentType === "BOOK" && item.bookSummary?.progress.readingQueuePosition != null)
+    .sort((left, right) => (left.bookSummary?.progress.readingQueuePosition ?? 0) - (right.bookSummary?.progress.readingQueuePosition ?? 0))
+    .slice(0, 8);
+  const recentlyRead = [...items]
+    .filter((item) => item.contentType === "BOOK" && item.libraryStatus === "COMPLETED")
+    .sort((left, right) => right.completedAt.localeCompare(left.completedAt))
     .slice(0, 6);
   const recentlyAdded = [...items]
     .sort((left, right) => right.addedAt.localeCompare(left.addedAt))
@@ -263,6 +317,24 @@ function MediaHome({
         items={recentlyWatched}
         onOpen={onOpen}
         title="Recently Watched"
+      />
+      <MediaShelf
+        empty="No books are currently in Reading."
+        items={continueReading}
+        onOpen={onOpen}
+        title="Continue Reading"
+      />
+      <MediaShelf
+        empty="Add a book to Read Next from its detail page."
+        items={readNext}
+        onOpen={onOpen}
+        title="Read Next"
+      />
+      <MediaShelf
+        empty="No books have been marked Read."
+        items={recentlyRead}
+        onOpen={onOpen}
+        title="Recently Read"
       />
       <MediaShelf items={recentlyAdded} onOpen={onOpen} title="Recently Added" />
     </div>
@@ -344,6 +416,7 @@ function MediaLibraryView({
           <option value="">All types</option>
           <option value="MOVIE">Movies</option>
           <option value="SERIES">Series</option>
+          <option value="BOOK">Books</option>
         </select>
         <select
           aria-label="Library status filter"
@@ -483,20 +556,22 @@ function MediaRow({
   const date = item.releaseDate || item.firstAirDate;
   return (
     <button className="media-library-row" onClick={() => onOpen(item.id)} type="button">
-      <Poster path={item.posterPath} title={item.title} />
+      <Poster contentType={item.contentType} path={item.posterPath} title={item.title} />
       <div className="media-library-row-main">
         <div className="media-card-title-row">
           <strong>
             {item.isFavorite && "★ "}
             {item.title}
           </strong>
-          <span>{item.contentType === "MOVIE" ? "Movie" : "Series"}</span>
+          <span>{item.contentType === "MOVIE" ? "Movie" : item.contentType === "SERIES" ? "Series" : "Book"}</span>
         </div>
+        <span>{item.contentType === "BOOK" && item.bookSummary?.primaryAuthorText ? `${item.bookSummary.primaryAuthorText} · ` : ""}{date ? date.slice(0, 4) : "Year unknown"} · {mediaStatusLabel(item.libraryStatus, item.contentType)}</span>
         <span>
-          {date ? date.slice(0, 4) : "Year unknown"} · {statusLabel(item.libraryStatus)}
-        </span>
-        <span>
-          {item.contentType === "MOVIE"
+          {item.contentType === "BOOK"
+            ? item.bookSummary
+              ? bookProgressLabel(item.bookSummary.progress)
+              : "No reading progress"
+            : item.contentType === "MOVIE"
             ? item.movieWatched
               ? "Watched"
               : "Unwatched"
@@ -508,9 +583,12 @@ function MediaRow({
       </div>
       <div className="media-row-badges">
         {item.queuePosition && <span>Queue #{item.queuePosition}</span>}
+        {item.contentType === "BOOK" && item.bookSummary?.progress.readingQueuePosition != null && <span>Read Next #{item.bookSummary.progress.readingQueuePosition}</span>}
+        {item.contentType === "BOOK" && item.bookSummary && item.bookSummary.progress.preferredFormat !== "UNKNOWN" && <span>{item.bookSummary.progress.preferredFormat}</span>}
+        {item.contentType === "BOOK" && item.bookSummary?.primarySeriesText && <span>{item.bookSummary.primarySeriesText}</span>}
         {item.newEpisodesCount > 0 && <span>New {item.newEpisodesCount}</span>}
         {item.availabilityIsStale && <span>Stale</span>}
-        {item.subscriptionProviders.slice(0, 3).map((provider) => (
+        {item.contentType !== "BOOK" && item.subscriptionProviders.slice(0, 3).map((provider) => (
           <span title={provider.providerName} key={provider.providerName}>
             {provider.providerLogoPath ? (
               <img
@@ -542,6 +620,13 @@ function MediaSettingsView({
   onStatus: (status: string, isError?: boolean) => void;
 }) {
   const [form, setForm] = useState(settings);
+  const [bookProviders, setBookProviders] = useState<BookProviderStatus | null>(null);
+
+  useEffect(() => {
+    getBookProviderStatus()
+      .then(setBookProviders)
+      .catch((error) => onStatus(formatUnknownError(error), true));
+  }, [onStatus]);
 
   async function saveSettings() {
     try {
@@ -639,6 +724,19 @@ function MediaSettingsView({
       </section>
 
       <section className="media-section-card">
+        <h4>Book metadata providers</h4>
+        {bookProviders ? (
+          <div className="media-provider-status-grid">
+            <span>Google Books</span><strong>{bookProviders.googleBooksConfigured ? "Configured" : "Missing GOOGLE_BOOKS_API_KEY"}</strong>
+            <span>Open Library</span><strong>{bookProviders.openLibraryContactConfigured ? "Available · contact configured" : "Available · contact missing"}</strong>
+            <span>Hardcover</span><strong>{bookProviders.hardcoverConfigured ? "Configured" : "Optional token missing"}</strong>
+          </div>
+        ) : <p className="media-hint">Loading provider configuration status...</p>}
+        <p className="media-hint">Provider credentials remain in the Rust backend environment. OPEN_LIBRARY_CONTACT_EMAIL identifies this app to Open Library and is not a secret token.</p>
+        <div className="media-action-row" aria-label="Book data sources"><button className="ghost-button compact-button" onClick={() => void openBookDataSource("google_books").catch((error) => onStatus(formatUnknownError(error), true))} type="button">Google Books</button><button className="ghost-button compact-button" onClick={() => void openBookDataSource("open_library").catch((error) => onStatus(formatUnknownError(error), true))} type="button">Open Library</button><button className="ghost-button compact-button" onClick={() => void openBookDataSource("hardcover").catch((error) => onStatus(formatUnknownError(error), true))} type="button">Hardcover</button></div>
+      </section>
+
+      <section className="media-section-card">
         <h4>Credits and data boundaries</h4>
         <p>This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
         <p>Streaming availability data provided by JustWatch through TMDB.</p>
@@ -646,17 +744,8 @@ function MediaSettingsView({
           TMDB supplies catalogue metadata and availability references. Overlay Forge stores your
           notes, ratings, tags, queue, links, and viewing history only in local SQLite.
         </p>
+        <p className="media-hint">Google Books, Open Library, and optional Hardcover supply public book metadata and provider-reported links. Reading history, progress, ownership, notes, ratings, tags, and queues stay in local SQLite.</p>
       </section>
     </div>
   );
-}
-
-function statusLabel(status: MediaLibraryStatus) {
-  return {
-    PLANNED: "Plan to Watch",
-    WATCHING: "Watching",
-    COMPLETED: "Completed",
-    ON_HOLD: "On Hold",
-    DROPPED: "Dropped"
-  }[status];
 }

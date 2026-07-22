@@ -12,6 +12,7 @@ import type {
   MediaLibraryStatus
 } from "../../services/media";
 import { formatUnknownError } from "../../utils/errors";
+import { resolveMediaArtwork } from "./books/bookPresentation";
 
 const emptyManualEntry: ManualMediaInput = {
   contentType: "MOVIE",
@@ -298,8 +299,18 @@ export function MediaCatalogSearch({ onAdded, onStatus }: MediaCatalogSearchProp
   );
 }
 
-export function Poster({ path, title }: { path: string; title: string }) {
-  if (!path) {
+export function Poster({
+  path,
+  title,
+  contentType = "MOVIE"
+}: {
+  path: string;
+  title: string;
+  contentType?: MediaContentType;
+}) {
+  const source = resolveMediaArtwork(path, contentType);
+  const [failedSource, setFailedSource] = useState("");
+  if (!source || failedSource === source) {
     return <div className="media-poster-placeholder">{title.slice(0, 1).toUpperCase()}</div>;
   }
   return (
@@ -307,7 +318,8 @@ export function Poster({ path, title }: { path: string; title: string }) {
       alt={`${title} poster`}
       className="media-poster"
       loading="lazy"
-      src={`https://image.tmdb.org/t/p/w342${path}`}
+      onError={() => setFailedSource(source)}
+      src={source}
     />
   );
 }

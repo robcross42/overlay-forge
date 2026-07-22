@@ -76,6 +76,31 @@ This file centralizes deferred work. Items listed here are not approved scope un
 
 ## Media Library
 
+### Books
+
+- Google Bookshelf synchronization.
+- Hardcover account, list, progress, journal, or profile synchronization.
+- Open Library account/list synchronization.
+- Goodreads integration.
+- Amazon Product Advertising API integration.
+- Barcode or ISBN camera scanning.
+- Bulk CSV, Goodreads, StoryGraph, or LibraryThing import.
+- Multi-profile or household reading state and cloud sync.
+- Social sharing and book recommendations.
+- Automatic series-release notifications and scheduled metadata refresh.
+- Reading reminders, Calendar integration, and desktop notifications.
+- Reading-session history, charts, speed prediction, and reread counts.
+- Quotes and highlights.
+- Ebook or audiobook file management and embedded playback.
+- EPUB/PDF parsing.
+- Kindle, Kobo, or Audible account integration.
+- Library-card integration and automated borrow/hold placement.
+- Book price tracking.
+- Arbitrary book-provider scraping.
+- Automatic low-confidence work merging.
+- Full manual provider-identity merge UI.
+- Automatic cover downloading/caching unless remote loading proves unreliable.
+
 - Trakt, Plex, Jellyfin, Kodi, and streaming-account sync.
 - Browser-history or service-history import.
 - Automatic playback detection and partial playback position.
@@ -86,6 +111,9 @@ This file centralizes deferred work. Items listed here are not approved scope un
 - Add a backend-owned streaming-link provider integration for dynamic movie, season, and episode deep links; evaluate the Streaming Availability API first because it can resolve existing TMDB IDs and return region-specific provider links.
 - Cache Canadian provider icons and direct links in normalized SQLite rows keyed to movies or exact season/episode coordinates, while preserving user-owned manual links as overrides and fallbacks.
 - Render a clickable provider icon beside a movie or episode only when the provider response contains a validated HTTPS deep link; do not fabricate provider URLs, scrape streaming services, automate account login, or infer Netflix content IDs from TMDB IDs.
+- Add a user-initiated, backend-owned YouTube Data API search for free full-length movie candidates using normalized title and release-year queries; do not scrape YouTube or require account login/OAuth for this discovery path.
+- Treat YouTube results as candidates rather than proof that a movie is complete, free, regionally available, or authorized. Surface channel identity, duration, title, and availability signals, prefer official studio/distributor/licensed channels, and require a validated HTTPS watch URL before offering a direct action or saving a YouTube streaming link.
+- Use the user-reported multiple full-length options for *Ghosts of Mars* as an initial manual validation case. Preserve manual links as overrides, mark unavailable results stale, and do not download, rehost, bypass regional restrictions, or represent an upload as licensed without reliable evidence.
 - JustWatch or streaming-service scraping.
 - Torrent, download, or piracy-related functionality.
 - Trailer playback and expanded cast/crew browsing.
@@ -95,6 +123,15 @@ This file centralizes deferred work. Items listed here are not approved scope un
 - CSV, Trakt, IMDb, TV Time, Letterboxd, or other service import.
 - Export beyond a future basic local backup format.
 - Spoiler-protected episode notes.
+
+## Music Library
+
+- Extend the library with music-specific artist, release/album, track, collection, and playlist concepts rather than forcing music into movie, season, or episode records.
+- Link artists, releases, and tracks to user-curated or backend-discovered YouTube music videos and live appearances. Use the YouTube Data API rather than scraping, prefer official artist/label/broadcaster channels, show source context, validate HTTPS watch URLs, and open playback externally.
+- Let the user select one or more local music collection roots and index supported audio files locally, including paths and available embedded metadata such as artist, album, track number, duration, and artwork. Keep files user-owned, avoid uploading collection details, and handle missing or moved files without deleting library metadata automatically.
+- Offer MP3 downloads only when an authorized provider exposes an explicit direct download for content the user may lawfully acquire, such as an artist/label download, purchased file, user-owned source, or public-domain/appropriately licensed recording. Record the source and available licence/ownership context before downloading.
+- Do not extract or convert audio from YouTube, bypass DRM or regional controls, automate account login, or download/rehost copyrighted recordings without authorization. YouTube links remain streaming references even when the linked video is a music video or live performance.
+- Defer local audio playback, format conversion, metadata editing, duplicate detection, collection relocation, playlists, listening history, and music-service account sync until the core music library and source-rights boundaries are designed.
 
 ## Sync And Import
 

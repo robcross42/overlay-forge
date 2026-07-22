@@ -1,3 +1,4 @@
+use super::books::domain::{BookMediaDetailSummary, BookMediaSummary};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
@@ -9,6 +10,7 @@ pub const DEFAULT_MEDIA_REGION: &str = "CA";
 pub enum MediaContentType {
     Movie,
     Series,
+    Book,
 }
 
 impl Display for MediaContentType {
@@ -16,6 +18,7 @@ impl Display for MediaContentType {
         formatter.write_str(match self {
             Self::Movie => "MOVIE",
             Self::Series => "SERIES",
+            Self::Book => "BOOK",
         })
     }
 }
@@ -27,8 +30,9 @@ impl FromStr for MediaContentType {
         match value.trim().to_ascii_uppercase().as_str() {
             "MOVIE" => Ok(Self::Movie),
             "SERIES" => Ok(Self::Series),
+            "BOOK" => Ok(Self::Book),
             _ => Err(MediaError::validation(
-                "Media type must be MOVIE or SERIES.",
+                "Media type must be MOVIE, SERIES, or BOOK.",
             )),
         }
     }
@@ -47,6 +51,21 @@ pub enum MediaLibraryStatus {
 impl MediaLibraryStatus {
     pub fn protects_from_automatic_transition(self) -> bool {
         matches!(self, Self::OnHold | Self::Dropped)
+    }
+
+    pub fn label_for(self, content_type: MediaContentType) -> &'static str {
+        match (content_type, self) {
+            (MediaContentType::Book, Self::Planned) => "Plan to Read",
+            (MediaContentType::Book, Self::Watching) => "Reading",
+            (MediaContentType::Book, Self::Completed) => "Read",
+            (MediaContentType::Book, Self::OnHold) => "On Hold",
+            (MediaContentType::Book, Self::Dropped) => "Did Not Finish",
+            (_, Self::Planned) => "Plan to Watch",
+            (_, Self::Watching) => "Watching",
+            (_, Self::Completed) => "Completed",
+            (_, Self::OnHold) => "On Hold",
+            (_, Self::Dropped) => "Dropped",
+        }
     }
 }
 
@@ -382,6 +401,7 @@ pub struct MediaLibrarySummary {
     pub new_episodes_count: i64,
     pub subscription_providers: Vec<MediaProviderSummary>,
     pub availability_is_stale: bool,
+    pub book_summary: Option<BookMediaSummary>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -504,6 +524,7 @@ pub struct MediaLibraryDetail {
     pub provider_snapshot: Option<MediaProviderSnapshotRecord>,
     pub providers: Vec<MediaProviderAvailabilityRecord>,
     pub settings: MediaSettingsRecord,
+    pub book_detail: Option<BookMediaDetailSummary>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -539,17 +560,26 @@ pub fn validate_rating(rating: Option<f64>) -> Result<(), MediaError> {
 
 pub fn validate_http_url(url: &str) -> Result<String, MediaError> {
     let trimmed = url.trim();
-    let lower = trimmed.to_ascii_lowercase();
     if trimmed.is_empty() {
         return Err(MediaError::validation("A URL is required."));
     }
-    if !(lower.starts_with("http://") || lower.starts_with("https://")) {
+    if trimmed
+        .chars()
+        .any(|character| character.is_whitespace() || character.is_control())
+    {
+        return Err(MediaError::validation("The URL cannot contain whitespace."));
+    }
+    let parsed = reqwest::Url::parse(trimmed)
+        .map_err(|_| MediaError::validation("The URL is malformed."))?;
+    if !matches!(parsed.scheme(), "http" | "https") {
         return Err(MediaError::validation(
             "Only http and https URLs can be opened.",
         ));
     }
-    if trimmed.chars().any(char::is_whitespace) {
-        return Err(MediaError::validation("The URL cannot contain whitespace."));
+    if parsed.host_str().is_none() || !parsed.username().is_empty() || parsed.password().is_some() {
+        return Err(MediaError::validation(
+            "The URL must have a host and cannot contain embedded credentials.",
+        ));
     }
     Ok(trimmed.to_string())
 }
@@ -565,6 +595,10 @@ mod tests {
             MediaLibraryStatus::OnHold
         );
         assert!(MediaLibraryStatus::from_str("NOT_INTERESTED").is_err());
+        assert_eq!(
+            MediaLibraryStatus::Planned.label_for(MediaContentType::Book),
+            "Plan to Read"
+        );
     }
 
     #[test]
@@ -623,5 +657,9 @@ mod tests {
         assert!(validate_http_url("http://example.com/watch").is_ok());
         assert!(validate_http_url("file:///tmp/media").is_err());
         assert!(validate_http_url("javascript:alert(1)").is_err());
+        assert!(validate_http_url("https://").is_err());
+        assert!(validate_http_url("https://example.com/a b").is_err());
+        assert!(validate_http_url("https://user:secret@example.com").is_err());
+        assert!(validate_http_url("https://example.com/\0bad").is_err());
     }
 }

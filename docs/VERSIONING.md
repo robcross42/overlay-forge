@@ -72,6 +72,8 @@ The date is the date the version is cut, not necessarily the first date work sta
 
 When cutting a version, update all project metadata that stores the app version.
 
+Also update the current stable version in `docs/PROJECT_OVERVIEW.md` as part of the same release change. The overview should identify the latest released version, not an in-progress version still recorded under `## Unreleased`.
+
 When making ordinary unreleased changes, do not update project version metadata unless the user explicitly asks to cut a version.
 
 ## Validation Notes
