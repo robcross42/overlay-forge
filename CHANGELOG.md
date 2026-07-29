@@ -6,19 +6,34 @@ Changelog entries keep local date and time stamps so a day's work can be reviewe
 
 ## Changelog Policy
 
-Overlay Forge uses semantic versioning in `MAJOR.MINOR.PATCH` form. Do not increment the minor version just because a new chat, work session, or calendar day starts. Use `## Unreleased` for active work until a meaningful version is intentionally cut.
+Overlay Forge uses traceability-first `MAJOR.MINOR.PATCH` project versions. Keep `## Unreleased` only for uncommitted work; every completed change commit receives a unique version, matching changelog section, synchronized metadata, and annotated Git tag.
 
 Version rules:
 
-- `MAJOR`: incompatible or breaking release changes.
-- `MINOR`: substantial new user-visible capabilities.
-- `PATCH`: bug fixes, documentation-only changes, validation updates, small UX refinements, and internal refactors.
+- `MAJOR`: a new broad product generation or fundamental cross-product change.
+- `MINOR`: a substantial cohesive capability, expansion, or major rework.
+- `PATCH`: the default for one independently completed change, including fixes, refinements, documentation, validation, internal work, and modest additions.
 
-During `0.x` development, minor versions may still contain breaking early-development changes. Patch versions should remain non-breaking fixes, documentation, and small refinements.
+Before committing, split unrelated releasable work or automatically promote cohesive work that exceeds the planned version level. See `docs/VERSIONING.md` for the circuit breaker and traceability workflow.
 
 Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
+
+## 0.11.1 - 2026-07-29
+
+### 2026-07-29
+
+#### Documentation
+
+- 01:13:29 EDT - Added Media Library routing to `AGENTS.md`, clarified that its documentation map is a curated entry-point index rather than a Markdown inventory, and preserved root-to-subtree instruction and documentation nesting rules for future files.
+- 01:27:38 EDT - Replaced mandatory reasoning-level resubmission gates with an execution-first Medium default, current Light/Medium/High/Extra High/Ultra guidance, and automatic higher-effort sub-agent delegation when useful so submitted tasks continue without a reasoning-setting interruption.
+- 01:49:49 EDT - Reworked project versioning around one completed change, commit, version, changelog section, and annotated tag; added automatic scope promotion and splitting circuit breakers plus a version-consistency check.
+- 01:49:49 EDT - Adopted `0.11.1` as the one-time transition version for the accumulated post-`v0.11.0` documentation-policy work without rewriting the already-pushed commit history.
+
+#### Validation
+
+- 01:53:22 EDT - Validated `0.11.1` metadata and version documentation with `npm.cmd run version:check`, `npm.cmd run build`, `cargo build --manifest-path src-tauri/Cargo.toml`, and `git diff --check`.
 
 ## 0.11.0 - 2026-07-22
 
