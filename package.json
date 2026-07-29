@@ -1,12 +1,13 @@
 {
   "name": "overlay-forge",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "check": "npm run build && npm run cargo:build",
+    "version:check": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-project-version.ps1",
     "preview": "vite preview",
     "tauri": "tauri",
     "cargo:build": "cargo build --manifest-path src-tauri/Cargo.toml",

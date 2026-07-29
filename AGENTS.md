@@ -183,14 +183,14 @@ For broad cleanup or architecture work, run `npm run build`, `cargo build`, `car
 
 ## Versioning And Changelog Rules
 
-- Use semantic versioning in `MAJOR.MINOR.PATCH` form.
-- Do not increment the minor version just because a new chat, work session, or calendar day starts.
-- Keep changelog entries date/time-stamped under day headings.
-- Use `## Unreleased` for active work until the user intentionally cuts a version.
-- Use `PATCH` for fixes, documentation-only changes, validation updates, small UX refinements, and internal refactors.
-- Use `MINOR` for substantial new user-visible capabilities.
-- Use `MAJOR` for incompatible or breaking release changes.
-- Keep `docs/PROJECT_OVERVIEW.md` on the latest released version; do not advance it for work that remains under `## Unreleased`.
+- Use traceability-first `MAJOR.MINOR.PATCH` project versions as defined in `docs/VERSIONING.md`.
+- Every completed change commit must have one unique version, one matching changelog section, synchronized project metadata, and an annotated `vMAJOR.MINOR.PATCH` Git tag.
+- Keep work under `## Unreleased` only while it is uncommitted. Assign the exact version before committing.
+- Use `PATCH` by default for one independently completed change, including fixes, refinements, documentation, validation, internal work, and modest additions to existing features.
+- Use `MINOR` for a substantial cohesive capability, expansion, or major rework within the current product generation.
+- Use `MAJOR` for a new broad product generation or a fundamental cross-product change.
+- Before committing, apply the version circuit breaker: split unrelated releasable work into separate commits and versions, or automatically promote cohesive work that exceeds the planned level. Never force oversized work through a lower version.
+- Update all version metadata, `README.md`, `docs/PROJECT_OVERVIEW.md`, and `CHANGELOG.md` together, then run `npm.cmd run version:check` on Windows.
 - Read `docs/VERSIONING.md` before changing version metadata or changelog structure.
 
 ## Validation Rules
@@ -216,7 +216,10 @@ When the user asks for a commit or release/checkpoint completion:
 
 1. Run appropriate validation.
 2. Review `git status`.
-3. Stage only intended files.
-4. Use a specific commit message.
-5. Do not include unrelated local changes.
-6. Push only when the user requested or the current workflow explicitly requires it.
+3. Apply the version circuit breaker and select the next version from the latest version tag.
+4. Update the changelog and all project version metadata, then run `npm.cmd run version:check` on Windows.
+5. Stage only intended files.
+6. Commit with `vMAJOR.MINOR.PATCH: description`.
+7. Create an annotated `vMAJOR.MINOR.PATCH` tag on that commit.
+8. Do not include unrelated local changes.
+9. Push the branch and its version tag only when the user requested or the current workflow explicitly requires it.
