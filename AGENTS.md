@@ -6,6 +6,14 @@ This file is the top-level instruction file for Codex work in this repository.
 
 Codex should read this file before planning, editing, validation, documentation updates, or commits. Supporting documentation lives under `docs/` and should be read when relevant to the requested change.
 
+### Instruction Scope And Nesting
+
+The root `AGENTS.md` applies to the entire repository. A nested `AGENTS.md` may add narrower instructions for its own directory subtree when that area genuinely needs local build, validation, generated-file, or domain rules.
+
+When working in a subtree, read the instruction chain from the repository root through the target directory. Deeper instructions supplement the root rules and take precedence only where they explicitly conflict. Do not copy the full root file into nested instruction files, and do not add a nested `AGENTS.md` merely to point back to this file.
+
+Keep cross-repository architecture, safety, documentation, versioning, validation, and commit rules here. Keep nested instructions limited to the owning subtree so the hierarchy remains useful and does not fragment global policy.
+
 ## Current Workflow
 
 The user performs code requests directly from Codex chat in VS Code.
@@ -25,43 +33,37 @@ Read the smallest relevant set before editing:
 | Validation expectations | `docs/VALIDATION.md` |
 | Versioning or changelog updates | `docs/VERSIONING.md`, `CHANGELOG.md` |
 | Gaming screenshots | `docs/GAMING_SCREENSHOTS.md` |
+| Media Library | `docs/MEDIA_LIBRARY.md` |
 | GearBlocks feature work | `docs/GEARBLOCKS.md`, then the focused GearBlocks docs |
 | Smoking Cessation | `docs/SMOKING_CESSATION.md` |
 | Repair Resell | `docs/REPAIR_RESELL.md` |
 | The Spell Brigade | `docs/THE_SPELL_BRIGADE.md` |
 
-## Reasoning Model Selection
+This map is a routing index, not an inventory of every Markdown file. Add a Markdown file here only when it is an active, authoritative entry point or a required first read for a recurring work area. Supporting, historical, generated, vendor, template, bridge, and narrowly scoped README files should normally be linked from their owning parent document or discovered within their subtree instead of being listed here.
 
-Mandatory preflight: classify every user request before doing any substantive work, including answering research/design questions, reading external sources, running commands, editing files, or making plans.
+Preserve documentation nesting: route from this map to the broad owning document, then from that document to focused supporting docs. When adding a Markdown file, decide whether it changes task routing. If it does, update this map and the owning documentation index where useful; if it does not, keep the file discoverable from its nearest relevant parent without expanding the root map.
 
-Default to **Medium Reasoning**.
+## Reasoning Effort
 
-Use **Low Reasoning** only for narrow, obvious changes such as small copy edits, simple constant updates, or isolated style tweaks.
+Default to **Medium** reasoning. Reasoning classification guides execution; it must not become a resubmission gate. Do not stop, pause, or ask the user to repeat a request solely because the active reasoning setting is above or below the level that would have been ideal.
 
-Use **High Reasoning** when the request affects:
+Classify by complexity, uncertainty, and consequence rather than by subsystem name:
 
-- architecture
-- persistence or migrations
-- Rust/Tauri command flow
-- OpenAI request assembly
-- GitHub integration
-- GearBlocks runtime import/export
-- scheduler behavior
-- security or token handling
-- cross-feature UI state
-- large refactors
+| Level | Typical use |
+| --- | --- |
+| **Light** | Narrow copy, constant, or isolated style changes when conserving usage is important. |
+| **Medium** | Default for documentation, research, status reviews, commits and pushes, routine GitHub operations, ordinary fixes and features, and well-understood frontend, Rust, or SQLite work. |
+| **High** | Difficult architecture decisions, security-sensitive work, complex migrations, broad refactors, or ambiguous cross-subsystem defects. |
+| **Extra High** | Major multi-subsystem changes, risky data transformations, or uncertain reverse engineering. |
+| **Ultra** | Exceptional data recovery, highly destructive migrations, serious security incidents, or unusually difficult system-wide work. |
 
-Use **Very High Reasoning** when the request affects multiple major subsystems, requires uncertain reverse engineering, or could damage user data.
+Prefer completing the task over conserving tokens. When the active setting is lower than the ideal level:
 
-If the current Codex reasoning setting is lower than the task requires, stop all processing before reading more context, browsing, running tools, planning, or editing. Tell the user exactly which reasoning level to switch to and wait for the user to resubmit the prompt with the correct reasoning setting.
+1. Continue the task at the active setting with proportionate inspection, validation, and safety checks.
+2. When useful, automatically delegate concrete, bounded analysis, implementation, or review subtasks to sub-agents configured with the higher reasoning effort. This repository explicitly authorizes that delegation for reasoning escalation; the primary agent remains responsible for integration, verification, and the final result.
+3. If higher-effort delegation is unavailable or would add more coordination than value, proceed at the active setting instead of sending the user away to resubmit.
 
-This includes **Low -> Medium** escalation. If the user is set to Low and the request requires Medium, stop immediately and ask the user to switch to Medium. Do not proceed just because Medium is the default or because the request looks easy to answer.
-
-If the current Codex reasoning setting is **Medium** and the task only requires **Low**, proceed at Medium without stopping.
-
-If the current Codex reasoning setting is **High** or **Very High** and the task only requires **Low** or **Medium**, stop all processing before editing, tell the user the lower recommended reasoning level, and wait for the user to resubmit the prompt.
-
-Do not flag after completion that a lower reasoning level would have been sufficient. Only stop before work begins when the current setting is either too low for the requested task or unnecessarily High / Very High for a Low / Medium task.
+Do not downgrade or interrupt work when the active setting is higher than necessary. Stop only for a genuine blocker such as missing authority, an unavoidable user decision, unavailable required input, or a safety constraint. Reasoning-level mismatch by itself is never a blocker.
 
 ## Architecture And Abstraction Rules
 
@@ -171,6 +173,7 @@ For broad cleanup or architecture work, run `npm run build`, `cargo build`, `car
 ## Documentation Rules
 
 - Update docs when behavior, scope, validation, or persistence changes.
+- Review every newly added Markdown file for ownership and discoverability. Add it to the root Documentation Map only when it meets the routing criteria above.
 - When cutting a release, update the current stable version in `docs/PROJECT_OVERVIEW.md` alongside the changelog and project version metadata.
 - Keep active documentation compact and task-facing.
 - Put historical release/checkpoint details in `docs/PROJECT_HISTORY.md`, not separate active tracker files.

@@ -20,6 +20,13 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+### 2026-07-29
+
+#### Documentation
+
+- 01:13:29 EDT - Added Media Library routing to `AGENTS.md`, clarified that its documentation map is a curated entry-point index rather than a Markdown inventory, and preserved root-to-subtree instruction and documentation nesting rules for future files.
+- 01:27:38 EDT - Replaced mandatory reasoning-level resubmission gates with an execution-first Medium default, current Light/Medium/High/Extra High/Ultra guidance, and automatic higher-effort sub-agent delegation when useful so submitted tasks continue without a reasoning-setting interruption.
+
 ## 0.11.0 - 2026-07-22
 
 ### 2026-07-20
