@@ -198,3 +198,10 @@ This file centralizes deferred work. Items listed here are not approved scope un
 ## GearBlocks Runtime Scene Context
 
 - Add a derived `obj_game_runtime_scene_summary` or similar scene-facts cache after normalized runtime imports if prompt assembly becomes expensive.
+
+## Trailmakers
+
+- Design the first user-requested Lua mod against the installed `trailmakers_docs.lua` and shipped example mods.
+- Decide whether Trailmakers vehicle builds need normalized records, blueprint/file discovery, build guides, parts catalogs, or runtime context beyond chats and screenshots.
+- Add explicit, user-controlled indexing for the local Lua API or example mods only when it provides clear value; never execute Lua discovered from SQLite or user-editable configuration.
+- Keep DLL injection and game-DLL replacement permanently outside the supported modding path.

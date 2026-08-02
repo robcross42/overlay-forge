@@ -79,8 +79,7 @@ import { formatUnknownError as formatError } from "../../utils/errors";
 import {
   getSupportedGameModule,
   isSupportedGameModuleView,
-  PATH_OF_EXILE_2_SLUG,
-  THE_SPELL_BRIGADE_SLUG
+  PATH_OF_EXILE_2_SLUG
 } from "./gameModules";
 import type {
   SupportedGameModule,
@@ -2512,7 +2511,7 @@ export function Gaming({
               ) : null
             )}
 
-          {selectedGame.slug === THE_SPELL_BRIGADE_SLUG &&
+          {selectedGame.slug !== PATH_OF_EXILE_2_SLUG &&
             selectedGameModule?.sections.map((section) =>
               gameView === section.view ? (
                 <GameModuleSectionScaffold

@@ -124,6 +124,32 @@ Pass criteria:
 The screenshot PNG, capture manifest, screenshot metadata row, and matching local-path reference rows are removed.
 ```
 
+## Trailmakers Validation
+
+Validate:
+
+```text
+Open Gaming and select Trailmakers from the game context picker.
+```
+
+Pass criteria:
+
+```text
+Trailmakers exposes Home, Chats, Vehicle Builds, Build Reference, Modding, and Screenshots without showing GearBlocks-only construction/API/tool controls.
+```
+
+Validate the seeded authority configuration and local installation:
+
+```text
+The authority_sources game setting contains both configured wiki URLs, the installed mods directory exists, and trailmakers_docs.lua is present.
+```
+
+Pass criteria:
+
+```text
+Trailmakers chat receives the source policy from the backend; mod guidance identifies Lua-only support and treats the installed API definition as authoritative for the local game version.
+```
+
 ## Media Library Validation
 
 Validate without `TMDB_API_READ_ACCESS_TOKEN`:

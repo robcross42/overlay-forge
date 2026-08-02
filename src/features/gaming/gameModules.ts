@@ -10,7 +10,10 @@ export type SupportedGameModuleView =
   | "spells"
   | "upgrades"
   | "synergies"
-  | "runs";
+  | "runs"
+  | "vehicle-builds"
+  | "building-reference"
+  | "modding";
 
 export type SupportedGameModuleSection = {
   view: SupportedGameModuleView;
@@ -29,6 +32,7 @@ export type SupportedGameModule = {
 
 export const PATH_OF_EXILE_2_SLUG = "path-of-exile-2";
 export const THE_SPELL_BRIGADE_SLUG = "the-spell-brigade";
+export const TRAILMAKERS_SLUG = "trailmakers";
 
 const SUPPORTED_GAME_MODULES: SupportedGameModule[] = [
   {
@@ -128,6 +132,35 @@ const SUPPORTED_GAME_MODULES: SupportedGameModule[] = [
         eyebrow: "Objectives",
         description:
           "Planned location for team objectives, run outcomes, successful combinations, and lessons learned."
+      }
+    ]
+  },
+  {
+    slug: TRAILMAKERS_SLUG,
+    name: "Trailmakers",
+    eyebrow: "Vehicle Building Workspace",
+    showScreenshots: true,
+    sections: [
+      {
+        view: "vehicle-builds",
+        label: "Vehicle Builds",
+        eyebrow: "Build Planning",
+        description:
+          "Local workspace for vehicle goals, block choices, controls, logic, tuning, iteration notes, and build-specific chat."
+      },
+      {
+        view: "building-reference",
+        label: "Build Reference",
+        eyebrow: "Gameplay Authority",
+        description:
+          "Gameplay research anchored to the requested Trailmakers Wiki reference; version-sensitive guidance must be checked against the live source or identified as unverified."
+      },
+      {
+        view: "modding",
+        label: "Modding",
+        eyebrow: "Lua Workspace",
+        description:
+          "Future Lua mod work grounded in the official wiki.gg modding guide and the API definitions and examples shipped in the installed mods directory."
       }
     ]
   }

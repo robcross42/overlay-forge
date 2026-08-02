@@ -4522,8 +4522,29 @@ fn game_custom_prompt_context(
 ) -> Result<String, String> {
     match game.slug.as_str() {
         "gearblocks" => gearblocks_prompt_context(state, game.id, include_scene_diff),
+        "trailmakers" => trailmakers_prompt_context(state, game.id),
         _ => Ok(String::new()),
     }
+}
+
+fn trailmakers_prompt_context(state: &State<'_, AppState>, game_id: i64) -> Result<String, String> {
+    let Some(sources) = state
+        .database
+        .get_game_setting(game_id, "authority_sources")
+        .map_err(|error| error.to_string())?
+    else {
+        return Ok(String::new());
+    };
+
+    Ok(format!(
+        "Trailmakers authority policy:\n\
+         - Use the configured gameplay URL as the requested primary gameplay reference. Consult the live page when current information is required instead of treating cached text as automatically current; if live retrieval is unavailable, say that current information could not be verified.\n\
+         - Use the configured wiki.gg modding URL for supported modding workflow and safety boundaries.\n\
+         - Before writing mod code, inspect the installed trailmakers_docs.lua and shipped examples at the configured local path; those define the API available to the installed game version.\n\
+         - Trailmakers modding is Lua-only. Do not propose DLL injection, game-DLL replacement, or arbitrary command execution.\n\n\
+         Configured sources:\n{}",
+        sources.setting_value_json
+    ))
 }
 
 fn gearblocks_prompt_context(

@@ -2573,6 +2573,22 @@ impl AppDatabase {
                 'the-spell-brigade',
                 'Game-specific workspace for The Spell Brigade chats, wizard and spell planning, upgrades, team synergies, run notes, and screenshots.'
             );
+
+            INSERT OR IGNORE INTO def_game (id_game, game_key, ui_name, summary, schema_json)
+            VALUES (
+                4,
+                'trailmakers',
+                'Trailmakers',
+                'Supported Trailmakers vehicle-building and Lua-modding game module definition.',
+                '{\"fields\":{\"id_game\":\"stable integer game definition id\",\"game_key\":\"stable lowercase game key\",\"ui_name\":\"visible game definition name\",\"summary\":\"definition summary\"}}'
+            );
+
+            INSERT OR IGNORE INTO obj_game (name, slug, summary)
+            VALUES (
+                'Trailmakers',
+                'trailmakers',
+                'Vehicle-building workspace for Trailmakers chats, build planning, screenshots, gameplay reference, and future Lua modding. Primary gameplay reference: https://trailmakers.fandom.com/wiki/Trailmakers_Wiki. Modding reference: https://trailmakers.wiki.gg/wiki/Modding.'
+            );
             ",
         )?;
         Self::ensure_repair_resell_schema(&connection)?;
@@ -2595,6 +2611,10 @@ impl AppDatabase {
         )?;
         connection.execute(
             "UPDATE obj_game SET id_game = 3 WHERE slug = 'the-spell-brigade'",
+            [],
+        )?;
+        connection.execute(
+            "UPDATE obj_game SET id_game = 4 WHERE slug = 'trailmakers'",
             [],
         )?;
         Self::ensure_column(
@@ -2755,6 +2775,49 @@ impl AppDatabase {
                 '{\"fields\":{\"title\":\"visible build title\",\"source\":\"build source site\",\"sourceUrl\":\"canonical external build URL\",\"characterClass\":\"base class\",\"ascendancy\":\"ascendancy\",\"creator\":\"guide creator\",\"buildRole\":\"guide role or archetype\",\"patch\":\"guide patch/league label\",\"status\":\"current play status\",\"updatedOn\":\"source update date\",\"summary\":\"short source-grounded summary\",\"tags\":\"string labels\",\"activeVariant\":\"selected source variant anchor\"}}'
             FROM obj_game
             WHERE slug = 'path-of-exile-2'
+            ON CONFLICT(game_id, setting_key) DO UPDATE SET
+                id_game = excluded.id_game,
+                setting_value_json = excluded.setting_value_json,
+                schema_json = excluded.schema_json,
+                modified_at = CURRENT_TIMESTAMP
+            ",
+            [],
+        )?;
+        connection.execute(
+            "
+            INSERT INTO obj_game_setting (
+                game_id,
+                id_game,
+                setting_key,
+                setting_value_json,
+                schema_json
+            )
+            SELECT
+                id,
+                id_game,
+                'authority_sources',
+                '{
+                    \"gameplay\": {
+                        \"label\": \"Trailmakers Wiki (Fandom)\",
+                        \"url\": \"https://trailmakers.fandom.com/wiki/Trailmakers_Wiki\",
+                        \"role\": \"primary_gameplay_reference\",
+                        \"freshness\": \"fetch_current_page_when_used\"
+                    },
+                    \"modding\": {
+                        \"label\": \"Official Trailmakers Wiki - Modding\",
+                        \"url\": \"https://trailmakers.wiki.gg/wiki/Modding\",
+                        \"role\": \"primary_modding_guide\"
+                    },
+                    \"localApi\": {
+                        \"label\": \"Installed Trailmakers Lua API\",
+                        \"directoryPath\": \"C:\\\\Program Files (x86)\\\\Steam\\\\steamapps\\\\common\\\\Trailmakers\\\\mods\",
+                        \"apiDefinitionPath\": \"C:\\\\Program Files (x86)\\\\Steam\\\\steamapps\\\\common\\\\Trailmakers\\\\mods\\\\trailmakers_docs.lua\",
+                        \"role\": \"authoritative_for_installed_game_version\"
+                    }
+                }',
+                '{\"fields\":{\"gameplay\":\"primary live gameplay reference\",\"modding\":\"official Lua modding guide\",\"localApi\":\"installed-game Lua API and examples\"}}'
+            FROM obj_game
+            WHERE slug = 'trailmakers'
             ON CONFLICT(game_id, setting_key) DO UPDATE SET
                 id_game = excluded.id_game,
                 setting_value_json = excluded.setting_value_json,
@@ -12285,6 +12348,31 @@ mod tests {
             )
             .expect("The Spell Brigade game row should be seeded");
         assert_eq!(spell_brigade_id_game, 3);
+
+        let trailmakers_id_game: i64 = connection
+            .query_row(
+                "SELECT id_game FROM obj_game WHERE slug = 'trailmakers'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("Trailmakers game row should be seeded");
+        assert_eq!(trailmakers_id_game, 4);
+
+        let trailmakers_sources: String = connection
+            .query_row(
+                "
+                SELECT setting_value_json
+                FROM obj_game_setting
+                WHERE game_id = (SELECT id FROM obj_game WHERE slug = 'trailmakers')
+                    AND setting_key = 'authority_sources'
+                ",
+                [],
+                |row| row.get(0),
+            )
+            .expect("Trailmakers authority sources should be seeded");
+        assert!(trailmakers_sources.contains("trailmakers.fandom.com"));
+        assert!(trailmakers_sources.contains("trailmakers.wiki.gg"));
+        assert!(trailmakers_sources.contains("trailmakers_docs.lua"));
 
         drop(connection);
         drop(database);

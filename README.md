@@ -7,7 +7,7 @@ The active coding workflow is direct Codex chat in VS Code. Repository Markdown 
 ## Current Status
 
 ```text
-Current stable app release: 0.11.1
+Current stable app release: 0.11.2
 Status: Active local-first desktop command hub
 ```
 
@@ -33,6 +33,7 @@ Overlay Forge is now maintained as an evolving local-first command hub. Current 
 - SQLite naming normalization.
 - Path of Exile 2 game module scaffold.
 - The Spell Brigade game module scaffold for wizard, spell, upgrade, synergy, and run planning.
+- Trailmakers vehicle-building workspace with chats, screenshots, authoritative gameplay/modding sources, and an installed Lua API boundary for future mods.
 - Former Projects module removed from active code; legacy project/planning SQLite rows are retained for data preservation and future review.
 
 ## Documentation Map
@@ -59,6 +60,7 @@ Overlay Forge is now maintained as an evolving local-first command hub. Current 
 | `docs/MEDIA_LIBRARY.md` | Movie/series/book scope, provider boundaries, progress, migration, and persistence. |
 | `docs/REPAIR_RESELL.md` | Repair Resell restoration, pickup, and learning-path vision. |
 | `docs/THE_SPELL_BRIGADE.md` | The Spell Brigade module scope and planning scaffold. |
+| `docs/TRAILMAKERS.md` | Trailmakers building workspace, source authority, and Lua modding boundary. |
 
 ## Development
 

@@ -192,6 +192,8 @@ Screenshot image bytes are stored as PNG files under `game-screenshots/`. SQLite
 
 Game build guides are imported from user-selected Markdown files into normalized SQLite rows. The independent build-guide overlay window is shell-owned like the game chat overlay: Rust/Tauri stores the active guide selection, applies persisted bounds, and exposes a keybind-driven show/hide path. The overlay renders narrow, stacked rows rather than wide tables so it can stay pinned to the left or right side of the screen during gameplay.
 
+Trailmakers reuses the shared Gaming workspace and module scaffold. `def_game`/`obj_game` own its identity, `obj_game_setting` owns its authority-source configuration, and the backend game-context path supplies that configuration to Trailmakers chat. React owns only the vehicle-building section presentation. Future mod code must be grounded in the installed `trailmakers_docs.lua` and shipped examples for the local game version; do not add DLL injection or arbitrary execution paths.
+
 See `docs/GAMING_SCREENSHOTS.md` for capture behavior.
 
 ## Media Library Boundary

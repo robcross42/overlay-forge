@@ -20,6 +20,38 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.11.2 - 2026-08-02
+
+### 2026-08-01
+
+#### Added
+
+- 01:30:18 EDT - Added a Trailmakers Gaming entry focused on vehicle-building chats, build references, screenshots, and future Lua mod work, backed by normalized game and authority-source settings.
+- 01:30:18 EDT - Added Trailmakers-specific chat context that prioritizes the requested live gameplay wiki, the official modding guide, and the installed Lua API documentation for version-sensitive mod guidance.
+
+#### Changed
+
+- 01:30:18 EDT - Generalized the existing supported-game section renderer so Trailmakers and future configured games can reuse the shared Gaming module scaffold without game-specific rendering branches.
+
+#### Documentation
+
+- 01:30:18 EDT - Added the Trailmakers guide and routed it through the curated AGENTS.md, README, architecture, data model, feature scope, deferred work, project overview, and validation documentation.
+
+#### Validation
+
+- 01:32:41 EDT - Validated the Trailmakers entry with npm.cmd run build, cargo build, all 43 Rust tests, cargo clippy --all-targets, the focused normalized-schema seed test, git diff --check, and local checks confirming the configured mods directory and trailmakers_docs.lua exist. Clippy reports only the documented pre-existing Repair Resell high-arity warning; repository-wide Rust formatting still has pre-existing drift in untouched code.
+
+### 2026-08-02
+
+#### Changed
+
+- 00:46:52 EDT - Updated all project version metadata to 0.11.2 for the Trailmakers Gaming entry.
+
+#### Validation
+
+- 00:46:52 EDT - User manually validated the Trailmakers game addition for release.
+- 00:48:41 EDT - Revalidated release 0.11.2 with the version-consistency check, frontend production build, backend build, all 43 Rust tests, Clippy, and git diff validation. Clippy reports only the documented pre-existing Repair Resell high-arity warning.
+
 ## 0.11.1 - 2026-07-29
 
 ### 2026-07-29

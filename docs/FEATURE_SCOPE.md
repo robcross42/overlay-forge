@@ -15,6 +15,7 @@ Future work should preserve the completed local-first desktop overlay foundation
 - User-curated YouTube references.
 - Gaming workspace and screenshot metadata path.
 - GearBlocks save/runtime data boundaries.
+- Trailmakers vehicle-building workspace and source-authority boundaries.
 - Smoking Cessation local SQLite ownership.
 - Repair Resell local listing and estimate ownership.
 - Scheduler bounded Rust-handler dispatch.
@@ -220,6 +221,26 @@ Out of scope unless explicitly requested:
 - Automated build or tier-list recommendations.
 - Save-file parsing, process inspection, telemetry, or live game integration.
 - Automatic imports from community wikis or other third-party sources.
+
+## Trailmakers Module Scope
+
+Trailmakers is a local-first Gaming entry focused on using the overlay while building vehicles.
+
+Current scope:
+
+- Shared Gaming chats and screenshot capture.
+- Vehicle Builds, Build Reference, and Modding planning sections.
+- Requested primary gameplay authority at `https://trailmakers.fandom.com/wiki/Trailmakers_Wiki`.
+- Official modding authority at `https://trailmakers.wiki.gg/wiki/Modding`.
+- Installed-game Lua authority rooted at `C:\Program Files (x86)\Steam\steamapps\common\Trailmakers\mods`, especially `trailmakers_docs.lua` and shipped examples.
+- Backend-supplied authority-source context for Trailmakers chat.
+
+Out of scope until explicitly requested:
+
+- Writing, installing, enabling, publishing, or updating a Trailmakers mod.
+- Automatic indexing of Lua APIs, examples, Workshop mods, blueprints, or vehicle files.
+- DLL injection, game-DLL replacement, or non-Lua runtime modification.
+- Treating cached wiki text as guaranteed current; version-sensitive guidance must fetch the live source and prefer the installed API definition for local mod compatibility.
 
 ## Persistence Boundary
 

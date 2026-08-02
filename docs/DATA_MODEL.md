@@ -485,7 +485,7 @@ created_at
 modified_at
 ```
 
-Static game definitions. `GearBlocks` is seeded with `id_game = 1`, `Path of Exile 2` with `id_game = 2`, and `The Spell Brigade` with `id_game = 3`.
+Static game definitions. `GearBlocks` is seeded with `id_game = 1`, `Path of Exile 2` with `id_game = 2`, `The Spell Brigade` with `id_game = 3`, and `Trailmakers` with `id_game = 4`.
 
 ### `obj_game`
 
@@ -524,6 +524,8 @@ setting_value_json = currently played build metadata, source URL, class, ascenda
 ```
 
 Path of Exile 2 character builds now use `obj_game_character_build` for editable build records. The `current_build` setting remains compatibility data from the earlier scaffold.
+
+Trailmakers seeds `setting_key = authority_sources`. Its JSON records the requested primary gameplay wiki, official wiki.gg modding guide, installed Steam `mods` directory, and installed `trailmakers_docs.lua` API-definition path. The row is definition-owned configuration used by backend chat context; it is not executable configuration.
 
 ### `obj_game_character_build`
 

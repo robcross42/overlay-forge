@@ -38,6 +38,7 @@ Read the smallest relevant set before editing:
 | Smoking Cessation | `docs/SMOKING_CESSATION.md` |
 | Repair Resell | `docs/REPAIR_RESELL.md` |
 | The Spell Brigade | `docs/THE_SPELL_BRIGADE.md` |
+| Trailmakers | `docs/TRAILMAKERS.md` |
 
 This map is a routing index, not an inventory of every Markdown file. Add a Markdown file here only when it is an active, authoritative entry point or a required first read for a recurring work area. Supporting, historical, generated, vendor, template, bridge, and narrowly scoped README files should normally be linked from their owning parent document or discovered within their subtree instead of being listed here.
 

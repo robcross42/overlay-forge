@@ -11,7 +11,7 @@ The active coding workflow is direct Codex chat in VS Code. Repository Markdown 
 Current stable project status:
 
 ```text
-Overlay Forge 0.11.1
+Overlay Forge 0.11.2
 Status: Active local-first desktop command hub
 ```
 
@@ -34,6 +34,7 @@ Overlay Forge organizes calendar items, references, game context, and focused ut
 - SQLite naming normalization.
 - Path of Exile 2 game module scaffold and local build records.
 - The Spell Brigade game module scaffold for chats, screenshots, and co-op run planning.
+- Trailmakers game module scaffold for vehicle builds, screenshots, source-grounded gameplay help, and future Lua modding.
 - Former Projects module removed from active code while legacy project/planning SQLite data remains preserved.
 
 ## Active Documentation Structure
@@ -51,7 +52,7 @@ Overlay Forge organizes calendar items, references, game context, and focused ut
 | `docs/FEATURE_SCOPE.md` | Scope boundaries and guardrails. |
 | `docs/DEFERRED_ITEMS.md` | Centralized deferred work. |
 | `docs/VALIDATION.md` | Build and manual validation expectations. |
-| `docs/VERSIONING.md` | Semantic versioning and changelog rules. |
+| `docs/VERSIONING.md` | Traceability-first project versioning and changelog rules. |
 | `docs/GAMING_SCREENSHOTS.md` | Gaming screenshot workflow. |
 | `docs/GEARBLOCKS.md` | GearBlocks module overview. |
 | `docs/GEARBLOCKS_RUNTIME.md` | GearBlocks save/runtime data flow. |
@@ -60,6 +61,7 @@ Overlay Forge organizes calendar items, references, game context, and focused ut
 | `docs/SMOKING_CESSATION.md` | Smoking Cessation module scope. |
 | `docs/REPAIR_RESELL.md` | Repair Resell restoration, pickup, and learning-path vision. |
 | `docs/THE_SPELL_BRIGADE.md` | The Spell Brigade module scope and planning scaffold. |
+| `docs/TRAILMAKERS.md` | Trailmakers building workspace, source authority, and Lua modding boundary. |
 
 ## Terminology
 
