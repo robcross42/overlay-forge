@@ -20,6 +20,35 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.11.3 - 2026-08-02
+
+### 2026-08-02
+
+#### Added
+
+- 04:52:55 EDT - Added the Retirement Planning foundation workspace with Dashboard, Finances, Budget & Goals, Scenarios, Income Experiments, Simulations, Homes, and Readiness Checklist navigation backed by a local CAD profile.
+
+#### Changed
+
+- 04:52:55 EDT - Replaced the active Repair Resell navigation surface with Retirement Planning and moved the inactive legacy React surface into the archive.
+
+#### Documentation
+
+- 04:52:55 EDT - Added the Retirement Planning guide, archived the prior Repair Resell boundary, and updated the project architecture, data model, scope, validation, deferred-work, overview, and routing documentation.
+
+#### Validation
+
+- 04:52:55 EDT - Validated the foundation with the frontend production build, backend build, all 44 Rust tests, the archive-preservation migration regression test, Clippy, and git diff validation. Clippy reports only the pre-existing legacy Repair Resell high-arity warning.
+- 21:01:54 EDT - User manually validated the Retirement Planning module framework for release.
+
+#### Changed
+
+- 21:01:54 EDT - Updated all project version metadata to 0.11.3 for the Retirement Planning foundation.
+
+#### Validation
+
+- 21:03:59 EDT - Revalidated release 0.11.3 with the version-consistency check, frontend production build, backend build, all 44 Rust tests, Clippy, and git diff validation. Clippy reports only the documented legacy Repair Resell high-arity warning.
+
 ## 0.11.2 - 2026-08-02
 
 ### 2026-08-01

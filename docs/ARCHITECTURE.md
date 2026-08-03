@@ -83,7 +83,7 @@ The Tauri backend owns:
 - GearBlocks API catalog and runtime API availability indexing.
 - Game build guide import, persistence, and overlay-window commands.
 - Smoking Cessation event and settings commands.
-- Repair Resell source registry, manual import, conservative public refresh, listing persistence, keyword/category rules, watchlist, and manual deal estimates.
+- Retirement Planning foundation profile command and local SQLite ownership.
 - Scheduler commands and backend worker dispatch.
 - Global hotkey registration.
 - Window show/hide behavior.
@@ -246,15 +246,15 @@ The module may render a narrow Markdown export under app data for personal conte
 
 See `docs/SMOKING_CESSATION.md`.
 
-## Repair Resell Boundary
+## Retirement Planning Foundation
 
-Repair Resell is a local-first utility module for tracking buy -> repair/refurbish -> resell candidates. React renders filters, source controls, manual import, watchlist toggles, and estimate forms. Persistence, source refresh, keyword/category rules, listing snapshots, and deal calculations are backend-owned through Tauri commands.
+Retirement Planning is a local-first planning workspace. Its initial backend boundary owns a persisted profile definition; React renders the planning shell and does not own financial values, calculations, or scenario policy.
 
-SQLite stores the source registry, search profiles, listings, snapshots, deterministic keyword/category mappings, watchlist entries, travel profiles, and manual estimates. The scraper layer is allowlist/source-record based, manually triggered, uses normal HTTP fetch for public sources only, and falls back to manual import when a source is disabled, private, login-gated, or unstable.
+The foundation intentionally creates no asset, debt, income, expense, goal, scenario, or experiment values. The user-provided approximate values remain pending confirmation in the future editable finance workflow. Future retirement records must use integer minor currency units and backend-owned validation.
 
-The module does not perform LLM analysis, OpenAI calls, credentialed scraping, account login, browser automation, bidding, buying, seller messaging, payment, or checkout workflows.
+It does not perform financial-institution access, brokerage or betting actions, payment execution, credential storage, market-data collection, tax/legal/medical advice, or automatic inclusion of speculative income.
 
-Future pickup planning, repair knowledge-base, inventory, parts, sales, analytics, and restoration-learning features should continue through backend services and SQLite repositories rather than moving business rules into React. See `docs/REPAIR_RESELL.md` for the module vision.
+Repair/resell is deliberately being recreated later as a Retirement Planning income experiment. The prior Repair Resell commands, tables, and implementation are inactive legacy material retained only to preserve existing local data.
 
 ## Scheduler Boundary
 

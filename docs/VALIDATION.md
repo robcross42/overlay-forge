@@ -57,7 +57,7 @@ The primary overlay hides and does not remain always-on-top. Standalone game cha
 ```
 
 ```text
-Switch between Calendar, Cessation, Repair Resell, Gaming, YouTube, and Settings.
+Switch between Calendar, Cessation, Retirement Planning, Gaming, YouTube, and Settings.
 ```
 
 Pass criteria:
@@ -65,6 +65,20 @@ Pass criteria:
 ```text
 Each active module loads without disrupting persisted data.
 ```
+
+## Retirement Planning Foundation Validation
+
+Validate:
+
+~~~text
+Open Retirement Planning and select each of the eight planning sections.
+~~~
+
+Pass criteria:
+
+~~~text
+The local profile loads, all planning sections render, no financial balances are prepopulated, and Income Experiments identifies Repair Resell as a fresh future workflow.
+~~~
 
 ```text
 Restart the app.

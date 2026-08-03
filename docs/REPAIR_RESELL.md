@@ -1,5 +1,7 @@
 # Repair Resell
 
+> Archived on 2026-08-02. This document is retained for historical reference only. The active replacement path is Retirement Planning Income Experiments; see docs/RETIREMENT_PLANNING.md and docs/archive/REPAIR_RESELL_ARCHIVE.md.
+
 ## Direction
 
 Repair Resell is a local-first module for building a restoration-funded learning path, not only a flipping tool. Profit matters because it can pay down debt, reduce mortgage pressure, and fund the next project, but the long-term value is the user's growing repair knowledge base.

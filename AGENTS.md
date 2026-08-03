@@ -36,7 +36,7 @@ Read the smallest relevant set before editing:
 | Media Library | `docs/MEDIA_LIBRARY.md` |
 | GearBlocks feature work | `docs/GEARBLOCKS.md`, then the focused GearBlocks docs |
 | Smoking Cessation | `docs/SMOKING_CESSATION.md` |
-| Repair Resell | `docs/REPAIR_RESELL.md` |
+| Retirement Planning | `docs/RETIREMENT_PLANNING.md` |
 | The Spell Brigade | `docs/THE_SPELL_BRIGADE.md` |
 | Trailmakers | `docs/TRAILMAKERS.md` |
 

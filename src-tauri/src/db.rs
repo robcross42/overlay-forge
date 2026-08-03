@@ -99,6 +99,22 @@ pub struct SmokingCessationSettingsRecord {
 }
 
 #[derive(Clone, Serialize)]
+pub struct RetirementPlanningProfileRecord {
+    pub id: i64,
+    pub name: String,
+    #[serde(rename = "currencyCode")]
+    pub currency_code: String,
+    #[serde(rename = "retirementDefinition")]
+    pub retirement_definition: String,
+    #[serde(rename = "profileStatus")]
+    pub profile_status: String,
+    #[serde(rename = "createdAt")]
+    pub created_at: String,
+    #[serde(rename = "modifiedAt")]
+    pub modified_at: String,
+}
+
+#[derive(Clone, Serialize)]
 pub struct RepairResellSourceRecord {
     pub id: String,
     #[serde(rename = "kindKey")]
@@ -1661,6 +1677,33 @@ impl AppDatabase {
                 patch_timezone
             )
             VALUES (1, 'Nicoderm Step 1', '2026-06-21 15:00:00', 'EDT');
+
+            CREATE TABLE IF NOT EXISTS obj_retirement_planning_profile (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                name TEXT NOT NULL DEFAULT 'Retirement Planning',
+                currency_code TEXT NOT NULL DEFAULT 'CAD',
+                retirement_definition TEXT NOT NULL DEFAULT 'Leaving current full-time employment while continuing optional projects and side-income activities.',
+                profile_status TEXT NOT NULL DEFAULT 'foundation',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK (currency_code = 'CAD'),
+                CHECK (profile_status IN ('foundation', 'active', 'archived'))
+            );
+
+            INSERT OR IGNORE INTO obj_retirement_planning_profile (
+                id,
+                name,
+                currency_code,
+                retirement_definition,
+                profile_status
+            )
+            VALUES (
+                1,
+                'Retirement Planning',
+                'CAD',
+                'Leaving current full-time employment while continuing optional projects and side-income activities.',
+                'foundation'
+            );
 
             CREATE TABLE IF NOT EXISTS def_scheduler_type (
                 id INTEGER PRIMARY KEY,
@@ -4577,6 +4620,26 @@ impl AppDatabase {
     pub fn get_smoking_cessation_settings(&self) -> Result<SmokingCessationSettingsRecord> {
         let connection = self.connection()?;
         Self::get_smoking_cessation_settings_for_connection(&connection)
+    }
+
+    pub fn get_retirement_planning_profile(&self) -> Result<RetirementPlanningProfileRecord> {
+        let connection = self.connection()?;
+        connection.query_row(
+            "
+            SELECT
+                id,
+                name,
+                currency_code,
+                retirement_definition,
+                profile_status,
+                created_at,
+                modified_at
+            FROM obj_retirement_planning_profile
+            WHERE id = 1
+            ",
+            [],
+            retirement_planning_profile_from_row,
+        )
     }
 
     pub fn update_smoking_cigarette_count(
@@ -11643,6 +11706,20 @@ fn smoking_event_from_row(row: &rusqlite::Row<'_>) -> Result<SmokingEventRecord>
     })
 }
 
+fn retirement_planning_profile_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<RetirementPlanningProfileRecord> {
+    Ok(RetirementPlanningProfileRecord {
+        id: row.get(0)?,
+        name: row.get(1)?,
+        currency_code: row.get(2)?,
+        retirement_definition: row.get(3)?,
+        profile_status: row.get(4)?,
+        created_at: row.get(5)?,
+        modified_at: row.get(6)?,
+    })
+}
+
 fn smoking_cessation_settings_from_row(
     row: &rusqlite::Row<'_>,
 ) -> Result<SmokingCessationSettingsRecord> {
@@ -12312,6 +12389,7 @@ mod tests {
             "obj_game",
             "obj_game_setting",
             "obj_game_character_build",
+            "obj_retirement_planning_profile",
             "obj_setting",
             "obj_scheduler",
             "n2n_planning_conversation_context",
@@ -12330,6 +12408,21 @@ mod tests {
             )
             .expect("seeded game should have schema metadata");
         assert!(game_schema.contains("\"table\":\"obj_game\""));
+
+        let retirement_profile: (String, String, String) = connection
+            .query_row(
+                "
+                SELECT name, currency_code, profile_status
+                FROM obj_retirement_planning_profile
+                WHERE id = 1
+                ",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .expect("retirement planning foundation profile should be seeded");
+        assert_eq!(retirement_profile.0, "Retirement Planning");
+        assert_eq!(retirement_profile.1, "CAD");
+        assert_eq!(retirement_profile.2, "foundation");
 
         let path_of_exile_id_game: i64 = connection
             .query_row(
@@ -12376,6 +12469,32 @@ mod tests {
 
         drop(connection);
         drop(database);
+        remove_db_files(&path);
+    }
+
+    #[test]
+    fn retirement_foundation_preserves_archived_repair_resell_rows() {
+        let path = temp_db_path("retirement-preserves-resell");
+        remove_db_files(&path);
+
+        let database = AppDatabase::new(path.clone()).expect("database should initialize");
+        let connection = Connection::open(&path).expect("database should reopen");
+        let before: i64 = connection
+            .query_row("SELECT count(*) FROM obj_resell_source", [], |row| row.get(0))
+            .expect("archived repair resell source count should be readable");
+        assert!(before > 0);
+        drop(connection);
+        drop(database);
+
+        let reopened = AppDatabase::new(path.clone()).expect("database should reopen");
+        let connection = Connection::open(&path).expect("database should reopen for verification");
+        let after: i64 = connection
+            .query_row("SELECT count(*) FROM obj_resell_source", [], |row| row.get(0))
+            .expect("archived repair resell source count should remain readable");
+        assert_eq!(after, before);
+
+        drop(connection);
+        drop(reopened);
         remove_db_files(&path);
     }
 

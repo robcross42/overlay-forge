@@ -1330,7 +1330,11 @@ modified_at
 
 Run history for scheduled events.
 
-## Repair Resell Tables
+## Retirement Planning Foundation
+
+The one-row local profile establishes the Retirement Planning workspace in CAD with the user's definition of retirement: leaving current full-time employment while continuing optional projects and side-income activities. It stores no financial balances, debt values, income assumptions, or scenario calculations. Those require explicit editable records in later milestones.
+
+## Archived Repair Resell Tables
 
 Repair Resell tables use table-specific text primary keys named `id_<tablename>` and include `created_at` plus `modified_at`.
 
@@ -1377,7 +1381,7 @@ obj_resell_deal_estimate
 
 Travel profiles store fuel/distance assumptions. Deal estimates are manual MVP records with deterministic max-safe-bid and net-profit calculations stored alongside user-entered costs and resale assumptions.
 
-### Future Repair Resell Data Direction
+### Archived Repair Resell Data Direction
 
 Future Repair Resell schema work should preserve room for:
 

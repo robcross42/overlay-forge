@@ -11,7 +11,7 @@ The active coding workflow is direct Codex chat in VS Code. Repository Markdown 
 Current stable project status:
 
 ```text
-Overlay Forge 0.11.2
+Overlay Forge 0.11.3
 Status: Active local-first desktop command hub
 ```
 
@@ -29,7 +29,7 @@ Overlay Forge organizes calendar items, references, game context, and focused ut
 - Gaming workspace with screenshot capture.
 - GearBlocks save decoding, runtime export import, parts catalog, and in-game script tooling.
 - Smoking Cessation module.
-- Repair Resell module for local buy-repair-resell listing tracking, source registry, watchlist, deterministic keyword flags, and manual estimates.
+- Retirement Planning foundation for local, assumption-led employment-exit planning. The prior Repair Resell surface is archived with its SQLite data preserved.
 - Scheduler framework.
 - SQLite naming normalization.
 - Path of Exile 2 game module scaffold and local build records.
@@ -59,7 +59,7 @@ Overlay Forge organizes calendar items, references, game context, and focused ut
 | `docs/GEARBLOCKS_PLUGIN.md` | BepInEx, GearLib, and marker plugin boundaries. |
 | `docs/GEARBLOCKS_PARTS_CATALOG.md` | Validated GearBlocks parts vocabulary. |
 | `docs/SMOKING_CESSATION.md` | Smoking Cessation module scope. |
-| `docs/REPAIR_RESELL.md` | Repair Resell restoration, pickup, and learning-path vision. |
+| `docs/RETIREMENT_PLANNING.md` | Retirement Planning scope, safety boundaries, and milestone roadmap. |
 | `docs/THE_SPELL_BRIGADE.md` | The Spell Brigade module scope and planning scaffold. |
 | `docs/TRAILMAKERS.md` | Trailmakers building workspace, source authority, and Lua modding boundary. |
 

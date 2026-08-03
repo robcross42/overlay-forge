@@ -7,7 +7,7 @@ import { Calendar } from "../features/calendar/Calendar";
 import { Cessation } from "../features/cessation/Cessation";
 import { Gaming } from "../features/gaming/Gaming";
 import { MediaLibrary } from "../features/media/MediaLibrary";
-import { RepairResell } from "../features/repair-resell/RepairResell";
+import { RetirementPlanning } from "../features/retirement/RetirementPlanning";
 import { Settings } from "../features/settings/Settings";
 import { YouTube } from "../features/youtube/YouTube";
 import { getAppStatus } from "../services/appStatus";
@@ -32,7 +32,7 @@ type ComponentId =
   | "calendar"
   | "cessation"
   | "media"
-  | "repair-resell"
+  | "retirement-planning"
   | "gaming"
   | "youtube"
   | "settings";
@@ -40,7 +40,7 @@ type ComponentId =
 const navItems = [
   { id: "calendar", label: "Calendar" },
   { id: "cessation", label: "Cessation" },
-  { id: "repair-resell", label: "Repair Resell" },
+  { id: "retirement-planning", label: "Retirement Planning" },
   { id: "youtube", label: "YouTube" },
   { id: "media", label: "Media Library" },
   { id: "gaming", label: "Gaming" },
@@ -630,7 +630,7 @@ export default function App() {
           <ComponentHost>
             {activeComponent === "calendar" && <Calendar />}
             {activeComponent === "cessation" && <Cessation />}
-            {activeComponent === "repair-resell" && <RepairResell />}
+            {activeComponent === "retirement-planning" && <RetirementPlanning />}
             {activeComponent === "gaming" && (
               <Gaming
                 chatOverlayMode={isChatOverlayMode}

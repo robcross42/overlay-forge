@@ -17,7 +17,7 @@ Future work should preserve the completed local-first desktop overlay foundation
 - GearBlocks save/runtime data boundaries.
 - Trailmakers vehicle-building workspace and source-authority boundaries.
 - Smoking Cessation local SQLite ownership.
-- Repair Resell local listing and estimate ownership.
+- Retirement Planning local profile and future financial-planning ownership.
 - Scheduler bounded Rust-handler dispatch.
 - SQLite naming conventions.
 
@@ -142,17 +142,15 @@ Out of scope unless requested:
 - Medical advice automation.
 - Sharing records externally.
 
-## Repair Resell Boundary
+## Retirement Planning Foundation Boundary
 
-Repair Resell is local-first.
+Retirement Planning is local-first planning and decision support. It must not represent retirement timing, investment results, speculation, or side income as guaranteed.
 
-Long-term direction:
+Current foundation:
 
-- Treat the module as a restoration-funded learning path, not only a flipping surface.
-- Use profit to help pay down debt, reduce mortgage pressure, and fund increasingly ambitious repair projects.
-- Prefer workflows that build repair knowledge: find, diagnose, learn, repair/restore, keep/sell/part out, and record what was learned.
-- Model pickup economics around the user's available Wednesday, Saturday, and Sunday pickup windows, with special value for Wednesday business-hour pickups.
-- Prefer multi-item auction pickups and regional auction clusters when long trips would make single-item fuel costs unattractive.
+- A local CAD retirement profile and eight-area workspace shell.
+- No seeded financial values until an editable confirmation flow exists.
+- Repair/resell is deferred for fresh implementation as an Income Experiment, not migrated from the retired module.
 
 Current scope:
 

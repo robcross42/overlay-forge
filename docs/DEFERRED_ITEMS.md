@@ -7,7 +7,7 @@ This file centralizes deferred work. Items listed here are not approved scope un
 - Decide whether a future workspace should restore Projects, replace it with another planning model, migrate old project records into another module, export them, or delete them after explicit approval.
 - Review whether project-scoped chat, project Markdown context, bridge drafts, and project GitHub metadata should remain retired or return as a different workflow.
 - Preserve legacy project/planning SQLite rows until an explicit migration, export, or deletion plan is requested.
-- Avoid reintroducing a top-level Projects module without a new purpose and a clearer relationship to Gaming, Calendar, Repair Resell, and local documentation.
+- Avoid reintroducing a top-level Projects module without a new purpose and a clearer relationship to Gaming, Calendar, Retirement Planning, and local documentation.
 
 ## Chat UX And Controls
 
@@ -146,25 +146,17 @@ This file centralizes deferred work. Items listed here are not approved scope un
 - Preserve existing Scratchpad, Tasks, and Notes data until an explicit migration or deletion plan is requested.
 - Decide whether Calendar should own lightweight reminders, dated notes, task-like items, and quick scratch entries.
 
-## Repair Resell Future Work
+## Archived Repair Resell
 
-- Multi-item auction pickup planning that groups watchlisted lots by source, region, pickup window, closing date, and vehicle/trailer capacity.
-- Pickup economics that spread fuel and travel time across a whole load instead of evaluating each listing in isolation.
-- Wednesday/business-hour pickup planning, plus Saturday/Sunday longer-trip planning, based on the user's work schedule.
-- Regional arbitrage tracking between lower-cost inventory areas and Kitchener/GTA resale opportunities.
-- Estate-auction bundle evaluation for hand tools, woodworking equipment, mechanics' tools, lawn equipment, bicycles, and shop equipment.
-- Parts-harvesting workflows for donor machines, part-out value, combined repairs, and remaining-parts resale.
-- Trailer-enabled hauling workflows for riding mowers, utility trailers, motorcycles, ATVs, compact tractors, shop machinery, and other larger-margin items.
-- Optional return-load opportunity tracking to offset fuel costs when a truck/trailer trip can transport something back for someone else.
-- Repair/restoration knowledge base records for symptoms, diagnosis, root cause, parts used, cost, time spent, photos, manuals, videos, lessons learned, and final outcome.
-- Model, brand, engine-family, and failure-mode history so prior repairs surface when similar listings appear later.
-- Phase-based learning progression from bicycles and small engines toward riding mowers, trailers, motorcycles, ATVs, compact tractors, engine rebuilding, vehicle restoration, and eventually a ground-up car build.
-- LLM listing analysis and repair/resale estimate enrichment.
-- OpenAI-backed category, make/model/year, red-flag, failure-mode, parts, and max-safe-bid suggestions.
-- Listing photo ingestion, local image storage, and optional future vision support.
-- Inventory, purchase, inspection, repair task, parts, sale listing, sale, analytics, and skill-area tracking tables.
-- Comparable resale data collection.
-- Scheduled/background source refreshes.
+- Do not extend the archived module. Preserve its existing local data until an explicit export or cleanup request.
+- Recreate repair/resell later as a Retirement Planning Income Experiment with evidence, reliability, intended physical tasks, and user-controlled scenario inclusion.
+
+## Retirement Planning
+
+- Add editable account, debt, income, expense, budget, and goal records with historical snapshots.
+- Add transparent scenarios, criteria, and financial-independence calculations that keep core funding separate from optional side income.
+- Add Income Experiments, evidence-based Red/Yellow/Green reliability, Intended physical tasks, employer/IP tracking, and paper-only simulations.
+- Add rural-home comparisons and explicitly selected project-aware chat context.
 - Preferred-brand and model alerts for brands such as John Deere, Honda, Scott, Stihl, and other user-selected interests.
 - Any credentialed marketplace access, login automation, seller messaging, automated bidding, automated buying, checkout, payment, or social posting workflow.
 

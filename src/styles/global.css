@@ -54,6 +54,55 @@
   align-content: flex-start;
 }
 
+.retirement-planning-body {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-height: 0;
+  overflow: auto;
+  padding: 18px;
+}
+
+.retirement-planning-tabs {
+  padding: 0;
+}
+
+.retirement-planning-card,
+.retirement-planning-notice {
+  display: grid;
+  gap: 8px;
+}
+
+.retirement-planning-card {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.retirement-planning-card > p,
+.retirement-planning-card > span,
+.retirement-planning-notice > span {
+  margin: 0;
+  color: var(--muted);
+}
+
+.retirement-planning-card > p {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.retirement-planning-card h4 {
+  margin: 0;
+}
+
+.retirement-planning-notice {
+  padding: 12px;
+  border-left: 3px solid rgba(79, 208, 165, 0.55);
+  background: rgba(79, 208, 165, 0.07);
+}
+
 .repair-resell-layout {
   display: grid;
   grid-template-columns: minmax(300px, 0.92fr) minmax(340px, 1.08fr);

@@ -17,7 +17,8 @@ use crate::db::{
     GearBlocksPartRenderProfileDraft, GearBlocksPartRenderProfileRecord, NoteRecord,
     RepairResellCategoryRecord,
     RepairResellDealEstimateRecord, RepairResellKeywordFlagRecord, RepairResellListingRecord,
-    RepairResellSourceRecord, RepairResellTravelProfileRecord, SchedulerRecord,
+    RepairResellSourceRecord, RepairResellTravelProfileRecord, RetirementPlanningProfileRecord,
+    SchedulerRecord,
     SmokingCessationSettingsRecord, SmokingEventRecord, TaskRecord, YouTubeReferenceRecord,
     YouTubeReferenceUpdateDraft,
 };
@@ -2289,6 +2290,16 @@ pub fn get_smoking_cessation_settings(
     state
         .database
         .get_smoking_cessation_settings()
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn get_retirement_planning_profile(
+    state: State<'_, AppState>,
+) -> Result<RetirementPlanningProfileRecord, String> {
+    state
+        .database
+        .get_retirement_planning_profile()
         .map_err(|error| error.to_string())
 }
 

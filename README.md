@@ -7,11 +7,11 @@ The active coding workflow is direct Codex chat in VS Code. Repository Markdown 
 ## Current Status
 
 ```text
-Current stable app release: 0.11.2
+Current stable app release: 0.11.3
 Status: Active local-first desktop command hub
 ```
 
-Overlay Forge is now maintained as an evolving local-first command hub. Current stable capabilities include functional GearBlocks build guides, chat-to-guide generation, official API indexing, standalone overlay-window behavior, Smoking Cessation tracking, and Repair Resell planning.
+Overlay Forge is now maintained as an evolving local-first command hub. Current stable capabilities include functional GearBlocks build guides, chat-to-guide generation, official API indexing, standalone overlay-window behavior, Smoking Cessation tracking, and the Retirement Planning foundation.
 
 ## Core Capabilities
 
@@ -28,7 +28,7 @@ Overlay Forge is now maintained as an evolving local-first command hub. Current 
 - GearBlocks save decoding, runtime export import, parts catalog, script tooling, and backlog BepInEx plugin templates.
 - GearBlocks build guide import, chat-generated guide creation, in-game build guide overlay, and active guide chat context.
 - Smoking Cessation module.
-- Repair Resell module for local listing tracking, source registry, watchlist, deterministic flags, and manual deal estimates.
+- Retirement Planning foundation for local, assumption-led employment-exit planning; legacy Repair Resell data is preserved in archive.
 - Scheduler framework.
 - SQLite naming normalization.
 - Path of Exile 2 game module scaffold.
@@ -58,7 +58,7 @@ Overlay Forge is now maintained as an evolving local-first command hub. Current 
 | `docs/GEARBLOCKS_PARTS_CATALOG.md` | Validated GearBlocks parts vocabulary. |
 | `docs/SMOKING_CESSATION.md` | Smoking Cessation module scope. |
 | `docs/MEDIA_LIBRARY.md` | Movie/series/book scope, provider boundaries, progress, migration, and persistence. |
-| `docs/REPAIR_RESELL.md` | Repair Resell restoration, pickup, and learning-path vision. |
+| `docs/RETIREMENT_PLANNING.md` | Retirement Planning scope, safety boundaries, and milestone roadmap. |
 | `docs/THE_SPELL_BRIGADE.md` | The Spell Brigade module scope and planning scaffold. |
 | `docs/TRAILMAKERS.md` | Trailmakers building workspace, source authority, and Lua modding boundary. |
 

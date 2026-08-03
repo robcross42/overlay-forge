@@ -4,6 +4,7 @@ type TabId = "listings" | "watchlist" | "estimates" | "sources" | "settings";
 
 const tabs: TabId[] = ["listings", "watchlist", "estimates", "sources", "settings"];
 
+// Inactive legacy UI retained with the archived Repair Resell data model.
 export function RepairResell() {
   const [activeTab, setActiveTab] = useState<TabId>("listings");
 
