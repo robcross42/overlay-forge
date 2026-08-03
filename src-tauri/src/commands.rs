@@ -17,7 +17,7 @@ use crate::db::{
     GearBlocksPartRenderProfileDraft, GearBlocksPartRenderProfileRecord, NoteRecord,
     RepairResellCategoryRecord,
     RepairResellDealEstimateRecord, RepairResellKeywordFlagRecord, RepairResellListingRecord,
-    RepairResellSourceRecord, RepairResellTravelProfileRecord, RetirementPlanningProfileRecord,
+    RepairResellSourceRecord, RepairResellTravelProfileRecord,
     SchedulerRecord,
     SmokingCessationSettingsRecord, SmokingEventRecord, TaskRecord, YouTubeReferenceRecord,
     YouTubeReferenceUpdateDraft,
@@ -30,6 +30,10 @@ use crate::openai;
 use crate::repair_resell::{
     self, RepairResellDealEstimateInput, RepairResellManualImportInput,
     RepairResellRefreshResult, RepairResellWatchlistInput,
+};
+use crate::retirement_secure::{
+    self, ProtectedStoreStatus, RetirementFinancialRecord, RetirementFinancialRecordInput,
+    RetirementProfile, RetirementProfileInput,
 };
 use crate::windows::{self, StandaloneWindowConfig, WindowKind, WindowManager};
 use crate::{AppState, GameBuildGuideOverlaySelection, GameChatOverlaySelection};
@@ -2296,11 +2300,76 @@ pub fn get_smoking_cessation_settings(
 #[tauri::command]
 pub fn get_retirement_planning_profile(
     state: State<'_, AppState>,
-) -> Result<RetirementPlanningProfileRecord, String> {
-    state
-        .database
-        .get_retirement_planning_profile()
-        .map_err(|error| error.to_string())
+) -> Result<RetirementProfile, String> {
+    retirement_secure::get_profile(&state.database, &state.retirement_session_key)
+}
+
+#[tauri::command]
+pub fn get_retirement_protected_store_status(
+    state: State<'_, AppState>,
+) -> Result<ProtectedStoreStatus, String> {
+    retirement_secure::protected_store_status(&state.database, &state.retirement_session_key)
+}
+
+#[tauri::command]
+pub fn initialize_retirement_protected_store(
+    state: State<'_, AppState>,
+) -> Result<ProtectedStoreStatus, String> {
+    retirement_secure::initialize(&state.database, &state.retirement_session_key)
+}
+
+#[tauri::command]
+pub fn unlock_retirement_protected_store(
+    state: State<'_, AppState>,
+) -> Result<ProtectedStoreStatus, String> {
+    retirement_secure::unlock(&state.database, &state.retirement_session_key)
+}
+
+#[tauri::command]
+pub fn lock_retirement_protected_store(
+    state: State<'_, AppState>,
+) -> Result<ProtectedStoreStatus, String> {
+    retirement_secure::lock(&state.database, &state.retirement_session_key)
+}
+
+#[tauri::command]
+pub fn get_retirement_protected_profile(
+    state: State<'_, AppState>,
+) -> Result<RetirementProfile, String> {
+    retirement_secure::get_profile(&state.database, &state.retirement_session_key)
+}
+
+#[tauri::command]
+pub fn save_retirement_protected_profile(
+    input: RetirementProfileInput,
+    state: State<'_, AppState>,
+) -> Result<RetirementProfile, String> {
+    retirement_secure::save_profile(&state.database, &state.retirement_session_key, input)
+}
+
+#[tauri::command]
+pub fn list_retirement_financial_records(
+    entity_type: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<RetirementFinancialRecord>, String> {
+    retirement_secure::list_financial_records(&state.database, &state.retirement_session_key, &entity_type)
+}
+
+#[tauri::command]
+pub fn save_retirement_financial_record(
+    input: RetirementFinancialRecordInput,
+    state: State<'_, AppState>,
+) -> Result<RetirementFinancialRecord, String> {
+    retirement_secure::save_financial_record(&state.database, &state.retirement_session_key, input)
+}
+
+#[tauri::command]
+pub fn archive_retirement_financial_record(
+    id: String,
+    entity_type: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    retirement_secure::archive_financial_record(&state.database, &state.retirement_session_key, &id, &entity_type)
 }
 
 #[tauri::command]

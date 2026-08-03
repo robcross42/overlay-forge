@@ -66,18 +66,18 @@ Pass criteria:
 Each active module loads without disrupting persisted data.
 ```
 
-## Retirement Planning Foundation Validation
+## Retirement Planning Protected Data Validation
 
 Validate:
 
 ~~~text
-Open Retirement Planning and select each of the eight planning sections.
+Open Retirement Planning, enable protected storage, and select each of the eight planning sections.
 ~~~
 
 Pass criteria:
 
 ~~~text
-The local profile loads, all planning sections render, no financial balances are prepopulated, and Income Experiments identifies Repair Resell as a fresh future workflow.
+Protected setup succeeds only through the OS credential store. The profile and finance editor appear only while unlocked; all planning sections render; no financial balances are prepopulated; and Income Experiments identifies Repair Resell as a fresh future workflow.
 ~~~
 
 ```text
@@ -87,7 +87,7 @@ Restart the app.
 Pass criteria:
 
 ```text
-Persisted records restore correctly.
+After unlock, protected records restore correctly. After Lock, profile and financial reads are rejected until Unlock. Verify entered plaintext cannot be found in the SQLite file.
 ```
 
 ## Retired Projects Module

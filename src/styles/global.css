@@ -67,6 +67,48 @@
   padding: 0;
 }
 
+.retirement-planning-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.retirement-finance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.retirement-form,
+.retirement-record-list {
+  display: grid;
+  gap: 10px;
+}
+
+.retirement-form label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.retirement-form input,
+.retirement-form select,
+.retirement-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.retirement-record-list > div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.retirement-record-list span { color: var(--muted); font-size: 0.8rem; }
+.retirement-record-list button { grid-row: 1 / span 2; grid-column: 2; }
+
 .retirement-planning-card,
 .retirement-planning-notice {
   display: grid;

@@ -142,15 +142,21 @@ Out of scope unless requested:
 - Medical advice automation.
 - Sharing records externally.
 
-## Retirement Planning Foundation Boundary
+## Retirement Planning Protected Data Boundary
 
 Retirement Planning is local-first planning and decision support. It must not represent retirement timing, investment results, speculation, or side income as guaranteed.
 
-Current foundation:
+## Archived Repair Resell Scope
 
-- A local CAD retirement profile and eight-area workspace shell.
-- No seeded financial values until an editable confirmation flow exists.
+The following preserved legacy scope applies only to the archived Repair Resell implementation and does not expand active Retirement Planning scope.
+
+- An explicitly enabled and explicitly lockable local protected store using the OS credential store plus AES-256-GCM encrypted SQLite payloads.
+- Profile, accounts, debts, income/contribution records, and encrypted prior-value history.
+- A local CAD profile and eight-area workspace shell.
+- No seeded financial values.
 - Repair/resell is deferred for fresh implementation as an Income Experiment, not migrated from the retired module.
+
+Still out of scope: calculations, projections, budgets, goals, financial-institution connections, cloud synchronization, exports, broker/payment actions, and financial advice.
 
 Current scope:
 

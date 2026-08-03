@@ -8,6 +8,7 @@ mod lifecycle;
 mod media;
 mod openai;
 mod repair_resell;
+mod retirement_secure;
 mod windows;
 
 use std::sync::Mutex;
@@ -26,7 +27,12 @@ use commands::{
     focus_game_chat_overlay_window, focus_last_game_window, get_active_game_build_guide_overlay,
     get_active_game_chat_overlay, get_app_status, get_game_build_guide, get_game_setting,
     get_gearblocks_third_party_dependency_status, get_openai_api_key_status,
-    get_overlay_forge_foreground_window_label, get_retirement_planning_profile, get_scratchpad,
+    get_overlay_forge_foreground_window_label, get_retirement_planning_profile,
+    get_retirement_protected_profile, get_retirement_protected_store_status,
+    initialize_retirement_protected_store, lock_retirement_protected_store,
+    save_retirement_financial_record, save_retirement_protected_profile,
+    list_retirement_financial_records, archive_retirement_financial_record,
+    unlock_retirement_protected_store, get_scratchpad,
     get_smoking_cessation_settings,
     get_youtube_reference, import_game_build_guide_markdown, import_game_build_guide_url,
     import_gearblocks_catalog_screenshot_images, import_gearblocks_official_api_docs,
@@ -99,6 +105,7 @@ pub struct GameBuildGuideOverlaySelection {
 
 pub struct AppState {
     pub database: AppDatabase,
+    pub retirement_session_key: retirement_secure::RetirementSessionKey,
     pub pending_shortcut_action: Mutex<Option<String>>,
     pub last_game_window: Mutex<Option<isize>>,
     pub active_game_chat_overlay: Mutex<Option<GameChatOverlaySelection>>,
@@ -133,6 +140,7 @@ pub fn run() {
 
             app.manage(AppState {
                 database,
+                retirement_session_key: Mutex::new(None),
                 pending_shortcut_action: Mutex::new(None),
                 last_game_window: Mutex::new(None),
                 active_game_chat_overlay: Mutex::new(None),
@@ -343,6 +351,15 @@ pub fn run() {
             delete_smoking_event,
             get_smoking_cessation_settings,
             get_retirement_planning_profile,
+            get_retirement_protected_store_status,
+            initialize_retirement_protected_store,
+            unlock_retirement_protected_store,
+            lock_retirement_protected_store,
+            get_retirement_protected_profile,
+            save_retirement_protected_profile,
+            list_retirement_financial_records,
+            save_retirement_financial_record,
+            archive_retirement_financial_record,
             update_smoking_cigarette_count,
             export_smoking_cessation_chatgpt_context,
             list_repair_resell_sources,

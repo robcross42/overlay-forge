@@ -1330,9 +1330,11 @@ modified_at
 
 Run history for scheduled events.
 
-## Retirement Planning Foundation
+## Retirement Planning Protected Records
 
-The one-row local profile establishes the Retirement Planning workspace in CAD with the user's definition of retirement: leaving current full-time employment while continuing optional projects and side-income activities. It stores no financial balances, debt values, income assumptions, or scenario calculations. Those require explicit editable records in later milestones.
+`obj_retirement_secure_store` records only the protected-store lifecycle state and migration timestamps. `obj_retirement_protected_record` stores entity type, encryption-payload version, nonce, ciphertext, archive flag, and timestamps for the encrypted profile, accounts, debts, income/contributions, and prior-record history. It must never contain decrypted financial or identity fields.
+
+The device key is held exclusively by the operating system credential store. Profile migration writes the encrypted replacement, clears the legacy readable profile fields, and marks migration complete in one SQLite transaction. Financial values are integer minor units inside encrypted payloads; they are not available to SQL queries.
 
 ## Archived Repair Resell Tables
 

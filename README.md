@@ -7,7 +7,7 @@ The active coding workflow is direct Codex chat in VS Code. Repository Markdown 
 ## Current Status
 
 ```text
-Current stable app release: 0.11.3
+Current stable app release: 0.12.0
 Status: Active local-first desktop command hub
 ```
 
@@ -28,7 +28,7 @@ Overlay Forge is now maintained as an evolving local-first command hub. Current 
 - GearBlocks save decoding, runtime export import, parts catalog, script tooling, and backlog BepInEx plugin templates.
 - GearBlocks build guide import, chat-generated guide creation, in-game build guide overlay, and active guide chat context.
 - Smoking Cessation module.
-- Retirement Planning foundation for local, assumption-led employment-exit planning; legacy Repair Resell data is preserved in archive.
+- Retirement Planning protected local data entry for profiles, accounts, debts, income, and contributions; legacy Repair Resell data is preserved in archive.
 - Scheduler framework.
 - SQLite naming normalization.
 - Path of Exile 2 game module scaffold.

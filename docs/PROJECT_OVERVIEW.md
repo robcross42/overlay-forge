@@ -11,7 +11,7 @@ The active coding workflow is direct Codex chat in VS Code. Repository Markdown 
 Current stable project status:
 
 ```text
-Overlay Forge 0.11.3
+Overlay Forge 0.12.0
 Status: Active local-first desktop command hub
 ```
 
@@ -29,7 +29,7 @@ Overlay Forge organizes calendar items, references, game context, and focused ut
 - Gaming workspace with screenshot capture.
 - GearBlocks save decoding, runtime export import, parts catalog, and in-game script tooling.
 - Smoking Cessation module.
-- Retirement Planning foundation for local, assumption-led employment-exit planning. The prior Repair Resell surface is archived with its SQLite data preserved.
+- Retirement Planning protected local data entry for profiles, accounts, debts, income, and contributions. The prior Repair Resell surface is archived with its SQLite data preserved.
 - Scheduler framework.
 - SQLite naming normalization.
 - Path of Exile 2 game module scaffold and local build records.
