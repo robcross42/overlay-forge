@@ -1,6 +1,6 @@
 [package]
 name = "overlay-forge"
-version = "0.11.3"
+version = "0.12.0"
 description = "A local-first desktop overlay command hub."
 authors = ["Overlay Forge"]
 edition = "2021"
@@ -25,3 +25,7 @@ windows-sys = { version = "0.59.0", features = ["Win32_Foundation", "Win32_Graph
 tauri-plugin-dialog = "2.7.1"
 flate2 = "1.1.9"
 bson = "3.1.0"
+aes-gcm = { version = "0.11.0", features = ["getrandom"] }
+getrandom = "0.3.4"
+keyring = { version = "4.1.5", features = ["v1"] }
+zeroize = { version = "1.9.0", features = ["derive"] }

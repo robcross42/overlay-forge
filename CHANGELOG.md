@@ -20,6 +20,26 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.12.0 - 2026-08-02
+
+### 2026-08-02
+
+#### Added
+
+- 23:54:26 EDT - Added explicitly enabled, session-lockable protected retirement data entry for the profile, accounts, debts, income, and contribution records.
+
+#### Changed
+
+- 23:54:26 EDT - Added backend-owned AES-256-GCM encryption, OS credential-store key custody, encrypted prior-value history, and atomic migration of the readable foundation profile.
+
+#### Documentation
+
+- 23:54:26 EDT - Documented the protected data model, architecture, scope boundary, and manual validation path.
+
+#### Validation
+
+- 23:56:46 EDT - Validated the protected data feature with the frontend production build, backend build, all 47 Rust tests, targeted encryption tamper/nonce/lock tests, Clippy, version consistency, and git diff validation. Clippy reports only the documented legacy Repair Resell high-arity warning.
+
 ## 0.11.3 - 2026-08-02
 
 ### 2026-08-02

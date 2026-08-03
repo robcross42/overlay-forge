@@ -1,124 +1,40 @@
-import { useEffect, useState } from "react";
-import {
-  getRetirementPlanningProfile,
-  type RetirementPlanningProfile
-} from "../../services/retirementPlanning";
+import { FormEvent, useEffect, useState } from "react";
+import { archiveFinancialRecord, getProtectedStoreStatus, getRetirementProfile, initializeProtectedStore, listFinancialRecords, lockProtectedStore, saveFinancialRecord, saveRetirementProfile, unlockProtectedStore, type ProtectedStoreStatus, type RetirementFinancialRecord, type RetirementFinancialRecordInput, type RetirementProfile } from "../../services/retirementPlanning";
 import { formatUnknownError as formatError } from "../../utils/errors";
 
-type RetirementSection =
-  | "dashboard"
-  | "finances"
-  | "budget-goals"
-  | "scenarios"
-  | "income-experiments"
-  | "simulations"
-  | "homes"
-  | "readiness";
-
+type RetirementSection = "dashboard" | "finances" | "budget-goals" | "scenarios" | "income-experiments" | "simulations" | "homes" | "readiness";
 const sections: Array<{ id: RetirementSection; label: string; description: string }> = [
-  {
-    id: "dashboard",
-    label: "Dashboard",
-    description: "A future assumption-led view of financial independence and employment-exit readiness."
-  },
-  {
-    id: "finances",
-    label: "Finances",
-    description: "Local accounts, debts, income, and contribution history will be entered here."
-  },
-  {
-    id: "budget-goals",
-    label: "Budget & Goals",
-    description: "Retirement spending, capital plans, and lifestyle goals will stay editable and explicit."
-  },
-  {
-    id: "scenarios",
-    label: "Scenarios",
-    description: "Core-funded and optional side-income scenarios will remain separate and assumption-driven."
-  },
-  {
-    id: "income-experiments",
-    label: "Income Experiments",
-    description: "Repair/resell will be recreated here as a fresh retirement income experiment, not migrated from the retired module."
-  },
-  {
-    id: "simulations",
-    label: "Simulations",
-    description: "Paper-only research and simulated positions will remain separate from retirement assets."
-  },
-  {
-    id: "homes",
-    label: "Homes",
-    description: "Rural-home comparisons may affect scenarios without becoming a retirement prerequisite."
-  },
-  {
-    id: "readiness",
-    label: "Readiness Checklist",
-    description: "A future user-controlled checklist for confidence, planning completeness, and employment exit."
-  }
+  { id: "dashboard", label: "Dashboard", description: "A future assumption-led view of financial independence and employment-exit readiness." },
+  { id: "finances", label: "Finances", description: "Protected local accounts, debts, income, and contribution history." },
+  { id: "budget-goals", label: "Budget & Goals", description: "Retirement spending, capital plans, and lifestyle goals will stay editable and explicit." },
+  { id: "scenarios", label: "Scenarios", description: "Core-funded and optional side-income scenarios will remain separate and assumption-driven." },
+  { id: "income-experiments", label: "Income Experiments", description: "Repair/resell will be recreated here as a fresh retirement income experiment." },
+  { id: "simulations", label: "Simulations", description: "Paper-only research and simulated positions will remain separate from retirement assets." },
+  { id: "homes", label: "Homes", description: "Rural-home comparisons may affect scenarios without becoming a retirement prerequisite." },
+  { id: "readiness", label: "Readiness Checklist", description: "A future user-controlled checklist for planning completeness and employment exit." }
 ];
+const blankProfile: RetirementProfile = { displayLabel: "Retirement Planning", age: null, targetAge: null, retirementDefinition: "", notes: "" };
+const blankRecord = (entityType: RetirementFinancialRecord["entityType"]): RetirementFinancialRecordInput => ({ entityType, kind: entityType === "account" ? "rrsp" : entityType === "debt" ? "mortgage" : "employment_salary", label: "", institution: "", amountCents: 0, asOfDate: new Date().toISOString().slice(0, 10), interestRateBasisPoints: null, minimumPaymentCents: null, cadence: "monthly", expectedChangeDate: "", expectedChangeAmountCents: null, notes: "" });
 
 export function RetirementPlanning() {
   const [activeSection, setActiveSection] = useState<RetirementSection>("dashboard");
-  const [profile, setProfile] = useState<RetirementPlanningProfile | null>(null);
-  const [status, setStatus] = useState("Loading local retirement profile");
+  const [store, setStore] = useState<ProtectedStoreStatus | null>(null);
+  const [profile, setProfile] = useState<RetirementProfile>(blankProfile);
+  const [records, setRecords] = useState<RetirementFinancialRecord[]>([]);
+  const [draft, setDraft] = useState<RetirementFinancialRecordInput>(blankRecord("account"));
+  const [status, setStatus] = useState("Checking protected local storage");
 
-  useEffect(() => {
-    getRetirementPlanningProfile()
-      .then((nextProfile) => {
-        setProfile(nextProfile);
-        setStatus("Foundation ready");
-      })
-      .catch((error) => setStatus(formatError(error)));
-  }, []);
-
+  const loadUnlocked = async () => {
+    const [nextProfile, ...groups] = await Promise.all([getRetirementProfile(), listFinancialRecords("account"), listFinancialRecords("debt"), listFinancialRecords("income")]);
+    setProfile(nextProfile); setRecords(groups.flat()); setStatus("Protected data unlocked");
+  };
+  const refreshStatus = async () => { const next = await getProtectedStoreStatus(); setStore(next); setStatus(next.message); if (next.state === "unlocked") await loadUnlocked(); };
+  useEffect(() => { void refreshStatus().catch((error) => setStatus(formatError(error))); }, []);
+  const secureAction = async (action: () => Promise<ProtectedStoreStatus>) => { try { const next = await action(); setStore(next); await loadUnlocked(); } catch (error) { setStatus(formatError(error)); } };
+  const saveProfile = async (event: FormEvent) => { event.preventDefault(); try { setProfile(await saveRetirementProfile(profile)); setStatus("Profile saved locally in protected storage"); } catch (error) { setStatus(formatError(error)); } };
+  const saveRecord = async (event: FormEvent) => { event.preventDefault(); try { const saved = await saveFinancialRecord(draft); setRecords((current) => [...current.filter((item) => item.id !== saved.id), saved]); setDraft(blankRecord(draft.entityType)); setStatus("Financial record saved; the prior value is retained in protected history."); } catch (error) { setStatus(formatError(error)); } };
+  const archiveRecord = async (record: RetirementFinancialRecord) => { try { await archiveFinancialRecord(record.id, record.entityType); setRecords((items) => items.filter((item) => item.id !== record.id)); setStatus("Financial record archived."); } catch (error) { setStatus(formatError(error)); } };
+  const locked = store?.state !== "unlocked";
   const section = sections.find((item) => item.id === activeSection) ?? sections[0];
-
-  return (
-    <section aria-label="Retirement Planning" className="feature-panel retirement-planning-panel">
-      <div className="panel-heading">
-        <div>
-          <p>Local-first planning</p>
-          <h3>{profile?.name ?? "Retirement Planning"}</h3>
-        </div>
-        <span className="save-pill">{status}</span>
-      </div>
-
-      <div className="retirement-planning-body">
-        <nav aria-label="Retirement Planning sections" className="module-tabs retirement-planning-tabs">
-          {sections.map((item) => (
-            <button
-              aria-pressed={activeSection === item.id}
-              className={activeSection === item.id ? "module-tab active" : "module-tab"}
-              key={item.id}
-              onClick={() => setActiveSection(item.id)}
-              type="button"
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
-
-        <section className="retirement-planning-card" aria-live="polite">
-          <p>Foundation milestone</p>
-          <h4>{section.label}</h4>
-          <span>{section.description}</span>
-          <div className="retirement-planning-notice">
-            <strong>No financial values are seeded.</strong>
-            <span>
-              The supplied RRSP, TFSA, mortgage, salary, and contribution figures remain pending
-              your review in the future editable financial-input flow.
-            </span>
-          </div>
-          <div className="retirement-planning-notice">
-            <strong>Planning only.</strong>
-            <span>
-              This workspace will label assumptions and keep unproven side income out of core
-              retirement funding unless you explicitly include it in a scenario.
-            </span>
-          </div>
-        </section>
-      </div>
-    </section>
-  );
+  return <section aria-label="Retirement Planning" className="feature-panel retirement-planning-panel"><div className="panel-heading"><div><p>Local-first planning</p><h3>{locked ? "Retirement Planning" : profile.displayLabel || "Retirement Planning"}</h3></div><span className="save-pill">{status}</span></div><div className="retirement-planning-body">{store?.state === "uninitialized" ? <div className="retirement-planning-card"><h4>Enable protected retirement data</h4><span>Your operating system’s credential store holds the local encryption key. SQLite stores encrypted records only.</span><button type="button" onClick={() => void secureAction(initializeProtectedStore)}>Enable protected storage</button></div> : store?.state === "locked" ? <div className="retirement-planning-card"><h4>Protected data is locked</h4><span>Unlock this device’s local secure store to view or edit retirement data.</span><button type="button" onClick={() => void secureAction(unlockProtectedStore)}>Unlock protected data</button></div> : <><div className="retirement-planning-actions"><button type="button" onClick={() => void secureAction(lockProtectedStore)}>Lock protected data</button></div><nav aria-label="Retirement Planning sections" className="module-tabs retirement-planning-tabs">{sections.map((item) => <button aria-pressed={activeSection === item.id} className={activeSection === item.id ? "module-tab active" : "module-tab"} key={item.id} onClick={() => setActiveSection(item.id)} type="button">{item.label}</button>)}</nav>{activeSection === "finances" ? <div className="retirement-finance-grid"><form className="retirement-planning-card retirement-form" onSubmit={saveProfile}><p>Profile & financial baseline</p><label>Display label<input value={profile.displayLabel} onChange={(e) => setProfile({ ...profile, displayLabel: e.target.value })} /></label><label>Current age<input type="number" value={profile.age ?? ""} onChange={(e) => setProfile({ ...profile, age: e.target.value === "" ? null : Number(e.target.value) })} /></label><label>Target age<input type="number" value={profile.targetAge ?? ""} onChange={(e) => setProfile({ ...profile, targetAge: e.target.value === "" ? null : Number(e.target.value) })} /></label><label>Retirement definition<textarea value={profile.retirementDefinition} onChange={(e) => setProfile({ ...profile, retirementDefinition: e.target.value })} /></label><label>Private notes<textarea value={profile.notes} onChange={(e) => setProfile({ ...profile, notes: e.target.value })} /></label><button type="submit">Save protected profile</button></form><div className="retirement-planning-card"><p>Accounts, debts, income & contributions</p><div className="retirement-record-list">{records.map((record) => <div key={record.id}><strong>{record.label}</strong><span>{record.entityType} · {record.kind}</span><button type="button" onClick={() => void archiveRecord(record)}>Archive</button></div>)}</div><form className="retirement-form" onSubmit={saveRecord}><label>Type<select value={draft.entityType} onChange={(e) => setDraft(blankRecord(e.target.value as RetirementFinancialRecord["entityType"]))}><option value="account">Account</option><option value="debt">Debt</option><option value="income">Income / contribution</option></select></label><label>Kind<input value={draft.kind} onChange={(e) => setDraft({ ...draft, kind: e.target.value })} /></label><label>Label<input value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })} /></label><label>Institution<input value={draft.institution} onChange={(e) => setDraft({ ...draft, institution: e.target.value })} /></label><label>Amount (CAD)<input type="number" step="0.01" value={draft.amountCents / 100} onChange={(e) => setDraft({ ...draft, amountCents: Math.round(Number(e.target.value || 0) * 100) })} /></label><label>As-of date<input type="date" value={draft.asOfDate} onChange={(e) => setDraft({ ...draft, asOfDate: e.target.value })} /></label><label>Notes<textarea value={draft.notes ?? ""} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} /></label><button type="submit">Save protected record</button></form></div></div> : <section className="retirement-planning-card"><p>Foundation milestone</p><h4>{section.label}</h4><span>{section.description}</span><div className="retirement-planning-notice"><strong>Planning only.</strong><span>Assumptions and optional side income stay separate from core retirement funding.</span></div></section>}</>}</div></section>;
 }

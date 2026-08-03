@@ -246,11 +246,11 @@ The module may render a narrow Markdown export under app data for personal conte
 
 See `docs/SMOKING_CESSATION.md`.
 
-## Retirement Planning Foundation
+## Retirement Planning Protected Data
 
-Retirement Planning is a local-first planning workspace. Its initial backend boundary owns a persisted profile definition; React renders the planning shell and does not own financial values, calculations, or scenario policy.
+Retirement Planning is a local-first planning workspace. `retirement_secure` owns protected-store lifecycle, OS credential-store key retrieval, AES-256-GCM encryption/decryption, validation, encrypted history, and legacy-profile migration. Thin Tauri commands expose only status and decrypted DTOs during an explicitly unlocked session; React renders and clears local UI state when the user locks the module.
 
-The foundation intentionally creates no asset, debt, income, expense, goal, scenario, or experiment values. The user-provided approximate values remain pending confirmation in the future editable finance workflow. Future retirement records must use integer minor currency units and backend-owned validation.
+SQLite owns encrypted records and non-sensitive lifecycle metadata only. React does not own financial values, encryption policy, calculations, or scenario policy. The backend validates financial input and stores currency as integer minor units inside the encrypted payload.
 
 It does not perform financial-institution access, brokerage or betting actions, payment execution, credential storage, market-data collection, tax/legal/medical advice, or automatic inclusion of speculative income.
 

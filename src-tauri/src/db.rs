@@ -12,6 +12,7 @@ use std::sync::{
 use std::time::{SystemTime, UNIX_EPOCH};
 
 static REPAIR_RESELL_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
+static RETIREMENT_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 const MARKDOWN_CONTEXT_PER_FILE_LIMIT: usize = 200_000;
 const MARKDOWN_CONTEXT_TOTAL_LIMIT: usize = 650_000;
@@ -112,6 +113,25 @@ pub struct RetirementPlanningProfileRecord {
     pub created_at: String,
     #[serde(rename = "modifiedAt")]
     pub modified_at: String,
+}
+
+#[derive(Clone)]
+pub struct RetirementProtectedRecord {
+    pub id: String,
+    pub entity_type: String,
+    pub payload_version: i64,
+    pub nonce: Vec<u8>,
+    pub ciphertext: Vec<u8>,
+    pub is_archived: bool,
+    pub created_at: String,
+    pub modified_at: String,
+}
+
+#[derive(Clone)]
+pub struct RetirementSecureStoreRecord {
+    pub state: String,
+    pub initialized_at: String,
+    pub migrated_at: String,
 }
 
 #[derive(Clone, Serialize)]
@@ -1704,6 +1724,35 @@ impl AppDatabase {
                 'Leaving current full-time employment while continuing optional projects and side-income activities.',
                 'foundation'
             );
+
+            CREATE TABLE IF NOT EXISTS obj_retirement_secure_store (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                state TEXT NOT NULL DEFAULT 'uninitialized',
+                initialized_at TEXT NOT NULL DEFAULT '',
+                migrated_at TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK (state IN ('uninitialized', 'initialized', 'migration_failed'))
+            );
+
+            INSERT OR IGNORE INTO obj_retirement_secure_store (id, state)
+            VALUES (1, 'uninitialized');
+
+            CREATE TABLE IF NOT EXISTS obj_retirement_protected_record (
+                id TEXT PRIMARY KEY NOT NULL,
+                entity_type TEXT NOT NULL,
+                payload_version INTEGER NOT NULL,
+                nonce BLOB NOT NULL,
+                ciphertext BLOB NOT NULL,
+                is_archived INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                modified_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CHECK (payload_version > 0),
+                CHECK (is_archived IN (0, 1))
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_retirement_protected_record_entity
+            ON obj_retirement_protected_record (entity_type, is_archived, modified_at DESC);
 
             CREATE TABLE IF NOT EXISTS def_scheduler_type (
                 id INTEGER PRIMARY KEY,
@@ -4640,6 +4689,188 @@ impl AppDatabase {
             [],
             retirement_planning_profile_from_row,
         )
+    }
+
+    pub fn get_retirement_secure_store(&self) -> Result<RetirementSecureStoreRecord> {
+        let connection = self.connection()?;
+        connection.query_row(
+            "
+            SELECT state, initialized_at, migrated_at
+            FROM obj_retirement_secure_store
+            WHERE id = 1
+            ",
+            [],
+            |row| {
+                Ok(RetirementSecureStoreRecord {
+                    state: row.get(0)?,
+                    initialized_at: row.get(1)?,
+                    migrated_at: row.get(2)?,
+                })
+            },
+        )
+    }
+
+    pub fn mark_retirement_secure_store_initialized(&self) -> Result<()> {
+        let connection = self.connection()?;
+        connection.execute(
+            "
+            UPDATE obj_retirement_secure_store
+            SET state = 'initialized',
+                initialized_at = datetime('now', 'localtime'),
+                modified_at = CURRENT_TIMESTAMP
+            WHERE id = 1
+            ",
+            [],
+        )?;
+        Ok(())
+    }
+
+    pub fn mark_retirement_secure_store_migrated(&self) -> Result<()> {
+        let connection = self.connection()?;
+        connection.execute(
+            "
+            UPDATE obj_retirement_secure_store
+            SET state = 'initialized',
+                migrated_at = datetime('now', 'localtime'),
+                modified_at = CURRENT_TIMESTAMP
+            WHERE id = 1
+            ",
+            [],
+        )?;
+        Ok(())
+    }
+
+    pub fn upsert_retirement_protected_record(
+        &self,
+        id: &str,
+        entity_type: &str,
+        payload_version: i64,
+        nonce: &[u8],
+        ciphertext: &[u8],
+        is_archived: bool,
+    ) -> Result<()> {
+        let connection = self.connection()?;
+        connection.execute(
+            "
+            INSERT INTO obj_retirement_protected_record (
+                id, entity_type, payload_version, nonce, ciphertext, is_archived
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+            ON CONFLICT(id) DO UPDATE SET
+                entity_type = excluded.entity_type,
+                payload_version = excluded.payload_version,
+                nonce = excluded.nonce,
+                ciphertext = excluded.ciphertext,
+                is_archived = excluded.is_archived,
+                modified_at = CURRENT_TIMESTAMP
+            ",
+            params![
+                id,
+                entity_type,
+                payload_version,
+                nonce,
+                ciphertext,
+                if is_archived { 1 } else { 0 }
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_retirement_protected_record(
+        &self,
+        id: &str,
+        entity_type: &str,
+    ) -> Result<Option<RetirementProtectedRecord>> {
+        let connection = self.connection()?;
+        connection
+            .query_row(
+                "
+                SELECT id, entity_type, payload_version, nonce, ciphertext, is_archived, created_at, modified_at
+                FROM obj_retirement_protected_record
+                WHERE id = ?1 AND entity_type = ?2
+                ",
+                params![id, entity_type],
+                retirement_protected_record_from_row,
+            )
+            .optional()
+    }
+
+    pub fn list_retirement_protected_records(
+        &self,
+        entity_type: &str,
+        include_archived: bool,
+    ) -> Result<Vec<RetirementProtectedRecord>> {
+        let connection = self.connection()?;
+        let mut statement = connection.prepare(
+            "
+            SELECT id, entity_type, payload_version, nonce, ciphertext, is_archived, created_at, modified_at
+            FROM obj_retirement_protected_record
+            WHERE entity_type = ?1
+                AND (?2 = 1 OR is_archived = 0)
+            ORDER BY modified_at DESC, id DESC
+            ",
+        )?;
+        let records = statement
+            .query_map(
+                params![entity_type, if include_archived { 1 } else { 0 }],
+                retirement_protected_record_from_row,
+            )?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(records)
+    }
+
+    pub fn clear_legacy_retirement_profile(&self) -> Result<()> {
+        let connection = self.connection()?;
+        connection.execute(
+            "
+            UPDATE obj_retirement_planning_profile
+            SET name = '',
+                retirement_definition = '',
+                profile_status = 'archived',
+                modified_at = CURRENT_TIMESTAMP
+            WHERE id = 1
+            ",
+            [],
+        )?;
+        Ok(())
+    }
+
+    pub fn migrate_legacy_retirement_profile(
+        &self,
+        payload_version: i64,
+        nonce: &[u8],
+        ciphertext: &[u8],
+    ) -> Result<()> {
+        let mut connection = self.connection()?;
+        let transaction = connection.transaction()?;
+        transaction.execute(
+            "
+            INSERT OR IGNORE INTO obj_retirement_protected_record (
+                id, entity_type, payload_version, nonce, ciphertext, is_archived
+            ) VALUES ('profile-primary', 'profile', ?1, ?2, ?3, 0)
+            ",
+            params![payload_version, nonce, ciphertext],
+        )?;
+        transaction.execute(
+            "
+            UPDATE obj_retirement_planning_profile
+            SET name = '', retirement_definition = '', profile_status = 'archived',
+                modified_at = CURRENT_TIMESTAMP
+            WHERE id = 1
+            ",
+            [],
+        )?;
+        transaction.execute(
+            "
+            UPDATE obj_retirement_secure_store
+            SET state = 'initialized', migrated_at = datetime('now', 'localtime'),
+                modified_at = CURRENT_TIMESTAMP
+            WHERE id = 1
+            ",
+            [],
+        )?;
+        transaction.commit()?;
+        Ok(())
     }
 
     pub fn update_smoking_cigarette_count(
@@ -11468,6 +11699,15 @@ fn repair_resell_id(table: &str) -> String {
     format!("{table}_{nanos:x}_{sequence:x}")
 }
 
+pub fn retirement_protected_id(entity_type: &str) -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    let sequence = RETIREMENT_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+    format!("{entity_type}_{nanos:x}_{sequence:x}")
+}
+
 fn normalize_resell_key(value: &str) -> String {
     value
         .trim()
@@ -11717,6 +11957,21 @@ fn retirement_planning_profile_from_row(
         profile_status: row.get(4)?,
         created_at: row.get(5)?,
         modified_at: row.get(6)?,
+    })
+}
+
+fn retirement_protected_record_from_row(
+    row: &rusqlite::Row<'_>,
+) -> Result<RetirementProtectedRecord> {
+    Ok(RetirementProtectedRecord {
+        id: row.get(0)?,
+        entity_type: row.get(1)?,
+        payload_version: row.get(2)?,
+        nonce: row.get(3)?,
+        ciphertext: row.get(4)?,
+        is_archived: row.get::<_, i64>(5)? == 1,
+        created_at: row.get(6)?,
+        modified_at: row.get(7)?,
     })
 }
 
