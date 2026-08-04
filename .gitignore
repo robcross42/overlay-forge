@@ -3,6 +3,7 @@ dist/
 src-tauri/target/
 src-tauri/gen/
 game-screenshots/
+tools/poker-screen-recorder/captures/
 bridge-files/temp/
 logs/
 gearblocks-bepinex-workspace/

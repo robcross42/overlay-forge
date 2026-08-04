@@ -20,6 +20,22 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.12.1 - 2026-08-04
+
+### 2026-08-04
+
+#### Added
+
+- 02:05:52 EDT - Added a standalone, opt-in poker screen recorder for manual or interval-based full-screen PNG capture and post-session review without image analysis, client inspection, automation, or live recommendations.
+
+#### Documentation
+
+- 02:05:52 EDT - Added focused setup and operating guidance beside the recorder and excluded its generated capture directory from version control.
+
+#### Validation
+
+- 02:07:31 EDT - Validated synchronized 0.12.1 metadata, the frontend production build, the Rust/Tauri backend build, and git diff formatting. Python runtime validation was unavailable because this development machine has no installed Python interpreter.
+
 ## 0.12.0 - 2026-08-02
 
 ### 2026-08-02
