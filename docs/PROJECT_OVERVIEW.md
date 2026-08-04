@@ -11,7 +11,7 @@ The active coding workflow is direct Codex chat in VS Code. Repository Markdown 
 Current stable project status:
 
 ```text
-Overlay Forge 0.12.0
+Overlay Forge 0.12.2
 Status: Active local-first desktop command hub
 ```
 

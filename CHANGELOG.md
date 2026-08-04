@@ -20,6 +20,35 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.12.2 - 2026-08-04
+
+### 2026-08-04
+
+#### Documentation
+
+- 02:08:20 EDT - Documented Smart App Control being Off as a Windows prerequisite for Rust/Tauri compilation, including the misleading downstream crate errors, policy-state check, and supported settings path.
+- 02:08:20 EDT - Deferred an official Windows trust strategy covering release code signing, Smart App Control validation, compiler-time procedural macros, isolated development alternatives, and repeatable signature checks.
+
+#### Validation
+
+- 02:09:14 EDT - Validated synchronized 0.12.2 metadata, the frontend production build, the Rust/Tauri backend build, and git diff formatting.
+
+## 0.12.1 - 2026-08-04
+
+### 2026-08-04
+
+#### Added
+
+- 02:05:52 EDT - Added a standalone, opt-in poker screen recorder for manual or interval-based full-screen PNG capture and post-session review without image analysis, client inspection, automation, or live recommendations.
+
+#### Documentation
+
+- 02:05:52 EDT - Added focused setup and operating guidance beside the recorder and excluded its generated capture directory from version control.
+
+#### Validation
+
+- 02:07:31 EDT - Validated synchronized 0.12.1 metadata, the frontend production build, the Rust/Tauri backend build, and git diff formatting. Python runtime validation was unavailable because this development machine has no installed Python interpreter.
+
 ## 0.12.0 - 2026-08-02
 
 ### 2026-08-02

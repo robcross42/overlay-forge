@@ -1,5 +1,26 @@
 # Overlay Forge Validation
 
+## Windows Build Prerequisite
+
+Rust/Tauri validation on Windows 11 requires **Smart App Control set to Off**. Developer Mode is recommended for the development machine but does not override an enforced Smart App Control policy. Cargo-generated procedural-macro DLLs are unsigned local build artifacts. When Smart App Control blocks one, Rust may report downstream `E0463` errors for crates such as `tauri` or `tauri_plugin_global_shortcut` even though the dependencies are present.
+
+Configure Windows 11 25H2 or later through:
+
+```text
+Settings > System > Advanced > For developers > Developer Mode
+Windows Security > App & browser control > Smart App Control settings > Off
+```
+
+Developer Mode alone may leave an active Smart App Control policy enforced. Microsoft does not currently support a per-app Smart App Control exception. Do not treat Defender exclusions, Cargo cache deletion, or signing only the final Overlay Forge executable as fixes for this compiler-time block.
+
+To confirm the policy state, run:
+
+```powershell
+reg query "HKLM\SYSTEM\CurrentControlSet\Control\CI\Policy" /v VerifiedAndReputablePolicyState
+```
+
+`0x0` means Smart App Control is Off. After changing the setting, restart Windows if requested and rerun `npm run cargo:build`.
+
 ## Default Validation Commands
 
 Use validation appropriate to the changed area.
