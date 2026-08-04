@@ -1,74 +1,21 @@
 # Overlay Forge Project Overview
 
-## Product Direction
+## Current Shape
 
-Overlay Forge is a personal desktop command hub built as a local-first Tauri overlay. It floats above the user's workflow and organizes planning, calendar items, references, game context, and focused utility modules.
+Overlay Forge 1.0.0
 
-The active coding workflow is direct Codex chat in VS Code. Repository Markdown files provide local project context and implementation rules.
+This release is a private, lightweight launcher. Product features, settings, credentials, databases, generated data, documentation, versions, and releases belong to the Media, Gaming, and Retirement repositories.
 
-## Current Project Shape
+The host owns only:
 
-Current stable project status:
+- A closed typed product registry.
+- Requested-target dispatch.
+- Last-used product resume state.
+- A minimal fallback picker.
+- Host window state.
 
-```text
-Overlay Forge 0.11.3
-Status: Active local-first desktop command hub
-```
+It does not dynamically load code, execute commands from SQLite, own a marketplace, update products, or contain product-domain tables.
 
-Overlay Forge organizes calendar items, references, game context, and focused utility modules inside a local-first desktop shell. The retired Projects module is no longer part of the active shell or command surface.
+## Provenance
 
-## Major Completed Areas
-
-- Tauri v2 overlay shell.
-- React + TypeScript frontend.
-- Rust/Tauri backend command layer.
-- SQLite local persistence.
-- Calendar as the visible main-shell organizer surface.
-- Scratchpad, Tasks, and Notes code/data retained for later organizer consolidation review.
-- User-curated YouTube references.
-- Gaming workspace with screenshot capture.
-- GearBlocks save decoding, runtime export import, parts catalog, and in-game script tooling.
-- Smoking Cessation module.
-- Retirement Planning foundation for local, assumption-led employment-exit planning. The prior Repair Resell surface is archived with its SQLite data preserved.
-- Scheduler framework.
-- SQLite naming normalization.
-- Path of Exile 2 game module scaffold and local build records.
-- The Spell Brigade game module scaffold for chats, screenshots, and co-op run planning.
-- Trailmakers game module scaffold for vehicle builds, screenshots, source-grounded gameplay help, and future Lua modding.
-- Former Projects module removed from active code while legacy project/planning SQLite data remains preserved.
-
-## Active Documentation Structure
-
-| File | Purpose |
-| --- | --- |
-| `README.md` | Repository entry point and current workflow. |
-| `AGENTS.md` | Codex instructions and repo rules. |
-| `CHANGELOG.md` | Date/time-stamped change history. |
-| `.vscode/CODEX_INSTRUCTIONS.md` | VS Code quick reference. |
-| `docs/PROJECT_OVERVIEW.md` | Current project direction and active shape. |
-| `docs/PROJECT_HISTORY.md` | Archived early project history. |
-| `docs/ARCHITECTURE.md` | Frontend/backend/module architecture. |
-| `docs/DATA_MODEL.md` | SQLite schema and naming conventions. |
-| `docs/FEATURE_SCOPE.md` | Scope boundaries and guardrails. |
-| `docs/DEFERRED_ITEMS.md` | Centralized deferred work. |
-| `docs/VALIDATION.md` | Build and manual validation expectations. |
-| `docs/VERSIONING.md` | Traceability-first project versioning and changelog rules. |
-| `docs/GAMING_SCREENSHOTS.md` | Gaming screenshot workflow. |
-| `docs/GEARBLOCKS.md` | GearBlocks module overview. |
-| `docs/GEARBLOCKS_RUNTIME.md` | GearBlocks save/runtime data flow. |
-| `docs/GEARBLOCKS_PLUGIN.md` | BepInEx, GearLib, and marker plugin boundaries. |
-| `docs/GEARBLOCKS_PARTS_CATALOG.md` | Validated GearBlocks parts vocabulary. |
-| `docs/SMOKING_CESSATION.md` | Smoking Cessation module scope. |
-| `docs/RETIREMENT_PLANNING.md` | Retirement Planning scope, safety boundaries, and milestone roadmap. |
-| `docs/THE_SPELL_BRIGADE.md` | The Spell Brigade module scope and planning scaffold. |
-| `docs/TRAILMAKERS.md` | Trailmakers building workspace, source authority, and Lua modding boundary. |
-
-## Terminology
-
-Use current names in new work:
-
-| Current term | Meaning |
-| --- | --- |
-| GearBlocks Runtime Export | Runtime scene data reconstructed from GearBlocks script output. |
-
-Do not reintroduce retired external-transfer terminology.
+The product repositories were extracted from `robcross42/overlay-forge` `develop` commit `96aeb79778e148a66b8f88c2b9bcd27b8a415454`. The original application database remains unchanged as an explicit import and rollback source.
