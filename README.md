@@ -3,7 +3,7 @@
 Overlay Forge is the private launcher for three independently owned local-first Tauri products.
 
 ```text
-Current stable app release: 1.0.0
+Current stable app release: 1.0.1
 Source extraction baseline: develop@96aeb79778e148a66b8f88c2b9bcd27b8a415454
 ```
 
@@ -13,9 +13,9 @@ The authoritative ownership inventory and extraction provenance are in [`docs/RE
 
 | Product | Repository |
 | --- | --- |
-| Media | `robcross42/overlay-forge-media` |
-| Gaming | `robcross42/overlay-forge-gaming` |
-| Retirement | `robcross42/overlay-forge-retirement` |
+| Media | [`robcross42/overlay-forge-media`](https://github.com/robcross42/overlay-forge-media) |
+| Gaming | [`robcross42/overlay-forge-gaming`](https://github.com/robcross42/overlay-forge-gaming) |
+| Retirement | [`robcross42/overlay-forge-retirement`](https://github.com/robcross42/overlay-forge-retirement) |
 
 Targets are closed Rust enum values: `media`, `gaming`, and `retirement`. Example:
 

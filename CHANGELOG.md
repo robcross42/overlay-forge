@@ -20,6 +20,12 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 1.0.1 - 2026-08-04
+
+### Changed
+
+- Audited every active host Markdown file for the repository split, linked the three private product repositories, and clarified the historical boundary for pre-1.0 changelog entries.
+
 ## 1.0.0 - 2026-08-04
 
 ### 2026-08-04
@@ -35,6 +41,8 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 #### Data
 
 - 04:16:20 EDT - Isolated host state in `overlay-forge-host.sqlite3`; the original `overlay-forge.sqlite3` remains unchanged as a recoverable product-import source.
+
+> Changelog entries below this point describe the former monolithic application before the 1.0 repository split. They are retained only as historical release records; their modules, paths, and ownership statements are not current host architecture.
 
 #### Validation
 

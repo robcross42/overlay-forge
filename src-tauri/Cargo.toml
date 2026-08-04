@@ -1,6 +1,6 @@
 [package]
 name = "overlay-forge"
-version = "1.0.0"
+version = "1.0.1"
 description = "Private launcher for Overlay Forge products."
 authors = ["Overlay Forge"]
 edition = "2021"

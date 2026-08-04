@@ -2,7 +2,7 @@
 
 ## Current Shape
 
-Overlay Forge 1.0.0
+Overlay Forge 1.0.1
 
 This release is a private, lightweight launcher. Product features, settings, credentials, databases, generated data, documentation, versions, and releases belong to the Media, Gaming, and Retirement repositories.
 
