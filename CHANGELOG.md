@@ -20,6 +20,34 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 1.0.1 - 2026-08-04
+
+### Changed
+
+- Audited every active host Markdown file for the repository split, linked the three private product repositories, and clarified the historical boundary for pre-1.0 changelog entries.
+
+## 1.0.0 - 2026-08-04
+
+### 2026-08-04
+
+#### Changed
+
+- 04:16:20 EDT - Rebuilt Overlay Forge as a private typed launcher that dispatches directly to independently owned Media, Gaming, and Retirement products, resumes the last-used valid product, and shows only a minimal fallback picker.
+
+#### Removed
+
+- 04:16:20 EDT - Removed all embedded product, organizer, health-tracking, scheduler, shared-chat, legacy resale, game, media, and retirement business logic from the host.
+
+#### Data
+
+- 04:16:20 EDT - Isolated host state in `overlay-forge-host.sqlite3`; the original `overlay-forge.sqlite3` remains unchanged as a recoverable product-import source.
+
+> Changelog entries below this point describe the former monolithic application before the 1.0 repository split. They are retained only as historical release records; their modules, paths, and ownership statements are not current host architecture.
+
+#### Validation
+
+- 04:16:20 EDT - Validated the frontend production build, Rust build, Clippy review, version consistency, and whitespace checks.
+
 ## 0.11.3 - 2026-08-02
 
 ### 2026-08-02

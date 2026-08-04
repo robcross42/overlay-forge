@@ -1,176 +1,36 @@
 # Overlay Forge
 
-Overlay Forge is a local-first Tauri desktop overlay for planning, calendar items, game context, and focused utility modules.
-
-The active coding workflow is direct Codex chat in VS Code. Repository Markdown files provide local context and implementation rules for that workflow.
-
-## Current Status
+Overlay Forge is the private launcher for three independently owned local-first Tauri products.
 
 ```text
-Current stable app release: 0.11.3
-Status: Active local-first desktop command hub
+Current stable app release: 1.0.1
+Source extraction baseline: develop@96aeb79778e148a66b8f88c2b9bcd27b8a415454
 ```
 
-Overlay Forge is now maintained as an evolving local-first command hub. Current stable capabilities include functional GearBlocks build guides, chat-to-guide generation, official API indexing, standalone overlay-window behavior, Smoking Cessation tracking, and the Retirement Planning foundation.
+The host contains no product business logic. On startup it launches the requested product, otherwise resumes the last successfully launched product, and shows a minimal picker only when no valid target is available.
 
-## Core Capabilities
+The authoritative ownership inventory and extraction provenance are in [`docs/REPOSITORY_BOUNDARIES.md`](docs/REPOSITORY_BOUNDARIES.md).
 
-- Tauri v2 desktop overlay shell.
-- React + TypeScript frontend.
-- Rust/Tauri backend command layer.
-- SQLite local persistence.
-- Calendar as the visible main-shell organizer surface.
-- Scratchpad, Tasks, and Notes code/data retained for later organizer consolidation review.
-- Backend-owned OpenAI Responses API use through `OPENAI_API_KEY`.
-- User-curated YouTube references.
-- Local-first Media Library with movies, episodic series, books, TMDB/Google Books/Open Library/optional Hardcover metadata, separate Watch Next and Read Next queues, progress, tags, and provider links.
-- Gaming workspace and screenshot capture.
-- GearBlocks save decoding, runtime export import, parts catalog, script tooling, and backlog BepInEx plugin templates.
-- GearBlocks build guide import, chat-generated guide creation, in-game build guide overlay, and active guide chat context.
-- Smoking Cessation module.
-- Retirement Planning foundation for local, assumption-led employment-exit planning; legacy Repair Resell data is preserved in archive.
-- Scheduler framework.
-- SQLite naming normalization.
-- Path of Exile 2 game module scaffold.
-- The Spell Brigade game module scaffold for wizard, spell, upgrade, synergy, and run planning.
-- Trailmakers vehicle-building workspace with chats, screenshots, authoritative gameplay/modding sources, and an installed Lua API boundary for future mods.
-- Former Projects module removed from active code; legacy project/planning SQLite rows are retained for data preservation and future review.
-
-## Documentation Map
-
-| File | Purpose |
+| Product | Repository |
 | --- | --- |
-| `AGENTS.md` | Codex instructions and repository rules. |
-| `.vscode/CODEX_INSTRUCTIONS.md` | VS Code quick reference. |
-| `CHANGELOG.md` | Date/time-stamped change history. |
-| `docs/VERSIONING.md` | Semantic versioning and changelog rules. |
-| `docs/PROJECT_OVERVIEW.md` | Current project direction and active shape. |
-| `docs/PROJECT_HISTORY.md` | Archived early project history. |
-| `docs/ARCHITECTURE.md` | Frontend/backend/module ownership. |
-| `docs/DATA_MODEL.md` | SQLite schema and naming conventions. |
-| `docs/FEATURE_SCOPE.md` | Scope boundaries and guardrails. |
-| `docs/DEFERRED_ITEMS.md` | Centralized deferred work. |
-| `docs/VALIDATION.md` | Build and manual validation expectations. |
-| `docs/GAMING_SCREENSHOTS.md` | Gaming screenshot workflow. |
-| `docs/GEARBLOCKS.md` | GearBlocks module overview. |
-| `docs/GEARBLOCKS_RUNTIME.md` | GearBlocks save/runtime data flow. |
-| `docs/GEARBLOCKS_PLUGIN.md` | BepInEx, GearLib, and marker plugin boundaries. |
-| `docs/GEARBLOCKS_PARTS_CATALOG.md` | Validated GearBlocks parts vocabulary. |
-| `docs/SMOKING_CESSATION.md` | Smoking Cessation module scope. |
-| `docs/MEDIA_LIBRARY.md` | Movie/series/book scope, provider boundaries, progress, migration, and persistence. |
-| `docs/RETIREMENT_PLANNING.md` | Retirement Planning scope, safety boundaries, and milestone roadmap. |
-| `docs/THE_SPELL_BRIGADE.md` | The Spell Brigade module scope and planning scaffold. |
-| `docs/TRAILMAKERS.md` | Trailmakers building workspace, source authority, and Lua modding boundary. |
+| Media | [`robcross42/overlay-forge-media`](https://github.com/robcross42/overlay-forge-media) |
+| Gaming | [`robcross42/overlay-forge-gaming`](https://github.com/robcross42/overlay-forge-gaming) |
+| Retirement | [`robcross42/overlay-forge-retirement`](https://github.com/robcross42/overlay-forge-retirement) |
+
+Targets are closed Rust enum values: `media`, `gaming`, and `retirement`. Example:
+
+```powershell
+overlay-forge.exe --product=gaming
+```
+
+The host database is `%APPDATA%\com.overlayforge.desktop\overlay-forge-host.sqlite3` and stores only last-used product state and host window geometry. The original `overlay-forge.sqlite3` is never modified and remains the rollback/import source for the standalone products.
 
 ## Development
 
-Install dependencies:
-
 ```powershell
-npm install
+npm.cmd install
+npm.cmd run build
+npm.cmd run cargo:build
 ```
 
-Run the Tauri app:
-
-```powershell
-npm run tauri:dev
-```
-
-The dev command writes a terminal transcript to:
-
-```text
-logs\tauri-dev\tauri-dev_YYYYMMDD_HHMMSS.log
-```
-
-`logs\tauri-dev\latest.txt` contains the path to the latest dev-session log.
-
-Build the frontend:
-
-```powershell
-npm run build
-```
-
-Build the Rust/Tauri backend:
-
-```powershell
-cd src-tauri
-cargo build
-```
-
-## Versioning
-
-Overlay Forge uses semantic versioning in `MAJOR.MINOR.PATCH` form.
-
-Do not increment the minor version just because a new chat, work session, or calendar day starts.
-
-Use:
-
-- `MAJOR` for incompatible or breaking release changes.
-- `MINOR` for substantial new user-visible capabilities.
-- `PATCH` for bug fixes, documentation-only changes, validation updates, small UX refinements, and internal refactors that do not introduce a major capability.
-
-During `0.x` development, minor versions may still contain breaking early-development changes. Patch versions should remain non-breaking fixes, documentation, and small refinements.
-
-See `docs/VERSIONING.md` for the full policy.
-
-## Hotkeys
-
-The main overlay toggle is registered in Rust as:
-
-```text
-Ctrl+Shift+Space
-```
-
-The Gaming chat overlay focus shortcut is registered in Rust as:
-
-```text
-Ctrl+Shift+C
-```
-
-Global shortcuts can be configured from Settings -> Keybinds. Each function uses `key1`, `key2`, and `key3` as the ordered parts of one shortcut, such as `Ctrl`, `Shift`, `Space`.
-
-Mouse buttons are supported for shortcut parts, including `Mouse4`, `Mouse5`, and modifier combinations such as `Ctrl+Mouse4`.
-
-The Smoking Cessation module adds a `Record Cigarette` shortcut action. It starts unassigned and can be mapped from Settings.
-
-## Local Data
-
-The SQLite database is created automatically in the app data directory as:
-
-```text
-overlay-forge.sqlite3
-```
-
-Generated local screenshots, capture manifests, dev logs, plugin working copies, and third-party DLLs should remain outside committed source unless a document explicitly says otherwise.
-
-## Environment Variables
-
-Project chat uses:
-
-```text
-OPENAI_API_KEY
-```
-
-GitHub repository metadata fetches use:
-
-```text
-GITHUB_TOKEN
-```
-
-Media Library catalogue and metadata requests use:
-
-```text
-TMDB_API_READ_ACCESS_TOKEN
-GOOGLE_BOOKS_API_KEY
-HARDCOVER_API_TOKEN
-```
-
-Open Library optionally uses `OPEN_LIBRARY_CONTACT_EMAIL` for documented request identification; it is contact configuration, not a secret token.
-
-All credentials are read only by the Rust/Tauri backend. They are not stored in SQLite and are not exposed to React/frontend code.
-
-## Current Workflow
-
-Use Codex chat directly in VS Code against the repository.
-
-Before implementation work, read `AGENTS.md` and the smallest relevant set of supporting docs from `docs/`.
+Product repositories must be built or installed before the launcher can dispatch to them.
