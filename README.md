@@ -7,7 +7,7 @@ The active coding workflow is direct Codex chat in VS Code. Repository Markdown 
 ## Current Status
 
 ```text
-Current stable app release: 0.12.1
+Current stable app release: 0.12.2
 Status: Active local-first desktop command hub
 ```
 
@@ -63,6 +63,17 @@ Overlay Forge is now maintained as an evolving local-first command hub. Current 
 | `docs/TRAILMAKERS.md` | Trailmakers building workspace, source authority, and Lua modding boundary. |
 
 ## Development
+
+### Windows prerequisite
+
+Windows 11 development machines must have **Smart App Control set to Off** before building the Rust/Tauri backend. Cargo compiles and loads unsigned procedural-macro DLLs during a normal build; Smart App Control enforcement can block those local DLLs and cause misleading Rust errors such as `E0463: can't find crate for tauri`.
+
+On Windows 11 25H2 or later:
+
+1. Enable **Settings > System > Advanced > For developers > Developer Mode** as the normal Windows development configuration.
+2. Set **Windows Security > App & browser control > Smart App Control settings > Off**; this is the setting required for the current Rust build.
+
+Developer Mode alone may not stop an already enforced Smart App Control policy. Microsoft currently provides no per-app bypass for Smart App Control. Use this configuration only on a development machine and leave Microsoft Defender and other appropriate security protections enabled. See Microsoft's [Smart App Control FAQ](https://support.microsoft.com/en-us/windows/smart-app-control-frequently-asked-questions-285ea03d-fa88-4d56-882e-6698afdb7003) and [Developer Mode guidance](https://learn.microsoft.com/en-us/windows/advanced-settings/developer-mode).
 
 Install dependencies:
 

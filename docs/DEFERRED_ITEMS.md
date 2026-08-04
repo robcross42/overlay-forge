@@ -167,6 +167,14 @@ This file centralizes deferred work. Items listed here are not approved scope un
 - Continue moving repeated frontend helpers into shared utilities or domain helpers when a behavior appears in more than one component.
 - Add stricter lint gates only after the current broad Clippy findings have been reduced enough that the checks can run cleanly in normal development.
 
+## Windows Trust And Smart App Control
+
+- Establish an official Windows code-signing and release-trust workflow for every distributed Overlay Forge executable, DLL, installer, updater, and uninstaller artifact. Use a certificate issued through a CA recognized by the Microsoft Trusted Root Program, keep private signing material out of the repository, and document secure local or CI-based signing ownership.
+- Validate signed release artifacts on a clean Windows 11 test environment with Smart App Control enforcement enabled, exercising installation, startup, updates, uninstall, and all binary-loading paths.
+- Investigate a Microsoft-supported development workflow that preserves appropriate protection while allowing Rust/Cargo to load locally generated unsigned procedural-macro DLLs. Keep this separate from release signing because signing the final Overlay Forge package does not sign Cargo's compiler-time artifacts.
+- Evaluate an isolated development VM or build machine if Microsoft does not provide a suitably scoped developer exception. Do not rely on Defender exclusions, undocumented registry bypasses, weakened custom App Control policies, or committed signing keys.
+- Add repeatable signature verification and Smart App Control release checks once the signing and development approaches are selected.
+
 ## GearBlocks Markers And GearLib
 
 - In-game visual marker rendering.

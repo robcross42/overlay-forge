@@ -20,6 +20,19 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.12.2 - 2026-08-04
+
+### 2026-08-04
+
+#### Documentation
+
+- 02:08:20 EDT - Documented Smart App Control being Off as a Windows prerequisite for Rust/Tauri compilation, including the misleading downstream crate errors, policy-state check, and supported settings path.
+- 02:08:20 EDT - Deferred an official Windows trust strategy covering release code signing, Smart App Control validation, compiler-time procedural macros, isolated development alternatives, and repeatable signature checks.
+
+#### Validation
+
+- 02:09:14 EDT - Validated synchronized 0.12.2 metadata, the frontend production build, the Rust/Tauri backend build, and git diff formatting.
+
 ## 0.12.1 - 2026-08-04
 
 ### 2026-08-04
