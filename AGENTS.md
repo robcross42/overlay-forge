@@ -26,19 +26,13 @@ Read the smallest relevant set before editing:
 
 | Work area | Read first |
 | --- | --- |
-| General project direction | `docs/PROJECT_OVERVIEW.md`, `docs/PROJECT_HISTORY.md` |
+| General project direction | `docs/PROJECT_OVERVIEW.md` |
+| Repository ownership and extraction provenance | `docs/REPOSITORY_BOUNDARIES.md` |
 | Frontend/backend architecture | `docs/ARCHITECTURE.md` |
 | SQLite tables or migrations | `docs/DATA_MODEL.md` |
-| Scope boundaries or deferred work | `docs/FEATURE_SCOPE.md`, `docs/DEFERRED_ITEMS.md` |
+| Scope boundaries | `docs/FEATURE_SCOPE.md` |
 | Validation expectations | `docs/VALIDATION.md` |
 | Versioning or changelog updates | `docs/VERSIONING.md`, `CHANGELOG.md` |
-| Gaming screenshots | `docs/GAMING_SCREENSHOTS.md` |
-| Media Library | `docs/MEDIA_LIBRARY.md` |
-| GearBlocks feature work | `docs/GEARBLOCKS.md`, then the focused GearBlocks docs |
-| Smoking Cessation | `docs/SMOKING_CESSATION.md` |
-| Retirement Planning | `docs/RETIREMENT_PLANNING.md` |
-| The Spell Brigade | `docs/THE_SPELL_BRIGADE.md` |
-| Trailmakers | `docs/TRAILMAKERS.md` |
 
 This map is a routing index, not an inventory of every Markdown file. Add a Markdown file here only when it is an active, authoritative entry point or a required first read for a recurring work area. Supporting, historical, generated, vendor, template, bridge, and narrowly scoped README files should normally be linked from their owning parent document or discovered within their subtree instead of being listed here.
 
@@ -177,8 +171,7 @@ For broad cleanup or architecture work, run `npm run build`, `cargo build`, `car
 - Review every newly added Markdown file for ownership and discoverability. Add it to the root Documentation Map only when it meets the routing criteria above.
 - When cutting a release, update the current stable version in `docs/PROJECT_OVERVIEW.md` alongside the changelog and project version metadata.
 - Keep active documentation compact and task-facing.
-- Put historical release/checkpoint details in `docs/PROJECT_HISTORY.md`, not separate active tracker files.
-- Put deferred items in `docs/DEFERRED_ITEMS.md`.
+- Keep host documentation focused on the launcher; product history and deferred work belong in the owning product repository.
 - Use current terminology from these docs when naming UI, docs, and future features.
 - Do not reintroduce retired external-transfer terminology into new documentation or UI.
 
@@ -206,7 +199,7 @@ Minimum defaults:
 | Rust / Tauri backend | `cd src-tauri && cargo build` |
 | Shared frontend/backend behavior | both commands |
 | Persistence changes | both commands plus migration review |
-| GearBlocks script/plugin work | build/type-check plus manual game-path validation where possible |
+| Launcher registry or dispatch | both commands plus direct/resume/fallback launch review |
 | Scheduler changes | backend build plus bounded-job behavior review |
 
 If validation cannot be run, state that clearly and explain what was not validated.
