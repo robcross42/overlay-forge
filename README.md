@@ -3,7 +3,7 @@
 Overlay Forge is the private launcher for three independently owned local-first Tauri products.
 
 ```text
-Current stable app release: 1.0.1
+Current stable app release: 1.0.2
 Source extraction baseline: develop@96aeb79778e148a66b8f88c2b9bcd27b8a415454
 ```
 

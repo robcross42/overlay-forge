@@ -20,6 +20,19 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 1.0.2 - 2026-08-14
+
+### 2026-08-14
+
+#### Documentation
+
+- 17:12:00 EDT - Recorded `LanInputBridge` as a deferred Overlay Forge Windows module concept with explicit input-safety, authenticated LAN transport, protocol, security, verification, exclusion, and implementation-gate requirements.
+- 17:12:00 EDT - Linked deferred module concepts from the project overview and scope while preserving the current host-only implementation boundary.
+
+#### Validation
+
+- 17:12:00 EDT - Passed the frontend production build, backend build, version-consistency check, and diff validation; no module implementation or runtime behavior changed.
+
 ## 1.0.1 - 2026-08-04
 
 ### Changed

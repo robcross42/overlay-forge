@@ -2,7 +2,7 @@
 
 ## Current Shape
 
-Overlay Forge 1.0.1
+Overlay Forge 1.0.2
 
 This release is a private, lightweight launcher. Product features, settings, credentials, databases, generated data, documentation, versions, and releases belong to the Media, Gaming, and Retirement repositories.
 
@@ -15,6 +15,10 @@ The host owns only:
 - Host window state.
 
 It does not dynamically load code, execute commands from SQLite, own a marketplace, update products, or contain product-domain tables.
+
+Deferred modules are outside the current release and implementation scope. See
+[Future Module Concepts](FUTURE_FEATURES.md) for the proposed `LanInputBridge` Windows module and
+the decisions required before it can change the host-only boundary.
 
 ## Provenance
 
