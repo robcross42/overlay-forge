@@ -20,6 +20,22 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 1.0.3 - 2026-08-16
+
+### 2026-08-16
+
+#### Changed
+
+- 02:42:00 EDT - Registered the standalone Side Hustles product through the host's closed typed target registry and known executable discovery paths.
+
+#### Documentation
+
+- 02:42:00 EDT - Recorded Side Hustles repository, SQLite, application-identifier, and product-ownership boundaries without moving financial logic into the host.
+
+#### Validation
+
+- 02:42:00 EDT - Added registry, target parsing, candidate-path, and product-record coverage for Side Hustles.
+
 ## 1.0.2 - 2026-08-14
 
 ### 2026-08-14
