@@ -8,6 +8,7 @@ enum ProductKind {
     Media,
     Gaming,
     Retirement,
+    SideHustles,
 }
 
 impl ProductKind {
@@ -16,6 +17,7 @@ impl ProductKind {
             Self::Media => "media",
             Self::Gaming => "gaming",
             Self::Retirement => "retirement",
+            Self::SideHustles => "side-hustles",
         }
     }
     fn name(self) -> &'static str {
@@ -23,6 +25,7 @@ impl ProductKind {
             Self::Media => "Overlay Forge Media",
             Self::Gaming => "Overlay Forge Gaming",
             Self::Retirement => "Overlay Forge Retirement",
+            Self::SideHustles => "Overlay Forge Side Hustles",
         }
     }
     fn executable(self) -> &'static str {
@@ -30,6 +33,7 @@ impl ProductKind {
             Self::Media => "overlay-forge-media.exe",
             Self::Gaming => "overlay-forge-gaming.exe",
             Self::Retirement => "overlay-forge-retirement.exe",
+            Self::SideHustles => "overlay-forge-side-hustles.exe",
         }
     }
     fn parse(value: &str) -> Option<Self> {
@@ -37,15 +41,17 @@ impl ProductKind {
             "media" => Some(Self::Media),
             "gaming" => Some(Self::Gaming),
             "retirement" => Some(Self::Retirement),
+            "side-hustles" => Some(Self::SideHustles),
             _ => None,
         }
     }
 }
 
-const PRODUCTS: [ProductKind; 3] = [
+const PRODUCTS: [ProductKind; 4] = [
     ProductKind::Media,
     ProductKind::Gaming,
     ProductKind::Retirement,
+    ProductKind::SideHustles,
 ];
 
 #[derive(Serialize)]
@@ -174,7 +180,7 @@ pub fn show_picker(app: &AppHandle) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::ProductKind;
+    use super::{candidate_paths, list_products, ProductKind};
 
     #[test]
     fn registry_accepts_only_closed_product_keys() {
@@ -190,6 +196,30 @@ mod tests {
             ProductKind::parse("retirement"),
             Some(ProductKind::Retirement)
         ));
+        assert!(matches!(
+            ProductKind::parse("side-hustles"),
+            Some(ProductKind::SideHustles)
+        ));
         assert!(ProductKind::parse("powershell -Command calc").is_none());
+    }
+
+    #[test]
+    fn side_hustles_uses_only_the_typed_repository_and_executable_identity() {
+        let kind = ProductKind::SideHustles;
+        assert_eq!(kind.key(), "side-hustles");
+        assert_eq!(kind.executable(), "overlay-forge-side-hustles.exe");
+        assert!(candidate_paths(kind).into_iter().all(|path| {
+            path.ends_with("overlay-forge-side-hustles.exe")
+                && !path.to_string_lossy().contains("powershell")
+        }));
+    }
+
+    #[test]
+    fn product_records_include_side_hustles() {
+        let records = list_products();
+        assert_eq!(records.len(), 4);
+        assert!(records.iter().any(|record| {
+            record.key == "side-hustles" && record.name == "Overlay Forge Side Hustles"
+        }));
     }
 }

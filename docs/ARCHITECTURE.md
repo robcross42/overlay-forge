@@ -13,3 +13,7 @@ Startup sequence:
 5. Show the fallback picker only when no valid executable is available.
 
 The standalone repositories deliberately own their duplicated shell infrastructure for the first split. A shared-core repository is not part of this generation.
+
+The closed registry contains Media, Gaming, Retirement, and Side Hustles. Side Hustles resolves only through the typed `side-hustles` identity and known `overlay-forge-side-hustles.exe` filename; its financial inputs, calculations, settings, and SQLite data remain product-owned.
+
+Side Hustles uses preferred standalone development port `1425`. Issue #10 owns generalized host negotiation and collision handling; this registry addition does not add dynamic discovery, port leases, arbitrary executable paths, or user-editable launch commands.

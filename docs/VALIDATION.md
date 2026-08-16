@@ -16,5 +16,6 @@ Manual checks:
 - Without a requested target, the last-used available product resumes.
 - Without a valid last-used product, only the minimal picker appears.
 - Unavailable products are disabled with a clear build/install message.
+- `side-hustles` resolves only the known `overlay-forge-side-hustles.exe` target and appears disabled when that executable is unavailable.
 - The host database contains only host tables.
 - The legacy application database is not opened or modified.
