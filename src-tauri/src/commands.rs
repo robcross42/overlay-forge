@@ -8,6 +8,7 @@ enum ProductKind {
     Media,
     Gaming,
     Retirement,
+    Journal,
 }
 
 impl ProductKind {
@@ -16,6 +17,7 @@ impl ProductKind {
             Self::Media => "media",
             Self::Gaming => "gaming",
             Self::Retirement => "retirement",
+            Self::Journal => "journal",
         }
     }
     fn name(self) -> &'static str {
@@ -23,6 +25,7 @@ impl ProductKind {
             Self::Media => "Overlay Forge Media",
             Self::Gaming => "Overlay Forge Gaming",
             Self::Retirement => "Overlay Forge Retirement",
+            Self::Journal => "Overlay Forge Journal",
         }
     }
     fn executable(self) -> &'static str {
@@ -30,6 +33,7 @@ impl ProductKind {
             Self::Media => "overlay-forge-media.exe",
             Self::Gaming => "overlay-forge-gaming.exe",
             Self::Retirement => "overlay-forge-retirement.exe",
+            Self::Journal => "overlay-forge-journal.exe",
         }
     }
     fn parse(value: &str) -> Option<Self> {
@@ -37,16 +41,45 @@ impl ProductKind {
             "media" => Some(Self::Media),
             "gaming" => Some(Self::Gaming),
             "retirement" => Some(Self::Retirement),
+            "journal" => Some(Self::Journal),
             _ => None,
         }
     }
 }
 
-const PRODUCTS: [ProductKind; 3] = [
+const PRODUCTS: [ProductKind; 4] = [
     ProductKind::Media,
     ProductKind::Gaming,
     ProductKind::Retirement,
+    ProductKind::Journal,
 ];
+
+// The web product owns its server and data. The host only opens this fixed loopback target.
+const JOURNAL_URL: &str = "http://127.0.0.1:4319";
+
+enum LaunchTarget {
+    Executable(PathBuf),
+    LocalJournal,
+}
+
+impl LaunchTarget {
+    fn display_path(&self) -> String {
+        match self {
+            Self::Executable(path) => path.to_string_lossy().into_owned(),
+            Self::LocalJournal => JOURNAL_URL.into(),
+        }
+    }
+
+    fn open(self) -> std::io::Result<()> {
+        match self {
+            Self::Executable(path) => std::process::Command::new(path).spawn().map(|_| ()),
+            Self::LocalJournal => std::process::Command::new("explorer.exe")
+                .arg(JOURNAL_URL)
+                .spawn()
+                .map(|_| ()),
+        }
+    }
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -85,10 +118,28 @@ fn candidate_paths(kind: ProductKind) -> Vec<PathBuf> {
     paths
 }
 
-fn resolve(kind: ProductKind) -> Option<PathBuf> {
+fn resolve(kind: ProductKind) -> Option<LaunchTarget> {
+    if matches!(kind, ProductKind::Journal) {
+        let response = reqwest::blocking::Client::builder()
+            .no_proxy()
+            .timeout(std::time::Duration::from_millis(500))
+            .build()
+            .ok()?
+            .get(format!("{JOURNAL_URL}/api/health"))
+            .send()
+            .ok()?;
+        if !response.status().is_success() {
+            return None;
+        }
+        let health: serde_json::Value = response.json().ok()?;
+        return (health.get("service").and_then(serde_json::Value::as_str)
+            == Some("overlay-forge-journal"))
+        .then_some(LaunchTarget::LocalJournal);
+    }
     candidate_paths(kind)
         .into_iter()
         .find(|path| path.is_file())
+        .map(LaunchTarget::Executable)
 }
 
 #[tauri::command]
@@ -101,9 +152,7 @@ pub fn list_products() -> Vec<ProductRecord> {
                 key: kind.key().into(),
                 name: kind.name().into(),
                 available: path.is_some(),
-                launch_path: path
-                    .map(|p| p.to_string_lossy().into_owned())
-                    .unwrap_or_default(),
+                launch_path: path.map(|target| target.display_path()).unwrap_or_default(),
             }
         })
         .collect()
@@ -112,12 +161,11 @@ pub fn list_products() -> Vec<ProductRecord> {
 fn launch(kind: ProductKind, state: &AppState) -> Result<(), String> {
     let path = resolve(kind).ok_or_else(|| {
         format!(
-            "{} is not installed or built in its sibling development repository.",
+            "{} is unavailable. Install/build desktop products, or start Journal with npm.cmd run dev in its repository.",
             kind.name()
         )
     })?;
-    std::process::Command::new(&path)
-        .spawn()
+    path.open()
         .map_err(|e| format!("Could not launch {}: {e}", kind.name()))?;
     state
         .database

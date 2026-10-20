@@ -2,9 +2,9 @@
 
 ## Current Shape
 
-Overlay Forge 1.0.2
+Overlay Forge 1.0.4
 
-This release is a private, lightweight launcher. Product features, settings, credentials, databases, generated data, documentation, versions, and releases belong to the Media, Gaming, and Retirement repositories.
+This release is a private, lightweight launcher. Product features, settings, credentials, databases, generated data, documentation, versions, and releases belong to the Media, Gaming, Retirement, and Journal repositories. Journal is a local web product dispatched to its fixed loopback URL while its own development server is running; authenticated hosting is deferred.
 
 The host owns only:
 

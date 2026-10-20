@@ -20,6 +20,18 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 1.0.4 - 2026-10-20
+
+### 2026-10-20
+
+#### Added
+
+- Added the closed Journal product target with fixed loopback service identity discovery, browser dispatch, requested/last-used launch support, and product refresh (#13). Journal data and credentials remain in its independent repository.
+
+#### Validation
+
+- Reviewed the scoped diff and direct/resume/fallback paths. Tests not run (rapid-development policy); no desktop build, packaging, or launcher runtime validation performed. Existing unrelated documentation edits are excluded.
+
 ## 1.0.2 - 2026-08-14
 
 ### 2026-08-14
