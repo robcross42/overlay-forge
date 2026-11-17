@@ -20,6 +20,19 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.2.0 - 2026-11-16
+
+### 2026-11-16
+
+#### Added
+
+- 19:44:37 EST - Added a resident ChatGPT composer, browser sign-in, streamed multi-turn replies on the connected ChatGPT plan, and protected local conversation history (#15).
+- 19:44:37 EST - Added the dashboard and compact prompt with a shared native request registry, local status checks, and tray access.
+
+#### Validation
+
+- The Windows preview completed ChatGPT verification, streamed follow-ups with earlier context, and restored three completed turns after restart. See [Host Validation](docs/VALIDATION.md).
+
 ## 1.0.4 - 2026-10-20
 
 ### 2026-10-20
@@ -828,43 +841,7 @@ Version section for work started on 2026-06-16. Related changes that continued i
 - Documented the GearBlocks runtime refresh workflow for syncing current build changes into chat context after an explicit in-game export.
 - Documented that saved construction refresh reflects removals after the build is saved, while runtime log refresh remains the source for live runtime metadata.
 
-## 0.2.0 - 2026-06-15
-
-Minor version release for the GearBlocks construction runtime API interface inclusion.
-
-### 2026-06-15
-
-#### Changed
-
-- Bumped Overlay Forge from `0.1.0` to `0.2.0` for the new GearBlocks construction runtime API interface feature.
-- Marked the GearBlocks parts catalog as complete and validated for game version `0.8.96622`.
-- Added GearBlocks catalog version/status metadata to the Parts view.
-- Hid the GearBlocks category image import and clear controls from the normal Parts view while keeping the maintenance code path available for future game-version catalog refreshes.
-- Hid the GearBlocks Player.log parts import button from the normal Parts view while keeping the import functionality available elsewhere for maintenance.
-- Added a blank GearBlocks Constructions top-level view as the future catalog surface for in-game constructions.
-- Added a persistent GearBlocks construction index backed by `game_constructions`, populated from `SavedConstructions` by decoding each `construction.bytes` file.
-- Changed the GearBlocks Constructions view to list indexed saved constructions with part, composite, and file-size summaries.
-- Fully implemented support structures and exporter wiring for the documented `SmashHammer.GearBlocks.Construction` namespace reference interfaces.
-- Added persisted GearBlocks runtime construction exports backed by SQLite so the full latest `Player.log` export is available to chat context without relying only on ad hoc log parsing.
-- Added explicit GearBlocks runtime log import for refreshing runtime exports and runtime parts after the user runs `Export Target` or `Export All` in GearBlocks.
-- Expanded the GearBlocks Lua exporter to emit availability-only `apiAttributes` metadata for documented construction interfaces.
-- Changed the GearBlocks part detail view to list available runtime API attributes by name while keeping API metadata out of default chat prompt context.
-
-#### Documentation
-
-- Updated README, project plan, architecture, and data model notes for the Overlay Forge `0.2.0` GearBlocks runtime API interface release and future troubleshooting path.
-
-#### Validation
-
-- Validated the GearBlocks runtime API interface metadata path in-game on Rob's vehicle: catalog part details show API attributes without values, and DB definitions / runtime export context include indexed interface availability metadata.
-
-#### Fixed
-
-- Removed GearBlocks runtime API metadata from default game-chat prompt context; API details should only be included by a future explicit user-controlled include/snapshot action.
-- Changed the GearBlocks Lua exporter API metadata path so `apiAttributes` indexes interface/member availability without executing getter commands to capture values.
-- Added install-time and in-session GearBlocks API availability caching so known runtime parts reuse indexed API metadata instead of re-probing interface availability on every export.
-- Removed automatic GearBlocks runtime log sync from normal game selection / Parts navigation; runtime logs now import only through explicit user actions such as `Import Runtime Log`.
-- Resynced game chat messages after failed sends so persisted user prompts remain accurately reflected instead of disappearing from the local UI state.
+## Earlier development notes
 
 ### 2026-06-14
 

@@ -41,8 +41,8 @@ $observedVersions = [ordered]@{
     "src-tauri/Cargo.toml" = Get-RequiredMatch -RelativePath "src-tauri/Cargo.toml" -Pattern '(?s)^\[package\].*?^version\s*=\s*"([^"]+)"' -Label "package version"
     "src-tauri/Cargo.lock" = Get-RequiredMatch -RelativePath "src-tauri/Cargo.lock" -Pattern '(?s)^\[\[package\]\]\s*\r?\nname\s*=\s*"overlay-forge"\s*\r?\nversion\s*=\s*"([^"]+)"' -Label "overlay-forge package version"
     "src-tauri/tauri.conf.json" = [string]$tauriConfig.version
-    "README.md" = Get-RequiredMatch -RelativePath "README.md" -Pattern '^Current stable app release:\s*(\d+\.\d+\.\d+)\s*$' -Label "current stable release"
-    "docs/PROJECT_OVERVIEW.md" = Get-RequiredMatch -RelativePath "docs/PROJECT_OVERVIEW.md" -Pattern '^Overlay Forge\s+(\d+\.\d+\.\d+)\s*$' -Label "current stable release"
+    "README.md" = Get-RequiredMatch -RelativePath "README.md" -Pattern '^Current development version:\s*(\d+\.\d+\.\d+)\s*$' -Label "current development version"
+    "docs/PROJECT_OVERVIEW.md" = Get-RequiredMatch -RelativePath "docs/PROJECT_OVERVIEW.md" -Pattern '^Overlay Forge\s+(\d+\.\d+\.\d+)\s*$' -Label "current development version"
 }
 
 $mismatches = @()

@@ -1,13 +1,15 @@
 # Overlay Forge
 
-Overlay Forge is the private launcher for independently owned desktop products and the local Journal web product.
+Overlay Forge is the resident personal AI host and launcher for independently owned desktop products and the local Journal web product.
 
 ```text
-Current stable app release: 1.0.4
+Current development version: 0.2.0
 Source extraction baseline: develop@96aeb79778e148a66b8f88c2b9bcd27b8a415454
 ```
 
-The host contains no product business logic. On startup it launches the requested product, otherwise resumes the last successfully launched product, and shows a minimal picker only when no valid target is available.
+The app contains no product business logic. On startup it dispatches a requested product or resumes the last available one, then remains resident with its dashboard. Ctrl+Alt+Space opens a compact prompt; closing a window hides it, and the tray provides reopen and Quit controls.
+
+In the Windows app, connect your account in **Connected Accounts** and grant ChatGPT plan use. Use **Chat** or the compact prompt to stream replies and continue a selected conversation. Completed conversations are protected and saved locally. Drafts and unfinished replies clear on exit. The app uses the connected ChatGPT plan with no API-key fallback. See [AI Anchor Decision and Delivery](docs/AI_ANCHOR.md) for the provider and lifecycle details.
 
 The authoritative ownership inventory and extraction provenance are in [`docs/REPOSITORY_BOUNDARIES.md`](docs/REPOSITORY_BOUNDARIES.md).
 
@@ -24,7 +26,7 @@ Targets are closed Rust enum values: `media`, `gaming`, `retirement`, and `journ
 overlay-forge.exe --product=gaming
 ```
 
-The host database is `%APPDATA%\com.overlayforge.desktop\overlay-forge-host.sqlite3` and stores only last-used product state and host window geometry. The original `overlay-forge.sqlite3` is never modified and remains the rollback/import source for the standalone products.
+The host database is `%APPDATA%\com.overlayforge.desktop\overlay-forge-host.sqlite3` and stores last-used product state, host window geometry, and platform-protected ChatGPT credentials and completed conversations. The original `overlay-forge.sqlite3` remains the rollback/import source for the standalone products.
 
 ## Development
 

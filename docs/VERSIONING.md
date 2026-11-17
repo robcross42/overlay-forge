@@ -77,8 +77,8 @@ Keep the same version in:
 - `src-tauri/Cargo.toml`
 - the `overlay-forge` package entry in `src-tauri/Cargo.lock`
 - `src-tauri/tauri.conf.json`
-- the current stable release in `README.md`
-- the current stable release in `docs/PROJECT_OVERVIEW.md`
+- the current development version in `README.md`
+- the current development version in `docs/PROJECT_OVERVIEW.md`
 - the newest version heading in `CHANGELOG.md`
 
 Run `npm.cmd run version:check` on Windows (`npm run version:check` elsewhere) after every version update. After the commit is tagged, `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-project-version.ps1 -RequireTag` also verifies that the matching local tag exists.
