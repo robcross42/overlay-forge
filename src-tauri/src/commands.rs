@@ -1,7 +1,7 @@
 use crate::AppState;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, State};
 
 #[derive(Clone, Copy)]
 enum ProductKind {
@@ -174,19 +174,27 @@ fn launch(kind: ProductKind, state: &AppState) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn launch_product(
-    product_key: String,
-    state: State<'_, AppState>,
-    app: AppHandle,
-) -> Result<(), String> {
+pub fn launch_product(product_key: String, state: State<'_, AppState>) -> Result<(), String> {
     let kind =
         ProductKind::parse(&product_key).ok_or_else(|| "Unknown product target.".to_string())?;
     launch(kind, state.inner())?;
-    app.exit(0);
     Ok(())
 }
 
-pub fn launch_requested_or_last(app: &AppHandle, state: &AppState) -> Result<bool, String> {
+pub fn launch_from_arguments(
+    state: &AppState,
+    args: impl Iterator<Item = String>,
+) -> Result<(), String> {
+    if let Some(kind) = args
+        .filter_map(|arg| ProductKind::parse(arg.trim_start_matches("--product=")))
+        .next()
+    {
+        launch(kind, state)?;
+    }
+    Ok(())
+}
+
+pub fn launch_requested_or_last(state: &AppState) -> Result<bool, String> {
     let requested = std::env::args()
         .skip(1)
         .find_map(|arg| ProductKind::parse(arg.trim_start_matches("--product=")));
@@ -201,7 +209,6 @@ pub fn launch_requested_or_last(app: &AppHandle, state: &AppState) -> Result<boo
     if let Some(kind) = target {
         if resolve(kind).is_some() {
             launch(kind, state)?;
-            app.exit(0);
             return Ok(true);
         }
     }
@@ -209,15 +216,8 @@ pub fn launch_requested_or_last(app: &AppHandle, state: &AppState) -> Result<boo
 }
 
 #[tauri::command]
-pub fn shutdown_app(app: AppHandle) {
-    app.exit(0)
-}
-
-pub fn show_picker(app: &AppHandle) -> Result<(), String> {
-    app.get_webview_window("main")
-        .ok_or_else(|| "Launcher window is unavailable.".to_string())?
-        .show()
-        .map_err(|e| e.to_string())
+pub fn shutdown_app(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    state.windows.quit(&app)
 }
 
 #[cfg(test)]

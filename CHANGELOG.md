@@ -20,6 +20,19 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 1.1.0 - 2026-11-16
+
+### 2026-11-16
+
+#### Added
+
+- 19:44:37 EST - Added a resident ChatGPT composer, browser sign-in, streamed multi-turn replies on the connected ChatGPT plan, and protected local conversation history (#15).
+- 19:44:37 EST - Added the dashboard and compact prompt with a shared native request registry, local status checks, and tray access.
+
+#### Validation
+
+- The Windows preview completed ChatGPT verification, streamed follow-ups with earlier context, and restored three completed turns after restart. See [Host Validation](docs/VALIDATION.md).
+
 ## 1.0.4 - 2026-10-20
 
 ### 2026-10-20

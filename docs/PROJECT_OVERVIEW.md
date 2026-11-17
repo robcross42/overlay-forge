@@ -2,19 +2,21 @@
 
 ## Current Shape
 
-Overlay Forge 1.0.4
+Overlay Forge 1.1.0
 
-This release is a private, lightweight launcher. Product features, settings, credentials, databases, generated data, documentation, versions, and releases belong to the Media, Gaming, Retirement, and Journal repositories. Journal is a local web product dispatched to its fixed loopback URL while its own development server is running; authenticated hosting is deferred.
+The main app is a resident personal AI host and launcher. Product features and databases remain in their independent repositories.
 
-The host owns only:
+The host owns:
 
 - A closed typed product registry.
 - Requested-target dispatch.
 - Last-used product resume state.
-- A minimal fallback picker.
+- A resident dashboard and compact prompt.
 - Host window state.
 
-It does not dynamically load code, execute commands from SQLite, own a marketplace, update products, or contain product-domain tables.
+The host streams multi-turn conversations using the connected ChatGPT plan and stores completed conversations locally. See [AI Anchor Decision and Delivery](AI_ANCHOR.md) for the implementation and remaining gates.
+
+The app does not dynamically load code, execute commands from SQLite, own a marketplace, update products, or contain product-domain tables.
 
 Deferred modules are outside the current release and implementation scope. See
 [Future Module Concepts](FUTURE_FEATURES.md) for the proposed `LanInputBridge` Windows module and
