@@ -20,7 +20,7 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
-## 1.1.0 - 2026-11-16
+## 0.1.1 - 2026-11-16
 
 ### 2026-11-16
 

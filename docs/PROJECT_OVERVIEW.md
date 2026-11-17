@@ -2,7 +2,9 @@
 
 ## Current Shape
 
-Overlay Forge 1.1.0
+Overlay Forge 0.1.1
+
+This is a private development version.
 
 The main app is a resident personal AI host and launcher. Product features and databases remain in their independent repositories.
 
