@@ -20,6 +20,14 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.2.1 - 2026-11-23
+
+### 2026-11-23
+
+#### Fixed
+
+- 18:11:57 EST - Restore a minimized quick prompt before focusing it through the shared window manager, including the shortcut and main-app button (#15).
+
 ## 0.2.0 - 2026-11-16
 
 ### 2026-11-16

@@ -81,7 +81,10 @@ impl WindowManager {
             .ok_or("Window unavailable.")?;
         if matches!(kind, WindowKind::QuickPrompt) {
             if window.is_visible().map_err(|e| e.to_string())? {
-                return window.set_focus().map_err(|e| e.to_string());
+                return window
+                    .unminimize()
+                    .and_then(|_| window.set_focus())
+                    .map_err(|e| e.to_string());
             }
             #[cfg(windows)]
             {

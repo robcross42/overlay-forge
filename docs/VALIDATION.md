@@ -16,3 +16,9 @@
 - Verify requested and last-used product dispatch. The host stays resident, and the dashboard shows which products are unavailable. The legacy database stays untouched.
 
 Linux sign-in and desktop recovery, multi-display behavior, and packaged builds require separate acceptance.
+
+## Minimized quick-prompt regression — 23 November 2026
+
+Minimize the quick prompt, then reopen it with Ctrl+Alt+Space and separately with Open quick prompt in the main app. Both paths must restore and focus the existing prompt, preserving its unsent draft. Repeat after Escape/hide. The shared WindowManager owns restoration; a visible minimized window must not take a focus-only path.
+
+Agent-observed on Windows: the original failure was a minimized quick prompt. After the fix and development rebuild/restart, both Open quick prompt and Ctrl+Alt+Space restored the same minimized window with the unsent draft retained. The draft was restored manually after the development restart; this does not claim draft persistence across restart. No automated tests were added or run.
