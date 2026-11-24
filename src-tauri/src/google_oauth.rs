@@ -20,7 +20,7 @@ use std::{
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 pub const CLIENT_ID: &str =
-    "840684879038-5lf8vqhsj9mahburvq1mqpfemugiv45t.apps.googleusercontent.com";
+    "840684879038-u3ge7ov3vede0slbgntdam99mtg0u86r.apps.googleusercontent.com";
 const ISSUER: &str = "https://accounts.google.com";
 const CALLBACK_PATH: &str = "/";
 const MAX_HEADERS: usize = 16 * 1024;

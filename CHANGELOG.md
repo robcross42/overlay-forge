@@ -20,6 +20,14 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.3.2 - 2026-11-23
+
+### 2026-11-23
+
+#### Changed
+
+- 19:22:54 EST - Updated the Google Desktop OAuth client ID to the owner's new Overlay Forge client; native JSON import continues to require an exact client match (#17).
+
 ## 0.3.1 - 2026-11-23
 
 ### 2026-11-23

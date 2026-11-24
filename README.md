@@ -3,7 +3,7 @@
 Overlay Forge is the resident personal AI host and launcher for independently owned desktop products and the local Journal web product.
 
 ```text
-Current development version: 0.3.1
+Current development version: 0.3.2
 Source extraction baseline: develop@96aeb79778e148a66b8f88c2b9bcd27b8a415454
 ```
 
