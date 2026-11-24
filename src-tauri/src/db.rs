@@ -14,6 +14,11 @@ impl HostDatabase {
     fn initialize(connection: Connection) -> rusqlite::Result<Self> {
         connection.execute_batch(r#"
             PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL;
+            CREATE TABLE IF NOT EXISTS obj_host_ui_preferences (
+                id INTEGER PRIMARY KEY CHECK(id=1),
+                navigation_collapsed INTEGER NOT NULL DEFAULT 0 CHECK(navigation_collapsed IN (0,1))
+            );
+            INSERT OR IGNORE INTO obj_host_ui_preferences(id) VALUES(1);
             CREATE TABLE IF NOT EXISTS obj_host_launcher_state (
                 id INTEGER PRIMARY KEY CHECK(id=1), last_product_key TEXT,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -44,6 +49,20 @@ impl HostDatabase {
         self.connection
             .lock()
             .map_err(|_| rusqlite::Error::InvalidQuery)
+    }
+    pub fn navigation_collapsed(&self) -> rusqlite::Result<bool> {
+        self.connection()?.query_row(
+            "SELECT navigation_collapsed FROM obj_host_ui_preferences WHERE id=1",
+            [],
+            |row| row.get(0),
+        )
+    }
+    pub fn save_navigation_collapsed(&self, collapsed: bool) -> rusqlite::Result<()> {
+        self.connection()?.execute(
+            "UPDATE obj_host_ui_preferences SET navigation_collapsed=?1 WHERE id=1",
+            params![collapsed],
+        )?;
+        Ok(())
     }
     pub fn google_client_config(&self) -> rusqlite::Result<Option<Vec<u8>>> {
         self.connection()?.query_row("SELECT protected_config FROM obj_host_google_client WHERE id=1", [], |row| row.get(0)).optional()

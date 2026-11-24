@@ -20,6 +20,18 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.3.5 - 2026-11-23
+
+### 2026-11-23
+
+#### Changed
+
+- 22:11:52 EST - Persist dashboard navigation collapse state in host SQLite and restore it after restart. Authorized native commands own storage; failed saves are visible and restore the previous state (#20).
+
+#### Validation
+
+- Frontend build, native development compilation/relaunch, version consistency and diff review passed. Restart persistence awaits owner confirmation. Tests not run (rapid-development policy).
+
 ## 0.3.4 - 2026-11-23
 
 ### 2026-11-23

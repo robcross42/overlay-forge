@@ -3,13 +3,13 @@
 Overlay Forge is the resident personal AI host and launcher for independently owned desktop products and the local Journal web product.
 
 ```text
-Current development version: 0.3.4
+Current development version: 0.3.5
 Source extraction baseline: develop@96aeb79778e148a66b8f88c2b9bcd27b8a415454
 ```
 
 The app contains no product business logic. Google sign-in returns to the main Overlay Forge dashboard without opening a product. Choose Media or another product from that dashboard; typed target forwarding remains available to an already signed-in host. Ctrl+Alt+Space opens a compact prompt; closing a window hides it, and the tray provides reopen and Quit controls.
 
-Use **Hide navigation** in the dashboard header to collapse the left pane, and **Show navigation** to restore it. The main pane scrolls independently; navigation stays in place and scrolls separately when needed in a short window. The collapsed state lasts for the current session.
+Use **Hide navigation** in the dashboard header to collapse the left pane, and **Show navigation** to restore it. The main pane scrolls independently; navigation stays in place and scrolls separately when needed in a short window. The collapsed state is saved locally and restored after restarting the app.
 
 ## Google sign-in and family access
 

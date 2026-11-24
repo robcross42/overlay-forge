@@ -5,6 +5,7 @@ import { ChatgptConnectionCard } from "../ai/ChatgptConnectionCard";
 import { StatusCheckSummary } from "../ai/StatusCheckSummary";
 import { GoogleSession, GoogleSessionGate, ProfileControls } from "./GoogleSession";
 import { ProductLauncher } from "./ProductLauncher";
+import { useNavigationPreference } from "./useNavigationPreference";
 
 const pages = ["Home", "Chat", "Connected Accounts", "Monitoring", "Activity & Approvals", "Settings"] as const;
 const quick = new URLSearchParams(window.location.search).get("surface") === "quick";
@@ -20,7 +21,8 @@ export default function App() {
 function AdminApp({ session }: { session: GoogleSession }) {
   const [conversationSelection, setConversationSelection] = useState<string | null>();
   const { hub, error, run } = useHub(session.sessionId, conversationSelection);
-  const [navigationCollapsed, setNavigationCollapsed] = useState(false);
+  const navigation = useNavigationPreference(session.sessionId, !quick);
+  const navigationCollapsed = navigation.collapsed;
   const [page, setPage] = useState<typeof pages[number]>("Home");
   const [provider, setProvider] = useState<Provider>("chatgpt");
   const [demo, setDemo] = useState(false);
@@ -68,8 +70,10 @@ function AdminApp({ session }: { session: GoogleSession }) {
         type="button"
         aria-controls="main-navigation"
         aria-expanded={!navigationCollapsed}
-        onClick={() => setNavigationCollapsed(collapsed => !collapsed)}
+        disabled={navigation.disabled}
+        onClick={() => void navigation.toggle()}
       >{navigationCollapsed ? "Show navigation" : "Hide navigation"}</button>}<div><p className="eyebrow">PERSONAL AI HUB · FIRST SLICE</p><h1>{quick ? "Overlay Forge" : page}</h1></div><button onClick={() => void run(quick ? "show_main" : "show_quick_prompt")}>{quick ? "Open main app" : "Open quick prompt"}</button>{quick && <button onClick={() => void run("hide_quick_prompt")}>Hide</button>}</header>
+      {navigation.error && <p className="error" role="alert">{navigation.error}</p>}
       <div className="actions"><button onClick={() => void run("hub_stop_all")}>Stop all local work / request cleanup</button></div>
       {!quick && (page === "Home" || page === "Connected Accounts") && <ChatgptConnectionCard connection={connection} run={run} />}
       {hub && !quick && page !== "Chat" && <StatusCheckSummary checks={hub.statusChecks} />}
