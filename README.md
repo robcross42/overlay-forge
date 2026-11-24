@@ -3,7 +3,7 @@
 Overlay Forge is the resident personal AI host and launcher for independently owned desktop products and the local Journal web product.
 
 ```text
-Current development version: 0.3.5
+Current development version: 0.3.6
 Source extraction baseline: develop@96aeb79778e148a66b8f88c2b9bcd27b8a415454
 ```
 
@@ -15,7 +15,9 @@ Use **Hide navigation** in the dashboard header to collapse the left pane, and *
 
 Google sign-in uses the Desktop OAuth client configured in the native adapter. It requests only `openid email profile` using the system browser, PKCE and a loopback callback. The configured Google Desktop client requires its application client secret during token exchange. In the app, choose **Import Google client JSON** and select the Desktop client's JSON downloaded from Google Auth Platform. Native code checks the client ID and stores only a platform-protected copy in the host database. JSON contents and secrets never enter React, command arguments or logs. The downloaded original remains under the owner's control. Import is available before sign-in for local setup/repair, or within the administrator session; an active family session cannot replace it. Repair can replace only the same compiled application client configuration and cannot change the pinned administrator or authenticate a user. Reimport a newly downloaded matching JSON here if its application secret is wrong or rotated, without deleting ChatGPT data or the admin binding. No Gmail/Calendar/Drive permissions, Google user refresh tokens or hosted service is required. The Google Cloud project owner must configure its consent audience and allow the intended accounts where required. See [Google's desktop OAuth documentation](https://developers.google.com/identity/protocols/oauth2/native-app).
 
-Before the first run, create `%APPDATA%\com.overlayforge.desktop\google-auth.json` with the following local setup, substituting the administrator's Gmail address:
+On Ubuntu, Google sign-in opens the default desktop browser through GIO (`libglib2.0-bin`). Keep the desktop keyring unlocked so the app can store and read the imported Google client configuration.
+
+Before the first run, create `google-auth.json` in `%APPDATA%\com.overlayforge.desktop` on Windows or `${XDG_DATA_HOME:-$HOME/.local/share}/com.overlayforge.desktop` on Ubuntu. Substitute the administrator's Gmail address in this local configuration:
 
 ```json
 { "admin_email": "administrator@gmail.com" }
@@ -25,7 +27,7 @@ This local configuration stays outside source control. The first Google-verified
 
 Sign in again after app exit; Google may reuse the browser's existing session. The local app session lasts until sign-out, account switch or process exit. ID tokens are checked when establishing it and then discarded; there is no remote revocation polling or Google service access. Signing out clears in-memory drafts and requests in both windows and retains saved protected ChatGPT data. Switching is blocked while owned work or computer cleanup remains unresolved. Signing out of Overlay Forge does not sign out of Google in the browser or disconnect the administrator's ChatGPT account.
 
-These are local app roles, not an operating-system security boundary against administrators or arbitrary programs under the same OS user. Product databases and product-level AI integrations are independent; host sign-in does not add access control to Media or other standalone apps. Do not copy credentials or private runtime databases between devices. Linux browser sign-in is not implemented.
+These are local app roles, not an operating-system security boundary against administrators or arbitrary programs under the same OS user. Product databases and product-level AI integrations are independent; host sign-in does not add access control to Media or other standalone apps. Do not copy credentials or private runtime databases between devices.
 
 In the Windows app, connect your account in **Connected Accounts** and grant ChatGPT plan use. Use **Chat** or the compact prompt to stream replies and continue a selected conversation. Completed conversations are protected and saved locally. Drafts and unfinished replies clear on exit. The app uses the connected ChatGPT plan with no API-key fallback. See [AI Anchor Decision and Delivery](docs/AI_ANCHOR.md) for the provider and lifecycle details.
 

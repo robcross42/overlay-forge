@@ -2,7 +2,7 @@
 
 ## Current Shape
 
-Overlay Forge 0.3.5
+Overlay Forge 0.3.6
 
 This is a private development version.
 

@@ -20,6 +20,18 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.3.6 - 2026-11-23
+
+### 2026-11-23
+
+#### Fixed
+
+- 22:59:26 EST - Open Google OAuth in the Ubuntu default browser through GIO and document local Google setup.
+
+#### Validation
+
+- Ubuntu frontend and native debug builds passed, along with all 33 native tests. Live Google sign-in opened Brave and returned to Overlay Forge with a verified family session.
+
 ## 0.3.5 - 2026-11-23
 
 ### 2026-11-23
