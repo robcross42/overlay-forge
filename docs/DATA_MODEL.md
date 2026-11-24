@@ -2,6 +2,10 @@
 
 The host uses `overlay-forge-host.sqlite3`. The legacy `overlay-forge.sqlite3` remains untouched.
 
+## Google identity registry
+
+`overlay-forge-identities.sqlite3` is a separate host-owned SQLite registry in the same app-data directory. Idempotent creation adds `identity_config` (one configured bootstrap email and its pinned Google admin issuer/subject) and `google_profile` (opaque UUID, canonical issuer/subject, current verified email/name labels, with unique issuer/subject). No Google tokens, passwords or client secrets are stored. Bootstrap configuration is read from local `google-auth.json` only before configuration exists; administrator binding and profile upsert commit atomically. The authenticated session and its command-generation ID are memory-only and reset at process start. Role is derived from the pinned issuer/subject, never a renderer-supplied flag. Existing ChatGPT tables and protected payloads are unchanged and remain accessible only through administrator-authorized native commands.
+
 ## `obj_host_launcher_state`
 
 Singleton row containing only `last_product_key` and `updated_at`. The product key must map to the compiled `ProductKind` enum.

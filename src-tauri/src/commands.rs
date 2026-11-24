@@ -174,7 +174,8 @@ fn launch(kind: ProductKind, state: &AppState) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn launch_product(product_key: String, state: State<'_, AppState>) -> Result<(), String> {
+pub fn launch_product(product_key: String, state: State<'_, AppState>, session_id: String) -> Result<(), String> {
+    let _profile = crate::profiles::ProfileService::require_signed_in(&state, Some(&session_id))?;
     let kind =
         ProductKind::parse(&product_key).ok_or_else(|| "Unknown product target.".to_string())?;
     launch(kind, state.inner())?;
@@ -185,6 +186,7 @@ pub fn launch_from_arguments(
     state: &AppState,
     args: impl Iterator<Item = String>,
 ) -> Result<(), String> {
+    let _profile = crate::profiles::ProfileService::require_signed_in(state, None)?;
     if let Some(kind) = args
         .filter_map(|arg| ProductKind::parse(arg.trim_start_matches("--product=")))
         .next()

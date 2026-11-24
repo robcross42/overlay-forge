@@ -20,6 +20,14 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.3.0 - 2026-11-23
+
+### 2026-11-23
+
+#### Added
+
+- 19:02:27 EST - Added Google desktop sign-in and family/admin roles. Only the pinned administrator can access the existing protected ChatGPT connection, chat history, drafts and requests. Family members can open products; curated AI media actions remain future work (#17).
+
 ## 0.2.1 - 2026-11-23
 
 ### 2026-11-23

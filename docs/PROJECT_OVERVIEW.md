@@ -2,11 +2,13 @@
 
 ## Current Shape
 
-Overlay Forge 0.2.1
+Overlay Forge 0.3.0
 
 This is a private development version.
 
 The main app is a resident personal AI host and launcher. Product features and databases remain in their independent repositories.
+
+Google sign-in identifies administrator and family sessions. Only the pinned administrator can access the host's existing ChatGPT connection and chat data; family sessions can launch products. Curated family media actions remain future work. See [Google setup](../README.md#google-sign-in-and-family-access).
 
 The host owns:
 

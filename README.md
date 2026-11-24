@@ -3,11 +3,27 @@
 Overlay Forge is the resident personal AI host and launcher for independently owned desktop products and the local Journal web product.
 
 ```text
-Current development version: 0.2.1
+Current development version: 0.3.0
 Source extraction baseline: develop@96aeb79778e148a66b8f88c2b9bcd27b8a415454
 ```
 
-The app contains no product business logic. On startup it dispatches a requested product or resumes the last available one, then remains resident with its dashboard. Ctrl+Alt+Space opens a compact prompt; closing a window hides it, and the tray provides reopen and Quit controls.
+The app contains no product business logic. After Google sign-in it dispatches a requested product or resumes the last available one, then remains resident with its dashboard. Ctrl+Alt+Space opens a compact prompt; closing a window hides it, and the tray provides reopen and Quit controls.
+
+## Google sign-in and family access
+
+Google sign-in uses the public Desktop OAuth client configured in the native adapter. It requests only `openid email profile` using the system browser, PKCE and a loopback callback. No Google client secret, Gmail/Calendar/Drive permissions, refresh tokens or hosted service is required. The Google Cloud project owner must configure its consent audience and allow the intended accounts where required. See [Google's desktop OAuth documentation](https://developers.google.com/identity/protocols/oauth2/native-app).
+
+Before the first run, create `%APPDATA%\com.overlayforge.desktop\google-auth.json` with the following local setup, substituting the administrator's Gmail address:
+
+```json
+{ "admin_email": "administrator@gmail.com" }
+```
+
+This local configuration stays outside source control. The first Google-verified sign-in matching that address permanently pins its issuer and subject as administrator in the local identity registry. Later email/name changes cannot grant that role to someone else, and editing the setup file cannot replace a pinned administrator. Other Google accounts become family members. ChatGPT, its connection controls, conversations, drafts, requests and approvals are administrator-only, including at the native command boundary. Existing protected ChatGPT data remains intact and becomes visible only to that administrator. Family members can launch independently owned products. Curated AI actions such as finding similar media are future work.
+
+Sign in again after app exit; Google may reuse the browser's existing session. The local app session lasts until sign-out, account switch or process exit. ID tokens are checked when establishing it and then discarded; there is no remote revocation polling or Google service access. Signing out clears in-memory drafts and requests in both windows and retains saved protected ChatGPT data. Switching is blocked while owned work or computer cleanup remains unresolved. Signing out of Overlay Forge does not sign out of Google in the browser or disconnect the administrator's ChatGPT account.
+
+These are local app roles, not an operating-system security boundary against administrators or arbitrary programs under the same OS user. Product databases and product-level AI integrations are independent; host sign-in does not add access control to Media or other standalone apps. Do not copy credentials or private runtime databases between devices. Linux browser sign-in is not implemented.
 
 In the Windows app, connect your account in **Connected Accounts** and grant ChatGPT plan use. Use **Chat** or the compact prompt to stream replies and continue a selected conversation. Completed conversations are protected and saved locally. Drafts and unfinished replies clear on exit. The app uses the connected ChatGPT plan with no API-key fallback. See [AI Anchor Decision and Delivery](docs/AI_ANCHOR.md) for the provider and lifecycle details.
 

@@ -7,6 +7,9 @@ mod computer_session;
 mod db;
 mod hub_commands;
 mod windows;
+mod browser_auth;
+mod google_oauth;
+mod profiles;
 use commands::{launch_product, list_products, shutdown_app};
 use db::HostDatabase;
 use std::sync::Mutex;
@@ -19,6 +22,7 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 use windows::{WindowKind, WindowManager};
 
 pub struct AppState {
+    profiles: Mutex<profiles::ProfileService>,
     database: HostDatabase,
     hub: Mutex<ai_hub::AiHub>,
     windows: WindowManager,
@@ -44,11 +48,10 @@ pub fn run() {
         .setup(|app| {
             let root = app.path().app_data_dir()?;
             std::fs::create_dir_all(&root)?;
-            app.manage(AppState { database: HostDatabase::new(root.join("overlay-forge-host.sqlite3"))?, hub: Mutex::new(ai_hub::AiHub::default()), windows: WindowManager::default(), chatgpt: chatgpt::ChatgptService::new().map_err(std::io::Error::other)? });
+            app.manage(AppState { profiles: Mutex::new(profiles::ProfileService::new(&root).map_err(std::io::Error::other)?), database: HostDatabase::new(root.join("overlay-forge-host.sqlite3"))?, hub: Mutex::new(ai_hub::AiHub::default()), windows: WindowManager::default(), chatgpt: chatgpt::ChatgptService::new().map_err(std::io::Error::other)? });
             let state = app.state::<AppState>();
             status_watch::start(app.handle().clone());
             report(app.handle(),state.chatgpt.restore(&state.database));
-            report(app.handle(),chatgpt::ChatgptService::restore_conversations(app.handle()));
             state.windows.preload(app.handle()).map_err(std::io::Error::other)?;
             report(app.handle(), app.global_shortcut().on_shortcut("Ctrl+Alt+Space", |app,_,event| {
                 if event.state == ShortcutState::Pressed { report(app,app.state::<AppState>().windows.show(app,WindowKind::QuickPrompt)); }
@@ -69,7 +72,6 @@ pub fn run() {
             if let Some(icon) = app.default_window_icon() { tray = tray.icon(icon.clone()); }
             tray.build(app)?;
             state.windows.show(app.handle(),WindowKind::Main).map_err(std::io::Error::other)?;
-            report(app.handle(), commands::launch_requested_or_last(state.inner()).map(|_| ()));
             Ok(())
         })
         .on_window_event(|window,event| {
@@ -80,7 +82,7 @@ pub fn run() {
                 report(app,app.state::<AppState>().windows.hide(app,kind));
             }
         })
-        .invoke_handler(tauri::generate_handler![list_products,launch_product,shutdown_app,hub_commands::hub_snapshot,hub_commands::hub_draft,hub_commands::hub_submit,hub_commands::hub_action,hub_commands::hub_stop_all,chatgpt::chatgpt_sign_in,chatgpt::chatgpt_verify,chatgpt::chatgpt_disconnect,windows::show_main,windows::show_quick_prompt,windows::hide_quick_prompt])
+        .invoke_handler(tauri::generate_handler![profiles::identity_snapshot,profiles::identity_sign_in,profiles::identity_cancel,profiles::identity_sign_out,list_products,launch_product,shutdown_app,hub_commands::hub_snapshot,hub_commands::hub_draft,hub_commands::hub_submit,hub_commands::hub_action,hub_commands::hub_stop_all,chatgpt::chatgpt_sign_in,chatgpt::chatgpt_verify,chatgpt::chatgpt_disconnect,windows::show_main,windows::show_quick_prompt,windows::hide_quick_prompt])
         .run(tauri::generate_context!())
         .expect("error while running Overlay Forge");
 }

@@ -387,6 +387,12 @@ pub struct AiHub {
     startup_messages: Vec<String>,
 }
 impl AiHub {
+    pub fn can_switch_profile(&self) -> Result<(), String> {
+        if self.requests.iter().any(|r| r.terminal_outcome.is_none() || !r.computer.safe_to_forget()) {
+            return Err("Finish or cancel requests and resolve computer-session cleanup before changing Google profiles.".into());
+        }
+        Ok(())
+    }
     #[cfg(test)]
     pub fn snapshot(&self) -> HubSnapshot {
         self.snapshot_for(None, None)
