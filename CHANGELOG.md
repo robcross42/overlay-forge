@@ -20,6 +20,18 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.3.4 - 2026-11-23
+
+### 2026-11-23
+
+#### Changed
+
+- 21:50:21 EST - Added a keyboard-accessible dashboard navigation toggle and independent main/navigation scrolling, retaining the selected page and draft when collapsed (#20).
+
+#### Validation
+
+- 21:50:21 EST - Frontend TypeScript/Vite build passed. Tests not run (rapid-development policy); visual acceptance remains pending.
+
 ## 0.3.3 - 2026-11-23
 
 ### 2026-11-23

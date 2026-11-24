@@ -20,6 +20,7 @@ export default function App() {
 function AdminApp({ session }: { session: GoogleSession }) {
   const [conversationSelection, setConversationSelection] = useState<string | null>();
   const { hub, error, run } = useHub(session.sessionId, conversationSelection);
+  const [navigationCollapsed, setNavigationCollapsed] = useState(false);
   const [page, setPage] = useState<typeof pages[number]>("Home");
   const [provider, setProvider] = useState<Provider>("chatgpt");
   const [demo, setDemo] = useState(false);
@@ -59,10 +60,16 @@ function AdminApp({ session }: { session: GoogleSession }) {
       setConversationSelection(current => current === conversationSelection ? submittedConversation : current);
     }
   };
-  return <main className={quick ? "quick-shell" : "hub-shell"}>
-    {!quick && <aside><div className="brand">◈ Overlay Forge</div><p className="muted">Your resident AI anchor</p><nav>{pages.map(p => <button aria-current={page === p ? "page" : undefined} key={p} onClick={() => setPage(p)}>{p}</button>)}</nav><small>Local session / ChatGPT: {hub?.chatgpt?.state ?? "unavailable"}</small><button onClick={() => setQuit(true)}>Quit Overlay Forge</button></aside>}
+  return <main className={quick ? "quick-shell" : `hub-shell${navigationCollapsed ? " navigation-collapsed" : ""}`}>
+    {!quick && <aside id="main-navigation" hidden={navigationCollapsed}><div className="brand">◈ Overlay Forge</div><p className="muted">Your resident AI anchor</p><nav aria-label="Main navigation">{pages.map(p => <button aria-current={page === p ? "page" : undefined} key={p} onClick={() => setPage(p)}>{p}</button>)}</nav><small>Local session / ChatGPT: {hub?.chatgpt?.state ?? "unavailable"}</small><button onClick={() => setQuit(true)}>Quit Overlay Forge</button></aside>}
+    <div className={quick ? undefined : "workspace-scroll"}>
     <section className="workspace">
-      <header className="row"><div><p className="eyebrow">PERSONAL AI HUB · FIRST SLICE</p><h1>{quick ? "Overlay Forge" : page}</h1></div><button onClick={() => void run(quick ? "show_main" : "show_quick_prompt")}>{quick ? "Open main app" : "Open quick prompt"}</button>{quick && <button onClick={() => void run("hide_quick_prompt")}>Hide</button>}</header>
+      <header className="row">{!quick && <button
+        type="button"
+        aria-controls="main-navigation"
+        aria-expanded={!navigationCollapsed}
+        onClick={() => setNavigationCollapsed(collapsed => !collapsed)}
+      >{navigationCollapsed ? "Show navigation" : "Hide navigation"}</button>}<div><p className="eyebrow">PERSONAL AI HUB · FIRST SLICE</p><h1>{quick ? "Overlay Forge" : page}</h1></div><button onClick={() => void run(quick ? "show_main" : "show_quick_prompt")}>{quick ? "Open main app" : "Open quick prompt"}</button>{quick && <button onClick={() => void run("hide_quick_prompt")}>Hide</button>}</header>
       <div className="actions"><button onClick={() => void run("hub_stop_all")}>Stop all local work / request cleanup</button></div>
       {!quick && (page === "Home" || page === "Connected Accounts") && <ChatgptConnectionCard connection={connection} run={run} />}
       {hub && !quick && page !== "Chat" && <StatusCheckSummary checks={hub.statusChecks} />}
@@ -95,5 +102,6 @@ function AdminApp({ session }: { session: GoogleSession }) {
       {!quick && page === "Home" && <><section className="panel"><ProfileControls session={session} /></section><ProductLauncher sessionId={session.sessionId} /></>}
       {quit && <section className="panel" role="alertdialog" aria-label="Quit Overlay Forge"><h2>Quit Overlay Forge?</h2><p>Completed ChatGPT conversations are saved on this device. Drafts, unfinished replies and demo activity clear on exit.</p><button onClick={() => void run("shutdown_app")}>Quit Overlay Forge</button><button onClick={() => setQuit(false)}>Keep running</button></section>}
     </section>
+    </div>
   </main>;
 }
