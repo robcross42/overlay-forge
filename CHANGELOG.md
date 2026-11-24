@@ -20,6 +20,14 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.3.1 - 2026-11-23
+
+### 2026-11-23
+
+#### Fixed
+
+- 19:12:04 EST - Import the configured Google Desktop client's application secret into native protected storage and include it in token exchange. Added bounded native JSON import and safe rejection diagnostics after browser authorization failed to establish an app session (#17).
+
 ## 0.3.0 - 2026-11-23
 
 ### 2026-11-23

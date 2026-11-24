@@ -5,7 +5,7 @@ import { ProductLauncher } from "./ProductLauncher";
 
 export interface GoogleProfile { id: string; email: string | null; name: string | null; admin: boolean }
 export interface GoogleSession {
-  revision: number; sessionId: string; configured: boolean; busy: boolean;
+  revision: number; sessionId: string; configured: boolean; clientConfigured: boolean; busy: boolean;
   profile: GoogleProfile | null; detail: string;
 }
 
@@ -51,7 +51,8 @@ export function GoogleSessionGate({ children }: { children: (session: GoogleSess
       <p>Sign-in uses your system browser and requests your name and email. Gmail, Calendar and Drive access are separate permissions.</p>
       {session && (session.busy
         ? <button onClick={() => void act("identity_cancel")}>Cancel sign-in</button>
-        : <button disabled={!session.configured} onClick={() => void act("identity_sign_in")}>Continue with Google</button>)}
+        : <><button disabled={!session.configured || !session.clientConfigured} onClick={() => void act("identity_sign_in")}>Continue with Google</button>
+          <button onClick={() => void act("identity_import_google_client")}>Import Google client JSON</button><p>Choose the JSON downloaded for the Overlay Forge Desktop OAuth client. Its client secret is imported natively into protected storage. You can reimport here to repair setup.</p></>)}
       {session && !session.configured && <p>Administrator setup is required. See the Google sign-in setup in the project documentation.</p>}
       <button onClick={() => void act("shutdown_app")}>Quit Overlay Forge</button>
     </section>
@@ -77,6 +78,7 @@ export function ProfileControls({ session }: { session: GoogleSession }) {
     <p>{session.profile?.name ?? session.profile?.email ?? "Google account"} · {session.profile?.admin ? "Administrator" : "Family member"}</p>
     {session.profile?.name && session.profile.email && <p>{session.profile.email}</p>}
     <div className="actions"><button onClick={() => void act("identity_sign_in")}>Switch Google account</button>
+      {session.profile?.admin && <button onClick={() => void act("identity_import_google_client")}>Import Google client JSON</button>}
       <button onClick={() => void act("identity_sign_out")}>Sign out of Overlay Forge</button></div>
     {error && <p className="error" role="alert">{error}</p>}
   </section>;

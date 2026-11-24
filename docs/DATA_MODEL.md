@@ -14,6 +14,10 @@ Singleton row containing only `last_product_key` and `updated_at`. The product k
 
 Host-only geometry and visibility keyed by `window_key`.
 
+## `obj_host_google_client`
+
+The companion `obj_host_google_client` singleton holds a platform-protected Google Desktop application configuration BLOB, including its client secret and exact configured client ID. Native import uses the existing SecretStore and stable host protection identity. It stores no Google user access, refresh or ID tokens. Existing ChatGPT credentials and transcripts are unchanged.
+
 ## `obj_host_ai_connection`
 
 Singleton row with a stable UUID `host_id`, a nullable `protected_credentials` BLOB, and `updated_at`. The native SecretStore protects the main app's ChatGPT registration before SQLite using current-user DPAPI on Windows or AES-256-GCM with a host-scoped key held in Linux Secret Service. Recovery requires the matching platform profile and protection key. Plain access, refresh and ID tokens must never enter database fields, logs or renderer DTOs.

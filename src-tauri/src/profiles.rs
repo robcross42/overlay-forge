@@ -26,6 +26,7 @@ pub struct ProfileSnapshot {
     revision: u64,
     session_id: String,
     configured: bool,
+    client_configured: bool,
     busy: bool,
     profile: Option<Profile>,
     detail: String,
@@ -230,11 +231,15 @@ impl ProfileService {
     pub fn cancel(&self) {
         self.cancel.store(true, Ordering::SeqCst);
     }
-    fn snapshot(&self) -> Result<ProfileSnapshot, String> {
+    fn snapshot(&self, db: &crate::db::HostDatabase) -> Result<ProfileSnapshot, String> {
         Ok(ProfileSnapshot {
             revision: self.revision,
             session_id: self.session_id.clone(),
             configured: self.repository.configured()?,
+            client_configured: db
+                .google_client_config()
+                .map_err(|_| "Could not read Google client setup.")?
+                .is_some(),
             busy: self.busy,
             profile: self.active.clone(),
             detail: self.detail.clone(),
@@ -308,7 +313,7 @@ pub fn identity_snapshot(state: tauri::State<'_, AppState>) -> Result<ProfileSna
         .profiles
         .lock()
         .map_err(|_| "Google session is unavailable.")?
-        .snapshot()
+        .snapshot(&state.database)
 }
 #[tauri::command]
 pub fn identity_sign_in(app: AppHandle, session_id: String) -> Result<(), String> {
@@ -325,6 +330,7 @@ pub fn identity_sign_in(app: AppHandle, session_id: String) -> Result<(), String
         return Err("Configure the local administrator email before Google sign-in.".into());
     }
     ProfileService::ready_to_switch(&state)?;
+    let client = crate::google_client::GoogleClientConfig::load(&state.database)?;
     profiles.busy = true;
     profiles.cancel.store(false, Ordering::SeqCst);
     profiles.detail =
@@ -338,7 +344,7 @@ pub fn identity_sign_in(app: AppHandle, session_id: String) -> Result<(), String
     if std::thread::Builder::new()
         .name("google-sign-in".into())
         .spawn(move || {
-            let result = crate::google_oauth::sign_in(&cancel);
+            let result = crate::google_oauth::sign_in(&cancel, client.secret());
             ProfileService::finish_sign_in(&worker_app, result);
         })
         .is_err()
@@ -380,6 +386,62 @@ pub fn identity_sign_out(app: AppHandle, session_id: String) -> Result<(), Strin
     profiles.session_id = uuid::Uuid::new_v4().to_string();
     profiles.revision += 1;
     profiles.detail="Signed out of Overlay Forge. Saved data and protected ChatGPT credentials remain on this device. This does not sign out of Google in your browser.".into();
+    drop(profiles);
+    ProfileService::publish(&app);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn identity_import_google_client(
+    app: AppHandle,
+    session_id: String,
+) -> Result<(), String> {
+    use tauri_plugin_dialog::DialogExt;
+    fn authorize<'a>(
+        state: &'a AppState,
+        session: &str,
+    ) -> Result<MutexGuard<'a, ProfileService>, String> {
+        let profiles = state
+            .profiles
+            .lock()
+            .map_err(|_| "Google session is unavailable.")?;
+        profiles.check_session(session)?;
+        if profiles.busy {
+            return Err("Finish or cancel Google sign-in before importing client setup.".into());
+        }
+        if profiles
+            .active
+            .as_ref()
+            .is_some_and(|profile| !profile.admin)
+        {
+            return Err(
+                "Sign out or use the administrator profile to repair local Google client setup."
+                    .into(),
+            );
+        }
+        Ok(profiles)
+    }
+    {
+        let state = app.state::<AppState>();
+        let _profiles = authorize(&state, &session_id)?;
+    }
+    let selected = app
+        .dialog()
+        .file()
+        .add_filter("Google Desktop OAuth client JSON", &["json"])
+        .blocking_pick_file();
+    let Some(selected) = selected else {
+        return Ok(());
+    };
+    let path = selected
+        .into_path()
+        .map_err(|_| "Select a local Google client JSON file.")?;
+    let state = app.state::<AppState>();
+    let mut profiles = authorize(&state, &session_id)?;
+    ProfileService::ready_to_switch(&state)?;
+    crate::google_client::GoogleClientConfig::import(&state.database, &path)?;
+    profiles.detail = "Google Desktop client configuration imported into protected local storage. Continue with Google to sign in. The downloaded original was not modified.".into();
+    profiles.revision += 1;
     drop(profiles);
     ProfileService::publish(&app);
     Ok(())

@@ -9,6 +9,7 @@ mod hub_commands;
 mod windows;
 mod browser_auth;
 mod google_oauth;
+mod google_client;
 mod profiles;
 use commands::{launch_product, list_products, shutdown_app};
 use db::HostDatabase;
@@ -39,6 +40,7 @@ fn report(app: &tauri::AppHandle, result: Result<(), String>) {
 }
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_single_instance::init(|app,args,_| {
             // A second invocation retains typed target dispatch without starting another hub.
             report(app, commands::launch_from_arguments(app.state::<AppState>().inner(), args.into_iter().skip(1)));
@@ -82,7 +84,7 @@ pub fn run() {
                 report(app,app.state::<AppState>().windows.hide(app,kind));
             }
         })
-        .invoke_handler(tauri::generate_handler![profiles::identity_snapshot,profiles::identity_sign_in,profiles::identity_cancel,profiles::identity_sign_out,list_products,launch_product,shutdown_app,hub_commands::hub_snapshot,hub_commands::hub_draft,hub_commands::hub_submit,hub_commands::hub_action,hub_commands::hub_stop_all,chatgpt::chatgpt_sign_in,chatgpt::chatgpt_verify,chatgpt::chatgpt_disconnect,windows::show_main,windows::show_quick_prompt,windows::hide_quick_prompt])
+        .invoke_handler(tauri::generate_handler![profiles::identity_import_google_client,profiles::identity_snapshot,profiles::identity_sign_in,profiles::identity_cancel,profiles::identity_sign_out,list_products,launch_product,shutdown_app,hub_commands::hub_snapshot,hub_commands::hub_draft,hub_commands::hub_submit,hub_commands::hub_action,hub_commands::hub_stop_all,chatgpt::chatgpt_sign_in,chatgpt::chatgpt_verify,chatgpt::chatgpt_disconnect,windows::show_main,windows::show_quick_prompt,windows::hide_quick_prompt])
         .run(tauri::generate_context!())
         .expect("error while running Overlay Forge");
 }

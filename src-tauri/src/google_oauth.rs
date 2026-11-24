@@ -19,7 +19,8 @@ use std::{
 };
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
-const CLIENT_ID: &str = "840684879038-5lf8vqhsj9mahburvq1mqpfemugiv45t.apps.googleusercontent.com";
+pub const CLIENT_ID: &str =
+    "840684879038-5lf8vqhsj9mahburvq1mqpfemugiv45t.apps.googleusercontent.com";
 const ISSUER: &str = "https://accounts.google.com";
 const CALLBACK_PATH: &str = "/";
 const MAX_HEADERS: usize = 16 * 1024;
@@ -43,7 +44,7 @@ struct SignInAttempt<'a> {
     redirect: String,
 }
 
-pub fn sign_in(cancel: &AtomicBool) -> Result<GoogleIdentity, String> {
+pub fn sign_in(cancel: &AtomicBool, client_secret: &str) -> Result<GoogleIdentity, String> {
     let listener = TcpListener::bind(("127.0.0.1", 0))
         .map_err(|_| "Could not bind the local Google sign-in callback.")?;
     listener
@@ -67,7 +68,7 @@ pub fn sign_in(cancel: &AtomicBool) -> Result<GoogleIdentity, String> {
     // Close the listener before exchanging the one accepted authorization code.
     drop(listener);
     attempt.check_active()?;
-    let identity = attempt.exchange(&code)?;
+    let identity = attempt.exchange(&code, client_secret)?;
     // The profile owner must also check cancellation while committing this identity.
     attempt.check_active()?;
     Ok(identity)
@@ -272,7 +273,7 @@ impl SignInAttempt<'_> {
         Ok(Some(code))
     }
 
-    fn exchange(&self, code: &str) -> Result<GoogleIdentity, String> {
+    fn exchange(&self, code: &str, client_secret: &str) -> Result<GoogleIdentity, String> {
         let http = Client::builder()
             .https_only(true)
             .redirect(Policy::none())
@@ -283,9 +284,10 @@ impl SignInAttempt<'_> {
         let response = http
             .post("https://oauth2.googleapis.com/token")
             .timeout(self.request_timeout()?)
-            // Google documents client_secret as optional for public Desktop clients.
+            // The configured Desktop client requires its imported application secret.
             .form(&[
                 ("client_id", CLIENT_ID),
+                ("client_secret", client_secret),
                 ("grant_type", "authorization_code"),
                 ("code", code),
                 ("code_verifier", self.verifier.as_str()),
@@ -294,7 +296,7 @@ impl SignInAttempt<'_> {
             .send()
             .map_err(|_| "Google token exchange failed to connect. Start a fresh sign-in.")?;
         self.check_active()?;
-        let bytes = read_response(response)?;
+        let bytes = read_response(response, "token exchange")?;
         let tokens: TokenResponse = serde_json::from_slice(&bytes)
             .map_err(|_| "Google returned an invalid token response.")?;
         if tokens.id_token.is_empty() {
@@ -320,7 +322,7 @@ impl SignInAttempt<'_> {
             .send()
             .map_err(|_| "Unable to retrieve Google verification keys.")?;
         self.check_active()?;
-        let keys: JwkSet = serde_json::from_slice(&read_response(response)?)
+        let keys: JwkSet = serde_json::from_slice(&read_response(response, "signing-key lookup")?)
             .map_err(|_| "Invalid Google verification keys.")?;
         let key = keys
             .find(&kid)
@@ -425,10 +427,11 @@ impl Audience {
     }
 }
 
-fn read_response(response: reqwest::blocking::Response) -> Result<Zeroizing<Vec<u8>>, String> {
-    if !response.status().is_success() {
-        return Err("Google sign-in request was rejected. Check the Desktop client and consent-screen setup, then try again.".into());
-    }
+fn read_response(
+    response: reqwest::blocking::Response,
+    operation: &str,
+) -> Result<Zeroizing<Vec<u8>>, String> {
+    let status = response.status();
     if response.headers().len() > 64
         || response
             .headers()
@@ -449,6 +452,35 @@ fn read_response(response: reqwest::blocking::Response) -> Result<Zeroizing<Vec<
         .map_err(|_| "Could not read Google sign-in response.")?;
     if bytes.len() > MAX_BODY {
         return Err("Google sign-in response exceeded the limit.".into());
+    }
+    if !status.is_success() {
+        // Emit only fixed diagnostics. Provider bodies can contain sensitive request data.
+        let detail = serde_json::from_slice::<serde_json::Value>(&bytes).ok();
+        let code = detail
+            .as_ref()
+            .and_then(|value| value.get("error"))
+            .and_then(|value| value.as_str());
+        let description = detail
+            .as_ref()
+            .and_then(|value| value.get("error_description"))
+            .and_then(|value| value.as_str())
+            .unwrap_or_default();
+        let reason = if description.contains("client_secret") && description.contains("missing") {
+            "This Desktop client requires its client secret in the native token exchange. Import its Google client configuration locally; do not paste the secret into chat."
+        } else {
+            match code {
+                Some("invalid_client") => "Google rejected this client configuration.",
+                Some("invalid_grant") => "Google rejected the authorization code or PKCE grant. Start a fresh sign-in.",
+                Some("invalid_request") => "Google rejected the token request parameters.",
+                Some("unauthorized_client") => "This OAuth client is not authorized for the Desktop flow.",
+                Some("access_denied") => "Google denied authorization. Check consent and account eligibility.",
+                _ => "Google rejected the request. Check the Desktop client and consent-screen setup.",
+            }
+        };
+        return Err(format!(
+            "Google {operation} failed (HTTP {}). {reason}",
+            status.as_u16()
+        ));
     }
     Ok(bytes)
 }

@@ -3,7 +3,7 @@
 Overlay Forge is the resident personal AI host and launcher for independently owned desktop products and the local Journal web product.
 
 ```text
-Current development version: 0.3.0
+Current development version: 0.3.1
 Source extraction baseline: develop@96aeb79778e148a66b8f88c2b9bcd27b8a415454
 ```
 
@@ -11,7 +11,7 @@ The app contains no product business logic. After Google sign-in it dispatches a
 
 ## Google sign-in and family access
 
-Google sign-in uses the public Desktop OAuth client configured in the native adapter. It requests only `openid email profile` using the system browser, PKCE and a loopback callback. No Google client secret, Gmail/Calendar/Drive permissions, refresh tokens or hosted service is required. The Google Cloud project owner must configure its consent audience and allow the intended accounts where required. See [Google's desktop OAuth documentation](https://developers.google.com/identity/protocols/oauth2/native-app).
+Google sign-in uses the Desktop OAuth client configured in the native adapter. It requests only `openid email profile` using the system browser, PKCE and a loopback callback. The configured Google Desktop client requires its application client secret during token exchange. In the app, choose **Import Google client JSON** and select the Desktop client's JSON downloaded from Google Auth Platform. Native code checks the client ID and stores only a platform-protected copy in the host database. JSON contents and secrets never enter React, command arguments or logs. The downloaded original remains under the owner's control. Import is available before sign-in for local setup/repair, or within the administrator session; an active family session cannot replace it. Repair can replace only the same compiled application client configuration and cannot change the pinned administrator or authenticate a user. Reimport a newly downloaded matching JSON here if its application secret is wrong or rotated, without deleting ChatGPT data or the admin binding. No Gmail/Calendar/Drive permissions, Google user refresh tokens or hosted service is required. The Google Cloud project owner must configure its consent audience and allow the intended accounts where required. See [Google's desktop OAuth documentation](https://developers.google.com/identity/protocols/oauth2/native-app).
 
 Before the first run, create `%APPDATA%\com.overlayforge.desktop\google-auth.json` with the following local setup, substituting the administrator's Gmail address:
 

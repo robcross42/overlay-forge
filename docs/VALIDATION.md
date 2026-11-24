@@ -38,3 +38,9 @@ Live checks still to perform with the configured Desktop client:
 - Recheck Media launch/resume after Google sign-in, plus shortcut/Escape in signed-out and signed-in states. Existing standalone product processes and data are outside the host authorization boundary.
 
 Google Cloud audience/test-user configuration and actual client eligibility are owner-controlled. The original supplied client ID was replaced with the new Desktop client before the retry. No successful Google token exchange or family-account acceptance is claimed yet. App sessions last until sign-out/switch/process exit; no remote Google revocation polling is claimed.
+
+### Desktop client exchange correction
+
+The owner reported successful browser authorization followed by the app returning to its sign-in screen. App inspection found a rejected Google HTTP request; a bounded diagnostic request with an intentionally invalid code and the public client ID returned HTTP 400 and explicitly required the missing client secret. No real authorization code, secret or user token was used in that diagnostic. This established that the configured client needs its Desktop application secret despite Google's general parameter table describing it as optional.
+
+The follow-up adds native JSON import with a native file picker, exact client-ID validation, bounded input, platform-protected persistence, native-only secret loading, and safe fixed diagnostics identifying token exchange versus key lookup. The frontend build and Rust compile check passed. Real JSON import and successful Google sign-in remain pending owner acceptance; no automated tests were run. Cancelled, malformed, Web-client and wrong-client imports must not replace existing protected configuration.
