@@ -4,7 +4,7 @@ The host, Media, Gaming, and Retirement repositories were extracted from `overla
 
 | Repository | Owned runtime surface | SQLite ownership | Application identifier |
 | --- | --- | --- | --- |
-| `overlay-forge` | Resident AI shell, native ChatGPT connection and conversations, typed product discovery and dispatch | Host state plus platform-protected ChatGPT credentials and transcripts in `overlay-forge-host.sqlite3` | `com.overlayforge.desktop` |
+| `overlay-forge` | Resident AI shell, native ChatGPT connection and conversations, integrated Media composition, typed product discovery and dispatch | Host state plus platform-protected ChatGPT credentials and transcripts in `overlay-forge-host.sqlite3` | `com.overlayforge.desktop` |
 | `overlay-forge-media` | Film, television, books, music foundations, canonical media references, media settings, legacy import | Media/book/music/reference tables and `obj_legacy_import` in `overlay-forge-media.sqlite3` | `com.overlayforge.media` |
 | `overlay-forge-gaming` | Games, screenshots, chat/build overlays, character builds, guides, GearBlocks tooling, gaming settings, legacy import | Gaming/GearBlocks tables and `obj_legacy_import` in `overlay-forge-gaming.sqlite3` | `com.overlayforge.gaming` |
 | `overlay-forge-retirement` | Retirement profile, fresh repair/resell research, poker capture, AI-rig planning, retirement settings, legacy import | Retirement-owned tables and `obj_legacy_import` in `overlay-forge-retirement.sqlite3` | `com.overlayforge.retirement` |
@@ -14,4 +14,4 @@ The former organizer, smoking-cessation, and generic YouTube module surfaces rem
 
 YouTube material that remains useful is represented as a Media reference. Legacy imports remain explicit, allowlisted, transactional operations preserving their source database and provenance.
 
-The launcher discovers only known desktop product executable names in installed, current-directory, and sibling development locations. Journal uses a fixed loopback service identity check and browser target, `http://127.0.0.1:4319`. It never accepts an executable path, shell command, or browser URL from persisted or user-editable data. The Journal repository owns server startup, credentials, and data.
+Media is compiled and rendered in the host from the pinned `modules/media` submodule, retaining its own app-data directory and SQLite database. Standalone mode remains for isolated development. No second Media executable or server starts. For other products, the launcher discovers only known desktop product executable names in installed, current-directory, and sibling development locations. Journal uses a fixed loopback service identity check and browser target, `http://127.0.0.1:4319`. It never accepts an executable path, shell command, or browser URL from persisted or user-editable data. The Journal repository owns server startup, credentials, and data.

@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ReactNode, useEffect, useState } from "react";
-import { ProductLauncher } from "./ProductLauncher";
 
 export interface GoogleProfile { id: string; email: string | null; name: string | null; admin: boolean }
 export interface GoogleSession {
@@ -44,7 +43,7 @@ export function GoogleSessionGate({ children }: { children: (session: GoogleSess
     catch (cause) { setError(String(cause)); }
   };
   if (!session || session.busy || !session.profile) return <main className="identity-shell">
-    <section className="panel"><h1>Overlay Forge</h1><h2>Sign in with Google</h2>
+    <section className="panel">
       <p role="status">{session?.detail ?? "Opening your local session…"}</p>
       {error && <p className="error" role="alert">{error}</p>}
       <p>Use your Google account to open the app. ChatGPT is available only to the administrator.</p>
@@ -57,14 +56,7 @@ export function GoogleSessionGate({ children }: { children: (session: GoogleSess
       <button onClick={() => void act("shutdown_app")}>Quit Overlay Forge</button>
     </section>
   </main>;
-  if (session.profile.admin) return <>{children(session)}</>;
-  return <main className="identity-shell">
-    <section className="panel"><h1>Overlay Forge</h1><ProfileControls session={session} />
-      <p>ChatGPT is administrator-only. Curated media actions are planned and are not available yet.</p>
-      </section>
-    <ProductLauncher key={session.sessionId} sessionId={session.sessionId} />
-    <button onClick={() => void act("shutdown_app")}>Quit Overlay Forge</button>
-  </main>;
+  return <>{children(session)}</>;
 }
 
 export function ProfileControls({ session }: { session: GoogleSession }) {

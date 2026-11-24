@@ -6,6 +6,10 @@ The host uses `overlay-forge-host.sqlite3`. The legacy `overlay-forge.sqlite3` r
 
 `overlay-forge-identities.sqlite3` is a separate host-owned SQLite registry in the same app-data directory. Idempotent creation adds `identity_config` (one configured bootstrap email and its pinned Google admin issuer/subject) and `google_profile` (opaque UUID, canonical issuer/subject, current verified email/name labels, with unique issuer/subject). No Google tokens, passwords or client secrets are stored. Bootstrap configuration is read from local `google-auth.json` only before configuration exists; administrator binding and profile upsert commit atomically. The authenticated session and its command-generation ID are memory-only and reset at process start. Role is derived from the pinned issuer/subject, never a renderer-supplied flag. Existing ChatGPT tables and protected payloads are unchanged and remain accessible only through administrator-authorized native commands.
 
+## `obj_host_ui_preferences`
+
+Singleton host presentation preferences, currently the boolean `navigation_collapsed` (default expanded). Idempotent creation and `INSERT OR IGNORE` preserve the saved choice on restart without modifying other tables. Signed-in native commands read and save it through `HostDatabase`; the renderer uses no browser storage. This is a device-local preference shared by administrator and family navigation, not window geometry or a product setting.
+
 ## `obj_host_launcher_state`
 
 Singleton row containing only `last_product_key` and `updated_at`. The product key must map to the compiled `ProductKind` enum.

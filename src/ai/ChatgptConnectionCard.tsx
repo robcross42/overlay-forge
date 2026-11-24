@@ -6,9 +6,9 @@ export function ChatgptConnectionCard({ connection: c, run }: {
   run: (command: string, args?: Record<string, unknown>) => Promise<void>;
 }) {
   const [model, setModel] = useState("");
-  if (!c) return <section className="panel"><h2>ChatGPT live connection</h2><p>Native connection status unavailable.</p></section>;
+  if (!c) return <section className="panel"><p>Native connection status unavailable.</p></section>;
   return <section className="panel" aria-label="ChatGPT live connection">
-    <div className="row"><h2>ChatGPT live connection test</h2><strong>{c.verification.freshness === "stale" || c.verification.freshness === "unknown" ? `Current activity unknown (last state: ${c.state})` : c.state}</strong></div>
+    <div className="row"><strong>{c.verification.freshness === "stale" || c.verification.freshness === "unknown" ? `Current activity unknown (last state: ${c.state})` : c.state}</strong></div>
     <p role="status">{c.detail}</p>
     <p>Account: {c.accountLabel ?? "not connected"}{c.registration ? ` / Registration: ${c.registration}` : ""}</p>
     <p>Funding: {c.planGranted ? "ChatGPT plan-use permission granted." : "ChatGPT plan use requires permission."} ChatGPT usage and any credits you permit are governed by your ChatGPT settings. API-key billing is disabled.</p>

@@ -10,7 +10,6 @@ const captureLabels = {
 export function ComputerSessionStatus({ request: r, act }: { request: RequestRecord; act: (r: RequestRecord, a: Action) => void }) {
   const c = r.computer;
   return <section className="computer-session" aria-label={`Computer session for request ${r.id}`}>
-    <h3>Computer & screen session</h3>
     <p role="status">{captureLabels[c.captureState]}</p>
     <p>Indicator last observed: {c.indicatorState === "visible" ? "visible (possibly stale)" : c.indicatorState === "cleared" ? "cleared" : "not shown"}.</p>
     {c.demo && <>

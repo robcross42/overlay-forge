@@ -5,6 +5,8 @@ mod chatgpt;
 mod commands;
 mod computer_session;
 mod db;
+mod ui_preferences;
+mod integrated_media;
 mod hub_commands;
 mod windows;
 mod browser_auth;
@@ -43,7 +45,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_single_instance::init(|app,args,_| {
             // A second invocation retains typed target dispatch without starting another hub.
-            report(app, commands::launch_from_arguments(app.state::<AppState>().inner(), args.into_iter().skip(1)));
+            report(app, commands::launch_from_arguments(app.state::<AppState>().inner(), args.into_iter().skip(1), app));
             report(app, app.state::<AppState>().windows.show(app,WindowKind::Main));
         }))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -52,6 +54,11 @@ pub fn run() {
             std::fs::create_dir_all(&root)?;
             app.manage(AppState { profiles: Mutex::new(profiles::ProfileService::new(&root).map_err(std::io::Error::other)?), database: HostDatabase::new(root.join("overlay-forge-host.sqlite3"))?, hub: Mutex::new(ai_hub::AiHub::default()), windows: WindowManager::default(), chatgpt: chatgpt::ChatgptService::new().map_err(std::io::Error::other)? });
             let state = app.state::<AppState>();
+            if integrated_media::initialize(app.handle(), &root).is_err() {
+                if let Ok(mut hub) = state.hub.lock() {
+                    hub.startup_message("Media data could not be opened. The host remains available.".into());
+                }
+            }
             status_watch::start(app.handle().clone());
             report(app.handle(),state.chatgpt.restore(&state.database));
             state.windows.preload(app.handle()).map_err(std::io::Error::other)?;
@@ -84,7 +91,7 @@ pub fn run() {
                 report(app,app.state::<AppState>().windows.hide(app,kind));
             }
         })
-        .invoke_handler(tauri::generate_handler![profiles::identity_import_google_client,profiles::identity_snapshot,profiles::identity_sign_in,profiles::identity_cancel,profiles::identity_sign_out,list_products,launch_product,shutdown_app,hub_commands::hub_snapshot,hub_commands::hub_draft,hub_commands::hub_submit,hub_commands::hub_action,hub_commands::hub_stop_all,chatgpt::chatgpt_sign_in,chatgpt::chatgpt_verify,chatgpt::chatgpt_disconnect,windows::show_main,windows::show_quick_prompt,windows::hide_quick_prompt])
+        .invoke_handler(integrated_media::handler(tauri::generate_handler![ui_preferences::navigation_preference,ui_preferences::save_navigation_preference,profiles::identity_import_google_client,profiles::identity_snapshot,profiles::identity_sign_in,profiles::identity_cancel,profiles::identity_sign_out,list_products,launch_product,shutdown_app,hub_commands::hub_snapshot,hub_commands::hub_draft,hub_commands::hub_submit,hub_commands::hub_action,hub_commands::hub_stop_all,chatgpt::chatgpt_sign_in,chatgpt::chatgpt_verify,chatgpt::chatgpt_disconnect,windows::show_main,windows::show_quick_prompt,windows::hide_quick_prompt]))
         .run(tauri::generate_context!())
         .expect("error while running Overlay Forge");
 }
