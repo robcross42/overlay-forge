@@ -1,7 +1,7 @@
 use crate::AppState;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Emitter, State};
 
 #[derive(Clone, Copy)]
 enum ProductKind {
@@ -22,10 +22,10 @@ impl ProductKind {
     }
     fn name(self) -> &'static str {
         match self {
-            Self::Media => "Overlay Forge Media",
-            Self::Gaming => "Overlay Forge Gaming",
-            Self::Retirement => "Overlay Forge Retirement",
-            Self::Journal => "Overlay Forge Journal",
+            Self::Media => "Media",
+            Self::Gaming => "Gaming",
+            Self::Retirement => "Retirement",
+            Self::Journal => "Journal",
         }
     }
     fn executable(self) -> &'static str {
@@ -95,7 +95,7 @@ fn candidate_paths(kind: ProductKind) -> Vec<PathBuf> {
     if let Ok(local) = std::env::var("LOCALAPPDATA") {
         paths.push(
             PathBuf::from(local)
-                .join(kind.name())
+                .join(format!("Overlay Forge {}", kind.name()))
                 .join(kind.executable()),
         );
     }
@@ -147,18 +147,22 @@ pub fn list_products() -> Vec<ProductRecord> {
     PRODUCTS
         .into_iter()
         .map(|kind| {
-            let path = resolve(kind);
+            let path = if matches!(kind, ProductKind::Media) { None } else { resolve(kind) };
             ProductRecord {
                 key: kind.key().into(),
                 name: kind.name().into(),
-                available: path.is_some(),
+                available: matches!(kind, ProductKind::Media) || path.is_some(),
                 launch_path: path.map(|target| target.display_path()).unwrap_or_default(),
             }
         })
         .collect()
 }
 
-fn launch(kind: ProductKind, state: &AppState) -> Result<(), String> {
+fn launch(kind: ProductKind, state: &AppState, app: &AppHandle) -> Result<(), String> {
+    if matches!(kind, ProductKind::Media) {
+        app.emit("product-selected", "media").map_err(|error| error.to_string())?;
+        return state.database.remember_product(kind.key()).map_err(|error| error.to_string());
+    }
     let path = resolve(kind).ok_or_else(|| {
         format!(
             "{} is unavailable. Install/build desktop products, or start Journal with npm.cmd run dev in its repository.",
@@ -174,24 +178,25 @@ fn launch(kind: ProductKind, state: &AppState) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn launch_product(product_key: String, state: State<'_, AppState>, session_id: String) -> Result<(), String> {
+pub fn launch_product(product_key: String, state: State<'_, AppState>, session_id: String, app: AppHandle) -> Result<(), String> {
     let _profile = crate::profiles::ProfileService::require_signed_in(&state, Some(&session_id))?;
     let kind =
         ProductKind::parse(&product_key).ok_or_else(|| "Unknown product target.".to_string())?;
-    launch(kind, state.inner())?;
+    launch(kind, state.inner(), &app)?;
     Ok(())
 }
 
 pub fn launch_from_arguments(
     state: &AppState,
     args: impl Iterator<Item = String>,
+    app: &AppHandle,
 ) -> Result<(), String> {
     let _profile = crate::profiles::ProfileService::require_signed_in(state, None)?;
     if let Some(kind) = args
         .filter_map(|arg| ProductKind::parse(arg.trim_start_matches("--product=")))
         .next()
     {
-        launch(kind, state)?;
+        launch(kind, state, app)?;
     }
     Ok(())
 }

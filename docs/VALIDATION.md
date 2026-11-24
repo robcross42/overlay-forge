@@ -50,3 +50,9 @@ The follow-up adds native JSON import with a native file picker, exact client-ID
 ### Ubuntu browser launch — 23 November 2026
 
 The Ubuntu development build opened Google Accounts in the default browser after importing the matching Desktop client JSON. A real Google sign-in returned through the loopback callback, established a verified family session, and showed the signed-in controls in Overlay Forge. This used a temporary local profile. The frontend and native debug builds and all 33 native tests passed, including HTTPS validation and forwarding the complete URL as a single GIO argument.
+
+## Integrated Media and navigation dashboard (0.4.0)
+
+Frontend build, host native development compilation/relaunch, Media standalone frontend/native builds, library Clippy without warnings, version consistency and scoped diff review passed. Tests not run (rapid-development policy). Process inspection found one host executable and no separate Media executable. This is not visual or live-provider acceptance.
+
+Owner review: Home shows connection tiles without page headings, explanatory panels or chat; Chat retains its composer/history; direct Media navigation opens the library inside the host. Check movie/series/book browsing and progress against the existing Media database, navigation collapse persistence and independent scrolling. Administrator Media utilities remain available; family sessions use the library without maintenance utilities or host AI navigation. Other products retain external launch paths. Verify typed Media forwarding in an already signed-in host. The updated integrated frontend and native module have not been validated on Linux in this session; earlier 0.3.6 Linux browser-sign-in evidence does not establish that acceptance.

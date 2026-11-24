@@ -8,7 +8,7 @@ The host uses `overlay-forge-host.sqlite3`. The legacy `overlay-forge.sqlite3` r
 
 ## `obj_host_ui_preferences`
 
-Singleton host presentation preferences, currently the boolean `navigation_collapsed` (default expanded). Idempotent creation and `INSERT OR IGNORE` preserve the saved choice on restart without modifying other tables. Administrator-authorized native commands read and save it through `HostDatabase`; the renderer uses no browser storage. This is a device-local host preference, not window geometry or a product setting.
+Singleton host presentation preferences, currently the boolean `navigation_collapsed` (default expanded). Idempotent creation and `INSERT OR IGNORE` preserve the saved choice on restart without modifying other tables. Signed-in native commands read and save it through `HostDatabase`; the renderer uses no browser storage. This is a device-local preference shared by administrator and family navigation, not window geometry or a product setting.
 
 ## `obj_host_launcher_state`
 

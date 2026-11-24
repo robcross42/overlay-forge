@@ -2755,13 +2755,14 @@ dependencies = [
 
 [[package]]
 name = "overlay-forge"
-version = "0.3.6"
+version = "0.4.0"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
  "bson",
  "flate2",
  "jsonwebtoken",
+ "overlay-forge-media",
  "png 0.18.1",
  "rand",
  "reqwest 0.12.28",
@@ -2778,6 +2779,25 @@ dependencies = [
  "uuid",
  "windows-sys 0.59.0",
  "zeroize",
+]
+
+[[package]]
+name = "overlay-forge-media"
+version = "0.2.0"
+dependencies = [
+ "base64 0.22.1",
+ "bson",
+ "flate2",
+ "png 0.18.1",
+ "reqwest 0.12.28",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-global-shortcut",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

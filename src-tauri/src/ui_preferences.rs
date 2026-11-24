@@ -7,7 +7,7 @@ pub fn navigation_preference(
     state: State<'_, AppState>,
     session_id: String,
 ) -> Result<bool, String> {
-    let _profile = ProfileService::require_admin(&state, &session_id)?;
+    let _profile = ProfileService::require_signed_in(&state, Some(&session_id))?;
     state
         .database
         .navigation_collapsed()
@@ -20,7 +20,7 @@ pub fn save_navigation_preference(
     session_id: String,
     collapsed: bool,
 ) -> Result<(), String> {
-    let _profile = ProfileService::require_admin(&state, &session_id)?;
+    let _profile = ProfileService::require_signed_in(&state, Some(&session_id))?;
     state
         .database
         .save_navigation_collapsed(collapsed)

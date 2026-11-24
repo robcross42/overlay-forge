@@ -20,6 +20,20 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.4.0 - 2026-11-24
+
+### 2026-11-24
+
+#### Changed
+
+- 15:46:49 EST - Replaced repeated page headings and the explanatory Home/chat content with a graphical connections dashboard. Chat stays in Chat; product links move into shared navigation (#22).
+- 15:46:49 EST - Linked Media's owning repository as a pinned source submodule, embedding its existing UI and native services in the host without a second product executable or server. Preserved its separate database and standalone developer mode.
+- 15:46:49 EST - Added native session authorization for embedded Media, administrator-only settings/import operations, and a family shell with integrated Media while keeping host AI administration private.
+
+#### Validation
+
+- Frontend build, host native development compilation/relaunch, Media standalone frontend/native builds, warning-free library Clippy, version consistency and final diff review passed. One host executable was observed with no separate Media executable. Tests not run (rapid-development policy); updated UI/provider and Linux integrated acceptance remain pending.
+
 ## 0.3.6 - 2026-11-23
 
 ### 2026-11-23

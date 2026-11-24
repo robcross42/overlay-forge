@@ -1,6 +1,6 @@
 [package]
 name = "overlay-forge"
-version = "0.3.6"
+version = "0.4.0"
 description = "Private launcher for Overlay Forge products."
 authors = ["Overlay Forge"]
 edition = "2021"
@@ -13,6 +13,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.5.0", features = [] }
 
 [dependencies]
+overlay-forge-media = { path = "../modules/media/src-tauri", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri = { version = "2.9.0", features = ["protocol-asset", "tray-icon"] }

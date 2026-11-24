@@ -2,13 +2,13 @@
 
 ## Current Shape
 
-Overlay Forge 0.3.6
+Overlay Forge 0.4.0
 
 This is a private development version.
 
-The main app is a resident personal AI host and launcher. Product features and databases remain in their independent repositories.
+The main app is a resident personal AI host and launcher. Media UI and services are linked from the owning repository into one host application; product databases and domain code retain their separate ownership. Other modules keep their current launch paths.
 
-Google sign-in identifies administrator and family sessions. Only the pinned administrator can access the host's existing ChatGPT connection and chat data; family sessions can launch products. Curated family media actions remain future work. See [Google setup](../README.md#google-sign-in-and-family-access).
+Google sign-in identifies administrator and family sessions. Only the pinned administrator can access the host's existing ChatGPT connection and chat data; family sessions open integrated Media and use direct product navigation. Curated family media actions remain future work. See [Google setup](../README.md#google-sign-in-and-family-access).
 
 The host owns:
 
@@ -20,7 +20,7 @@ The host owns:
 
 The host streams multi-turn conversations using the connected ChatGPT plan and stores completed conversations locally. See [AI Anchor Decision and Delivery](AI_ANCHOR.md) for the implementation and remaining gates.
 
-The app does not dynamically load code, execute commands from SQLite, own a marketplace, update products, or contain product-domain tables.
+The app does not dynamically load code, execute commands from SQLite, own a marketplace, update products, and keeps product-domain tables outside the host database.
 
 Deferred modules are outside the current release and implementation scope. See
 [Future Module Concepts](FUTURE_FEATURES.md) for the proposed `LanInputBridge` Windows module and
