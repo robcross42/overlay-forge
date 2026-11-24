@@ -53,6 +53,7 @@ impl HostDatabase {
             ON CONFLICT(id) DO UPDATE SET protected_config=excluded.protected_config", params![protected])?;
         Ok(())
     }
+    #[cfg(test)]
     pub fn last_product(&self) -> rusqlite::Result<Option<String>> {
         self.connection()?
             .query_row(

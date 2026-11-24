@@ -3,11 +3,11 @@
 Overlay Forge is the resident personal AI host and launcher for independently owned desktop products and the local Journal web product.
 
 ```text
-Current development version: 0.3.2
+Current development version: 0.3.3
 Source extraction baseline: develop@96aeb79778e148a66b8f88c2b9bcd27b8a415454
 ```
 
-The app contains no product business logic. After Google sign-in it dispatches a requested product or resumes the last available one, then remains resident with its dashboard. Ctrl+Alt+Space opens a compact prompt; closing a window hides it, and the tray provides reopen and Quit controls.
+The app contains no product business logic. Google sign-in returns to the main Overlay Forge dashboard without opening a product. Choose Media or another product from that dashboard; typed target forwarding remains available to an already signed-in host. Ctrl+Alt+Space opens a compact prompt; closing a window hides it, and the tray provides reopen and Quit controls.
 
 ## Google sign-in and family access
 
@@ -58,6 +58,6 @@ Journal is a responsive web product in its own repository. Run `npm.cmd run dev`
 `C:\Dev\Repos\overlay-forge-journal`, then select Journal (or use `--product=journal`).
 The host checks the service identity at its fixed loopback health endpoint and opens
 `http://127.0.0.1:4319` in the default browser. Use **Refresh products** after starting
-the service. Requested-target and last-used resume also support Journal. The host
+the service. Explicit requested-target forwarding also supports Journal. The host
 does not start a server or store Journal data/credentials. Hosting, sign-in, and
 phone-to-Windows access are deferred; this development service is local to the PC.

@@ -12,10 +12,10 @@ The main app is the resident personal AI host under the [14 November boundary de
 
 Startup sequence:
 
-1. Resolve an optional typed command-line target.
-2. Otherwise resolve the last-used typed product.
-3. Launch an installed executable or known sibling development build.
-4. Keep the main app resident after successful dispatch.
-5. Show the dashboard and product picker, including when a target is unavailable. Show launch failures instead of aborting startup.
+1. Show the main host's Google sign-in surface.
+2. Verify identity and establish the host role/session.
+3. Restore host chat data for the administrator and focus the main dashboard. Authentication never launches a product or resumes the last-used module.
+4. Open products only after an explicit picker selection or typed target forwarded to the already signed-in host.
+5. Keep the host resident and show product availability/launch errors without moving identity ownership into a module. Last-used product state remains stored but is not an automatic post-authentication launch instruction.
 
 The standalone repositories deliberately own their duplicated shell infrastructure for the first split. A shared-core repository is not part of this generation.

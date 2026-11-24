@@ -2,7 +2,7 @@
 
 ## Current Shape
 
-Overlay Forge 0.3.2
+Overlay Forge 0.3.3
 
 This is a private development version.
 
@@ -14,7 +14,7 @@ The host owns:
 
 - A closed typed product registry.
 - Requested-target dispatch.
-- Last-used product resume state.
+- Last-used product state, without automatic post-sign-in launch.
 - A resident dashboard and compact prompt.
 - Host window state.
 

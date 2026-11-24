@@ -1,6 +1,6 @@
 # Overlay Forge Host Scope
 
-In scope: private product discovery, typed target dispatch, last-used resume, host window state, resident lifecycle, and the approved personal AI anchor described in [AI Anchor Decision and Delivery](AI_ANCHOR.md).
+In scope: private product discovery, explicit typed target dispatch, retained last-used product state, host window state, resident lifecycle, and the approved personal AI anchor described in [AI Anchor Decision and Delivery](AI_ANCHOR.md). Google authentication belongs to the main host and returns to its dashboard; it does not auto-launch a module.
 
 The AI anchor includes Google primary identity, separately authorized service access, extensible connected accounts, ChatGPT/Codex shared AI connections, monitoring, action approvals, and Dot feasibility. The resident shell, local request-state demonstration, native ChatGPT sign-in, fixed streaming account verification and multi-turn ChatGPT composer with protected local history are implemented. Account read/write, scheduled remote monitoring, hosted services and module connection APIs remain unavailable.
 

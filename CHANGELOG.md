@@ -20,6 +20,14 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.3.3 - 2026-11-23
+
+### 2026-11-23
+
+#### Fixed
+
+- 19:27:59 EST - Return successful Google sign-in to the main Overlay Forge dashboard instead of automatically launching the last-used product. Authentication and ChatGPT administration remain host-owned (#17).
+
 ## 0.3.2 - 2026-11-23
 
 ### 2026-11-23

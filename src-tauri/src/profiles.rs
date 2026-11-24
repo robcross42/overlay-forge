@@ -294,16 +294,15 @@ impl ProfileService {
         }
         profiles.busy = false;
         profiles.revision += 1;
+        drop(profiles);
+        Self::publish(app);
         if signed_in {
-            if let Err(error) = crate::commands::launch_requested_or_last(state.inner()) {
-                profiles.detail = format!("Signed in. Product launch failed: {error}");
+            if let Err(error) = state.windows.show(app, crate::windows::WindowKind::Main) {
                 if let Ok(mut hub) = state.hub.lock() {
                     hub.startup_message(error);
                 }
             }
         }
-        drop(profiles);
-        Self::publish(app);
     }
 }
 

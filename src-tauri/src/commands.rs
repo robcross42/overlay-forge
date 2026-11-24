@@ -196,27 +196,6 @@ pub fn launch_from_arguments(
     Ok(())
 }
 
-pub fn launch_requested_or_last(state: &AppState) -> Result<bool, String> {
-    let requested = std::env::args()
-        .skip(1)
-        .find_map(|arg| ProductKind::parse(arg.trim_start_matches("--product=")));
-    let target = requested.or_else(|| {
-        state
-            .database
-            .last_product()
-            .ok()
-            .flatten()
-            .and_then(|key| ProductKind::parse(&key))
-    });
-    if let Some(kind) = target {
-        if resolve(kind).is_some() {
-            launch(kind, state)?;
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
 #[tauri::command]
 pub fn shutdown_app(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
     state.windows.quit(&app)

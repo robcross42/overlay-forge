@@ -13,7 +13,7 @@
 - In **Chat**, leave **Use local demo** unchecked. Send a made-up word and ask for it again in the same conversation. Expect streamed replies. Use **New chat** for a separate context.
 - Restart after a completed reply. Expect the latest conversation to be selected and completed turns to be available for follow-up. Drafts and unfinished replies clear when the app exits.
 - Use **Stop all local work / request cleanup** during a reply. The card should retain any partial text and distinguish local stop from remote completion.
-- Verify requested and last-used product dispatch. The host stays resident, and the dashboard shows which products are unavailable. The legacy database stays untouched.
+- Verify explicit product-picker launch and requested-target forwarding to an already signed-in host. The host stays resident, and the dashboard shows which products are unavailable. Google sign-in must return to the main dashboard without launching a remembered module. The legacy database stays untouched.
 
 Sleep/wake is not validated and was explicitly declared nonblocking by the owner on 23 November 2026. Multi-monitor testing was removed from active acceptance because the owner uses one monitor; it remains unscheduled backlog [#18](https://github.com/robcross42/overlay-forge/issues/18). Linux and packaged builds require separate acceptance.
 
@@ -35,7 +35,9 @@ Live checks still to perform with the configured Desktop client:
 - Sign out and check both windows: private chat/request/draft views disappear. Saved protected data stays on disk. Sign in again as administrator and confirm restored history.
 - Switch to a different Google account: expect Family member role, product launcher, no host ChatGPT controls or history. Verify native hub/ChatGPT commands reject that session and stale administrator session IDs; hiding controls alone is insufficient evidence.
 - Decline or cancel Google sign-in and retry. An interrupted switch should preserve the prior profile and report the error. Switching during an active request or unresolved resource cleanup must fail clearly until work is settled.
-- Recheck Media launch/resume after Google sign-in, plus shortcut/Escape in signed-out and signed-in states. Existing standalone product processes and data are outside the host authorization boundary.
+- Recheck explicit Media launch after Google sign-in, plus shortcut/Escape in signed-out and signed-in states. Successful sign-in must focus the main dashboard and leave Media closed unless it was already running. Existing standalone product processes and data are outside the host authorization boundary.
+
+Owner sign-in succeeded with the newest Desktop client and protected JSON import; agent UI inspection confirmed Administrator status and restored host history. The owner then clarified that authentication must return to the main host. The previous automatic last-used-product launch was removed from sign-in completion, which now uses the existing WindowManager to show the main window. Live acceptance of that corrected return destination remains pending. Separately, Media's debug executable was observed loading the host frontend at port 1420 and reporting `Command identity_snapshot not found`; that Media development-port conflict remains unresolved and is not Google authentication inside Media.
 
 Google Cloud audience/test-user configuration and actual client eligibility are owner-controlled. The original supplied client ID was replaced with the new Desktop client before the retry. No successful Google token exchange or family-account acceptance is claimed yet. App sessions last until sign-out/switch/process exit; no remote Google revocation polling is claimed.
 
