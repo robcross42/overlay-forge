@@ -149,6 +149,14 @@ impl WindowManager {
         Ok(())
     }
     pub fn quit(&self, app: &AppHandle) -> Result<(), String> {
+        {
+            let profiles = app.state::<crate::AppState>();
+            let profiles = profiles.profiles.lock().map_err(|_| "Google session is unavailable.")?;
+            if profiles.is_busy() {
+                profiles.cancel();
+                return Err("Quit paused while Google sign-in stops. Wait a moment, then Quit again.".into());
+            }
+        }
         if app.state::<crate::AppState>().chatgpt.is_busy() {
             app.state::<crate::AppState>().chatgpt.stop(app);
             return Err("Quit paused while ChatGPT connection work stops. Wait for its final status, then Quit again.".into());

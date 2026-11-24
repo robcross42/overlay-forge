@@ -60,7 +60,7 @@ export class HubClient {
     return `${count("user")} needs you · ${count("assistant")} working${count("unknown") ? ` · ${count("unknown")} unknown` : ""}`;
   }
 }
-export function useHub(conversationId?: string | null) {
+export function useHub(sessionId: string, conversationId?: string | null) {
   const [hub, setHub] = useState<Snapshot>();
   const [error, setError] = useState("");
   useEffect(() => {
@@ -68,7 +68,7 @@ export function useHub(conversationId?: string | null) {
     let unlisten: (() => void) | undefined;
     const refresh = async () => {
       try {
-        const snapshot = await invoke<Snapshot>("hub_snapshot", { conversationId: conversationId ?? null });
+        const snapshot = await invoke<Snapshot>("hub_snapshot", { conversationId: conversationId ?? null, sessionId });
         if (active) setHub(old => !old || snapshot.revision >= old.revision ? snapshot : old);
       } catch (e) { if (active) setError(String(e)); }
     };
@@ -77,9 +77,9 @@ export function useHub(conversationId?: string | null) {
       unlisten = stop; void refresh();
     }).catch(e => { if (active) setError(String(e)); });
     return () => { active = false; unlisten?.(); };
-  }, [conversationId]);
+  }, [conversationId, sessionId]);
   const run = async <T = void>(command: string, args?: Record<string, unknown>): Promise<T | undefined> => {
-    try { const result = await HubClient.mutate<T>(command, args); setError(""); return result; }
+    try { const result = await HubClient.mutate<T>(command, { ...args, sessionId }); setError(""); return result; }
     catch (e) { setError(String(e)); }
   };
   return { hub, error, run };

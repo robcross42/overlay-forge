@@ -20,6 +20,38 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.3.3 - 2026-11-23
+
+### 2026-11-23
+
+#### Fixed
+
+- 19:27:59 EST - Return successful Google sign-in to the main Overlay Forge dashboard instead of automatically launching the last-used product. Authentication and ChatGPT administration remain host-owned (#17).
+
+## 0.3.2 - 2026-11-23
+
+### 2026-11-23
+
+#### Changed
+
+- 19:22:54 EST - Updated the Google Desktop OAuth client ID to the owner's new Overlay Forge client; native JSON import continues to require an exact client match (#17).
+
+## 0.3.1 - 2026-11-23
+
+### 2026-11-23
+
+#### Fixed
+
+- 19:12:04 EST - Import the configured Google Desktop client's application secret into native protected storage and include it in token exchange. Added bounded native JSON import and safe rejection diagnostics after browser authorization failed to establish an app session (#17).
+
+## 0.3.0 - 2026-11-23
+
+### 2026-11-23
+
+#### Added
+
+- 19:02:27 EST - Added Google desktop sign-in and family/admin roles. Only the pinned administrator can access the existing protected ChatGPT connection, chat history, drafts and requests. Family members can open products; curated AI media actions remain future work (#17).
+
 ## 0.2.1 - 2026-11-23
 
 ### 2026-11-23

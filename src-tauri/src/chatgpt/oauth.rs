@@ -55,37 +55,8 @@ impl AuthAttempt {
     }
     #[cfg(windows)]
     pub fn open_browser(&self, host: &str) -> Result<(), String> {
-        use std::{
-            os::windows::process::CommandExt,
-            path::PathBuf,
-            process::{Command, Stdio},
-        };
-        use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
-
-        let error = "Could not open the system browser. No credentials were transmitted.";
-        let powershell = PathBuf::from(std::env::var_os("SystemRoot").ok_or(error)?)
-            .join(r"System32\WindowsPowerShell\v1.0\powershell.exe");
-        // Pass the URL as data and remove it from the environment before opening the browser.
-        let opened = Command::new(powershell)
-            .args([
-                "-NoProfile",
-                "-NonInteractive",
-                "-Command",
-                "$url = $env:OVERLAY_FORGE_OAUTH_URL; Remove-Item Env:OVERLAY_FORGE_OAUTH_URL; Start-Process -FilePath $url -ErrorAction Stop",
-            ])
-            .env("OVERLAY_FORGE_OAUTH_URL", self.authorization_url(host))
-            .env_remove("OPENAI_API_KEY")
-            .env_remove("OPENAI_ACCESS_TOKEN")
-            .env_remove("CHATGPT_ACCESS_TOKEN")
-            .creation_flags(CREATE_NO_WINDOW)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .map_err(|_| error)?;
-        opened.success().then_some(()).ok_or_else(|| error.into())
+        crate::browser_auth::open_system_browser(&self.authorization_url(host))
     }
-
     #[cfg(not(windows))]
     pub fn open_browser(&self, _host: &str) -> Result<(), String> {
         Err("ChatGPT browser sign-in is currently available on Windows.".into())

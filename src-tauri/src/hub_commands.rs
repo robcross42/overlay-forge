@@ -9,7 +9,8 @@ fn notify(app: &AppHandle) {
     let _ = app.emit("hub-changed", ());
 }
 #[tauri::command]
-pub fn hub_stop_all(state: State<'_, AppState>, app: AppHandle) -> Result<(), String> {
+pub fn hub_stop_all(state: State<'_, AppState>, app: AppHandle, session_id: String) -> Result<(), String> {
+    let _profile = crate::profiles::ProfileService::require_admin(&state, &session_id)?;
     state
         .hub
         .lock()
@@ -23,7 +24,9 @@ pub fn hub_stop_all(state: State<'_, AppState>, app: AppHandle) -> Result<(), St
 pub fn hub_snapshot(
     state: State<'_, AppState>,
     conversation_id: Option<String>,
+    session_id: String,
 ) -> Result<HubSnapshot, String> {
+    let _profile = crate::profiles::ProfileService::require_admin(&state, &session_id)?;
     let hub = state.hub.lock().map_err(|_| "AI hub is unavailable.")?;
     let connection = state.chatgpt.snapshot()?;
     let mut snapshot = hub.snapshot_for(
@@ -39,7 +42,9 @@ pub fn hub_draft(
     text: String,
     state: State<'_, AppState>,
     app: AppHandle,
+    session_id: String,
 ) -> Result<(), String> {
+    let _profile = crate::profiles::ProfileService::require_admin(&state, &session_id)?;
     state
         .hub
         .lock()
@@ -56,7 +61,9 @@ pub fn hub_submit(
     conversation_id: Option<String>,
     state: State<'_, AppState>,
     app: AppHandle,
+    session_id: String,
 ) -> Result<Option<String>, String> {
+    let _profile = crate::profiles::ProfileService::require_admin(&state, &session_id)?;
     if provider == AiProvider::Chatgpt && !demo {
         return crate::chatgpt::ChatgptService::start_chat(
             &app,
@@ -85,7 +92,9 @@ pub fn hub_action(
     input: ActionInput,
     state: State<'_, AppState>,
     app: AppHandle,
+    session_id: String,
 ) -> Result<(), String> {
+    let _profile = crate::profiles::ProfileService::require_admin(&state, &session_id)?;
     state
         .hub
         .lock()

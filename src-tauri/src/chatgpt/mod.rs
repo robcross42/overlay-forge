@@ -683,14 +683,20 @@ pub enum Operation {
     Disconnect,
 }
 #[tauri::command]
-pub fn chatgpt_sign_in(app: AppHandle) -> Result<(), String> {
-    ChatgptService::start(app, Operation::SignIn)
+pub fn chatgpt_sign_in(app: AppHandle, session_id: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let _profile = crate::profiles::ProfileService::require_admin(&state, &session_id)?;
+    ChatgptService::start(app.clone(), Operation::SignIn)
 }
 #[tauri::command]
-pub fn chatgpt_verify(app: AppHandle, model: Option<String>) -> Result<(), String> {
-    ChatgptService::start(app, Operation::Verify(model))
+pub fn chatgpt_verify(app: AppHandle, model: Option<String>, session_id: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let _profile = crate::profiles::ProfileService::require_admin(&state, &session_id)?;
+    ChatgptService::start(app.clone(), Operation::Verify(model))
 }
 #[tauri::command]
-pub fn chatgpt_disconnect(app: AppHandle) -> Result<(), String> {
-    ChatgptService::start(app, Operation::Disconnect)
+pub fn chatgpt_disconnect(app: AppHandle, session_id: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let _profile = crate::profiles::ProfileService::require_admin(&state, &session_id)?;
+    ChatgptService::start(app.clone(), Operation::Disconnect)
 }

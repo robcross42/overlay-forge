@@ -31,6 +31,9 @@ impl HostDatabase {
                 conversation_id TEXT PRIMARY KEY NOT NULL,
                 protected_transcript BLOB NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS obj_host_google_client (
+                id INTEGER PRIMARY KEY CHECK(id=1), protected_config BLOB NOT NULL
+            );
         "#)?;
         Ok(Self {
             connection: Mutex::new(connection),
@@ -42,6 +45,15 @@ impl HostDatabase {
             .lock()
             .map_err(|_| rusqlite::Error::InvalidQuery)
     }
+    pub fn google_client_config(&self) -> rusqlite::Result<Option<Vec<u8>>> {
+        self.connection()?.query_row("SELECT protected_config FROM obj_host_google_client WHERE id=1", [], |row| row.get(0)).optional()
+    }
+    pub fn save_google_client_config(&self, protected: &[u8]) -> rusqlite::Result<()> {
+        self.connection()?.execute("INSERT INTO obj_host_google_client(id,protected_config) VALUES(1,?1)
+            ON CONFLICT(id) DO UPDATE SET protected_config=excluded.protected_config", params![protected])?;
+        Ok(())
+    }
+    #[cfg(test)]
     pub fn last_product(&self) -> rusqlite::Result<Option<String>> {
         self.connection()?
             .query_row(

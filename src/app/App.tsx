@@ -1,27 +1,28 @@
-import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { Action, HubClient, Provider, RequestRecord, useHub } from "../ai/hub";
 import { RequestCard } from "../ai/RequestCard";
 import { ChatgptConnectionCard } from "../ai/ChatgptConnectionCard";
 import { StatusCheckSummary } from "../ai/StatusCheckSummary";
+import { GoogleSession, GoogleSessionGate, ProfileControls } from "./GoogleSession";
+import { ProductLauncher } from "./ProductLauncher";
 
-type Product = { key: string; name: string; available: boolean; launchPath: string };
 const pages = ["Home", "Chat", "Connected Accounts", "Monitoring", "Activity & Approvals", "Settings"] as const;
 const quick = new URLSearchParams(window.location.search).get("surface") === "quick";
 const accounts = [
-  ["Google primary identity", "Unavailable · Desktop OpenID Connect / PKCE and ID-token validation are not implemented. Identity alone will grant no Gmail or Calendar access."],
+  ["Google primary identity", "Connected · Your verified Google identity controls your Overlay Forge role. Identity alone grants no Gmail or Calendar access."],
   ["Google services", "Disconnected · Gmail read and Calendar scopes require separate supported authorization and actual-grant reconciliation."],
   ["Codex", "Unavailable · Native app-server protocol, workspace permissions, streaming and approval transport required."],
   ["Dot", "Unavailable · No verified native session endpoint or conversation link configured. A new model session is not your Dot. MCP Events remains a feasibility gate."],
 ];
 export default function App() {
+  return <GoogleSessionGate>{session => <AdminApp key={session.sessionId} session={session} />}</GoogleSessionGate>;
+}
+function AdminApp({ session }: { session: GoogleSession }) {
   const [conversationSelection, setConversationSelection] = useState<string | null>();
-  const { hub, error, run } = useHub(conversationSelection);
+  const { hub, error, run } = useHub(session.sessionId, conversationSelection);
   const [page, setPage] = useState<typeof pages[number]>("Home");
   const [provider, setProvider] = useState<Provider>("chatgpt");
   const [demo, setDemo] = useState(false);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [productStatus, setProductStatus] = useState("");
   const [quit, setQuit] = useState(false);
   const input = useRef<HTMLTextAreaElement>(null);
   const pendingEdits = useRef(0);
@@ -34,23 +35,12 @@ export default function App() {
     pendingEdits.current++;
     void run("hub_draft", { provider, text }).finally(() => { pendingEdits.current--; });
   };
-  async function refreshProducts() {
-    try { setProducts(await invoke<Product[]>("list_products")); }
-    catch (e) { setProductStatus(String(e)); }
-  }
-  useEffect(() => { if (!quick) void refreshProducts(); }, []);
   useEffect(() => {
     if (!quick) return;
     const focus = () => input.current?.focus();
     window.addEventListener("focus", focus);
     return () => window.removeEventListener("focus", focus);
   }, []);
-  useEffect(() => {
-    if (!quick) return;
-    const escape = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); void run("hide_quick_prompt"); } };
-    window.addEventListener("keydown", escape);
-    return () => window.removeEventListener("keydown", escape);
-  }, [run]);
   const connection = hub?.chatgpt;
   const liveChat = provider === "chatgpt" && !demo;
   const conversations = hub?.chatgptConversations ?? [];
@@ -98,14 +88,11 @@ export default function App() {
       </section>}
       {(quick || page === "Chat") && <ChatgptConnectionCard connection={connection} run={run} />}
       {hub && (quick || page === "Chat") && <StatusCheckSummary checks={hub.statusChecks} />}
-      {!quick && page === "Connected Accounts" && <section className="panel"><h2>Accounts & capabilities</h2><p>OAuth is preferred where supported. App identity, service access, AI disclosure, and action approval are separate permissions.</p>{accounts.map(([title,detail]) => <article className="account" key={title}><h3>{title}</h3><p>{detail}</p></article>)}<p>ChatGPT tokens remain native and platform-protected; the renderer receives only account/status fields. Google, Codex and Dot remain unavailable.</p></section>}
+      {!quick && page === "Connected Accounts" && <section className="panel"><h2>Accounts & capabilities</h2><ProfileControls session={session} /><p>OAuth is preferred where supported. App identity, service access, AI disclosure, and action approval are separate permissions.</p>{accounts.map(([title,detail]) => <article className="account" key={title}><h3>{title}</h3><p>{detail}</p></article>)}<p>ChatGPT tokens remain native and platform-protected. ChatGPT access is administrator-only. Codex and Dot remain unavailable.</p></section>}
       {!quick && page === "Monitoring" && <section className="panel"><h2>Monitoring is not running</h2><p>Signing in will not enable monitoring. Rules will require a selected account and resource, purpose, cadence, quiet hours, destination, retention and explicit enablement.</p><p>Durable jobs, retry/backoff, deduplication, cursors, pause and bounded catch-up are not implemented. A local app cannot check accounts while this PC is off. Hosted workers require a separate decision.</p></section>}
       {!quick && page === "Activity & Approvals" && <section className="panel"><h2>All request activity</h2><p>{HubClient.aggregate(hub?.requests ?? [])}</p><p>Approvals below belong only to the local demo; they cannot grant access or execute external actions.</p>{[...(hub?.requests ?? [])].reverse().map(r => <RequestCard key={r.id} request={r} act={act} />)}{!hub?.requests.length && <p>No request activity yet.</p>}</section>}
       {!quick && page === "Settings" && <section className="panel"><h2>Session & privacy</h2><p>Shortcut: Ctrl+Alt+Space. Registration errors appear above. Custom shortcuts and durable preferences are not implemented.</p><p>Completed ChatGPT conversations are protected and saved on this device. Drafts, unfinished replies and demo activity are cleared on Quit. Each ChatGPT submission includes the text you send and completed turns from the selected conversation.</p><p>ChatGPT and Codex have separate drafts and request histories. Switching provider affects only your next submission.</p><p>Placement uses the cursor display work area on each invocation. Sleep/wake, display-change recovery, and timing targets still require runtime validation.</p></section>}
-      {!quick && page === "Home" && <section className="panel"><div className="row"><h2>Your products</h2><button onClick={() => void refreshProducts()}>Refresh</button></div><p role="status">{productStatus}</p><div className="products">{products.map(product => <button key={product.key} disabled={!product.available} onClick={() => {
-        setProductStatus(`Launching ${product.name}…`);
-        void invoke("launch_product", { productKey: product.key }).then(() => setProductStatus(`${product.name} opened. Overlay Forge remains resident.`)).catch(e => setProductStatus(String(e)));
-      }}><strong>{product.name}</strong><small>{product.available ? "Open product" : product.key === "journal" ? "Start its local development server" : "Build or install this product first"}</small></button>)}</div></section>}
+      {!quick && page === "Home" && <><section className="panel"><ProfileControls session={session} /></section><ProductLauncher sessionId={session.sessionId} /></>}
       {quit && <section className="panel" role="alertdialog" aria-label="Quit Overlay Forge"><h2>Quit Overlay Forge?</h2><p>Completed ChatGPT conversations are saved on this device. Drafts, unfinished replies and demo activity clear on exit.</p><button onClick={() => void run("shutdown_app")}>Quit Overlay Forge</button><button onClick={() => setQuit(false)}>Keep running</button></section>}
     </section>
   </main>;

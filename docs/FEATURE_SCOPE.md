@@ -1,8 +1,10 @@
 # Overlay Forge Host Scope
 
-In scope: private product discovery, typed target dispatch, last-used resume, host window state, resident lifecycle, and the approved personal AI anchor described in [AI Anchor Decision and Delivery](AI_ANCHOR.md).
+In scope: private product discovery, explicit typed target dispatch, retained last-used product state, host window state, resident lifecycle, and the approved personal AI anchor described in [AI Anchor Decision and Delivery](AI_ANCHOR.md). Google authentication belongs to the main host and returns to its dashboard; it does not auto-launch a module.
 
 The AI anchor includes Google primary identity, separately authorized service access, extensible connected accounts, ChatGPT/Codex shared AI connections, monitoring, action approvals, and Dot feasibility. The resident shell, local request-state demonstration, native ChatGPT sign-in, fixed streaming account verification and multi-turn ChatGPT composer with protected local history are implemented. Account read/write, scheduled remote monitoring, hosted services and module connection APIs remain unavailable.
+
+Google desktop identity and family/admin roles are implemented. The administrator is pinned to the first verified Google issuer/subject matching the locally configured admin Gmail. ChatGPT is administrator-only; family sessions have product-launcher access. Family-facing curated prompts/responses, including similar-media discovery, are future work and do not authorize ordinary family chat. See [Google setup and boundaries](../README.md#google-sign-in-and-family-access). Host roles do not change standalone product authentication or data ownership.
 
 Out of scope: embedded product UI or business logic, product settings/data migration, dynamic code loading, marketplace behavior, automatic updates, and executable commands stored in SQLite or editable configuration. Hosted monitoring requires separate authorization.
 
