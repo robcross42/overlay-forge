@@ -1,3 +1,5 @@
+import { isTauri } from "@tauri-apps/api/core";
+import { BrowserApp } from "../browser/BrowserApp";
 import { useEffect, useRef, useState } from "react";
 import { Action, HubClient, Provider, RequestRecord, useHub } from "../ai/hub";
 import { RequestCard } from "../ai/RequestCard";
@@ -15,6 +17,7 @@ const accounts = [
   ["Dot", "Unavailable · No verified native session endpoint or conversation link configured. A new model session is not your Dot. MCP Events remains a feasibility gate."],
 ];
 export default function App() {
+  if (!isTauri()) return <BrowserApp />;
   return <GoogleSessionGate>{session => session.profile?.admin
     ? <AdminApp key={session.sessionId} session={session} />
     : <FamilyApp key={session.sessionId} session={session} />}</GoogleSessionGate>;

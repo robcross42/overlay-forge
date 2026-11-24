@@ -73,6 +73,8 @@ Preferred categories are Added, Changed, Fixed, Removed, Documentation, Validati
 Keep the same version in:
 
 - `package.json`
+- `server/Cargo.toml` and its package entry in `server/Cargo.lock`
+- `crates/google-identity/Cargo.toml` and its package entries in both consumer Cargo lockfiles
 - the root package and empty-package entries in `package-lock.json`
 - `src-tauri/Cargo.toml`
 - the `overlay-forge` package entry in `src-tauri/Cargo.lock`

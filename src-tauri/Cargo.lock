@@ -2755,13 +2755,14 @@ dependencies = [
 
 [[package]]
 name = "overlay-forge"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
  "bson",
  "flate2",
  "jsonwebtoken",
+ "overlay-forge-google-identity",
  "overlay-forge-media",
  "png 0.18.1",
  "rand",
@@ -2782,8 +2783,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "overlay-forge-google-identity"
+version = "0.5.0"
+dependencies = [
+ "jsonwebtoken",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "overlay-forge-media"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "base64 0.22.1",
  "bson",

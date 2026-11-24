@@ -20,6 +20,20 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.5.0 - 2026-11-24
+
+### 2026-11-24
+
+#### Added
+
+- 16:30:07 EST - Added a headless browser server with Google Web OAuth, manually approved Gmail/Workspace addresses, first-login Google subject pinning and independent revocable browser sessions (#25).
+- 16:30:07 EST - Added browser transport for the shared family Media UI, client-side link opening and per-account navigation preference, without exposing desktop administration, file import or server-side program launching.
+- 16:30:07 EST - Reused Media's headless services and extracted shared Google signature/claim verification for native and browser authentication. Added HTTPS proxy, local development and approval-management setup.
+
+#### Validation
+
+- 16:30:07 EST - Frontend build, headless server check/Clippy, native library check and scoped authentication review passed. Linux dependency-tree inspection confirms no GUI runtime in server mode. Tests not run (rapid-development policy). Public URL, Google Web client, real login, public TLS/proxy and Ubuntu runtime acceptance remain owner configuration/validation.
+
 ## 0.4.0 - 2026-11-24
 
 ### 2026-11-24

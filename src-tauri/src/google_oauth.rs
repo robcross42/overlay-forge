@@ -1,9 +1,8 @@
 //! Native Google OpenID Connect. Only the verified identity leaves this module.
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-use jsonwebtoken::{
-    decode, decode_header,
-    jwk::{JwkSet, KeyAlgorithm, PublicKeyUse},
-    Algorithm, DecodingKey, Validation,
+pub use overlay_forge_google_identity::GoogleIdentity;
+use overlay_forge_google_identity::{
+    verify_google_identity, VerificationContext, GOOGLE_ISSUER as ISSUER,
 };
 use rand::RngCore;
 use reqwest::{blocking::Client, redirect::Policy, Url};
@@ -21,18 +20,9 @@ use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 pub const CLIENT_ID: &str =
     "840684879038-u3ge7ov3vede0slbgntdam99mtg0u86r.apps.googleusercontent.com";
-const ISSUER: &str = "https://accounts.google.com";
 const CALLBACK_PATH: &str = "/";
 const MAX_HEADERS: usize = 16 * 1024;
 const MAX_BODY: usize = 64 * 1024;
-
-pub struct GoogleIdentity {
-    pub issuer: String,
-    pub subject: String,
-    pub email: Option<String>,
-    pub name: Option<String>,
-    pub expires_at: u64,
-}
 
 struct SignInAttempt<'a> {
     cancel: &'a AtomicBool,
@@ -308,79 +298,18 @@ impl SignInAttempt<'_> {
 
     fn validate_identity(&self, http: &Client, token: &str) -> Result<GoogleIdentity, String> {
         self.check_active()?;
-        let header = decode_header(token).map_err(|_| "Invalid Google identity token.")?;
-        if header.alg != Algorithm::RS256 {
-            return Err("Unsupported Google identity signature algorithm.".into());
-        }
-        let kid = header
-            .kid
-            .filter(|value| !value.is_empty())
-            .ok_or("Google identity has no signing-key ID.")?;
-        let response = http
-            .get("https://www.googleapis.com/oauth2/v3/certs")
-            .timeout(self.request_timeout()?)
-            .send()
-            .map_err(|_| "Unable to retrieve Google verification keys.")?;
+        let identity = verify_google_identity(
+            http,
+            token,
+            VerificationContext {
+                client_id: CLIENT_ID,
+                nonce: self.nonce.as_str(),
+                started_at: self.started_at,
+                require_authoritative_email: false,
+            },
+        )?;
         self.check_active()?;
-        let keys: JwkSet = serde_json::from_slice(&read_response(response, "signing-key lookup")?)
-            .map_err(|_| "Invalid Google verification keys.")?;
-        let key = keys
-            .find(&kid)
-            .ok_or("Google signing key was not found. Retry sign-in.")?;
-        if key
-            .common
-            .key_algorithm
-            .as_ref()
-            .is_some_and(|algorithm| *algorithm != KeyAlgorithm::RS256)
-            || key
-                .common
-                .public_key_use
-                .as_ref()
-                .is_some_and(|usage| *usage != PublicKeyUse::Signature)
-        {
-            return Err("Google verification key is not an RS256 signing key.".into());
-        }
-        let decoding_key =
-            DecodingKey::from_jwk(key).map_err(|_| "Unsupported Google verification key.")?;
-        let mut rules = Validation::new(Algorithm::RS256);
-        rules.set_issuer(&[ISSUER, "accounts.google.com"]);
-        rules.set_audience(&[CLIENT_ID]);
-        rules.set_required_spec_claims(&["iss", "sub", "aud", "exp", "iat", "nonce"]);
-        rules.leeway = 0;
-        let claims = decode::<IdentityClaims>(token, &decoding_key, &rules)
-            .map_err(|_| {
-                "Google identity signature, issuer, audience or expiry validation failed."
-            })?
-            .claims;
-        let now = seconds();
-        if claims.nonce != self.nonce.as_str()
-            || claims.iat > now.saturating_add(60)
-            || claims.iat < self.started_at.saturating_sub(60)
-            || claims.exp <= claims.iat
-            || claims.exp <= now
-            || !valid_label(&claims.sub, 255)
-            || claims
-                .azp
-                .as_deref()
-                .is_some_and(|value| value != CLIENT_ID)
-            || (claims.aud.count() > 1 && claims.azp.as_deref() != Some(CLIENT_ID))
-        {
-            return Err(
-                "Google identity nonce, subject, issued-at or authorized-party validation failed."
-                    .into(),
-            );
-        }
-        self.check_active()?;
-        Ok(GoogleIdentity {
-            issuer: ISSUER.into(),
-            subject: claims.sub,
-            // Email is a display label, never the stable profile key.
-            email: claims
-                .email
-                .filter(|email| claims.email_verified && valid_label(email, 320)),
-            name: claims.name.filter(|name| valid_label(name, 256)),
-            expires_at: claims.exp,
-        })
+        Ok(identity)
     }
 }
 
@@ -392,39 +321,6 @@ struct TokenResponse {
     access_token: String,
     #[serde(default)]
     refresh_token: String,
-}
-
-#[derive(Deserialize)]
-struct IdentityClaims {
-    sub: String,
-    aud: Audience,
-    exp: u64,
-    iat: u64,
-    nonce: String,
-    #[serde(default)]
-    azp: Option<String>,
-    #[serde(default)]
-    email: Option<String>,
-    #[serde(default)]
-    email_verified: bool,
-    #[serde(default)]
-    name: Option<String>,
-}
-
-#[derive(Deserialize)]
-#[serde(untagged)]
-enum Audience {
-    One(String),
-    Many(Vec<String>),
-}
-
-impl Audience {
-    fn count(&self) -> usize {
-        match self {
-            Self::One(value) => usize::from(!value.is_empty()),
-            Self::Many(values) => values.len(),
-        }
-    }
 }
 
 fn read_response(
@@ -497,10 +393,6 @@ fn respond(stream: &mut TcpStream, accepted: bool) {
     };
     let response = format!("HTTP/1.1 {status}\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {}\r\nCache-Control: no-store\r\nContent-Security-Policy: default-src 'none'; frame-ancestors 'none'\r\nX-Content-Type-Options: nosniff\r\nConnection: close\r\n\r\n{message}", message.len());
     let _ = stream.write_all(response.as_bytes());
-}
-
-fn valid_label(value: &str, max: usize) -> bool {
-    !value.trim().is_empty() && value.len() <= max && !value.chars().any(char::is_control)
 }
 
 fn random_value() -> Zeroizing<String> {

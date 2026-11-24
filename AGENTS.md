@@ -29,6 +29,7 @@ Read the smallest relevant set before editing:
 | General project direction | `docs/PROJECT_OVERVIEW.md` |
 | Repository ownership and extraction provenance | `docs/REPOSITORY_BOUNDARIES.md` |
 | Frontend/backend architecture | `docs/ARCHITECTURE.md` |
+| Browser/server access, Web OAuth and approvals | `docs/BROWSER_SERVER.md` |
 | SQLite tables or migrations | `docs/DATA_MODEL.md` |
 | Scope boundaries | `docs/FEATURE_SCOPE.md` |
 | Validation expectations | `docs/VALIDATION.md` |

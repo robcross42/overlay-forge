@@ -2,9 +2,9 @@
 
 ## Current Shape
 
-Overlay Forge 0.4.0
+Overlay Forge 0.5.0
 
-This is a private development version.
+This is a private development version. A headless server now serves the Media family UI to approved Google users in normal browsers; see [Browser server setup](BROWSER_SERVER.md).
 
 The main app is a resident personal AI host and launcher. Media UI and services are linked from the owning repository into one host application; product databases and domain code retain their separate ownership. Other modules keep their current launch paths.
 

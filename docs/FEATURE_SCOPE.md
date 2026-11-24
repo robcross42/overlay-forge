@@ -15,3 +15,7 @@ Product work belongs in the Media, Gaming, Retirement, or Journal repository and
 Deferred module concepts are not current scope. `LanInputBridge` is recorded in
 [Future Module Concepts](FUTURE_FEATURES.md); implementing it requires an explicit decision to
 change the current host-only repository boundary.
+
+## Approved browser clients
+
+The 24 November direction authorizes a headless Ubuntu server behind HTTPS, Google Web OAuth and a locally managed email allowlist. Browser clients access the shared family Media library without a desktop installation. Desktop administration/AI remains private and is not proxied to browsers. Other products are not yet browser modules. Hosted infrastructure provisioning, public DNS/TLS setup and Google Web OAuth client creation remain owner configuration, described in [Browser server setup](BROWSER_SERVER.md).

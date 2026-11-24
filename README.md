@@ -3,13 +3,17 @@
 Overlay Forge is the resident personal AI host and launcher for independently owned desktop products and the local Journal web product.
 
 ```text
-Current development version: 0.4.0
+Current development version: 0.5.0
 Source extraction baseline: develop@96aeb79778e148a66b8f88c2b9bcd27b8a415454
 ```
 
 Google sign-in returns administrators to a graphical connection dashboard; chat stays in Chat. Pages use navigation selection rather than repeated page headings. Choose Media, Gaming, Retirement or Journal directly in the left navigation. Media renders inside the host; other products retain their existing standalone launch paths. Family sessions open the integrated Media view and never receive host AI administration. Typed target forwarding remains available to an already signed-in host. Ctrl+Alt+Space opens a compact prompt; closing a window hides it, and the tray provides reopen and Quit controls.
 
 Use **Hide navigation** in the dashboard header to collapse the left pane, and **Show navigation** to restore it. The main pane scrolls independently; navigation stays in place and scrolls separately when needed in a short window. The collapsed state is saved locally and restored after restarting the app.
+
+## Browser clients and Ubuntu server
+
+The same Media UI can run in normal browsers through the new headless server. Ubuntu hosts the data and services; browser users sign in with an approved Google Gmail/Workspace account. You approve/revoke emails locally on the server. Web sessions and access approvals are separate from the desktop administrator session, and browser clients never receive desktop ChatGPT/admin commands. Follow [Browser server setup](docs/BROWSER_SERVER.md) for Web OAuth, HTTPS, approval commands and local Windows/browser development. Public URL, Google Web client and TLS/proxy configuration must be supplied before deployment.
 
 ## Google sign-in and family access
 

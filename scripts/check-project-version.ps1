@@ -36,6 +36,11 @@ if ($expectedVersion -notmatch '^\d+\.\d+\.\d+$') {
 }
 
 $observedVersions = [ordered]@{
+    "server/Cargo.toml" = Get-RequiredMatch -RelativePath "server/Cargo.toml" -Pattern '(?s)^\[package\].*?^version\s*=\s*"([^"]+)"' -Label "server package version"
+    "server/Cargo.lock" = Get-RequiredMatch -RelativePath "server/Cargo.lock" -Pattern '(?s)^\[\[package\]\]\s*\r?\nname\s*=\s*"overlay-forge-server"\s*\r?\nversion\s*=\s*"([^"]+)"' -Label "server lockfile version"
+    "crates/google-identity/Cargo.toml" = Get-RequiredMatch -RelativePath "crates/google-identity/Cargo.toml" -Pattern '(?s)^\[package\].*?^version\s*=\s*"([^"]+)"' -Label "shared identity version"
+    "server shared identity lock" = Get-RequiredMatch -RelativePath "server/Cargo.lock" -Pattern '(?s)^\[\[package\]\]\s*\r?\nname\s*=\s*"overlay-forge-google-identity"\s*\r?\nversion\s*=\s*"([^"]+)"' -Label "server shared identity version"
+    "native shared identity lock" = Get-RequiredMatch -RelativePath "src-tauri/Cargo.lock" -Pattern '(?s)^\[\[package\]\]\s*\r?\nname\s*=\s*"overlay-forge-google-identity"\s*\r?\nversion\s*=\s*"([^"]+)"' -Label "native shared identity version"
     "package-lock.json root" = Get-RequiredMatch -RelativePath "package-lock.json" -Pattern '^\{\s*\r?\n\s*"name"\s*:\s*"overlay-forge",\s*\r?\n\s*"version"\s*:\s*"([^"]+)"' -Label "root version"
     "package-lock.json package" = Get-RequiredMatch -RelativePath "package-lock.json" -Pattern '(?s)"packages"\s*:\s*\{\s*""\s*:\s*\{\s*"name"\s*:\s*"overlay-forge",\s*"version"\s*:\s*"([^"]+)"' -Label "empty-package version"
     "src-tauri/Cargo.toml" = Get-RequiredMatch -RelativePath "src-tauri/Cargo.toml" -Pattern '(?s)^\[package\].*?^version\s*=\s*"([^"]+)"' -Label "package version"

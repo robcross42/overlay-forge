@@ -15,7 +15,7 @@ const embeddedStyles = mediaStyles.replace(":root", ":host") + `
   .media-detail-hero h3, .media-card-title-row h4 { display:block; }
 `;
 
-export function EmbeddedMedia({ sessionId, administrator }: { sessionId: string; administrator: boolean }) {
+export function EmbeddedMedia({ sessionId, administrator, transport }: { sessionId: string; administrator: boolean; transport?: MediaTransport }) {
   const container = useRef<HTMLDivElement>(null);
   const [mount, setMount] = useState<HTMLDivElement>();
   useEffect(() => {
@@ -26,11 +26,11 @@ export function EmbeddedMedia({ sessionId, administrator }: { sessionId: string;
     style.textContent = embeddedStyles;
     const content = document.createElement("div");
     content.style.height = "100%";
-    const transport: MediaTransport = (command, args) => invoke(command, { ...args, sessionId });
-    const restore = configureMediaTransport(transport);
+    const nativeTransport: MediaTransport = (command, args) => invoke(command, { ...args, sessionId });
+    const restore = configureMediaTransport(transport ?? nativeTransport);
     shadow.replaceChildren(style, content);
     setMount(content);
     return () => { restore(); };
-  }, [sessionId]);
+  }, [sessionId, transport]);
   return <div className={`embedded-media${administrator ? "" : " family-media"}`} ref={container} aria-label="Media">{mount && createPortal(administrator ? <MediaApp /> : <div className="media-product-shell"><MediaLibrary /></div>, mount)}</div>;
 }
