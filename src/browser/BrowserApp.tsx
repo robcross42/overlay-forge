@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { EmbeddedMedia } from "../app/EmbeddedMedia";
 import { BrowserClient, type BrowserSession } from "./client";
+import { NavigationToggle } from "../app/NavigationToggle";
 
 export function BrowserApp() {
   const [session, setSession] = useState<BrowserSession | null>();
@@ -56,9 +57,9 @@ export function BrowserApp() {
       </nav>
       <button disabled={busy} onClick={() => void signOut()}>Sign out</button>
     </aside>
+    <NavigationToggle collapsed={session.navigationCollapsed} disabled={busy}
+      controls="browser-navigation" onToggle={() => void toggleNavigation()} />
     <div className="workspace-scroll"><section className={`workspace${page === "media" ? " workspace-media" : ""}`} aria-label={page === "media" ? "Media" : "Account"}>
-      <div className="workspace-tools"><button aria-controls="browser-navigation" aria-expanded={!session.navigationCollapsed} disabled={busy} onClick={() => void toggleNavigation()}>
-        {session.navigationCollapsed ? "Show navigation" : "Hide navigation"}</button></div>
       {error && <p className="error" role="alert">{error}</p>}
       {page === "media" && transport ? <EmbeddedMedia sessionId="browser" administrator={false} transport={transport} /> : <section className="panel">
         <p>{session.name ?? session.email}</p><p>{session.email}</p>

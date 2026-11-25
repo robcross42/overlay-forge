@@ -32,6 +32,7 @@ nav button{text-align:left;background:transparent;border-color:transparent}nav b
 
 .workspace-tools { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:24px; }
 .workspace-tools button { font-size:.8rem; }
+.workspace-tools:empty { display:none; }
 .module-navigation {
   display: grid;
   grid-auto-rows: max-content;
@@ -63,3 +64,11 @@ nav button{text-align:left;background:transparent;border-color:transparent}nav b
 .workspace-media { max-width:none; height:100%; display:flex; flex-direction:column; }
 .workspace-media .workspace-tools { flex:none; }
 .embedded-media { flex:1; min-height:400px; }
+.hub-shell { position:relative; --sidebar-width:225px; }
+.navigation-toggle {
+  position:absolute; z-index:5; top:18px; left:var(--sidebar-width);
+  transform:translateX(-50%); width:28px; height:36px; padding:0;
+  display:grid; place-items:center; border-radius:8px; font-size:1.2rem;
+}
+.navigation-collapsed .navigation-toggle { left:0; transform:none; }
+@media(max-width:760px) { .hub-shell { --sidebar-width:190px; } }

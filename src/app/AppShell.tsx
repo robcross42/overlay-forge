@@ -4,6 +4,7 @@ import { ReactNode, useEffect, useState } from "react";
 import type { GoogleSession } from "./GoogleSession";
 import { useNavigationPreference } from "./useNavigationPreference";
 import { EmbeddedMedia } from "./EmbeddedMedia";
+import { NavigationToggle } from "./NavigationToggle";
 
 export const adminPages = ["Home", "Chat", "Connected Accounts", "Monitoring", "Activity & Approvals", "Settings"] as const;
 export type AppPage = typeof adminPages[number] | "Media";
@@ -45,12 +46,11 @@ export function AppShell({ session, page, onPage, quick, children }: {
       <button aria-label="Refresh modules" title="Refresh modules" onClick={() => setProductRevision(value => value + 1)}>↻</button>
       <button onClick={() => setConfirmQuit(true)}>Quit</button>
     </aside>}
+    {!quick && <NavigationToggle collapsed={navigation.collapsed} disabled={navigation.disabled}
+      controls="main-navigation" onToggle={() => void navigation.toggle()} />}
     <div className="workspace-scroll">
       <section className={`workspace${page === "Media" && !quick ? " workspace-media" : ""}`} aria-label={quick ? "Quick prompt" : page}>
         <div className="workspace-tools">
-          {!quick && <button type="button" aria-controls="main-navigation" aria-expanded={!navigation.collapsed}
-            disabled={navigation.disabled} onClick={() => void navigation.toggle()}>
-            {navigation.collapsed ? "Show navigation" : "Hide navigation"}</button>}
           {(quick || session.profile?.admin) && <button onClick={() => void invoke(quick ? "show_main" : "show_quick_prompt").catch(() => setError("Could not open the requested view."))}>
             {quick ? "Open main app" : "Open quick prompt"}</button>}
           {quick && <button onClick={() => void invoke("hide_quick_prompt").catch(() => setError("Could not hide the prompt."))}>Hide</button>}
