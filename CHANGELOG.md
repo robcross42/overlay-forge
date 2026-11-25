@@ -20,6 +20,18 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.5.2 - 2026-11-25
+
+### 2026-11-25
+
+#### Changed
+
+- 16:25:46 EST - Pinned Media's section-header search, collapsed filters and responsive list/poster presentation. Existing browser/native transport, authentication and server configuration are unchanged. (#29).
+
+#### Validation
+
+- 16:25:46 EST - Targeted TypeScript checks, version consistency and scoped diff review passed. Tests not run (rapid-development policy). No builds, browser runtime/visual acceptance or deployment performed.
+
 ## 0.5.1 - 2026-11-25
 
 ### 2026-11-25
