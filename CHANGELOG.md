@@ -34,6 +34,18 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 - 16:30:07 EST - Frontend build, headless server check/Clippy, native library check and scoped authentication review passed. Linux dependency-tree inspection confirms no GUI runtime in server mode. Tests not run (rapid-development policy). Public URL, Google Web client, real login, public TLS/proxy and Ubuntu runtime acceptance remain owner configuration/validation.
 
+## 0.4.1 - 2026-11-24
+
+### 2026-11-24
+
+#### Fixed
+
+- 16:06:46 EST - Fit navigation to the actual viewport height with responsive spacing and single-line labels. All entries and footer controls fit the owner's maximized desktop window without a sidebar scrollbar; genuinely short windows retain accessible overflow (#23).
+
+#### Validation
+
+- 16:06:46 EST - Observed the sidebar overflow before the fix and all controls fitting without a scrollbar afterward in the running maximized Windows app. Other monitor/scaling combinations and Linux remain unverified. Tests not run (rapid-development policy).
+
 ## 0.4.0 - 2026-11-24
 
 ### 2026-11-24
