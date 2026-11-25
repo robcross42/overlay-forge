@@ -20,6 +20,249 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.5.0 - 2026-11-24
+
+### 2026-11-24
+
+#### Added
+
+- 16:30:07 EST - Added a headless browser server with Google Web OAuth, manually approved Gmail/Workspace addresses, first-login Google subject pinning and independent revocable browser sessions (#25).
+- 16:30:07 EST - Added browser transport for the shared family Media UI, client-side link opening and per-account navigation preference, without exposing desktop administration, file import or server-side program launching.
+- 16:30:07 EST - Reused Media's headless services and extracted shared Google signature/claim verification for native and browser authentication. Added HTTPS proxy, local development and approval-management setup.
+
+#### Validation
+
+- 16:30:07 EST - Frontend build, headless server check/Clippy, native library check and scoped authentication review passed. Linux dependency-tree inspection confirms no GUI runtime in server mode. Tests not run (rapid-development policy). Public URL, Google Web client, real login, public TLS/proxy and Ubuntu runtime acceptance remain owner configuration/validation.
+
+## 0.4.1 - 2026-11-24
+
+### 2026-11-24
+
+#### Fixed
+
+- 16:06:46 EST - Fit navigation to the actual viewport height with responsive spacing and single-line labels. All entries and footer controls fit the owner's maximized desktop window without a sidebar scrollbar; genuinely short windows retain accessible overflow (#23).
+
+#### Validation
+
+- 16:06:46 EST - Observed the sidebar overflow before the fix and all controls fitting without a scrollbar afterward in the running maximized Windows app. Other monitor/scaling combinations and Linux remain unverified. Tests not run (rapid-development policy).
+
+## 0.4.0 - 2026-11-24
+
+### 2026-11-24
+
+#### Changed
+
+- 15:46:49 EST - Replaced repeated page headings and the explanatory Home/chat content with a graphical connections dashboard. Chat stays in Chat; product links move into shared navigation (#22).
+- 15:46:49 EST - Linked Media's owning repository as a pinned source submodule, embedding its existing UI and native services in the host without a second product executable or server. Preserved its separate database and standalone developer mode.
+- 15:46:49 EST - Added native session authorization for embedded Media, administrator-only settings/import operations, and a family shell with integrated Media while keeping host AI administration private.
+
+#### Validation
+
+- Frontend build, host native development compilation/relaunch, Media standalone frontend/native builds, warning-free library Clippy, version consistency and final diff review passed. One host executable was observed with no separate Media executable. Tests not run (rapid-development policy); updated UI/provider and Linux integrated acceptance remain pending.
+
+## 0.3.6 - 2026-11-23
+
+### 2026-11-23
+
+#### Fixed
+
+- 22:59:26 EST - Open Google OAuth in the Ubuntu default browser through GIO and document local Google setup.
+
+#### Validation
+
+- Ubuntu frontend and native debug builds passed, along with all 33 native tests. Live Google sign-in opened Brave and returned to Overlay Forge with a verified family session.
+
+## 0.3.5 - 2026-11-23
+
+### 2026-11-23
+
+#### Changed
+
+- 22:11:52 EST - Persist dashboard navigation collapse state in host SQLite and restore it after restart. Authorized native commands own storage; failed saves are visible and restore the previous state (#20).
+
+#### Validation
+
+- Frontend build, native development compilation/relaunch, version consistency and diff review passed. Restart persistence awaits owner confirmation. Tests not run (rapid-development policy).
+
+## 0.3.4 - 2026-11-23
+
+### 2026-11-23
+
+#### Changed
+
+- 21:50:21 EST - Added a keyboard-accessible dashboard navigation toggle and independent main/navigation scrolling, retaining the selected page and draft when collapsed (#20).
+
+#### Validation
+
+- 21:50:21 EST - Frontend TypeScript/Vite build passed. Tests not run (rapid-development policy); visual acceptance remains pending.
+
+## 0.3.3 - 2026-11-23
+
+### 2026-11-23
+
+#### Fixed
+
+- 19:27:59 EST - Return successful Google sign-in to the main Overlay Forge dashboard instead of automatically launching the last-used product. Authentication and ChatGPT administration remain host-owned (#17).
+
+## 0.3.2 - 2026-11-23
+
+### 2026-11-23
+
+#### Changed
+
+- 19:22:54 EST - Updated the Google Desktop OAuth client ID to the owner's new Overlay Forge client; native JSON import continues to require an exact client match (#17).
+
+## 0.3.1 - 2026-11-23
+
+### 2026-11-23
+
+#### Fixed
+
+- 19:12:04 EST - Import the configured Google Desktop client's application secret into native protected storage and include it in token exchange. Added bounded native JSON import and safe rejection diagnostics after browser authorization failed to establish an app session (#17).
+
+## 0.3.0 - 2026-11-23
+
+### 2026-11-23
+
+#### Added
+
+- 19:02:27 EST - Added Google desktop sign-in and family/admin roles. Only the pinned administrator can access the existing protected ChatGPT connection, chat history, drafts and requests. Family members can open products; curated AI media actions remain future work (#17).
+
+## 0.2.1 - 2026-11-23
+
+### 2026-11-23
+
+#### Fixed
+
+- 18:11:57 EST - Restore a minimized quick prompt before focusing it through the shared window manager, including the shortcut and main-app button (#15).
+
+## 0.2.0 - 2026-11-16
+
+### 2026-11-16
+
+#### Added
+
+- 19:44:37 EST - Added a resident ChatGPT composer, browser sign-in, streamed multi-turn replies on the connected ChatGPT plan, and protected local conversation history (#15).
+- 19:44:37 EST - Added the dashboard and compact prompt with a shared native request registry, local status checks, and tray access.
+
+#### Validation
+
+- The Windows preview completed ChatGPT verification, streamed follow-ups with earlier context, and restored three completed turns after restart. See [Host Validation](docs/VALIDATION.md).
+
+## 1.0.4 - 2026-10-20
+
+### 2026-10-20
+
+#### Added
+
+- Added the closed Journal product target with fixed loopback service identity discovery, browser dispatch, requested/last-used launch support, and product refresh (#13). Journal data and credentials remain in its independent repository.
+
+#### Validation
+
+- Reviewed the scoped diff and direct/resume/fallback paths. Tests not run (rapid-development policy); no desktop build, packaging, or launcher runtime validation performed. Existing unrelated documentation edits are excluded.
+
+## 1.0.2 - 2026-08-14
+
+### 2026-08-14
+
+#### Documentation
+
+- 17:12:00 EDT - Recorded `LanInputBridge` as a deferred Overlay Forge Windows module concept with explicit input-safety, authenticated LAN transport, protocol, security, verification, exclusion, and implementation-gate requirements.
+- 17:12:00 EDT - Linked deferred module concepts from the project overview and scope while preserving the current host-only implementation boundary.
+
+#### Validation
+
+- 17:12:00 EDT - Passed the frontend production build, backend build, version-consistency check, and diff validation; no module implementation or runtime behavior changed.
+
+## 1.0.1 - 2026-08-04
+
+### Changed
+
+- Audited every active host Markdown file for the repository split, linked the three private product repositories, and clarified the historical boundary for pre-1.0 changelog entries.
+
+## 1.0.0 - 2026-08-04
+
+### 2026-08-04
+
+#### Changed
+
+- 04:16:20 EDT - Rebuilt Overlay Forge as a private typed launcher that dispatches directly to independently owned Media, Gaming, and Retirement products, resumes the last-used valid product, and shows only a minimal fallback picker.
+
+#### Removed
+
+- 04:16:20 EDT - Removed all embedded product, organizer, health-tracking, scheduler, shared-chat, legacy resale, game, media, and retirement business logic from the host.
+
+#### Data
+
+- 04:16:20 EDT - Isolated host state in `overlay-forge-host.sqlite3`; the original `overlay-forge.sqlite3` remains unchanged as a recoverable product-import source.
+
+> Changelog entries below this point describe the former monolithic application before the 1.0 repository split. They are retained only as historical release records; their modules, paths, and ownership statements are not current host architecture.
+
+#### Validation
+
+- 04:16:20 EDT - Validated the frontend production build, Rust build, Clippy review, version consistency, and whitespace checks.
+
+## 0.11.3 - 2026-08-02
+
+### 2026-08-02
+
+#### Added
+
+- 04:52:55 EDT - Added the Retirement Planning foundation workspace with Dashboard, Finances, Budget & Goals, Scenarios, Income Experiments, Simulations, Homes, and Readiness Checklist navigation backed by a local CAD profile.
+
+#### Changed
+
+- 04:52:55 EDT - Replaced the active Repair Resell navigation surface with Retirement Planning and moved the inactive legacy React surface into the archive.
+
+#### Documentation
+
+- 04:52:55 EDT - Added the Retirement Planning guide, archived the prior Repair Resell boundary, and updated the project architecture, data model, scope, validation, deferred-work, overview, and routing documentation.
+
+#### Validation
+
+- 04:52:55 EDT - Validated the foundation with the frontend production build, backend build, all 44 Rust tests, the archive-preservation migration regression test, Clippy, and git diff validation. Clippy reports only the pre-existing legacy Repair Resell high-arity warning.
+- 21:01:54 EDT - User manually validated the Retirement Planning module framework for release.
+
+#### Changed
+
+- 21:01:54 EDT - Updated all project version metadata to 0.11.3 for the Retirement Planning foundation.
+
+#### Validation
+
+- 21:03:59 EDT - Revalidated release 0.11.3 with the version-consistency check, frontend production build, backend build, all 44 Rust tests, Clippy, and git diff validation. Clippy reports only the documented legacy Repair Resell high-arity warning.
+
+## 0.11.2 - 2026-08-02
+
+### 2026-08-01
+
+#### Added
+
+- 01:30:18 EDT - Added a Trailmakers Gaming entry focused on vehicle-building chats, build references, screenshots, and future Lua mod work, backed by normalized game and authority-source settings.
+- 01:30:18 EDT - Added Trailmakers-specific chat context that prioritizes the requested live gameplay wiki, the official modding guide, and the installed Lua API documentation for version-sensitive mod guidance.
+
+#### Changed
+
+- 01:30:18 EDT - Generalized the existing supported-game section renderer so Trailmakers and future configured games can reuse the shared Gaming module scaffold without game-specific rendering branches.
+
+#### Documentation
+
+- 01:30:18 EDT - Added the Trailmakers guide and routed it through the curated AGENTS.md, README, architecture, data model, feature scope, deferred work, project overview, and validation documentation.
+
+#### Validation
+
+- 01:32:41 EDT - Validated the Trailmakers entry with npm.cmd run build, cargo build, all 43 Rust tests, cargo clippy --all-targets, the focused normalized-schema seed test, git diff --check, and local checks confirming the configured mods directory and trailmakers_docs.lua exist. Clippy reports only the documented pre-existing Repair Resell high-arity warning; repository-wide Rust formatting still has pre-existing drift in untouched code.
+
+### 2026-08-02
+
+#### Changed
+
+- 00:46:52 EDT - Updated all project version metadata to 0.11.2 for the Trailmakers Gaming entry.
+
+#### Validation
+
+- 00:46:52 EDT - User manually validated the Trailmakers game addition for release.
+- 00:48:41 EDT - Revalidated release 0.11.2 with the version-consistency check, frontend production build, backend build, all 43 Rust tests, Clippy, and git diff validation. Clippy reports only the documented pre-existing Repair Resell high-arity warning.
+
 ## 0.11.1 - 2026-07-29
 
 ### 2026-07-29
@@ -714,43 +957,7 @@ Version section for work started on 2026-06-16. Related changes that continued i
 - Documented the GearBlocks runtime refresh workflow for syncing current build changes into chat context after an explicit in-game export.
 - Documented that saved construction refresh reflects removals after the build is saved, while runtime log refresh remains the source for live runtime metadata.
 
-## 0.2.0 - 2026-06-15
-
-Minor version release for the GearBlocks construction runtime API interface inclusion.
-
-### 2026-06-15
-
-#### Changed
-
-- Bumped Overlay Forge from `0.1.0` to `0.2.0` for the new GearBlocks construction runtime API interface feature.
-- Marked the GearBlocks parts catalog as complete and validated for game version `0.8.96622`.
-- Added GearBlocks catalog version/status metadata to the Parts view.
-- Hid the GearBlocks category image import and clear controls from the normal Parts view while keeping the maintenance code path available for future game-version catalog refreshes.
-- Hid the GearBlocks Player.log parts import button from the normal Parts view while keeping the import functionality available elsewhere for maintenance.
-- Added a blank GearBlocks Constructions top-level view as the future catalog surface for in-game constructions.
-- Added a persistent GearBlocks construction index backed by `game_constructions`, populated from `SavedConstructions` by decoding each `construction.bytes` file.
-- Changed the GearBlocks Constructions view to list indexed saved constructions with part, composite, and file-size summaries.
-- Fully implemented support structures and exporter wiring for the documented `SmashHammer.GearBlocks.Construction` namespace reference interfaces.
-- Added persisted GearBlocks runtime construction exports backed by SQLite so the full latest `Player.log` export is available to chat context without relying only on ad hoc log parsing.
-- Added explicit GearBlocks runtime log import for refreshing runtime exports and runtime parts after the user runs `Export Target` or `Export All` in GearBlocks.
-- Expanded the GearBlocks Lua exporter to emit availability-only `apiAttributes` metadata for documented construction interfaces.
-- Changed the GearBlocks part detail view to list available runtime API attributes by name while keeping API metadata out of default chat prompt context.
-
-#### Documentation
-
-- Updated README, project plan, architecture, and data model notes for the Overlay Forge `0.2.0` GearBlocks runtime API interface release and future troubleshooting path.
-
-#### Validation
-
-- Validated the GearBlocks runtime API interface metadata path in-game on Rob's vehicle: catalog part details show API attributes without values, and DB definitions / runtime export context include indexed interface availability metadata.
-
-#### Fixed
-
-- Removed GearBlocks runtime API metadata from default game-chat prompt context; API details should only be included by a future explicit user-controlled include/snapshot action.
-- Changed the GearBlocks Lua exporter API metadata path so `apiAttributes` indexes interface/member availability without executing getter commands to capture values.
-- Added install-time and in-session GearBlocks API availability caching so known runtime parts reuse indexed API metadata instead of re-probing interface availability on every export.
-- Removed automatic GearBlocks runtime log sync from normal game selection / Parts navigation; runtime logs now import only through explicit user actions such as `Import Runtime Log`.
-- Resynced game chat messages after failed sends so persisted user prompts remain accurately reflected instead of disappearing from the local UI state.
+## Earlier development notes
 
 ### 2026-06-14
 

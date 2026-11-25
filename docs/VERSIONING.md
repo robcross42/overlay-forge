@@ -73,12 +73,14 @@ Preferred categories are Added, Changed, Fixed, Removed, Documentation, Validati
 Keep the same version in:
 
 - `package.json`
+- `server/Cargo.toml` and its package entry in `server/Cargo.lock`
+- `crates/google-identity/Cargo.toml` and its package entries in both consumer Cargo lockfiles
 - the root package and empty-package entries in `package-lock.json`
 - `src-tauri/Cargo.toml`
 - the `overlay-forge` package entry in `src-tauri/Cargo.lock`
 - `src-tauri/tauri.conf.json`
-- the current stable release in `README.md`
-- the current stable release in `docs/PROJECT_OVERVIEW.md`
+- the current development version in `README.md`
+- the current development version in `docs/PROJECT_OVERVIEW.md`
 - the newest version heading in `CHANGELOG.md`
 
 Run `npm.cmd run version:check` on Windows (`npm run version:check` elsewhere) after every version update. After the commit is tagged, `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/check-project-version.ps1 -RequireTag` also verifies that the matching local tag exists.

@@ -1,261 +1,35 @@
-# Overlay Forge Architecture
+# Overlay Forge Host Architecture
 
-## Application Shape
+The main app is the resident personal AI host under the [14 November boundary decision](AI_ANCHOR.md). React renders dashboard and compact-prompt views. Rust owns product dispatch, native window lifecycle and per-request state. `ProductKind` remains a closed enum.
 
-Overlay Forge is a Tauri desktop application with a React + TypeScript frontend and a Rust/Tauri backend. SQLite is the local source of truth.
+`HostDatabase` owns launcher/window state, protected ChatGPT credentials and protected completed conversations. `AiHub` holds provider-separated drafts, active requests and restored conversations. The native ChatGPT service assembles scoped history, owns credentials and streams through one Responses transport. Both windows subscribe before reading versioned snapshots. See the [data model](DATA_MODEL.md).
 
-The shell owns top-level layout, navigation, component hosting, window behavior, always-on-top behavior, global hotkeys, and overlay show/hide behavior.
+`ProfileService` and its `ProfileRepository` own Google session identity and the pinned administrator. `google_oauth` verifies browser sign-in and discards Google tokens; `browser_auth` is the shared browser-opening boundary used by both Google and ChatGPT. Every hub and ChatGPT command holds the profile guard through access checks and worker reservation. Session IDs reject delayed renderer commands after sign-out/switch. Profile transitions wait for worker completion and settled resource ownership, clear `AiHub`, and restore saved conversations only for the administrator. The frontend session gate unmounts both windows' private views during transitions; native authorization does not depend on hiding buttons. The singleton ChatGPT connection remains administrator-owned; family access uses the integrated Media shell and existing product launch targets; host AI remains administrator-only. See [setup and session limits](../README.md#google-sign-in-and-family-access).
 
-Feature modules render inside the shell-owned component host and should not directly own top-level window behavior.
+`ComputerSession` separately owns capture-resource evidence and last-observed indicator state for each request. Task completion never implies release. All normal task terminal paths, Stop and Quit request cleanup; absent adapter verification remains unknown. Unresolved ownership prevents eviction and normal Quit. The present implementation is metadata-only: no capture API is called. Durable lease recovery and a real native resource-owning adapter remain prerequisites; see [the lifecycle contract](AI_ANCHOR.md#task-status-and-computer-session-release).
 
-## Architecture Principles
+`WindowManager` creates both windows from typed composed configs and owns showing, hiding, focusing, placement and Quit. `WindowKind` replaces ad hoc label selection at call sites. The single-instance plugin forwards subsequent typed product invocations; tray controls and the global-shortcut plugin retain access to the resident app. Escape hides without cancelling. Windows focus restoration is best effort and errors are visible. Window-state persistence is not implemented and no `WindowStateRepository` is added until geometry restoration is implemented.
 
-Overlay Forge architecture should prefer reusable domain abstractions over one-off procedural patches when behavior is repeated or state crosses feature boundaries.
+Startup sequence:
 
-Repeated behavior, repeated state shape, duplicated validation, duplicated SQLite mapping, duplicated command payload shaping, and duplicated window setup are regression risks. New features and fixes should first determine whether they belong to an existing domain abstraction, such as a window manager, window config model, window state repository, module manager, settings service, SQLite repository, chat/session model, screenshot/attachment model, export service, log ingestion service, or Tauri command service layer.
+1. Show the main host's Google sign-in surface.
+2. Verify identity and establish the host role/session.
+3. Restore host chat data only for the administrator and focus the connection dashboard; family sessions open Media. Authentication never launches a product or resumes the last-used module.
+4. Open products only after an explicit picker selection or typed target forwarded to the already signed-in host.
+5. Keep the host resident and show product availability/launch errors without moving identity ownership into a module. Last-used product state remains stored but is not an automatic post-authentication launch instruction.
 
-If an appropriate abstraction already exists, extend it. If none exists and the concept appears in three or more places, or if two existing places have already diverged and caused a bug, create a shared abstraction before adding more call-site behavior.
+## Integrated Media
 
-The stack-specific model is:
+`AppShell` owns navigation, independent scrolling, persisted collapse state and the common Quit flow for administrator and family views. Home renders connection status tiles only. `EmbeddedMedia` mounts the owning product's React UI in a shadow root to isolate its stylesheet; product content titles remain visible while repeated page/section headings are omitted. Product links are direct navigation entries. Only Media is embedded in this slice.
 
-- React + TypeScript renders UI and handles local interaction.
-- TypeScript classes may own repeated state plus behavior for domain objects, validation, normalization, serialization, deserialization, command payload creation, and UI view-model mapping.
-- TypeScript interfaces and type aliases should remain the default for plain DTOs.
-- Rust uses structs, impl blocks, enums, traits, services, repositories, and modules rather than Java-style inheritance.
-- Tauri command handlers stay thin and delegate business logic to services, repositories, or domain methods.
-- SQLite access and row mapping should be centralized by persisted domain concept.
-- Long command, service, and repository argument lists should be converted into typed request, draft, options, or parameter structs when the values describe one domain operation.
-- Repeated frontend helpers such as unknown-error formatting, timestamp labels, local storage keys, Markdown cleanup, and command payload normalization should live in shared utilities or domain helpers.
-- Large source files should be split by domain boundary before they become dumping grounds for unrelated behavior.
+`modules/media` pins the Media repository via Git submodule. Cargo links its crate with the standalone feature disabled. `integrated_media` initializes the same product-owned database path and forwards only its shared command registry, rejecting missing/stale sessions and non-main-window requests. Settings writes and legacy import are administrator-only. Authorization guards remain held through synchronous Media commands so a session cannot switch during a mutation. Product services, mapping, schema and provider behavior remain owned by Media; no source copy or second process/server is used. The injected renderer transport adds the session ID before calling native commands. The existing Media data is device-local and shared across host profiles.
 
-For non-trivial code changes, implementation notes should identify the domain concept involved, the reusable abstraction added or reused, duplicate logic removed, regression risk reduced, and tests added or updated. If no abstraction is needed, the implementation note should explain why.
+The host still launches other standalone products. It does not implement their integration or copy their databases. Media's standalone developer bootstrap uses the same UI, registry and services.
 
-## Frontend Structure
+## Browser/server mode
 
-The frontend is organized around feature folders:
+The headless `server` crate is a separate process entry point which requires no Tauri or desktop libraries. It serves the built frontend and same-origin HTTP API behind an owner-managed HTTPS reverse proxy. `BrowserApp` is selected outside Tauri; `BrowserClient` supplies the existing Media renderer with an HTTP transport instead of native invoke. The MediaRuntime adapter in the pinned product crate maps typed commands to its existing services and database. No library business rules are copied into HTTP handlers. Client link actions resolve safe URLs and open them in that client's browser.
 
-```text
-src/
-├─ app/
-├─ components/
-├─ features/
-├─ services/
-├─ styles/
-└─ main.tsx
-```
+`AccessRepository` owns manually approved emails, first-login Google subject binding, session hashes, CSRF tokens and per-account navigation preference in a separate server SQLite database. This does not use the desktop singleton ProfileService or its administrator binding. Google Web authorization uses browser-bound, single-use state, PKCE and nonce; both desktop and server share `crates/google-identity` signature/claim verification. Browser email-first approval additionally requires verified Gmail/Workspace email authority. Google tokens are discarded after identity verification.
 
-Feature modules should keep UI state local where possible and call backend-owned Tauri commands for persistence, filesystem access, secret-backed requests, game capture, runtime import, and other privileged operations.
-
-React components should remain function components with hooks unless a specific task documents why a class component is needed. Components should not own backend business rules, persistence rules, or Tauri window lifecycle behavior.
-
-Shared frontend utility behavior belongs under focused utility or service modules rather than being redefined inside feature components.
-
-## UI Consistency Rules
-
-Organizer-style components should follow the same interaction pattern unless a task explicitly documents a reason to diverge:
-
-- Empty components show the primary New action and keep editor fields hidden.
-- New actions reveal the editor for the first item.
-- Selecting an existing list item opens it in selected/read-only mode.
-- Selected existing items expose an explicit Edit action before fields become editable.
-- Destructive actions are available only inside edit or selected-item context.
-- Active clickable actions use consistent enabled button styling.
-- Module-level `+` actions create new items for that module.
-- Item-level `...` actions open item menus such as Edit and Delete.
-- Hover-revealed actions must also be visible or reachable by keyboard focus.
-- Workspace surfaces should prioritize selected item content while navigation owns object-level actions.
-
-## Backend Responsibilities
-
-The Tauri backend owns:
-
-- SQLite initialization and migrations.
-- Scratchpad persistence commands.
-- Task CRUD commands.
-- Note CRUD commands.
-- Calendar event CRUD commands.
-- Backend-only OpenAI Responses API request handling.
-- YouTube reference CRUD commands.
-- YouTube URL validation and external-open handling.
-- Media Library repositories, progress rules, TMDB requests, availability caching, and safe external-open handling.
-- Gaming and screenshot capture commands.
-- GearBlocks saved construction decoding and runtime import.
-- GearBlocks API catalog and runtime API availability indexing.
-- Game build guide import, persistence, and overlay-window commands.
-- Smoking Cessation event and settings commands.
-- Repair Resell source registry, manual import, conservative public refresh, listing persistence, keyword/category rules, watchlist, and manual deal estimates.
-- Scheduler commands and backend worker dispatch.
-- Global hotkey registration.
-- Window show/hide behavior.
-
-The former Projects module command surface has been removed. Legacy project, planning conversation, bridge draft, project Markdown, and project GitHub SQLite tables remain in the database layer only to preserve old local data.
-
-Backend command handlers should receive input, validate it, call a service, repository, or domain method, and return typed results. They should not manually construct complex domain objects inline, duplicate defaults, duplicate SQLite access logic, or own large procedural feature implementations.
-
-Broad backend cleanup should include `cargo clippy --all-targets` when practical. Clear no-risk Clippy warnings should be fixed immediately. Larger warnings, such as high-arity persistence methods that need typed parameter structs, should be captured as explicit refactor work rather than suppressed silently.
-
-## Persistence Boundary
-
-SQLite is the local source of truth. Migrations must be idempotent and non-destructive.
-
-New persistence should follow the current naming convention:
-
-| Prefix | Meaning |
-| --- | --- |
-| `obj_` | Dynamic object rows. |
-| `def_` | Static definition rows. |
-| `o2o_` | One-to-one mapping rows. |
-| `n2n_` | Many-to-many mapping rows. |
-
-Avoid table-per-game settings. Use `obj_game_setting` or a normalized feature table keyed by `game_id` and `id_game`.
-
-Do not scatter SQL row mapping across unrelated files. Each persisted domain concept should have one canonical mapping path between database rows, domain objects, database insert/update payloads, and frontend DTOs where needed.
-
-SQLite access should surface recoverable infrastructure failures through `Result` values. Repository methods should not panic on normal database lock or mapping failures.
-
-Generated screenshots, manifests, runtime game data, copied DLLs, plugin build output, and local workspaces should remain ignored by git.
-
-## Window Boundary
-
-Overlay Forge treats windows as a first-class domain concept.
-
-All Tauri window creation, configuration, restoration, state persistence, and lifecycle behavior should route through centralized Rust window abstractions. Standalone overlays, the main overlay, and future independent windows should not copy setup logic across commands, React components, utility files, or one-off helpers.
-
-The expected Rust model uses composition:
-
-```text
-BaseWindowConfig
-  common settings shared by all windows
-
-OverlayWindowConfig
-  main overlay-specific configuration
-
-StandaloneWindowConfig
-  standalone-specific configuration
-
-WindowKind
-  enum describing allowed window types
-
-WindowManager
-  centralized creation, open, close, focus, restore, and mutation behavior
-
-WindowStateRepository
-  SQLite-backed persistence for size, position, visibility, and related state
-```
-
-The primary `Main` overlay is transient: it is not always-on-top and hides when it loses focus. Standalone `GameChat` and `GameBuildGuide` windows remain always-on-top and must not inherit the main window's focus-loss behavior.
-
-`WindowKind` should be an enum, not scattered string labels. `StandaloneWindowConfig` and `OverlayWindowConfig` should compose `BaseWindowConfig` rather than model Java-style inheritance.
-
-Before changing window behavior, inspect all existing creation paths. If more than one file constructs windows, sets default options, generates labels, restores geometry, or handles standalone-window configuration, consolidate the shared path before applying the feature or fix.
-
-## OpenAI Boundary
-
-Game chat and build-guide features call the OpenAI Responses API from the Rust/Tauri backend. React invokes local Tauri commands only and never reads `OPENAI_API_KEY`.
-
-Model selection, request shape, and assistant instructions should stay centralized in backend OpenAI service code so frontend components do not leak API details or secrets.
-
-## Codex Boundary
-
-Codex implementation happens directly in VS Code against the repository.
-
-Overlay Forge repository docs should provide project context, constraints, and validation expectations. The app should not automate VS Code/Codex implementation workflows unless the user explicitly scopes a future feature for that.
-
-## Retired Projects Data Boundary
-
-The former Projects module is retired. Its frontend feature folder, planning-chat UI, project services, project-scoped GitHub service, and active Tauri command registration have been removed.
-
-Retained legacy SQLite data includes:
-
-- Project records.
-- Planning conversations and messages.
-- Conversation context attachment links.
-- Bridge file drafts.
-- Project Markdown context configuration.
-- Project GitHub repository metadata.
-
-Do not restore commands, UI, GitHub token usage, project chat, prompt preview, bridge drafts, or Markdown context loading without an explicit future design.
-
-## YouTube Boundary
-
-YouTube references are local-first and user-curated. SQLite stores title, URL, parsed video id, optional channel name, notes, tags, and timestamps.
-
-No YouTube API key, account login, OAuth flow, watch history, subscription import, playlist sync, comment sync, transcript extraction, recommendations, downloads, scraping, background metadata crawler, or account sync is used.
-
-Saved YouTube URLs open externally in the system browser.
-
-## Gaming Boundary
-
-Gaming is a workspace under the shell-owned component host. Game rows are backed by `def_game` definitions and `obj_game` local sections.
-
-Screenshot image bytes are stored as PNG files under `game-screenshots/`. SQLite stores metadata and local paths only. Tauri asset loading is scoped to `game-screenshots/` for thumbnail previews.
-
-Game build guides are imported from user-selected Markdown files into normalized SQLite rows. The independent build-guide overlay window is shell-owned like the game chat overlay: Rust/Tauri stores the active guide selection, applies persisted bounds, and exposes a keybind-driven show/hide path. The overlay renders narrow, stacked rows rather than wide tables so it can stay pinned to the left or right side of the screen during gameplay.
-
-See `docs/GAMING_SCREENSHOTS.md` for capture behavior.
-
-## Media Library Boundary
-
-Media Library is a shell-hosted feature with a focused Rust domain boundary:
-
-- `MediaMetadataProvider` isolates provider-specific request and response mapping.
-- `TmdbMediaMetadataProvider` owns authenticated TMDB API v3 requests.
-- `MediaCatalogService` owns search, import, normalization, and refresh orchestration.
-- `MediaLibraryService` owns local entries, queue order, tags, settings, and user fields.
-- `MediaProgressService` owns movie and episodic progress plus automatic status transitions.
-- `MediaAvailabilityService` owns cached provider snapshots, manual links, preferred-link resolution, and safe external targets.
-- `MediaRepository` owns canonical SQLite row mapping and cross-table transactions.
-- `BookMetadataProvider` isolates string-ID book providers from the numeric, video-specific TMDB contract.
-- `BookProviderCoordinator` owns Google Books primary search, Open Library fallback/enrichment, optional Hardcover enrichment, exact matching, and partial-provider warnings.
-- `BookMetadataMerger` centralizes non-empty metadata precedence and exact-identity edition merging.
-- `BookCatalogService`, `BookLibraryService`, and `BookProgressService` own book import/refresh, local book state, and reading transitions.
-- `BookRepository` owns work/edition/source/author/reader/link/series mapping and book-only Read Next normalization.
-
-React calls typed Tauri commands only. It does not access provider credentials, send viewing or reading history to providers, own progress transitions, or perform remote catalogue requests.
-
-SQLite remains authoritative for notes, ratings, favourites, tags, Watch Next/Read Next order, preferred editions, ownership, manual links, and viewing/reading history. Provider refresh can update normalized catalogue metadata and provider cache only. Refresh must preserve all user-owned state and previous provider payloads on temporary failure.
-
-TMDB image paths are converted only to official `image.tmdb.org` URLs. Book covers initially allow HTTPS from `books.google.com`, `books.googleusercontent.com`, and `covers.openlibrary.org`; Hardcover images remain disabled pending a verified stable host. The module is not a general URL image proxy. See `docs/MEDIA_LIBRARY.md`.
-
-## GearBlocks Boundary
-
-GearBlocks support is local-first and split across:
-
-- Saved construction decoding.
-- Runtime scene export/import.
-- Runtime API availability indexing.
-- Part catalog display.
-- Optional in-game script window tools.
-- Backlog direct BepInEx plugin marker support.
-
-Normal chat navigation must not synchronously parse full-scene runtime logs. Runtime import should use explicit refresh/import paths, passive cursor-based log import, or bounded chat-send context assembly.
-
-API availability metadata is excluded from default prompt context unless a future explicit include/snapshot control is added.
-
-GearBlocks chat does not currently request marker placement or emit marker blocks; BepInEx marker work remains backlog.
-
-See `docs/GEARBLOCKS.md`, `docs/GEARBLOCKS_RUNTIME.md`, `docs/GEARBLOCKS_PLUGIN.md`, and `docs/GEARBLOCKS_PARTS_CATALOG.md`.
-
-## Smoking Cessation Boundary
-
-Smoking Cessation is a local-first core feature module. The React feature reads and writes through Tauri commands. Cigarette events and settings are stored in SQLite. Frontend charts are derived from SQLite rows at render time rather than storing aggregate data.
-
-The module may render a narrow Markdown export under app data for personal context review, but SQLite remains the source of truth.
-
-See `docs/SMOKING_CESSATION.md`.
-
-## Repair Resell Boundary
-
-Repair Resell is a local-first utility module for tracking buy -> repair/refurbish -> resell candidates. React renders filters, source controls, manual import, watchlist toggles, and estimate forms. Persistence, source refresh, keyword/category rules, listing snapshots, and deal calculations are backend-owned through Tauri commands.
-
-SQLite stores the source registry, search profiles, listings, snapshots, deterministic keyword/category mappings, watchlist entries, travel profiles, and manual estimates. The scraper layer is allowlist/source-record based, manually triggered, uses normal HTTP fetch for public sources only, and falls back to manual import when a source is disabled, private, login-gated, or unstable.
-
-The module does not perform LLM analysis, OpenAI calls, credentialed scraping, account login, browser automation, bidding, buying, seller messaging, payment, or checkout workflows.
-
-Future pickup planning, repair knowledge-base, inventory, parts, sales, analytics, and restoration-learning features should continue through backend services and SQLite repositories rather than moving business rules into React. See `docs/REPAIR_RESELL.md` for the module vision.
-
-## Scheduler Boundary
-
-The Scheduler framework is a backend-owned worker loop backed by convention-based SQLite tables.
-
-Schedule rows are dynamic `obj_scheduler` records pointing to static `def_scheduler_type` definitions. The dispatcher is closed over known Rust handlers. Scheduler records must not execute arbitrary commands, scripts, or Lua payloads stored in SQLite.
+Every HTTP Media command checks an unexpired approved session and exact Origin/CSRF before dispatching the fixed family command registry. Settings mutation, file imports, process launching and native host/ChatGPT commands are absent from HTTP routing. Revocation deletes sessions and future data requests fail. Shared Media data stays on the server. The server's loopback listener does not trust forwarded-origin headers; TLS/proxy configuration uses its explicit public origin. See [Browser server setup](BROWSER_SERVER.md) for data paths, configuration and remaining runtime acceptance.

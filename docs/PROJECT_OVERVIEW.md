@@ -1,72 +1,31 @@
 # Overlay Forge Project Overview
 
-## Product Direction
+## Current Shape
 
-Overlay Forge is a personal desktop command hub built as a local-first Tauri overlay. It floats above the user's workflow and organizes planning, calendar items, references, game context, and focused utility modules.
+Overlay Forge 0.5.0
 
-The active coding workflow is direct Codex chat in VS Code. Repository Markdown files provide local project context and implementation rules.
+This is a private development version. A headless server now serves the Media family UI to approved Google users in normal browsers; see [Browser server setup](BROWSER_SERVER.md).
 
-## Current Project Shape
+The main app is a resident personal AI host and launcher. Media UI and services are linked from the owning repository into one host application; product databases and domain code retain their separate ownership. Other modules keep their current launch paths.
 
-Current stable project status:
+Google sign-in identifies administrator and family sessions. Only the pinned administrator can access the host's existing ChatGPT connection and chat data; family sessions open integrated Media and use direct product navigation. Curated family media actions remain future work. See [Google setup](../README.md#google-sign-in-and-family-access).
 
-```text
-Overlay Forge 0.11.1
-Status: Active local-first desktop command hub
-```
+The host owns:
 
-Overlay Forge organizes calendar items, references, game context, and focused utility modules inside a local-first desktop shell. The retired Projects module is no longer part of the active shell or command surface.
+- A closed typed product registry.
+- Requested-target dispatch.
+- Last-used product state, without automatic post-sign-in launch.
+- A resident dashboard and compact prompt.
+- Host window state.
 
-## Major Completed Areas
+The host streams multi-turn conversations using the connected ChatGPT plan and stores completed conversations locally. See [AI Anchor Decision and Delivery](AI_ANCHOR.md) for the implementation and remaining gates.
 
-- Tauri v2 overlay shell.
-- React + TypeScript frontend.
-- Rust/Tauri backend command layer.
-- SQLite local persistence.
-- Calendar as the visible main-shell organizer surface.
-- Scratchpad, Tasks, and Notes code/data retained for later organizer consolidation review.
-- User-curated YouTube references.
-- Gaming workspace with screenshot capture.
-- GearBlocks save decoding, runtime export import, parts catalog, and in-game script tooling.
-- Smoking Cessation module.
-- Repair Resell module for local buy-repair-resell listing tracking, source registry, watchlist, deterministic keyword flags, and manual estimates.
-- Scheduler framework.
-- SQLite naming normalization.
-- Path of Exile 2 game module scaffold and local build records.
-- The Spell Brigade game module scaffold for chats, screenshots, and co-op run planning.
-- Former Projects module removed from active code while legacy project/planning SQLite data remains preserved.
+The app does not dynamically load code, execute commands from SQLite, own a marketplace, update products, and keeps product-domain tables outside the host database.
 
-## Active Documentation Structure
+Deferred modules are outside the current release and implementation scope. See
+[Future Module Concepts](FUTURE_FEATURES.md) for the proposed `LanInputBridge` Windows module and
+the decisions required before it can change the host-only boundary.
 
-| File | Purpose |
-| --- | --- |
-| `README.md` | Repository entry point and current workflow. |
-| `AGENTS.md` | Codex instructions and repo rules. |
-| `CHANGELOG.md` | Date/time-stamped change history. |
-| `.vscode/CODEX_INSTRUCTIONS.md` | VS Code quick reference. |
-| `docs/PROJECT_OVERVIEW.md` | Current project direction and active shape. |
-| `docs/PROJECT_HISTORY.md` | Archived early project history. |
-| `docs/ARCHITECTURE.md` | Frontend/backend/module architecture. |
-| `docs/DATA_MODEL.md` | SQLite schema and naming conventions. |
-| `docs/FEATURE_SCOPE.md` | Scope boundaries and guardrails. |
-| `docs/DEFERRED_ITEMS.md` | Centralized deferred work. |
-| `docs/VALIDATION.md` | Build and manual validation expectations. |
-| `docs/VERSIONING.md` | Semantic versioning and changelog rules. |
-| `docs/GAMING_SCREENSHOTS.md` | Gaming screenshot workflow. |
-| `docs/GEARBLOCKS.md` | GearBlocks module overview. |
-| `docs/GEARBLOCKS_RUNTIME.md` | GearBlocks save/runtime data flow. |
-| `docs/GEARBLOCKS_PLUGIN.md` | BepInEx, GearLib, and marker plugin boundaries. |
-| `docs/GEARBLOCKS_PARTS_CATALOG.md` | Validated GearBlocks parts vocabulary. |
-| `docs/SMOKING_CESSATION.md` | Smoking Cessation module scope. |
-| `docs/REPAIR_RESELL.md` | Repair Resell restoration, pickup, and learning-path vision. |
-| `docs/THE_SPELL_BRIGADE.md` | The Spell Brigade module scope and planning scaffold. |
+## Provenance
 
-## Terminology
-
-Use current names in new work:
-
-| Current term | Meaning |
-| --- | --- |
-| GearBlocks Runtime Export | Runtime scene data reconstructed from GearBlocks script output. |
-
-Do not reintroduce retired external-transfer terminology.
+The product repositories were extracted from `robcross42/overlay-forge` `develop` commit `96aeb79778e148a66b8f88c2b9bcd27b8a415454`. The original application database remains unchanged as an explicit import and rollback source.

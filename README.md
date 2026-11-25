@@ -1,174 +1,72 @@
 # Overlay Forge
 
-Overlay Forge is a local-first Tauri desktop overlay for planning, calendar items, game context, and focused utility modules.
-
-The active coding workflow is direct Codex chat in VS Code. Repository Markdown files provide local context and implementation rules for that workflow.
-
-## Current Status
+Overlay Forge is the resident personal AI host and launcher for independently owned desktop products and the local Journal web product.
 
 ```text
-Current stable app release: 0.11.1
-Status: Active local-first desktop command hub
+Current development version: 0.5.0
+Source extraction baseline: develop@96aeb79778e148a66b8f88c2b9bcd27b8a415454
 ```
 
-Overlay Forge is now maintained as an evolving local-first command hub. Current stable capabilities include functional GearBlocks build guides, chat-to-guide generation, official API indexing, standalone overlay-window behavior, Smoking Cessation tracking, and Repair Resell planning.
+Google sign-in returns administrators to a graphical connection dashboard; chat stays in Chat. Pages use navigation selection rather than repeated page headings. Choose Media, Gaming, Retirement or Journal directly in the left navigation. Media renders inside the host; other products retain their existing standalone launch paths. Family sessions open the integrated Media view and never receive host AI administration. Typed target forwarding remains available to an already signed-in host. Ctrl+Alt+Space opens a compact prompt; closing a window hides it, and the tray provides reopen and Quit controls.
 
-## Core Capabilities
+Use **Hide navigation** in the workspace controls to collapse the left pane, and **Show navigation** to restore it. The main pane scrolls independently; navigation stays in place and scrolls separately when needed in a short window. The collapsed state is saved locally and restored after restarting the app. Navigation spacing adapts to the available window height, including display scaling; it scrolls only when the window is too short to fit the controls.
 
-- Tauri v2 desktop overlay shell.
-- React + TypeScript frontend.
-- Rust/Tauri backend command layer.
-- SQLite local persistence.
-- Calendar as the visible main-shell organizer surface.
-- Scratchpad, Tasks, and Notes code/data retained for later organizer consolidation review.
-- Backend-owned OpenAI Responses API use through `OPENAI_API_KEY`.
-- User-curated YouTube references.
-- Local-first Media Library with movies, episodic series, books, TMDB/Google Books/Open Library/optional Hardcover metadata, separate Watch Next and Read Next queues, progress, tags, and provider links.
-- Gaming workspace and screenshot capture.
-- GearBlocks save decoding, runtime export import, parts catalog, script tooling, and backlog BepInEx plugin templates.
-- GearBlocks build guide import, chat-generated guide creation, in-game build guide overlay, and active guide chat context.
-- Smoking Cessation module.
-- Repair Resell module for local listing tracking, source registry, watchlist, deterministic flags, and manual deal estimates.
-- Scheduler framework.
-- SQLite naming normalization.
-- Path of Exile 2 game module scaffold.
-- The Spell Brigade game module scaffold for wizard, spell, upgrade, synergy, and run planning.
-- Former Projects module removed from active code; legacy project/planning SQLite rows are retained for data preservation and future review.
+## Browser clients and Ubuntu server
 
-## Documentation Map
+The same Media UI can run in normal browsers through the new headless server. Ubuntu hosts the data and services; browser users sign in with an approved Google Gmail/Workspace account. You approve/revoke emails locally on the server. Web sessions and access approvals are separate from the desktop administrator session, and browser clients never receive desktop ChatGPT/admin commands. Follow [Browser server setup](docs/BROWSER_SERVER.md) for Web OAuth, HTTPS, approval commands and local Windows/browser development. Public URL, Google Web client and TLS/proxy configuration must be supplied before deployment.
 
-| File | Purpose |
+## Google sign-in and family access
+
+Google sign-in uses the Desktop OAuth client configured in the native adapter. It requests only `openid email profile` using the system browser, PKCE and a loopback callback. The configured Google Desktop client requires its application client secret during token exchange. In the app, choose **Import Google client JSON** and select the Desktop client's JSON downloaded from Google Auth Platform. Native code checks the client ID and stores only a platform-protected copy in the host database. JSON contents and secrets never enter React, command arguments or logs. The downloaded original remains under the owner's control. Import is available before sign-in for local setup/repair, or within the administrator session; an active family session cannot replace it. Repair can replace only the same compiled application client configuration and cannot change the pinned administrator or authenticate a user. Reimport a newly downloaded matching JSON here if its application secret is wrong or rotated, without deleting ChatGPT data or the admin binding. No Gmail/Calendar/Drive permissions, Google user refresh tokens or hosted service is required. The Google Cloud project owner must configure its consent audience and allow the intended accounts where required. See [Google's desktop OAuth documentation](https://developers.google.com/identity/protocols/oauth2/native-app).
+
+On Ubuntu, Google sign-in opens the default desktop browser through GIO (`libglib2.0-bin`). Keep the desktop keyring unlocked so the app can store and read the imported Google client configuration.
+
+Before the first run, create `google-auth.json` in `%APPDATA%\com.overlayforge.desktop` on Windows or `${XDG_DATA_HOME:-$HOME/.local/share}/com.overlayforge.desktop` on Ubuntu. Substitute the administrator's Gmail address in this local configuration:
+
+```json
+{ "admin_email": "administrator@gmail.com" }
+```
+
+This local configuration stays outside source control. The first Google-verified sign-in matching that address permanently pins its issuer and subject as administrator in the local identity registry. Later email/name changes cannot grant that role to someone else, and editing the setup file cannot replace a pinned administrator. Other Google accounts become family members. ChatGPT, its connection controls, conversations, drafts, requests and approvals are administrator-only, including at the native command boundary. Existing protected ChatGPT data remains intact and becomes visible only to that administrator. Family members can launch independently owned products. Curated AI actions such as finding similar media are future work.
+
+Sign in again after app exit; Google may reuse the browser's existing session. The local app session lasts until sign-out, account switch or process exit. ID tokens are checked when establishing it and then discarded; there is no remote revocation polling or Google service access. Signing out clears in-memory drafts and requests in both windows and retains saved protected ChatGPT data. Switching is blocked while owned work or computer cleanup remains unresolved. Signing out of Overlay Forge does not sign out of Google in the browser or disconnect the administrator's ChatGPT account.
+
+These are local app roles, not an operating-system security boundary against administrators or arbitrary programs under the same OS user. Product databases and product-level AI integrations are independent; embedded Media calls require the current signed-in host session; Media settings writes and legacy import require the administrator. The standalone developer executable has its existing independent access model. Media library data is shared locally across host profiles, not partitioned by Google account. Do not copy credentials or private runtime databases between devices.
+
+In the Windows app, connect your account in **Connected Accounts** and grant ChatGPT plan use. Use **Chat** or the compact prompt to stream replies and continue a selected conversation. Completed conversations are protected and saved locally. Drafts and unfinished replies clear on exit. The app uses the connected ChatGPT plan with no API-key fallback. See [AI Anchor Decision and Delivery](docs/AI_ANCHOR.md) for the provider and lifecycle details.
+
+The authoritative ownership inventory and extraction provenance are in [`docs/REPOSITORY_BOUNDARIES.md`](docs/REPOSITORY_BOUNDARIES.md).
+
+| Product | Repository |
 | --- | --- |
-| `AGENTS.md` | Codex instructions and repository rules. |
-| `.vscode/CODEX_INSTRUCTIONS.md` | VS Code quick reference. |
-| `CHANGELOG.md` | Date/time-stamped change history. |
-| `docs/VERSIONING.md` | Semantic versioning and changelog rules. |
-| `docs/PROJECT_OVERVIEW.md` | Current project direction and active shape. |
-| `docs/PROJECT_HISTORY.md` | Archived early project history. |
-| `docs/ARCHITECTURE.md` | Frontend/backend/module ownership. |
-| `docs/DATA_MODEL.md` | SQLite schema and naming conventions. |
-| `docs/FEATURE_SCOPE.md` | Scope boundaries and guardrails. |
-| `docs/DEFERRED_ITEMS.md` | Centralized deferred work. |
-| `docs/VALIDATION.md` | Build and manual validation expectations. |
-| `docs/GAMING_SCREENSHOTS.md` | Gaming screenshot workflow. |
-| `docs/GEARBLOCKS.md` | GearBlocks module overview. |
-| `docs/GEARBLOCKS_RUNTIME.md` | GearBlocks save/runtime data flow. |
-| `docs/GEARBLOCKS_PLUGIN.md` | BepInEx, GearLib, and marker plugin boundaries. |
-| `docs/GEARBLOCKS_PARTS_CATALOG.md` | Validated GearBlocks parts vocabulary. |
-| `docs/SMOKING_CESSATION.md` | Smoking Cessation module scope. |
-| `docs/MEDIA_LIBRARY.md` | Movie/series/book scope, provider boundaries, progress, migration, and persistence. |
-| `docs/REPAIR_RESELL.md` | Repair Resell restoration, pickup, and learning-path vision. |
-| `docs/THE_SPELL_BRIGADE.md` | The Spell Brigade module scope and planning scaffold. |
+| Media | [`robcross42/overlay-forge-media`](https://github.com/robcross42/overlay-forge-media) |
+| Gaming | [`robcross42/overlay-forge-gaming`](https://github.com/robcross42/overlay-forge-gaming) |
+| Retirement | [`robcross42/overlay-forge-retirement`](https://github.com/robcross42/overlay-forge-retirement) |
+| Journal | [`robcross42/overlay-forge-journal`](https://github.com/robcross42/overlay-forge-journal) |
+
+Targets are closed Rust enum values: `media`, `gaming`, `retirement`, and `journal`. Example:
+
+```powershell
+overlay-forge.exe --product=gaming
+```
+
+The host database is `%APPDATA%\com.overlayforge.desktop\overlay-forge-host.sqlite3` and stores last-used product state, host window geometry, and platform-protected ChatGPT credentials and completed conversations. The original `overlay-forge.sqlite3` remains the rollback/import source for the standalone products.
 
 ## Development
 
-Install dependencies:
-
 ```powershell
-npm install
+git submodule update --init --recursive
+npm.cmd install
+npm.cmd run build
+npm.cmd run cargo:build
 ```
 
-Run the Tauri app:
+Media source is pinned at `modules/media` as a Git submodule of its owning repository. Its React UI and Rust services compile into the host, so Media needs no second application executable or development server. Tauri/WebView may still use their normal helper processes. Media keeps its existing `com.overlayforge.media/overlay-forge-media.sqlite3` app-data location; no database or credentials are copied. Provider environment variables must be available to the host process. The standalone Media application remains available for isolated development. Other desktop products must be built or installed before they can be launched.
 
-```powershell
-npm run tauri:dev
-```
-
-The dev command writes a terminal transcript to:
-
-```text
-logs\tauri-dev\tauri-dev_YYYYMMDD_HHMMSS.log
-```
-
-`logs\tauri-dev\latest.txt` contains the path to the latest dev-session log.
-
-Build the frontend:
-
-```powershell
-npm run build
-```
-
-Build the Rust/Tauri backend:
-
-```powershell
-cd src-tauri
-cargo build
-```
-
-## Versioning
-
-Overlay Forge uses semantic versioning in `MAJOR.MINOR.PATCH` form.
-
-Do not increment the minor version just because a new chat, work session, or calendar day starts.
-
-Use:
-
-- `MAJOR` for incompatible or breaking release changes.
-- `MINOR` for substantial new user-visible capabilities.
-- `PATCH` for bug fixes, documentation-only changes, validation updates, small UX refinements, and internal refactors that do not introduce a major capability.
-
-During `0.x` development, minor versions may still contain breaking early-development changes. Patch versions should remain non-breaking fixes, documentation, and small refinements.
-
-See `docs/VERSIONING.md` for the full policy.
-
-## Hotkeys
-
-The main overlay toggle is registered in Rust as:
-
-```text
-Ctrl+Shift+Space
-```
-
-The Gaming chat overlay focus shortcut is registered in Rust as:
-
-```text
-Ctrl+Shift+C
-```
-
-Global shortcuts can be configured from Settings -> Keybinds. Each function uses `key1`, `key2`, and `key3` as the ordered parts of one shortcut, such as `Ctrl`, `Shift`, `Space`.
-
-Mouse buttons are supported for shortcut parts, including `Mouse4`, `Mouse5`, and modifier combinations such as `Ctrl+Mouse4`.
-
-The Smoking Cessation module adds a `Record Cigarette` shortcut action. It starts unassigned and can be mapped from Settings.
-
-## Local Data
-
-The SQLite database is created automatically in the app data directory as:
-
-```text
-overlay-forge.sqlite3
-```
-
-Generated local screenshots, capture manifests, dev logs, plugin working copies, and third-party DLLs should remain outside committed source unless a document explicitly says otherwise.
-
-## Environment Variables
-
-Project chat uses:
-
-```text
-OPENAI_API_KEY
-```
-
-GitHub repository metadata fetches use:
-
-```text
-GITHUB_TOKEN
-```
-
-Media Library catalogue and metadata requests use:
-
-```text
-TMDB_API_READ_ACCESS_TOKEN
-GOOGLE_BOOKS_API_KEY
-HARDCOVER_API_TOKEN
-```
-
-Open Library optionally uses `OPEN_LIBRARY_CONTACT_EMAIL` for documented request identification; it is contact configuration, not a secret token.
-
-All credentials are read only by the Rust/Tauri backend. They are not stored in SQLite and are not exposed to React/frontend code.
-
-## Current Workflow
-
-Use Codex chat directly in VS Code against the repository.
-
-Before implementation work, read `AGENTS.md` and the smallest relevant set of supporting docs from `docs/`.
+Journal is a responsive web product in its own repository. Run `npm.cmd run dev` from
+`C:\Dev\Repos\overlay-forge-journal`, then select Journal (or use `--product=journal`).
+The host checks the service identity at its fixed loopback health endpoint and opens
+`http://127.0.0.1:4319` in the default browser. Use the navigation’s **Refresh modules** icon after starting
+the service. Explicit requested-target forwarding also supports Journal. The host
+does not start a server or store Journal data/credentials. Hosting, sign-in, and
+phone-to-Windows access are deferred; this development service is local to the PC.

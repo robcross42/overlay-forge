@@ -1,535 +1,194 @@
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::thread;
-use std::time::Duration;
+//! All app window creation and mutations are owned here. No renderer window permissions required.
+use std::sync::Mutex;
+use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
-use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
-
-use crate::AppState;
-
-static MANUAL_OVERLAY_DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);
-
-pub const ACTIVE_WINDOW_OPACITY: f64 = 1.0;
-pub const MAIN_CAPTURE_RESTORE_OPACITY: f64 = 0.78;
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy)]
 pub enum WindowKind {
     Main,
-    GameChat,
-    GameBuildGuide,
+    QuickPrompt,
 }
-
 impl WindowKind {
-    pub const fn label(self) -> &'static str {
+    fn label(self) -> &'static str {
         match self {
             Self::Main => "main",
-            Self::GameChat => "game-chat",
-            Self::GameBuildGuide => "game-build-guide",
-        }
-    }
-
-    pub const fn is_standalone(self) -> bool {
-        matches!(self, Self::GameChat | Self::GameBuildGuide)
-    }
-
-    pub const fn runtime_config(self) -> BaseWindowConfig {
-        BaseWindowConfig {
-            kind: self,
-            always_on_top: self.is_standalone(),
-            hide_on_focus_loss: matches!(self, Self::Main),
-            restore_opacity: if self.is_standalone() {
-                ACTIVE_WINDOW_OPACITY
-            } else {
-                MAIN_CAPTURE_RESTORE_OPACITY
-            },
+            Self::QuickPrompt => "quick-prompt",
         }
     }
 }
-
-#[derive(Clone, Copy, Debug)]
 pub struct BaseWindowConfig {
-    pub kind: WindowKind,
-    pub always_on_top: bool,
-    pub hide_on_focus_loss: bool,
-    pub restore_opacity: f64,
+    kind: WindowKind,
+    title: &'static str,
+    width: f64,
+    height: f64,
 }
-
-#[derive(Clone, Copy, Debug)]
 pub struct OverlayWindowConfig {
-    pub base: BaseWindowConfig,
+    base: BaseWindowConfig,
 }
-
-#[derive(Clone, Copy, Debug)]
 pub struct StandaloneWindowConfig {
-    pub base: BaseWindowConfig,
-    pub min_width: u32,
-    pub min_height: u32,
+    base: BaseWindowConfig,
 }
-
-impl OverlayWindowConfig {
-    pub const fn main() -> Self {
-        Self {
-            base: WindowKind::Main.runtime_config(),
-        }
-    }
+#[derive(Default)]
+pub struct WindowManager {
+    previous_foreground: Mutex<isize>,
 }
-
-impl StandaloneWindowConfig {
-    pub const fn game_chat() -> Self {
-        Self {
-            base: WindowKind::GameChat.runtime_config(),
-            min_width: 320,
-            min_height: 210,
-        }
-    }
-
-    pub const fn game_build_guide() -> Self {
-        Self {
-            base: WindowKind::GameBuildGuide.runtime_config(),
-            min_width: 700,
-            min_height: 520,
-        }
-    }
-}
-
-pub const CAPTURE_WINDOW_KINDS: [WindowKind; 3] = [
-    WindowKind::Main,
-    WindowKind::GameChat,
-    WindowKind::GameBuildGuide,
-];
-
-pub struct WindowManager<'a> {
-    app: &'a AppHandle,
-}
-
-impl<'a> WindowManager<'a> {
-    pub const fn new(app: &'a AppHandle) -> Self {
-        Self { app }
-    }
-
-    pub fn window(&self, kind: WindowKind) -> Option<WebviewWindow> {
-        self.app.get_webview_window(kind.label())
-    }
-
-    pub fn required_window(&self, kind: WindowKind) -> Result<WebviewWindow, String> {
-        self.window(kind).ok_or_else(|| {
-            format!(
-                "Overlay Forge window '{}' was not created at startup.",
-                kind.label()
-            )
-        })
-    }
-
-    pub fn configure_runtime(&self, kind: WindowKind) -> Result<(), String> {
-        let config = kind.runtime_config();
-        let window = self.required_window(config.kind)?;
-        window
-            .set_always_on_top(config.always_on_top)
-            .map_err(|error| error.to_string())?;
-        Ok(())
-    }
-
-    pub fn register_focus_loss_behavior(&self, kind: WindowKind) -> Result<(), String> {
-        let config = kind.runtime_config();
-        if !config.hide_on_focus_loss {
-            return Ok(());
-        }
-
-        let window = self.required_window(kind)?;
-        let app = self.app.clone();
-        window.on_window_event(move |event| {
-            if matches!(event, tauri::WindowEvent::Focused(false)) {
-                if let Err(error) = WindowManager::new(&app).hide(kind) {
-                    eprintln!(
-                        "Could not hide '{}' after focus loss: {error}",
-                        kind.label()
-                    );
-                }
-            }
-        });
-        Ok(())
-    }
-
-    pub fn show_and_focus(&self, kind: WindowKind) -> Result<WebviewWindow, String> {
-        let window = self.required_window(kind)?;
-        self.prepare_for_interaction(kind, &window)?;
-        window.show().map_err(|error| error.to_string())?;
-        let _ = set_overlay_opacity(&window, ACTIVE_WINDOW_OPACITY);
-        window.set_focus().map_err(|error| error.to_string())?;
-        Ok(window)
-    }
-
-    pub fn show_without_activation(&self, kind: WindowKind) -> Result<WebviewWindow, String> {
-        let window = self.required_window(kind)?;
-        let config = kind.runtime_config();
-        self.prepare_for_interaction(kind, &window)?;
-        let _ = set_overlay_opacity(&window, config.restore_opacity);
-        show_window_without_activation(&window, config.always_on_top)?;
-        Ok(window)
-    }
-
-    pub fn hide(&self, kind: WindowKind) -> Result<(), String> {
-        let window = self.required_window(kind)?;
-        hide_window(&window)
-    }
-
-    pub fn is_visible(&self, kind: WindowKind) -> Result<bool, String> {
-        let window = self.required_window(kind)?;
-        window_is_visible(&window)
-    }
-
-    pub fn prepare_for_interaction(
-        &self,
-        kind: WindowKind,
-        window: &WebviewWindow,
-    ) -> Result<(), String> {
-        window
-            .set_always_on_top(kind.runtime_config().always_on_top)
-            .map_err(|error| error.to_string())?;
-        ensure_window_accepts_mouse_input(window)
-    }
-
-    pub fn set_position(&self, kind: WindowKind, x: i32, y: i32) -> Result<(), String> {
-        self.required_window(kind)?
-            .set_position(PhysicalPosition::new(x, y))
-            .map_err(|error| error.to_string())
-    }
-
-    pub fn set_minimum_size(&self, config: StandaloneWindowConfig) -> Result<(), String> {
-        self.required_window(config.base.kind)?
-            .set_min_size(Some(PhysicalSize::new(config.min_width, config.min_height)))
-            .map_err(|error| error.to_string())
-    }
-
-    pub fn set_size(&self, kind: WindowKind, width: u32, height: u32) -> Result<(), String> {
-        self.required_window(kind)?
-            .set_size(PhysicalSize::new(width, height))
-            .map_err(|error| error.to_string())
-    }
-
-    pub fn foreground_label(&self) -> Result<Option<String>, String> {
-        foreground_window_label(self.app)
-    }
-
-    pub fn is_foreground(&self, kind: WindowKind) -> bool {
-        is_window_foreground(self.app, kind)
-    }
-
-    pub fn remember_foreground_window_as_game(&self) {
-        remember_foreground_window_as_game(self.app);
-    }
-}
-
-pub fn start_manual_drag(window: WebviewWindow) -> Result<(), String> {
-    manual_overlay_drag(window)
-}
-
-#[cfg(target_os = "windows")]
-fn manual_overlay_drag(window: WebviewWindow) -> Result<(), String> {
-    if MANUAL_OVERLAY_DRAG_ACTIVE.swap(true, Ordering::SeqCst) {
-        return Ok(());
-    }
-
-    thread::spawn(move || {
-        let _ = manual_overlay_drag_loop(window);
-        MANUAL_OVERLAY_DRAG_ACTIVE.store(false, Ordering::SeqCst);
-    });
-
-    Ok(())
-}
-
-#[cfg(target_os = "windows")]
-fn manual_overlay_drag_loop(window: WebviewWindow) -> Result<(), String> {
-    use std::mem;
-    use windows_sys::Win32::Foundation::POINT;
-    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
-    use windows_sys::Win32::UI::WindowsAndMessaging::GetCursorPos;
-
-    let started_at = std::time::Instant::now();
-    let start_window_position = window.outer_position().map_err(|error| error.to_string())?;
-    let start_cursor = unsafe {
-        let mut point: POINT = mem::zeroed();
-        if GetCursorPos(&mut point) == 0 {
-            return Err("Could not read the mouse position.".to_string());
-        }
-        point
-    };
-
-    loop {
-        let left_button_down =
-            unsafe { (GetAsyncKeyState(VK_LBUTTON as i32) & 0x8000u16 as i16) != 0 };
-        if !left_button_down {
-            break;
-        }
-
-        let cursor = unsafe {
-            let mut point: POINT = mem::zeroed();
-            if GetCursorPos(&mut point) == 0 {
-                break;
-            }
-            point
-        };
-        let next_x = start_window_position.x + (cursor.x - start_cursor.x);
-        let next_y = start_window_position.y + (cursor.y - start_cursor.y);
-        let _ = window.set_position(PhysicalPosition::new(next_x, next_y));
-        if started_at.elapsed() > Duration::from_secs(8) {
-            break;
-        }
-        thread::sleep(Duration::from_millis(8));
-    }
-
-    Ok(())
-}
-
-#[cfg(not(target_os = "windows"))]
-fn manual_overlay_drag(_window: WebviewWindow) -> Result<(), String> {
-    Err("Manual no-snap overlay drag is only available on Windows.".to_string())
-}
-
-#[cfg(target_os = "windows")]
-pub fn focus_last_game_window_from_state(state: &AppState) -> Result<bool, String> {
-    use windows_sys::Win32::Foundation::HWND;
-    use windows_sys::Win32::UI::WindowsAndMessaging::{IsWindow, SetForegroundWindow};
-
-    let hwnd = state
-        .last_game_window
-        .lock()
-        .map_err(|_| "Last game window state is unavailable.".to_string())?
-        .unwrap_or_default();
-    if hwnd == 0 {
-        return Ok(false);
-    }
-
-    let hwnd = hwnd as HWND;
-    unsafe {
-        if IsWindow(hwnd) == 0 {
-            return Ok(false);
-        }
-        Ok(SetForegroundWindow(hwnd) != 0)
-    }
-}
-
-#[cfg(not(target_os = "windows"))]
-pub fn focus_last_game_window_from_state(_state: &AppState) -> Result<bool, String> {
-    Ok(false)
-}
-
-#[cfg(target_os = "windows")]
-pub fn foreground_window_label(app: &AppHandle) -> Result<Option<String>, String> {
-    use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
-
-    let foreground = unsafe { GetForegroundWindow() };
-    if foreground.is_null() {
-        return Ok(None);
-    }
-
-    for window in app.webview_windows().values() {
-        let hwnd = window.hwnd().map_err(|error| error.to_string())?.0
-            as windows_sys::Win32::Foundation::HWND;
-        if foreground == hwnd {
-            return Ok(Some(window.label().to_string()));
-        }
-    }
-
-    Ok(None)
-}
-
-#[cfg(not(target_os = "windows"))]
-pub fn foreground_window_label(_app: &AppHandle) -> Result<Option<String>, String> {
-    Ok(Some(WindowKind::Main.label().to_string()))
-}
-
-#[cfg(target_os = "windows")]
-pub fn is_window_foreground(app: &AppHandle, kind: WindowKind) -> bool {
-    use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
-
-    let Some(window) = app.get_webview_window(kind.label()) else {
-        return false;
-    };
-    let Ok(hwnd) = window.hwnd() else {
-        return false;
-    };
-    unsafe { std::ptr::eq(GetForegroundWindow(), hwnd.0) }
-}
-
-#[cfg(not(target_os = "windows"))]
-pub fn is_window_foreground(_app: &AppHandle, _kind: WindowKind) -> bool {
-    false
-}
-
-#[cfg(target_os = "windows")]
-pub fn remember_foreground_window_as_game(app: &AppHandle) {
-    use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
-
-    let foreground = unsafe { GetForegroundWindow() };
-    if foreground.is_null() {
-        return;
-    }
-
-    for kind in CAPTURE_WINDOW_KINDS {
-        if let Some(window) = app.get_webview_window(kind.label()) {
-            if let Ok(hwnd) = window.hwnd() {
-                if std::ptr::eq(foreground, hwnd.0) {
-                    return;
-                }
-            }
-        }
-    }
-
-    let state = app.state::<AppState>();
-    if let Ok(mut last_game_window) = state.last_game_window.lock() {
-        *last_game_window = Some(foreground as isize);
-    };
-}
-
-#[cfg(not(target_os = "windows"))]
-pub fn remember_foreground_window_as_game(_app: &AppHandle) {}
-
-#[cfg(target_os = "windows")]
-pub fn show_window_without_activation(
-    window: &WebviewWindow,
-    always_on_top: bool,
-) -> Result<(), String> {
-    use windows_sys::Win32::Foundation::HWND;
-    use windows_sys::Win32::UI::WindowsAndMessaging::{
-        SetWindowPos, ShowWindow, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE,
-        SWP_NOSIZE, SWP_SHOWWINDOW, SW_SHOWNOACTIVATE,
-    };
-
-    let hwnd = window.hwnd().map_err(|error| error.to_string())?;
-    unsafe {
-        ShowWindow(hwnd.0 as HWND, SW_SHOWNOACTIVATE);
-        SetWindowPos(
-            hwnd.0 as HWND,
-            if always_on_top {
-                HWND_TOPMOST
-            } else {
-                HWND_NOTOPMOST
+impl WindowManager {
+    pub fn preload(&self, app: &AppHandle) -> Result<(), String> {
+        let main = StandaloneWindowConfig {
+            base: BaseWindowConfig {
+                kind: WindowKind::Main,
+                title: "Overlay Forge",
+                width: 1100.,
+                height: 780.,
             },
-            0,
-            0,
-            0,
-            0,
-            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW,
-        );
+        };
+        let prompt = OverlayWindowConfig {
+            base: BaseWindowConfig {
+                kind: WindowKind::QuickPrompt,
+                title: "Overlay Forge quick prompt",
+                width: 620.,
+                height: 600.,
+            },
+        };
+        self.create(app, main.base, false)?;
+        self.create(app, prompt.base, true)
     }
-    Ok(())
+    fn create(
+        &self,
+        app: &AppHandle,
+        config: BaseWindowConfig,
+        overlay: bool,
+    ) -> Result<(), String> {
+        let path = if overlay {
+            "index.html?surface=quick"
+        } else {
+            "index.html"
+        };
+        WebviewWindowBuilder::new(app, config.kind.label(), WebviewUrl::App(path.into()))
+            .title(config.title)
+            .inner_size(config.width, config.height)
+            .min_inner_size(360., 320.)
+            .visible(false)
+            .focused(false)
+            .skip_taskbar(overlay)
+            .always_on_top(overlay)
+            .build()
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+    pub fn show(&self, app: &AppHandle, kind: WindowKind) -> Result<(), String> {
+        let window = app
+            .get_webview_window(kind.label())
+            .ok_or("Window unavailable.")?;
+        if matches!(kind, WindowKind::QuickPrompt) {
+            if window.is_visible().map_err(|e| e.to_string())? {
+                return window
+                    .unminimize()
+                    .and_then(|_| window.set_focus())
+                    .map_err(|e| e.to_string());
+            }
+            #[cfg(windows)]
+            {
+                *self
+                    .previous_foreground
+                    .lock()
+                    .map_err(|_| "Focus state unavailable.")? =
+                    unsafe { windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow() }
+                        as isize;
+            }
+            let cursor = app.cursor_position().map_err(|e| e.to_string())?;
+            if let Some(monitor) = window
+                .monitor_from_point(cursor.x, cursor.y)
+                .map_err(|e| e.to_string())?
+            {
+                let area = monitor.work_area();
+                let scale = monitor.scale_factor();
+                let width = (620. * scale).min(area.size.width as f64) as u32;
+                let height = (600. * scale).min(area.size.height as f64) as u32;
+                window
+                    .set_size(tauri::PhysicalSize::new(width, height))
+                    .map_err(|e| e.to_string())?;
+                window
+                    .set_position(tauri::PhysicalPosition::new(
+                        area.position.x + ((area.size.width - width) / 2) as i32,
+                        area.position.y + ((area.size.height - height) / 2) as i32,
+                    ))
+                    .map_err(|e| e.to_string())?;
+            }
+        }
+        window
+            .show()
+            .and_then(|_| window.unminimize())
+            .and_then(|_| window.set_focus())
+            .map_err(|e| e.to_string())
+    }
+    pub fn hide(&self, app: &AppHandle, kind: WindowKind) -> Result<(), String> {
+        let window = app
+            .get_webview_window(kind.label())
+            .ok_or("Window unavailable.")?;
+        let restore =
+            matches!(kind, WindowKind::QuickPrompt) && window.is_focused().unwrap_or(false);
+        window.hide().map_err(|e| e.to_string())?;
+        if restore {
+            #[cfg(windows)]
+            {
+                let previous = *self
+                    .previous_foreground
+                    .lock()
+                    .map_err(|_| "Focus state unavailable.")?;
+                let hwnd = previous as windows_sys::Win32::Foundation::HWND;
+                if previous != 0
+                    && unsafe { windows_sys::Win32::UI::WindowsAndMessaging::IsWindow(hwnd) } != 0
+                    && unsafe {
+                        windows_sys::Win32::UI::WindowsAndMessaging::SetForegroundWindow(hwnd)
+                    } == 0
+                {
+                    return Err("Prompt hidden; Windows declined focus restoration.".into());
+                }
+            }
+        }
+        Ok(())
+    }
+    pub fn quit(&self, app: &AppHandle) -> Result<(), String> {
+        {
+            let profiles = app.state::<crate::AppState>();
+            let profiles = profiles.profiles.lock().map_err(|_| "Google session is unavailable.")?;
+            if profiles.is_busy() {
+                profiles.cancel();
+                return Err("Quit paused while Google sign-in stops. Wait a moment, then Quit again.".into());
+            }
+        }
+        if app.state::<crate::AppState>().chatgpt.is_busy() {
+            app.state::<crate::AppState>().chatgpt.stop(app);
+            return Err("Quit paused while ChatGPT connection work stops. Wait for its final status, then Quit again.".into());
+        }
+        let cleanup = app
+            .state::<crate::AppState>()
+            .hub
+            .lock()
+            .map_err(|_| "AI hub is unavailable; cleanup cannot be verified.")?
+            .prepare_shutdown();
+        use tauri::Emitter;
+        let _ = app.emit("hub-changed", ());
+        cleanup?;
+        app.exit(0);
+        Ok(())
+    }
 }
-
-#[cfg(not(target_os = "windows"))]
-pub fn show_window_without_activation(
-    window: &WebviewWindow,
-    _always_on_top: bool,
+#[tauri::command]
+pub fn show_main(app: AppHandle, state: tauri::State<'_, crate::AppState>) -> Result<(), String> {
+    state.windows.show(&app, WindowKind::Main)
+}
+#[tauri::command]
+pub fn show_quick_prompt(
+    app: AppHandle,
+    state: tauri::State<'_, crate::AppState>,
 ) -> Result<(), String> {
-    window.show().map_err(|error| error.to_string())
+    state.windows.show(&app, WindowKind::QuickPrompt)
 }
-
-#[cfg(target_os = "windows")]
-pub fn hide_window(window: &WebviewWindow) -> Result<(), String> {
-    use windows_sys::Win32::Foundation::HWND;
-    use windows_sys::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_HIDE};
-
-    let tauri_result = window.hide().map_err(|error| error.to_string());
-    let hwnd = window.hwnd().map_err(|error| error.to_string())?;
-    unsafe {
-        ShowWindow(hwnd.0 as HWND, SW_HIDE);
-    }
-    tauri_result
-}
-
-#[cfg(not(target_os = "windows"))]
-pub fn hide_window(window: &WebviewWindow) -> Result<(), String> {
-    window.hide().map_err(|error| error.to_string())
-}
-
-#[cfg(target_os = "windows")]
-pub fn window_is_visible(window: &WebviewWindow) -> Result<bool, String> {
-    use windows_sys::Win32::Foundation::HWND;
-    use windows_sys::Win32::UI::WindowsAndMessaging::IsWindowVisible;
-
-    let tauri_visible = window.is_visible().map_err(|error| error.to_string())?;
-    if tauri_visible {
-        return Ok(true);
-    }
-
-    let hwnd = window.hwnd().map_err(|error| error.to_string())?;
-    Ok(unsafe { IsWindowVisible(hwnd.0 as HWND) != 0 })
-}
-
-#[cfg(not(target_os = "windows"))]
-pub fn window_is_visible(window: &WebviewWindow) -> Result<bool, String> {
-    window.is_visible().map_err(|error| error.to_string())
-}
-
-#[cfg(target_os = "windows")]
-pub fn ensure_window_accepts_mouse_input(window: &WebviewWindow) -> Result<(), String> {
-    use windows_sys::Win32::UI::WindowsAndMessaging::{
-        GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_NOACTIVATE, WS_EX_TRANSPARENT,
-    };
-
-    let hwnd =
-        window.hwnd().map_err(|error| error.to_string())?.0 as windows_sys::Win32::Foundation::HWND;
-    unsafe {
-        let style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-        let next_style = style & !(WS_EX_TRANSPARENT as isize) & !(WS_EX_NOACTIVATE as isize);
-        if next_style != style {
-            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, next_style);
-        }
-    }
-
-    Ok(())
-}
-
-#[cfg(not(target_os = "windows"))]
-pub fn ensure_window_accepts_mouse_input(_window: &WebviewWindow) -> Result<(), String> {
-    Ok(())
-}
-
-#[cfg(target_os = "windows")]
-pub fn set_overlay_opacity(window: &WebviewWindow, opacity: f64) -> Result<(), String> {
-    use windows_sys::Win32::UI::WindowsAndMessaging::{
-        GetWindowLongPtrW, SetLayeredWindowAttributes, SetWindowLongPtrW, GWL_EXSTYLE, LWA_ALPHA,
-        WS_EX_LAYERED,
-    };
-
-    let hwnd =
-        window.hwnd().map_err(|error| error.to_string())?.0 as windows_sys::Win32::Foundation::HWND;
-    let alpha = (opacity.clamp(0.2, 1.0) * 255.0).round() as u8;
-
-    unsafe {
-        let style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, style | WS_EX_LAYERED as isize);
-        if SetLayeredWindowAttributes(hwnd, 0, alpha, LWA_ALPHA) == 0 {
-            return Err("Could not set overlay window opacity.".to_string());
-        }
-    }
-
-    Ok(())
-}
-
-#[cfg(not(target_os = "windows"))]
-pub fn set_overlay_opacity(_window: &WebviewWindow, _opacity: f64) -> Result<(), String> {
-    Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::WindowKind;
-
-    #[test]
-    fn main_window_is_transient_and_not_always_on_top() {
-        let config = WindowKind::Main.runtime_config();
-
-        assert!(!config.always_on_top);
-        assert!(config.hide_on_focus_loss);
-    }
-
-    #[test]
-    fn standalone_windows_remain_always_on_top_and_visible_after_focus_loss() {
-        for kind in [WindowKind::GameChat, WindowKind::GameBuildGuide] {
-            let config = kind.runtime_config();
-
-            assert!(config.always_on_top);
-            assert!(!config.hide_on_focus_loss);
-        }
-    }
+#[tauri::command]
+pub fn hide_quick_prompt(
+    app: AppHandle,
+    state: tauri::State<'_, crate::AppState>,
+) -> Result<(), String> {
+    state.windows.hide(&app, WindowKind::QuickPrompt)
 }

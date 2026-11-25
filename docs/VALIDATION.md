@@ -1,237 +1,64 @@
-# Overlay Forge Validation
+# Overlay Forge Host Validation
 
-## Default Validation Commands
+## Review checks
 
-Use validation appropriate to the changed area.
+- The Windows preview built the frontend and embedded-assets desktop application. Browser sign-in opened the default HTTPS browser, and the fixed verification prompt reached provider-confirmed completion.
+- The owner confirmed that a composer follow-up streamed and used earlier turns. A subsequent restart restored the selected conversation with all three completed turns, including the automatically saved follow-up.
+- The SQLite migration adds host-only tables with idempotent initialization. Completed transcripts are protected and replaced atomically. The app leaves product and legacy databases in their existing repositories.
+- The review branch passes the frontend build, Windows Rust check with embedded frontend assets, version consistency check and staged diff check. Automated tests were not run for this review branch.
 
-```powershell
-npm install
-npm run build
-npm run cargo:build
-npm run cargo:clippy
-npm run tauri:dev
-```
+## Manual checks
 
-Do not run broader validation than needed for a small change unless the request affects shared behavior.
+- In **Connected Accounts**, connect ChatGPT, grant plan use, and send the fixed verification prompt. Confirm that a completed provider stream establishes verification.
+- In **Chat**, leave **Use local demo** unchecked. Send a made-up word and ask for it again in the same conversation. Expect streamed replies. Use **New chat** for a separate context.
+- Restart after a completed reply. Expect the latest conversation to be selected and completed turns to be available for follow-up. Drafts and unfinished replies clear when the app exits.
+- Use **Stop all local work / request cleanup** during a reply. The card should retain any partial text and distinguish local stop from remote completion.
+- Verify explicit product-picker launch and requested-target forwarding to an already signed-in host. The host stays resident, and the dashboard shows which products are unavailable. Google sign-in must return to the main dashboard without launching a remembered module. The legacy database stays untouched.
 
-## Validation Matrix
+Sleep/wake is not validated and was explicitly declared nonblocking by the owner on 23 November 2026. Multi-monitor testing was removed from active acceptance because the owner uses one monitor; it remains unscheduled backlog [#18](https://github.com/robcross42/overlay-forge/issues/18). Linux and packaged builds require separate acceptance.
 
-| Changed area | Preferred validation |
-| --- | --- |
-| React / TypeScript / frontend UI | `npm run build` |
-| Rust / Tauri backend | `npm run cargo:build` |
-| Frontend + backend behavior | `npm run check` |
-| SQLite migrations | both builds plus migration review |
-| OpenAI request path | backend build plus chat-send manual check if possible |
-| Screenshot capture | frontend/backend builds plus manual capture/delete flow |
-| GearBlocks script exporter | build/type-check plus in-game load/export/import check where possible |
-| BepInEx plugin | plugin build plus install/run check where possible |
-| Scheduler | backend build plus startup/interval/run-history behavior review |
-| Smoking Cessation | frontend/backend builds plus event/keybind/export behavior review |
-| Media Library | frontend/backend builds plus migration, provider fixtures, missing-token, progress, refresh-preservation, separate queues, and URL checks |
+## Minimized quick-prompt regression — 23 November 2026
 
-For broad cleanup and architecture work, run `npm run cargo:clippy` as a review pass. Fix clear no-risk warnings immediately. Record larger warnings as explicit refactor work when they require changing public command shapes, repository APIs, or multiple call sites.
+Minimize the quick prompt, then reopen it with Ctrl+Alt+Space and separately with Open quick prompt in the main app. Both paths must restore and focus the existing prompt, preserving its unsent draft. Repeat after Escape/hide. The shared WindowManager owns restoration; a visible minimized window must not take a focus-only path.
 
-## Core Manual Regression Checklist
+Agent-observed on Windows: the original failure was a minimized quick prompt. After the fix and development rebuild/restart, both Open quick prompt and Ctrl+Alt+Space restored the same minimized window with the unsent draft retained. The draft was restored manually after the development restart; this does not claim draft persistence across restart. No automated tests were added or run.
 
-Use when changes are broad or touch shell/shared state.
+## Google identity and administrator boundary — 23 November 2026
 
-```text
-Open the app and reveal the overlay with Ctrl+Shift+Space.
-```
+Owner scope: one administrator-owned ChatGPT connection; family members get Google identity and product access. Family chat and curated media prompts are not implemented. Earlier main-app/Media owner validation, including tray exit, draft synchronization, demo state transitions, live Stop, and second-instance forwarding, is recorded in [#17](https://github.com/robcross42/overlay-forge/issues/17).
 
-Pass criteria:
+The frontend build, Windows Rust compile check, development build/launch, version consistency and scoped whitespace review passed for this feature. A separate native review checked session stamping, administrator enforcement, worker reservations and lock ordering. It identified a sign-in/automatic-launch race and hidden member launch errors, both corrected before handoff. Automated tests were not added or run (rapid-development policy). This is code review and compilation evidence, not real-account acceptance.
 
-```text
-Overlay appears using existing hotkey behavior.
-```
+Live checks still to perform with the configured Desktop client:
 
-```text
-Click a different application while the primary overlay is focused.
-```
+- Sign in as the configured administrator; expect Administrator role, existing ChatGPT connection and saved completed conversations. No new ChatGPT sign-in should be required solely because Google identity was added.
+- Sign out and check both windows: private chat/request/draft views disappear. Saved protected data stays on disk. Sign in again as administrator and confirm restored history.
+- Switch to a different Google account: expect Family member role, product launcher, no host ChatGPT controls or history. Verify native hub/ChatGPT commands reject that session and stale administrator session IDs; hiding controls alone is insufficient evidence.
+- Decline or cancel Google sign-in and retry. An interrupted switch should preserve the prior profile and report the error. Switching during an active request or unresolved resource cleanup must fail clearly until work is settled.
+- Recheck explicit Media launch after Google sign-in, plus shortcut/Escape in signed-out and signed-in states. Successful sign-in must focus the main dashboard and leave Media closed unless it was already running. Existing standalone product processes and data are outside the host authorization boundary.
 
-Pass criteria:
+Owner sign-in succeeded with the newest Desktop client and protected JSON import; agent UI inspection confirmed Administrator status and restored host history. The owner then clarified that authentication must return to the main host. The previous automatic last-used-product launch was removed from sign-in completion, which now uses the existing WindowManager to show the main window. Live acceptance of that corrected return destination remains pending. Separately, Media's debug executable was observed loading the host frontend at port 1420 and reporting `Command identity_snapshot not found`; that Media development-port conflict remains unresolved and is not Google authentication inside Media.
 
-```text
-The primary overlay hides and does not remain always-on-top. Standalone game chat and build-guide windows retain their existing always-on-top behavior.
-```
+Google Cloud audience/test-user configuration and actual client eligibility are owner-controlled. The original supplied client ID was replaced with the new Desktop client before the retry. No successful Google token exchange or family-account acceptance is claimed yet. App sessions last until sign-out/switch/process exit; no remote Google revocation polling is claimed.
 
-```text
-Switch between Calendar, Cessation, Repair Resell, Gaming, YouTube, and Settings.
-```
+### Desktop client exchange correction
 
-Pass criteria:
+The owner reported successful browser authorization followed by the app returning to its sign-in screen. App inspection found a rejected Google HTTP request; a bounded diagnostic request with an intentionally invalid code and the public client ID returned HTTP 400 and explicitly required the missing client secret. No real authorization code, secret or user token was used in that diagnostic. This established that the configured client needs its Desktop application secret despite Google's general parameter table describing it as optional.
 
-```text
-Each active module loads without disrupting persisted data.
-```
+The follow-up adds native JSON import with a native file picker, exact client-ID validation, bounded input, platform-protected persistence, native-only secret loading, and safe fixed diagnostics identifying token exchange versus key lookup. The frontend build and Rust compile check passed. Real JSON import and successful Google sign-in remain pending owner acceptance; no automated tests were run. Cancelled, malformed, Web-client and wrong-client imports must not replace existing protected configuration.
 
-```text
-Restart the app.
-```
+### Ubuntu browser launch — 23 November 2026
 
-Pass criteria:
+The Ubuntu development build opened Google Accounts in the default browser after importing the matching Desktop client JSON. A real Google sign-in returned through the loopback callback, established a verified family session, and showed the signed-in controls in Overlay Forge. This used a temporary local profile. The frontend and native debug builds and all 33 native tests passed, including HTTPS validation and forwarding the complete URL as a single GIO argument.
 
-```text
-Persisted records restore correctly.
-```
+## Integrated Media and navigation dashboard (0.4.0)
 
-## Retired Projects Module
+Frontend build, host native development compilation/relaunch, Media standalone frontend/native builds, library Clippy without warnings, version consistency and scoped diff review passed. Tests not run (rapid-development policy). Process inspection found one host executable and no separate Media executable. This is not visual or live-provider acceptance.
 
-The former Projects module has no active manual validation path. Legacy SQLite rows are preserved for data safety only.
+Owner review: Home shows connection tiles without page headings, explanatory panels or chat; Chat retains its composer/history; direct Media navigation opens the library inside the host. Check movie/series/book browsing and progress against the existing Media database, navigation collapse persistence and independent scrolling. Administrator Media utilities remain available; family sessions use the library without maintenance utilities or host AI navigation. Other products retain external launch paths. Verify typed Media forwarding in an already signed-in host. The updated integrated frontend and native module have not been validated on Linux in this session; earlier 0.3.6 Linux browser-sign-in evidence does not establish that acceptance.
 
-## Gaming Screenshot Validation
+## Browser server (0.5.0)
 
-Validated workflow:
+Passed frontend build, server cargo check and warning-free Clippy, native library cargo check, shared Google-verifier check, Media headless/default library checks, version consistency and scoped diff review. A read-only auth review covered state/browser binding, PKCE/nonce, issuer/audience/signatures, authoritative-email approval, cookies/CSRF, subject pinning, session expiry/revocation and the fixed Media runtime registry. No tests were created, updated or run (rapid-development policy). Server runtime dependency inspection for Linux contains no Tauri/GTK/WebKit/Wry. This is not a Linux execution result.
 
-```text
-Gaming -> selected game -> Capture Screenshot -> saved PNG -> in-app thumbnail preview -> screenshot context menu -> delete cleanup
-```
-
-Validate:
-
-```text
-Capture a screenshot while a game is the foreground window.
-```
-
-Pass criteria:
-
-```text
-Overlay Forge hides before capture, the PNG is saved under game-screenshots/<game-slug>/, and the app restores afterward.
-```
-
-Validate:
-
-```text
-Preview the screenshot in the selected game pane.
-```
-
-Pass criteria:
-
-```text
-The thumbnail renders through the Tauri asset path.
-```
-
-Validate:
-
-```text
-Right-click the screenshot and delete it.
-```
-
-Pass criteria:
-
-```text
-The screenshot PNG, capture manifest, screenshot metadata row, and matching local-path reference rows are removed.
-```
-
-## Media Library Validation
-
-Validate without `TMDB_API_READ_ACCESS_TOKEN`:
-
-```text
-Open Media Library, browse/edit local entries, then open Catalogue Search.
-```
-
-Pass criteria:
-
-```text
-Local data remains usable and catalogue search shows a readable missing-credential error.
-```
-
-With a valid token, validate movie and series searches, excluding people; add each result twice and confirm the second add is reported as already saved.
-
-Validate movie watched/unwatched state and watched-date editing. For a series, validate individual episode toggles, season/series bulk operations, mark-watched-through, next episode, completion, unwatch-after-completion, and specials settings.
-
-Validate metadata refresh after editing notes, rating, favourite, tags, queue order, progress, and a preferred manual link. All user-owned values must remain. A failed provider refresh must retain cached availability and display a stale/error state.
-
-Validate Watch Next add/remove/up/down behavior and restart persistence. Exercise local type, status, favourite, tag, unwatched, provider, and queue filters while offline.
-
-Validate that `file:`, `javascript:`, and other non-HTTP(S) manual links are rejected. Delete a title and confirm only its locally owned metadata, progress, availability, links, and mappings are removed.
-
-### Books Automated Checks
-
-Run:
-
-```powershell
-npm run check
-npm run cargo:test
-npm run cargo:clippy
-cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
-git diff --check
-```
-
-Book tests must cover the populated pre-book table rebuild, preserved IDs/foreign keys/TMDB identities, idempotence, ISBN checksums, provider fixture normalization, Hardcover GraphQL errors, exact-match merging, Open Library throttle intervals, manual books without credentials, refresh preservation, provider-failure isolation, typed progress, preferred edition, Read Next isolation, and HTTP(S)-only links. Provider unit tests use fixtures and do not call live services.
-
-### Books Manual Matrix
-
-1. With no `GOOGLE_BOOKS_API_KEY` and no `HARDCOVER_API_TOKEN`, confirm manual book creation and Open Library search remain usable.
-2. With Google configured and Hardcover absent, confirm Google search/add succeeds, Open Library exact-ISBN enrichment is optional, and Settings reports Hardcover as optional/unconfigured.
-3. Search with General, Title, Author, and ISBN. Invalid ISBN checksums must fail before a remote request. Add an exact duplicate and confirm the existing entry is returned.
-4. Simulate or observe each provider failure independently. A Google failure should permit Open Library fallback; Open Library or Hardcover failure must not block a successful Google add.
-5. Create/edit a manual book and edition. Set preferred edition, ownership, format, notes, rating, favourite, tags, and Read Next order; restart and confirm persistence.
-6. Exercise page, percent, audiobook-minute, and chapter progress; mark read and reset; verify On Hold and Did Not Finish are not overwritten automatically.
-7. Refresh after editing all user-owned fields. Confirm progress, dates, preferred edition, ownership, queue, manual links, series overrides, notes, rating, favourite, and tags remain unchanged.
-8. Open provider and user links. Reject `file:`, `javascript:`, whitespace-bearing, and malformed URLs. Confirm unapproved cover hosts render a placeholder.
-9. Filter the all-media Library to `BOOK`, then confirm Books rows use reading labels/progress and never display streaming-provider logos.
-10. Reopen existing movie/series entries and exercise Watch Next to confirm the BOOK migration and Read Next did not regress video data.
-
-Pass criteria:
-
-```text
-Books remain fully local-first, exact matching is conservative, optional providers fail independently,
-user state survives refresh/restart, and movie/series behavior is unchanged.
-```
-
-## GearBlocks Validation
-
-When GearBlocks runtime work changes, validate as much of this path as possible:
-
-```text
-Install or update the Overlay Forge GearBlocks script.
-Launch GearBlocks.
-Load the script in Script Mods.
-Run Export Scene.
-Refresh/import scene context in Overlay Forge.
-Open GearBlocks chat or parts details.
-```
-
-Pass criteria:
-
-```text
-Runtime exports import without reparsing unchanged log prefixes, parts are indexed, and chat context reflects the latest available scene state.
-```
-
-For future GearBlocks plugin backlog work:
-
-```text
-Build the plugin.
-Install the DLL under GearBlocks/BepInEx/plugins.
-Restart GearBlocks.
-Send a ping command, or a marker command only if marker work has explicitly resumed.
-```
-
-Pass criteria:
-
-```text
-The plugin processes command files and writes status output.
-```
-
-## User Pass/Fail Reporting Format
-
-```markdown
-# Validation Results
-
-## Overall Result
-
-Pass or Fail
-
-## Failed Items
-
-- Item:
-  - Expected:
-  - Actual:
-
-## Notes
-
-Any extra observations.
-```
+The public URL has not been chosen and no Google Web client/TLS proxy is configured by this work. Owner acceptance remains: approved and unapproved login, revoke/reapprove, independent browsers, expired sessions, browser link opening, startup/restart, Linux execution and public HTTPS deployment. [Browser server setup](BROWSER_SERVER.md) provides configuration and exact commands. No live OAuth exchange, deployment, credentials import or new browser-server process was performed in this session.

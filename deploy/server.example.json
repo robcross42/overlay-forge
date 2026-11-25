@@ -1,0 +1,7 @@
+{
+  "public_origin": "https://app.example.com",
+  "google_client_file": "/etc/overlay-forge/google-web-client.json",
+  "data_dir": "/var/lib/overlay-forge",
+  "frontend_dir": "/opt/overlay-forge/dist",
+  "bind": "127.0.0.1:4280"
+}
