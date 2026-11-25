@@ -180,10 +180,5 @@ async fn media_command(
     })
     .await
     .map_err(|_| ApiError::unavailable())?;
-    result.map(Json).map_err(|_| {
-        ApiError(
-            StatusCode::BAD_REQUEST,
-            "Media request could not be completed. Check your input or provider configuration.",
-        )
-    })
+    result.map(Json).map_err(ApiError::media)
 }

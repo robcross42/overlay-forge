@@ -27,6 +27,19 @@ cargo run --manifest-path server/Cargo.toml -- --config /etc/overlay-forge/serve
 
 This is development execution, not an installer or packaged release. Leave this process running, or use your existing process supervisor under an unprivileged OS account with access only to the configuration and data it needs. Public TLS, DNS, firewall and service installation are owner-managed; no deployment is performed by this change.
 
+## Metadata search credentials
+
+Google sign-in does not configure metadata providers. Movie/TV search and import require `TMDB_API_READ_ACCESS_TOKEN` in the **running server process** environment. Books uses `GOOGLE_BOOKS_API_KEY` for Google Books, with Open Library fallback and optional Hardcover configuration documented in the Media repository. A missing token is a server setup issue regardless of the client browser; saved local titles and manual entry remain available.
+
+For the current Ubuntu user service, store provider variables in a private file such as `~/.config/overlay-forge/providers.env` (directory mode 700, file mode 600), outside Git. Enter credentials locally; do not put them in frontend variables, chat or command arguments. Then run `systemctl --user edit overlay-forge-browser.service` and add this service override, replacing the home path if needed:
+
+```ini
+[Service]
+EnvironmentFile=/home/robolinux/.config/overlay-forge/providers.env
+```
+
+After the file exists, run `systemctl --user daemon-reload` and `systemctl --user restart overlay-forge-browser.service`. A shell export alone does not update an already running systemd service, and Rust does not automatically load repository .env files. Missing-credential responses now tell signed-in browser users that server search is not configured without exposing provider details or secrets.
+
 ## Approve or revoke an email
 
 Run these locally on the Ubuntu server using the same configuration and OS permissions. The server can remain running:

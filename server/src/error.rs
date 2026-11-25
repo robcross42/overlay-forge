@@ -7,6 +7,25 @@ use serde_json::json;
 
 pub struct ApiError(pub StatusCode, pub &'static str);
 impl ApiError {
+    pub fn media(error: overlay_forge_media_lib::MediaRuntimeError) -> Self {
+        use overlay_forge_media_lib::media::domain::MediaErrorKind;
+        use overlay_forge_media_lib::MediaRuntimeError;
+        match error {
+            MediaRuntimeError::Operation(error)
+                if error.kind == MediaErrorKind::MissingCredential =>
+            {
+                Self(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    "Media search is not configured on the server. Contact the app owner.",
+                )
+            }
+            _ => Self(
+                StatusCode::BAD_REQUEST,
+                "Media request could not be completed. Check your input or provider configuration.",
+            ),
+        }
+    }
+
     pub fn unauthorized() -> Self {
         Self(
             StatusCode::UNAUTHORIZED,

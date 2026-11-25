@@ -20,6 +20,20 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.5.1 - 2026-11-25
+
+### 2026-11-25
+
+#### Changed
+
+- 15:54:44 EST - Reused one accessible < or > sidebar-border toggle across native and browser shells, keeping existing collapse persistence. Pinned the Media content-tab/search refinement (#27).
+- 15:54:44 EST - Added a fixed safe missing-credential response through the HTTP error abstraction and documented backend provider setup for the Ubuntu user service.
+
+#### Validation
+
+- 15:54:44 EST - Changed-component syntax and targeted TypeScript checks, Rust formatting, version consistency and scoped diff review passed. Tests not run (rapid-development policy). Builds and browser runtime acceptance not performed.
+- 15:54:44 EST - Read-only inspection confirmed the running Ubuntu service lacks TMDB and Google Books credentials. The owner will transfer the TMDB token later; live search remains unvalidated.
+
 ## 0.5.0 - 2026-11-24
 
 ### 2026-11-24

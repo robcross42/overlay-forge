@@ -3,13 +3,13 @@
 Overlay Forge is the resident personal AI host and launcher for independently owned desktop products and the local Journal web product.
 
 ```text
-Current development version: 0.5.0
+Current development version: 0.5.1
 Source extraction baseline: develop@96aeb79778e148a66b8f88c2b9bcd27b8a415454
 ```
 
 Google sign-in returns administrators to a graphical connection dashboard; chat stays in Chat. Pages use navigation selection rather than repeated page headings. Choose Media, Gaming, Retirement or Journal directly in the left navigation. Media renders inside the host; other products retain their existing standalone launch paths. Family sessions open the integrated Media view and never receive host AI administration. Typed target forwarding remains available to an already signed-in host. Ctrl+Alt+Space opens a compact prompt; closing a window hides it, and the tray provides reopen and Quit controls.
 
-Use **Hide navigation** in the workspace controls to collapse the left pane, and **Show navigation** to restore it. The main pane scrolls independently; navigation stays in place and scrolls separately when needed in a short window. The collapsed state is saved locally and restored after restarting the app. Navigation spacing adapts to the available window height, including display scaling; it scrolls only when the window is too short to fit the controls.
+Use the < or > control on the sidebar's right border to collapse or restore navigation. The main pane scrolls independently; the collapsed state remains saved across sessions. Media opens Movies, TV, Books and Music; search belongs to each supported content area, and Music remains a placeholder.
 
 ## Browser clients and Ubuntu server
 
