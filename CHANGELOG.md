@@ -20,6 +20,14 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.6.1 - 2026-11-27
+
+### 2026-11-27
+
+#### Fixed
+
+- 18:36:04 EST - Clarified that desktop Google client import and local administrator setup are separate prerequisites for sign-in. The sign-in screen shows how to complete missing administrator setup.
+
 ## 0.6.0 - 2026-11-27
 
 ### 2026-11-27

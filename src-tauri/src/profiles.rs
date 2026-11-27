@@ -439,7 +439,7 @@ pub async fn identity_import_google_client(
     let mut profiles = authorize(&state, &session_id)?;
     ProfileService::ready_to_switch(&state)?;
     crate::google_client::GoogleClientConfig::import(&state.database, &path)?;
-    profiles.detail = "Google Desktop client configuration imported into protected local storage. Continue with Google to sign in. The downloaded original was not modified.".into();
+    profiles.detail = "Google Desktop client configuration saved to protected local storage.".into();
     profiles.revision += 1;
     drop(profiles);
     ProfileService::publish(&app);
