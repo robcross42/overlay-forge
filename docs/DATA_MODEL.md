@@ -1,5 +1,25 @@
 # Overlay Forge Host Data Model
 
+## Projects
+
+`obj_host_project` stores an opaque ID, the canonical serialized `ProjectDraft` body (title,
+description, typed stage, next step, Waiting on Rob, labelled references), and an independent
+boolean `archived`. The body is plain local catalog data and contains no financial figures or
+credentials. Only the administrator's authorized native commands access these records.
+
+`obj_host_project_seed` records the applied `initial-catalog-v1` seed. Both the ledger marker and
+initial rows are committed atomically. Stable seed IDs and `INSERT OR IGNORE` preserve existing
+rows; the ledger persists after deletion, preventing resurrection. No product/legacy data is
+migrated. `project_delete_requires_archive` rejects deletion of active records even through SQL.
+
+The initial catalog was curated on 27 November 2026 from the named local workspaces' README and
+status documentation, plus Rob's supplied stage/review instructions. Retirement workspaces are
+one entry; HouseReady/Real Estate and Contractor Simulator/Unity construction sim are aliases.
+The fictional lake map has no confirmed implementation/workspace and remains Planned. Ruckus's
+local main has no commits and contains staged/untracked prototype work; no new owner playtest
+is assigned. Media is pinned at 0.3.1, with Google host sign-in and UI/browser refinement ongoing.
+Stages are initial evidence-based notes and are editable; they do not automatically follow Git.
+
 The host uses `overlay-forge-host.sqlite3`. The legacy `overlay-forge.sqlite3` remains untouched.
 
 ## Google identity registry

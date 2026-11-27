@@ -1,5 +1,26 @@
 # Overlay Forge Host Validation
 
+## Projects catalog — 27 November 2026
+
+- `npm.cmd run build` and the native Tauri development compilation passed for 0.6.0.
+- `cargo test --manifest-path src-tauri/Cargo.toml projects::tests -- --nocapture` passed all
+  three focused checks. They cover disk reopen after editing, archive/restore without stage/detail
+  loss, exact-title confirmation, rejection of active deletion at repository and SQLite-trigger
+  layers, unchanged linked-file bytes, search/stage/Waiting on me, reference validation, and
+  repeat initialization/seeding after edits, archives and deletion. Other test suites were not run.
+- `npm.cmd run version:check` and `git diff --check` passed.
+- Agent-observed Windows UI acceptance: Projects and Media both opened from the main navigation
+  in the same development window. Created `Projects acceptance sample`, added a Waiting on Rob
+  action, edited its title to `Projects acceptance edited`, restarted the actual process, and
+  confirmed the edited record persisted after Rob completed Google sign-in.
+- Search and Waiting on me located the test entry. Archived it and observed no matching active
+  entry; restored it into Active, re-archived it, typed its exact title in the delete dialog and
+  permanently deleted only that synthetic record. The dialog explained tracker-only deletion and
+  disabled deletion until the exact title was supplied. The record disappeared after deletion.
+- Native administrator guards and the browser's Media-only route/command allowlist were reviewed.
+  No family-account switch, live external link, full test suite, packaging or server deployment
+  was exercised. Project stages/notes are a curated initial snapshot, not live repository status.
+
 ## Review checks
 
 - The Windows preview built the frontend and embedded-assets desktop application. Browser sign-in opened the default HTTPS browser, and the fixed verification prompt reached provider-confirmed completion.

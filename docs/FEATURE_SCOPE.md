@@ -1,5 +1,11 @@
 # Overlay Forge Host Scope
 
+Projects is an administrator-only desktop catalog inside the main shell. It supports add/edit,
+search, stage filters, Waiting on me, archive/restore and named permanent deletion from Archived.
+Entries point to existing repos/documents/workspaces; they never own or alter linked content.
+Projects is an approved exception to the older restriction on embedding additional product UI:
+it is host-owned tracking, not a migration of another product. The browser Media surface is unchanged.
+
 In scope: private product discovery, explicit typed target dispatch, retained last-used product state, host window state, resident lifecycle, and the approved personal AI anchor described in [AI Anchor Decision and Delivery](AI_ANCHOR.md). Google authentication belongs to the main host and returns to its dashboard; it does not auto-launch a module.
 
 The AI anchor includes Google primary identity, separately authorized service access, extensible connected accounts, ChatGPT/Codex shared AI connections, monitoring, action approvals, and Dot feasibility. The resident shell, local request-state demonstration, native ChatGPT sign-in, fixed streaming account verification and multi-turn ChatGPT composer with protected local history are implemented. Account read/write, scheduled remote monitoring, hosted services and module connection APIs remain unavailable.

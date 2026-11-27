@@ -1,9 +1,17 @@
 # Overlay Forge
 
+**Projects** in the desktop main navigation is Rob's private project catalog. Add or edit a title,
+description, stage, next step, Waiting on Rob and optional HTTPS/workspace/document references.
+Use **Waiting on me** for concrete asks. Archive hides a record without changing its stage;
+**Archived** offers Restore and permanent deletion after typing the exact project title.
+Deletion removes only the tracker record. Linked files and repositories are never changed.
+Initial entries are seeded once and never overwrite edits or resurrect deleted records.
+Projects is unavailable to family accounts and browser Media clients.
+
 Overlay Forge is the resident personal AI host and launcher for independently owned desktop products and the local Journal web product.
 
 ```text
-Current development version: 0.5.1
+Current development version: 0.6.0
 Source extraction baseline: develop@96aeb79778e148a66b8f88c2b9bcd27b8a415454
 ```
 

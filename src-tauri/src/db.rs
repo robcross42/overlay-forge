@@ -40,12 +40,13 @@ impl HostDatabase {
                 id INTEGER PRIMARY KEY CHECK(id=1), protected_config BLOB NOT NULL
             );
         "#)?;
+        crate::projects::repository::ProjectRepository::initialize(&connection)?;
         Ok(Self {
             connection: Mutex::new(connection),
         })
     }
 
-    fn connection(&self) -> rusqlite::Result<MutexGuard<'_, Connection>> {
+    pub(crate) fn connection(&self) -> rusqlite::Result<MutexGuard<'_, Connection>> {
         self.connection
             .lock()
             .map_err(|_| rusqlite::Error::InvalidQuery)
