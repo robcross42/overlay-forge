@@ -52,7 +52,10 @@ export function GoogleSessionGate({ children }: { children: (session: GoogleSess
         ? <button onClick={() => void act("identity_cancel")}>Cancel sign-in</button>
         : <><button disabled={!session.configured || !session.clientConfigured} onClick={() => void act("identity_sign_in")}>Continue with Google</button>
           <button onClick={() => void act("identity_import_google_client")}>Import Google client JSON</button><p>Choose the JSON downloaded for the Overlay Forge Desktop OAuth client. Its client secret is imported natively into protected storage. You can reimport here to repair setup.</p></>)}
-      {session && !session.configured && <p>Administrator setup is required. See the Google sign-in setup in the project documentation.</p>}
+      {session && !session.configured && <div role="note">
+        <p>Continue with Google also requires a local administrator Gmail address. Create <code>google-auth.json</code> with an <code>admin_email</code> field, then quit and reopen Overlay Forge.</p>
+        <p>On Ubuntu, use <code>~/.local/share/com.overlayforge.desktop</code>, or <code>$XDG_DATA_HOME/com.overlayforge.desktop</code> if you set XDG_DATA_HOME. On Windows, use <code>%APPDATA%\com.overlayforge.desktop</code>.</p>
+      </div>}
       <button onClick={() => void act("shutdown_app")}>Quit Overlay Forge</button>
     </section>
   </main>;
