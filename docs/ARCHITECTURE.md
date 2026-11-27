@@ -1,5 +1,26 @@
 # Overlay Forge Host Architecture
 
+## Projects catalog
+
+Projects is a host-owned module rendered in `AppShell`, alongside embedded Media. It adds no
+repository, package, window, runtime, login or integration service. `src/projects/` contains the
+presentational list/editor and typed session-bound command client. Native `projects/` owns the
+draft/stage model, validation, initial catalog and canonical SQLite repository. `HostDatabase`
+supplies its existing connection and initializes the additive schema.
+
+Every Projects command requires the existing pinned-administrator session guard and retains it
+through the operation. Family sessions have neither navigation nor data access; stale session
+IDs fail the same guard. The browser server stays Media-only and exposes no Projects endpoint.
+Catalog data is local host data, not transmitted to AI or metadata providers. It is not an
+encrypted vault; OS-account/database access still governs local files.
+
+References are inert absolute paths or HTTPS URLs. Paths are displayed as selectable text and
+never opened, executed, traversed or changed. Explicit HTTPS clicks reuse `browser_auth`.
+Archive is separate from stage; permanent deletion checks archived state and exact current title
+inside one repository transaction. A SQLite trigger independently rejects active-record deletion.
+Initial seeding uses a transactional ledger separate from records, so edits, archives and deleted
+seed entries survive future initialization. This is a curated snapshot, not live project scanning.
+
 The main app is the resident personal AI host under the [14 November boundary decision](AI_ANCHOR.md). React renders dashboard and compact-prompt views. Rust owns product dispatch, native window lifecycle and per-request state. `ProductKind` remains a closed enum.
 
 `HostDatabase` owns launcher/window state, protected ChatGPT credentials and protected completed conversations. `AiHub` holds provider-separated drafts, active requests and restored conversations. The native ChatGPT service assembles scoped history, owns credentials and streams through one Responses transport. Both windows subscribe before reading versioned snapshots. See the [data model](DATA_MODEL.md).

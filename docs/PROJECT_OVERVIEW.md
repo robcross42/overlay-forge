@@ -2,7 +2,7 @@
 
 ## Current Shape
 
-Overlay Forge 0.5.1
+Overlay Forge 0.6.0
 
 This is a private development version. A headless server now serves the Media family UI to approved Google users in normal browsers; see [Browser server setup](BROWSER_SERVER.md).
 

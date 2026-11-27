@@ -1,5 +1,10 @@
 # Repository Boundaries
 
+Projects is a host-owned private catalog, not another product repository. Its records and one-time
+seed ledger live in the host database. References preserve external repository/document ownership;
+the catalog cannot modify linked content. Native administrator authorization covers all catalog
+commands. Browser clients remain Media-only and receive no catalog data.
+
 The host, Media, Gaming, and Retirement repositories were extracted from `overlay-forge` `develop@96aeb79778e148a66b8f88c2b9bcd27b8a415454`. Journal was created independently in October 2026. Products are private and independently owned, with separate SQLite databases; Journal's current local web phase has no packaged application identifier.
 
 | Repository | Owned runtime surface | SQLite ownership | Application identifier |

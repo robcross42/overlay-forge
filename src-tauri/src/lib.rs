@@ -13,6 +13,7 @@ mod browser_auth;
 mod google_oauth;
 mod google_client;
 mod profiles;
+mod projects;
 use commands::{launch_product, list_products, shutdown_app};
 use db::HostDatabase;
 use std::sync::Mutex;
@@ -91,7 +92,7 @@ pub fn run() {
                 report(app,app.state::<AppState>().windows.hide(app,kind));
             }
         })
-        .invoke_handler(integrated_media::handler(tauri::generate_handler![ui_preferences::navigation_preference,ui_preferences::save_navigation_preference,profiles::identity_import_google_client,profiles::identity_snapshot,profiles::identity_sign_in,profiles::identity_cancel,profiles::identity_sign_out,list_products,launch_product,shutdown_app,hub_commands::hub_snapshot,hub_commands::hub_draft,hub_commands::hub_submit,hub_commands::hub_action,hub_commands::hub_stop_all,chatgpt::chatgpt_sign_in,chatgpt::chatgpt_verify,chatgpt::chatgpt_disconnect,windows::show_main,windows::show_quick_prompt,windows::hide_quick_prompt]))
+        .invoke_handler(integrated_media::handler(tauri::generate_handler![projects::projects_list,projects::projects_save,projects::projects_archive,projects::projects_delete,projects::projects_open_web_link,ui_preferences::navigation_preference,ui_preferences::save_navigation_preference,profiles::identity_import_google_client,profiles::identity_snapshot,profiles::identity_sign_in,profiles::identity_cancel,profiles::identity_sign_out,list_products,launch_product,shutdown_app,hub_commands::hub_snapshot,hub_commands::hub_draft,hub_commands::hub_submit,hub_commands::hub_action,hub_commands::hub_stop_all,chatgpt::chatgpt_sign_in,chatgpt::chatgpt_verify,chatgpt::chatgpt_disconnect,windows::show_main,windows::show_quick_prompt,windows::hide_quick_prompt]))
         .run(tauri::generate_context!())
         .expect("error while running Overlay Forge");
 }

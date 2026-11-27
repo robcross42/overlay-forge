@@ -20,6 +20,19 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.6.0 - 2026-11-27
+
+### 2026-11-27
+
+#### Added
+
+- 17:37:23 EST - Added Rob's private Projects catalog inside the existing host shell: add/edit, search, stage and Waiting on me filters, archive/restore, and named permanent deletion from Archived. Linked work stays untouched.
+- 17:37:23 EST - Added host-owned SQLite records, a delete-archive trigger and a transactional seed ledger for 24 curated project entries. Family and browser Media clients have no Projects access.
+
+#### Validation
+
+- 17:37:23 EST - Focused native project checks passed for persistence, archive/delete guards, named confirmation, filters, safe references and seed idempotency; frontend build passed. Runtime acceptance details are recorded in docs/VALIDATION.md.
+
 ## 0.5.1 - 2026-11-25
 
 ### 2026-11-25
