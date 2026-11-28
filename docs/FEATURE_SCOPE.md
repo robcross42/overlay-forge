@@ -4,7 +4,7 @@ Projects is an administrator-only desktop catalog inside the main shell. It supp
 search, stage filters, Waiting on me, archive/restore and named permanent deletion from Archived.
 Entries point to existing repos/documents/workspaces; they never own or alter linked content.
 Projects is an approved exception to the older restriction on embedding additional product UI:
-it is host-owned tracking, not a migration of another product. The browser Media surface is unchanged.
+it is host-owned tracking, not a migration of another product. Projects has no browser route.
 
 In scope: private product discovery, explicit typed target dispatch, retained last-used product state, host window state, resident lifecycle, and the approved personal AI anchor described in [AI Anchor Decision and Delivery](AI_ANCHOR.md). Google authentication belongs to the main host and returns to its dashboard; it does not auto-launch a module.
 
@@ -24,4 +24,4 @@ change the current host-only repository boundary.
 
 ## Approved browser clients
 
-The 24 November direction authorizes a headless Ubuntu server behind HTTPS, Google Web OAuth and a locally managed email allowlist. Browser clients access the shared family Media library without a desktop installation. Desktop administration/AI remains private and is not proxied to browsers. Other products are not yet browser modules. Hosted infrastructure provisioning, public DNS/TLS setup and Google Web OAuth client creation remain owner configuration, described in [Browser server setup](BROWSER_SERVER.md).
+The 24 November direction authorizes a headless Ubuntu server behind HTTPS, Google Web OAuth and a locally managed email allowlist. Browser clients access the shared family Media library without a desktop installation. Local LLM Chat is available to the configured browser owner, with in-memory conversations sent to Ubuntu’s loopback Ollama runner. Desktop administration and native ChatGPT remain private. Hosted infrastructure provisioning, public DNS/TLS setup and Google Web OAuth client creation remain owner configuration, described in [Browser server setup](BROWSER_SERVER.md).

@@ -10,7 +10,7 @@ supplies its existing connection and initializes the additive schema.
 
 Every Projects command requires the existing pinned-administrator session guard and retains it
 through the operation. Family sessions have neither navigation nor data access; stale session
-IDs fail the same guard. The browser server stays Media-only and exposes no Projects endpoint.
+IDs fail the same guard. The browser server exposes no Projects endpoint.
 Catalog data is local host data, not transmitted to AI or metadata providers. It is not an
 encrypted vault; OS-account/database access still governs local files.
 
@@ -54,3 +54,5 @@ The headless `server` crate is a separate process entry point which requires no 
 `AccessRepository` owns manually approved emails, first-login Google subject binding, session hashes, CSRF tokens and per-account navigation preference in a separate server SQLite database. This does not use the desktop singleton ProfileService or its administrator binding. Google Web authorization uses browser-bound, single-use state, PKCE and nonce; both desktop and server share `crates/google-identity` signature/claim verification. Browser email-first approval additionally requires verified Gmail/Workspace email authority. Google tokens are discarded after identity verification.
 
 Every HTTP Media command checks an unexpired approved session and exact Origin/CSRF before dispatching the fixed family command registry. Settings mutation, file imports, process launching and native host/ChatGPT commands are absent from HTTP routing. Revocation deletes sessions and future data requests fail. Shared Media data stays on the server. The server's loopback listener does not trust forwarded-origin headers; TLS/proxy configuration uses its explicit public origin. See [Browser server setup](BROWSER_SERVER.md) for data paths, configuration and remaining runtime acceptance.
+
+Local LLM Chat extends the same browser navigation. Its visibility and HTTP endpoint use one owner check against the configured email after the existing repository confirms an approved, Google-subject-bound session. The endpoint applies the same Origin and CSRF checks as Media. The `LocalLlm` service owns input validation and a separate, bounded Ollama transport pinned to Ubuntu loopback and `qwen3:8b`. The browser sends recent turns with each request and keeps its transcript in memory for the active session.

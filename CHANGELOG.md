@@ -20,6 +20,18 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 0.7.0 - 2026-11-27
+
+### 2026-11-27
+
+#### Added
+
+- 19:47:40 EST - Added owner-only Local LLM Chat beside Media in the browser app with an in-memory transcript, follow-ups and a new chat action. The Ubuntu backend uses Ollama with the installed `qwen3:8b` model on loopback. (#35)
+
+#### Validation
+
+- 19:47:40 EST - The owner marked Local LLM Chat validated after deployment to browser port 3000. On the identical preview build, Qwen recalled a test code on follow-up, and an approved non-owner could load Media and received HTTP 403 from chat.
+
 ## 0.6.1 - 2026-11-27
 
 ### 2026-11-27

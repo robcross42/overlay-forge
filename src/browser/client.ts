@@ -5,6 +5,12 @@ export interface BrowserSession {
   name: string | null;
   csrfToken: string;
   navigationCollapsed: boolean;
+  localLlmEnabled: boolean;
+}
+
+export interface LocalChatMessage {
+  role: "user" | "assistant";
+  content: string;
 }
 
 /** Same-origin cookies authenticate browser clients; tokens never enter browser storage. */
@@ -39,6 +45,10 @@ export class BrowserClient {
   }
   logout(csrf: string): Promise<void> { return this.post("/auth/logout", csrf); }
   saveNavigation(csrf: string, collapsed: boolean): Promise<void> { return this.post("/api/navigation", csrf, { collapsed }); }
+
+  localChat(csrf: string, messages: LocalChatMessage[]): Promise<{ content: string }> {
+    return this.post("/api/local-llm/chat", csrf, { messages });
+  }
 
   mediaTransport(csrf: string): MediaTransport {
     return async <T>(command: string, args = {}): Promise<T> => {

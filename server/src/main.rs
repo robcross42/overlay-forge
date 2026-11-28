@@ -1,5 +1,6 @@
 mod config;
 mod error;
+mod local_llm;
 mod oauth;
 mod repository;
 mod routes;
@@ -14,6 +15,7 @@ pub struct ServerState {
     google: GoogleClient,
     repository: AccessRepository,
     media: overlay_forge_media_lib::runtime::MediaRuntime,
+    local_llm: Option<local_llm::LocalLlm>,
     http: reqwest::blocking::Client,
     attempts: oauth::Attempts,
     workers: Arc<tokio::sync::Semaphore>,
@@ -104,12 +106,19 @@ fn run() -> Result<(), String> {
         .timeout(std::time::Duration::from_secs(15))
         .build()
         .map_err(|_| "Could not initialize Google transport.")?;
+    let local_llm = config
+        .local_llm_owner_email
+        .as_ref()
+        .map(|_| local_llm::LocalLlm::new())
+        .transpose()
+        .map_err(|_| "Could not initialize local chat transport.")?;
     let bind = config.bind;
     let state = Arc::new(ServerState {
         config,
         google,
         repository,
         media,
+        local_llm,
         http,
         attempts: oauth::Attempts::new(),
         workers: Arc::new(tokio::sync::Semaphore::new(8)),
