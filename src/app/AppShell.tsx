@@ -4,10 +4,11 @@ import { ReactNode, useEffect, useState } from "react";
 import type { GoogleSession } from "./GoogleSession";
 import { useNavigationPreference } from "./useNavigationPreference";
 import { EmbeddedMedia } from "./EmbeddedMedia";
+import { EmbeddedHockeyInventory } from "./EmbeddedHockeyInventory";
 import { NavigationToggle } from "./NavigationToggle";
 import { ProjectsModule } from "../projects/ProjectsModule";
 
-export const adminPages = ["Home", "Projects", "Chat", "Connected Accounts", "Monitoring", "Activity & Approvals", "Settings"] as const;
+export const adminPages = ["Home", "Projects", "Hockey Cards", "Chat", "Connected Accounts", "Monitoring", "Activity & Approvals", "Settings"] as const;
 export type AppPage = typeof adminPages[number] | "Media";
 interface Product { key: string; name: string; available: boolean }
 
@@ -35,6 +36,17 @@ export function AppShell({ session, page, onPage, quick, children }: {
     try { await invoke("launch_product", { productKey: product.key, sessionId: session.sessionId }); setError(""); }
     catch { setError(`Could not open ${product.name}.`); }
   }
+  const administrator = !!session.profile?.admin;
+  let content = children;
+  if (!quick && page === "Media") {
+    content = <EmbeddedMedia sessionId={session.sessionId} administrator={administrator} />;
+  }
+  if (!quick && page === "Projects") {
+    content = administrator && <ProjectsModule key={session.sessionId} sessionId={session.sessionId} />;
+  }
+  if (!quick && page === "Hockey Cards") {
+    content = administrator && <EmbeddedHockeyInventory key={session.sessionId} sessionId={session.sessionId} />;
+  }
   return <main className={quick ? "quick-shell" : `hub-shell${navigation.collapsed ? " navigation-collapsed" : ""}`}>
     {!quick && <aside id="main-navigation" hidden={navigation.collapsed}>
       <nav aria-label="Main navigation">
@@ -50,16 +62,14 @@ export function AppShell({ session, page, onPage, quick, children }: {
     {!quick && <NavigationToggle collapsed={navigation.collapsed} disabled={navigation.disabled}
       controls="main-navigation" onToggle={() => void navigation.toggle()} />}
     <div className="workspace-scroll">
-      <section className={`workspace${page === "Media" && !quick ? " workspace-media" : ""}`} aria-label={quick ? "Quick prompt" : page}>
+      <section className={`workspace${quick ? "" : page === "Media" ? " workspace-media" : page === "Hockey Cards" ? " workspace-hockey" : ""}`} aria-label={quick ? "Quick prompt" : page}>
         <div className="workspace-tools">
           {(quick || session.profile?.admin) && <button onClick={() => void invoke(quick ? "show_main" : "show_quick_prompt").catch(() => setError("Could not open the requested view."))}>
             {quick ? "Open main app" : "Open quick prompt"}</button>}
           {quick && <button onClick={() => void invoke("hide_quick_prompt").catch(() => setError("Could not hide the prompt."))}>Hide</button>}
         </div>
         {(error || navigation.error) && <p className="error" role="alert">{error || navigation.error}</p>}
-        {page === "Projects" && !quick
-          ? session.profile?.admin && <ProjectsModule key={session.sessionId} sessionId={session.sessionId} />
-          : page === "Media" && !quick ? <EmbeddedMedia sessionId={session.sessionId} administrator={!!session.profile?.admin} /> : children}
+        {content}
         {confirmQuit && <section className="panel" role="alertdialog" aria-label="Quit Overlay Forge">
           <p>Quit Overlay Forge? Unsent drafts will be cleared.</p>
           <div className="actions"><button onClick={() => void invoke("shutdown_app").catch(() => setError("Could not quit the app."))}>Quit</button>

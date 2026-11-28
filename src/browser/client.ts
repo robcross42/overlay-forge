@@ -1,3 +1,6 @@
+import type { MarketTransport } from "../../modules/hockey-cards/src/ComcMarket";
+import type { SalesCaptureTransport, SalesTransport } from "../../modules/hockey-cards/src/ComcSalesHistory";
+import type { InventoryCaptureTransport, InventoryTransport } from "../../modules/hockey-cards/src/ComcInventory";
 import type { MediaTransport } from "../../modules/media/src/embedded";
 
 export interface BrowserSession {
@@ -6,6 +9,10 @@ export interface BrowserSession {
   csrfToken: string;
   navigationCollapsed: boolean;
   localLlmEnabled: boolean;
+  hockeyInventoryEnabled: boolean;
+  hockeyInventoryCanImport: boolean;
+  hockeySalesEnabled: boolean;
+  hockeyMarketEnabled: boolean;
 }
 
 export interface LocalChatMessage {
@@ -48,6 +55,26 @@ export class BrowserClient {
 
   localChat(csrf: string, messages: LocalChatMessage[]): Promise<{ content: string }> {
     return this.post("/api/local-llm/chat", csrf, { messages });
+  }
+
+  hockeyMarketTransport(csrf: string): MarketTransport {
+    return (sort, hideAt, hideAuctions, minAsking) => this.post("/api/hockey/market", csrf, { sort, hideAt, hideAuctions, minAsking });
+  }
+
+  hockeySalesTransport(csrf: string): SalesTransport {
+    return (card) => this.post("/api/hockey/sales", csrf, { card });
+  }
+
+  hockeyInventoryCapture(csrf: string): InventoryCaptureTransport {
+    return (capture) => this.post("/api/hockey/inventory/import", csrf, capture);
+  }
+
+  hockeySalesCapture(csrf: string): SalesCaptureTransport {
+    return (observation) => this.post("/api/hockey/sales/observe", csrf, observation);
+  }
+
+  hockeyInventoryTransport(csrf: string): InventoryTransport {
+    return (query) => this.post("/api/hockey/inventory", csrf, query);
   }
 
   mediaTransport(csrf: string): MediaTransport {

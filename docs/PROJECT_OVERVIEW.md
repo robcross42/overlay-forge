@@ -2,11 +2,11 @@
 
 ## Current Shape
 
-Overlay Forge 0.7.0
+Overlay Forge 1.1.0
 
 This is a private development version. A headless server now serves the Media family UI to approved Google users in normal browsers; see [Browser server setup](BROWSER_SERVER.md).
 
-The main app is a resident personal AI host and launcher. Media UI and services are linked from the owning repository into one host application; product databases and domain code retain their separate ownership. Other modules keep their current launch paths.
+The main app is a resident personal AI host and launcher. Media and Hockey Cards link UI and services from their owning repositories into one host application. Product databases and domain code retain their separate ownership. Hockey Cards shows saved COMC inventory to the owner. Other modules keep their current launch paths.
 
 Google sign-in identifies administrator and family sessions. Only the pinned administrator can access the host's existing ChatGPT connection and chat data; family sessions open integrated Media and use direct product navigation. Curated family media actions remain future work. See [Google setup](../README.md#google-sign-in-and-family-access).
 

@@ -12,6 +12,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use hockey_comc_inventory::{InventoryError, InventoryPage, InventoryQuery};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use subtle::ConstantTimeEq;
@@ -29,6 +30,19 @@ pub fn router(state: Shared) -> Router {
         .route("/api/session", get(session))
         .route("/api/navigation", post(save_navigation))
         .route("/api/local-llm/chat", post(local_llm_chat))
+        .route("/api/hockey/inventory", post(hockey_inventory_query))
+        .route(
+            "/api/hockey/inventory/import",
+            post(crate::hockey_inventory::import_inventory)
+                .layer(axum::extract::DefaultBodyLimit::max(24 * 1024 * 1024)),
+        )
+        .route("/api/hockey/market", post(crate::hockey_inventory::market_query))
+        .route(
+            "/api/hockey/market/observe",
+            post(crate::hockey_inventory::observe_market).layer(DefaultBodyLimit::max(512 * 1024)),
+        )
+        .route("/api/hockey/sales", post(crate::hockey_inventory::sales_query))
+        .route("/api/hockey/sales/observe", post(crate::hockey_inventory::observe_sales))
         .route("/api/media/{command}", post(media_command))
         .fallback_service(ServeDir::new(&state.config.frontend_dir))
         .layer(DefaultBodyLimit::max(64 * 1024))
@@ -85,7 +99,7 @@ fn authenticate(state: &Shared, headers: &HeaderMap) -> Result<(String, BrowserS
         .ok_or_else(ApiError::unauthorized)?;
     Ok((hash, session))
 }
-fn authorize_write(
+pub(crate) fn authorize_write(
     state: &Shared,
     headers: &HeaderMap,
 ) -> Result<(String, BrowserSession), ApiError> {
@@ -104,12 +118,21 @@ fn is_local_llm_owner(state: &Shared, session: &BrowserSession) -> bool {
     state.config.local_llm_owner_email.as_deref() == Some(session.email.as_str())
 }
 
+pub(crate) fn hockey_inventory_allowed(state: &Shared, session: &BrowserSession) -> bool {
+    state.hockey_inventory.is_some()
+        && state.config.hockey_inventory_owner_email.as_deref() == Some(session.email.as_str())
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SessionResponse {
     #[serde(flatten)]
     session: BrowserSession,
     local_llm_enabled: bool,
+    hockey_inventory_enabled: bool,
+    hockey_inventory_can_import: bool,
+    hockey_sales_enabled: bool,
+    hockey_market_enabled: bool,
 }
 
 async fn session(
@@ -119,8 +142,41 @@ async fn session(
     let (_, session) = authenticate(&state, &headers)?;
     Ok(Json(SessionResponse {
         local_llm_enabled: is_local_llm_owner(&state, &session),
+        hockey_inventory_enabled: hockey_inventory_allowed(&state, &session),
+        hockey_inventory_can_import: hockey_inventory_allowed(&state, &session)
+            && state.config.hockey_inventory_database.is_none(),
+        hockey_sales_enabled: hockey_inventory_allowed(&state, &session) && state.hockey_market.sales.is_some(),
+        hockey_market_enabled: hockey_inventory_allowed(&state, &session) && state.hockey_market.snapshot.is_some(),
         session,
     }))
+}
+
+async fn hockey_inventory_query(
+    State(state): State<Shared>,
+    request: Request,
+) -> Result<Json<InventoryPage>, ApiError> {
+    let (_, session) = authorize_write(&state, request.headers())?;
+    if !hockey_inventory_allowed(&state, &session) {
+        return Err(ApiError::forbidden());
+    }
+    let Json(query) = Json::<InventoryQuery>::from_request(request, &state)
+        .await
+        .map_err(|_| ApiError(StatusCode::BAD_REQUEST, "Invalid inventory query."))?;
+    let permit = state
+        .workers
+        .clone()
+        .try_acquire_owned()
+        .map_err(|_| ApiError::unavailable())?;
+    tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        let inventory = state.hockey_inventory.as_ref().ok_or_else(ApiError::forbidden)?;
+        inventory.query(query).map(Json).map_err(|error| match error {
+            InventoryError::Invalid(message) => ApiError(StatusCode::BAD_REQUEST, message),
+            InventoryError::Unavailable => ApiError::unavailable(),
+        })
+    })
+    .await
+    .map_err(|_| ApiError::unavailable())?
 }
 
 async fn local_llm_chat(

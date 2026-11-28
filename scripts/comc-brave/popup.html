@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>COMC inventory snapshot</title>
+  <style>
+    body { min-width: 320px; margin: 16px; font: 14px system-ui; }
+    button { padding: 6px 12px; }
+    pre { white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <button id="read" type="button">Read COMC inventory</button>
+  <button id="save" type="button" disabled>Save to Overlay Forge</button>
+  <p><a href="https://www.comc.com/Manage/Inventory" target="_blank" rel="noreferrer">Open COMC Inventory Manager</a></p>
+  <pre id="result" role="status">Open a COMC tab to read your inventory.</pre>
+  <button id="read-sales" type="button">Read Recent Sales from this tab</button>
+  <p id="sales-status" role="status"></p>
+  <script src="popup.js"></script>
+</body>
+</html>

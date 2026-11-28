@@ -1,20 +1,34 @@
+import { refreshComcMarket } from "./comcMarket";
+import { useObservedComcCard } from "./comcSales";
 import { useEffect, useMemo, useState } from "react";
+import { ComcWorkspace } from "../../modules/hockey-cards/src/ComcWorkspace";
 import { EmbeddedMedia } from "../app/EmbeddedMedia";
 import { BrowserClient, type BrowserSession } from "./client";
 import { NavigationToggle } from "../app/NavigationToggle";
 import { LocalLlmChat } from "./LocalLlmChat";
 
-const pageLabels = { media: "Media", account: "Account", localChat: "Local LLM Chat" };
+const pageLabels = { media: "Media", account: "Account", hockey: "Hockey Cards", localChat: "Local LLM Chat" };
 
 export function BrowserApp() {
+  const observedComcCard = useObservedComcCard();
   const [session, setSession] = useState<BrowserSession | null>();
   const [selectedPage, setPage] = useState<keyof typeof pageLabels>("media");
-  const page = selectedPage === "localChat" && !session?.localLlmEnabled ? "media" : selectedPage;
+  const page = (selectedPage === "localChat" && !session?.localLlmEnabled) ||
+    (selectedPage === "hockey" && !session?.hockeyInventoryEnabled) ? "media" : selectedPage;
   const [error, setError] = useState(() => new URLSearchParams(window.location.search).get("auth") === "denied"
     ? "Sign-in was unsuccessful or this email has not been approved. Contact the app owner." : "");
   const [busy, setBusy] = useState(false);
   const client = useMemo(() => new BrowserClient(() => setSession(null)), []);
   const transport = useMemo(() => session ? client.mediaTransport(session.csrfToken) : undefined, [client, session?.csrfToken]);
+  const hockeyInventory = useMemo(() => session?.hockeyInventoryEnabled
+    ? client.hockeyInventoryTransport(session.csrfToken) : undefined,
+  [client, session?.hockeyInventoryEnabled, session?.csrfToken]);
+  const hockeyMarket = useMemo(() => session?.hockeyMarketEnabled
+    ? client.hockeyMarketTransport(session.csrfToken) : undefined,
+  [client, session?.hockeyMarketEnabled, session?.csrfToken]);
+  const hockeySales = useMemo(() => session?.hockeySalesEnabled
+    ? client.hockeySalesTransport(session.csrfToken) : undefined,
+  [client, session?.hockeySalesEnabled, session?.csrfToken]);
   useEffect(() => {
     let active = true;
     const refresh = () => {
@@ -57,6 +71,8 @@ export function BrowserApp() {
     <aside id="browser-navigation" hidden={session.navigationCollapsed}>
       <nav aria-label="Main navigation">
         <button aria-current={page === "media" ? "page" : undefined} onClick={() => setPage("media")}>Media</button>
+        {hockeyInventory && <button aria-current={page === "hockey" ? "page" : undefined}
+          onClick={() => setPage("hockey")}>{pageLabels.hockey}</button>}
         {session.localLlmEnabled && <button aria-current={page === "localChat" ? "page" : undefined}
           onClick={() => setPage("localChat")}>{pageLabels.localChat}</button>}
         <button aria-current={page === "account" ? "page" : undefined} onClick={() => setPage("account")}>Account</button>
@@ -65,9 +81,19 @@ export function BrowserApp() {
     </aside>
     <NavigationToggle collapsed={session.navigationCollapsed} disabled={busy}
       controls="browser-navigation" onToggle={() => void toggleNavigation()} />
-    <div className="workspace-scroll"><section className={`workspace${page === "media" ? " workspace-media" : ""}`} aria-label={pageLabels[page]}>
+    <div className="workspace-scroll"><section className={`workspace${page === "media" ? " workspace-media" : page === "hockey" ? " workspace-hockey" : ""}`} aria-label={pageLabels[page]}>
       {error && <p className="error" role="alert">{error}</p>}
       {page === "media" && transport && <EmbeddedMedia sessionId="browser" administrator={false} transport={transport} />}
+      {page === "hockey" && hockeyInventory && <ComcWorkspace
+        key={session.csrfToken}
+        inventory={hockeyInventory}
+        market={hockeyMarket}
+        refreshMarket={hockeyMarket ? refreshComcMarket : undefined}
+        sales={hockeySales}
+        observedCard={observedComcCard}
+        importInventory={session.hockeyInventoryCanImport ? client.hockeyInventoryCapture(session.csrfToken) : undefined}
+        importSales={hockeySales ? client.hockeySalesCapture(session.csrfToken) : undefined}
+      />}
       {session.localLlmEnabled && <div hidden={page !== "localChat"}>
         <LocalLlmChat key={session.csrfToken} client={client} csrf={session.csrfToken} />
       </div>}

@@ -20,6 +20,14 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 1.1.0 - 2026-11-28
+
+### 2026-11-28
+
+#### Added
+
+- 01:37:41 EST - Added owner-only Hockey Cards in the desktop and opt-in browser host. Combine card search, year, COMC sale status and USD price filters with sorting over saved inventory. The browser can import inventory and Recent Sales captures and look up saved sales by catalog ID. An optional Brave extension can read and save inventory from a signed-in COMC tab, with verified partial results and progress retained if its popup is closed. It can also save Recent Sales automatically when the user opens a COMC Hockey card, including catalog history displayed on a graded listing. It reads all verified Recent Sales pages in one deduplicated observation. The pane has top buttons for Inventory, Market, and Sales History. Refresh Market reads the latest Recently Added page in Brave and keeps the active filters. It uses a direct COMC tab handoff and reports whether the snapshot was saved. (#37)
+
 ## 0.7.0 - 2026-11-27
 
 ### 2026-11-27
