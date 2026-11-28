@@ -98,9 +98,8 @@ async function captureRecentSales(message, sender) {
   try {
     const opened = new URL(sender.url);
     const source = new URL(message.sourceUrl);
-    const cardPath = /^\/Cards\/Hockey\/(?:[^/]+\/){4}\d{1,32}$/;
-    const basePath = opened.pathname.replace(/\/(?:Graded|Ungraded|AftermarketAuto)\/[^/]+\/[^/]+$/, "");
-    if (source.origin !== opened.origin || source.pathname !== basePath ||
+    const cardPath = /^\/Cards\/Hockey\/(?:[^/]+\/){4}\d{1,32}(?:\/(?:Graded|Ungraded|AftermarketAuto)\/[^/]+\/[^/]+)?$/;
+    if (source.origin !== opened.origin || source.pathname !== opened.pathname ||
         !cardPath.test(source.pathname) || message.sourceUrl !== source.origin + source.pathname) return {};
     if (message.type === "market-sales-unavailable") {
       throw new Error("COMC’s Recent Sales data could not be read for this card.");
@@ -113,7 +112,7 @@ async function captureRecentSales(message, sender) {
     }
     const capture = { sourceUrl: message.sourceUrl, sales: message.sales };
     const { added } = await transferToOverlayForge("sales", capture, sender.tab.windowId);
-    const catalog = source.pathname.split("/").at(-1);
+    const catalog = source.pathname.split("/")[7];
     status = added ? "Catalog " + catalog + " · " + added + " new sales saved."
       : "Catalog " + catalog + " · " + (capture.sales.length
         ? "Recent Sales already saved." : "COMC showed no Recent Sales.");

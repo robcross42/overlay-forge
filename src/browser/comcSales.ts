@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { comcBaseSalesUrl } from "../../modules/hockey-cards/src/comcCapture";
+import { comcSalesUrl } from "../../modules/hockey-cards/src/comcCapture";
 
 // The Brave worker updates this tab-local selection after the sales save.
 export function useObservedComcCard() {
@@ -8,7 +8,7 @@ export function useObservedComcCard() {
     function refresh() {
       const stored = sessionStorage.getItem("overlay-forge:comc-sales-card");
       if (stored?.startsWith("https://www.comc.com/")) {
-        const url = comcBaseSalesUrl(new URL(stored));
+        const url = comcSalesUrl(new URL(stored));
         if (url) setCard({ url });
       }
     }
