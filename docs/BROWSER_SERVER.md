@@ -60,6 +60,12 @@ Use the same server and frontend build. Put a local config outside Git with `pub
 
 HTTP cookies without Secure are supported only in this explicit localhost mode; production requires HTTPS. `localhost` and `127.0.0.1` are different origins: browse using the configured host. `http://localhost:1420` is the desktop Vite preview, not the browser server.
 
+## Browser administrator
+
+Set `browser_admin_email` to one approved Google email. The server uses the browser session's verified, pinned Google identity. Existing configurations that omit this field use `local_llm_owner_email` as their single administrator. Local LLM Chat still requires its own opt-in setting for that same account.
+
+Only the administrator can switch between **Admin** and **End User** views in the sidebar. End User view shows the same pages as a regular approved account. This is a preview of the other account's navigation. Endpoint authorization still uses the signed-in identity. A fresh page starts in Admin view for the administrator.
+
 ## Local LLM Chat on Ubuntu
 
 The Ubuntu runner is Ollama with the installed model tag `qwen3:8b`. The server calls Ollama at `http://127.0.0.1:11434/api/chat`. Keep port 11434 bound to Ubuntu loopback and forward only Overlay Forge through SSH. Edge uses Overlay Forge's own origin for every chat request. Prompts and replies stay in the open browser tab's memory and go to the local runner for inference. Overlay Forge does not log prompt text or save transcripts. Each request carries up to six recent exchanges for context. **New Chat**, a reload or sign-out clears the transcript.

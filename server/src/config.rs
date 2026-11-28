@@ -14,6 +14,7 @@ pub struct Config {
     pub data_dir: PathBuf,
     pub frontend_dir: PathBuf,
     pub media_database: Option<PathBuf>,
+    pub browser_admin_email: Option<String>,
     pub local_llm_owner_email: Option<String>,
     #[serde(default = "default_bind")]
     pub bind: SocketAddr,
@@ -67,6 +68,10 @@ impl Config {
             *email = crate::repository::normalize_email(email)
                 .map_err(|_| "local_llm_owner_email must be a complete email address.")?;
         }
+        if let Some(email) = &mut config.browser_admin_email {
+            *email = crate::repository::normalize_email(email)
+                .map_err(|_| "browser_admin_email must be a complete email address.")?;
+        }
         let base = path.parent().unwrap_or(Path::new("."));
         for value in [
             &mut config.google_client_file,
@@ -83,6 +88,12 @@ impl Config {
             }
         }
         Ok(config)
+    }
+    pub fn is_browser_admin(&self, email: &str) -> bool {
+        self.browser_admin_email
+            .as_deref()
+            .or(self.local_llm_owner_email.as_deref())
+            == Some(email)
     }
     pub fn google_client(&self) -> Result<GoogleClient, String> {
         #[cfg(unix)]

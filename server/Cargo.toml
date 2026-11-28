@@ -1,6 +1,6 @@
 [package]
 name = "overlay-forge-server"
-version = "0.7.0"
+version = "1.0.4"
 edition = "2021"
 publish = false
 

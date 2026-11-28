@@ -101,7 +101,8 @@ fn authorize_write(
     Ok(auth)
 }
 fn is_local_llm_owner(state: &Shared, session: &BrowserSession) -> bool {
-    state.config.local_llm_owner_email.as_deref() == Some(session.email.as_str())
+    state.config.is_browser_admin(&session.email)
+        && state.config.local_llm_owner_email.as_deref() == Some(session.email.as_str())
 }
 
 #[derive(Serialize)]
@@ -109,6 +110,7 @@ fn is_local_llm_owner(state: &Shared, session: &BrowserSession) -> bool {
 struct SessionResponse {
     #[serde(flatten)]
     session: BrowserSession,
+    administrator: bool,
     local_llm_enabled: bool,
 }
 
@@ -118,6 +120,7 @@ async fn session(
 ) -> Result<Json<SessionResponse>, ApiError> {
     let (_, session) = authenticate(&state, &headers)?;
     Ok(Json(SessionResponse {
+        administrator: state.config.is_browser_admin(&session.email),
         local_llm_enabled: is_local_llm_owner(&state, &session),
         session,
     }))

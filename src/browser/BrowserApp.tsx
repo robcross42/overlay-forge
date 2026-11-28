@@ -9,7 +9,10 @@ const pageLabels = { media: "Media", account: "Account", localChat: "Local LLM C
 export function BrowserApp() {
   const [session, setSession] = useState<BrowserSession | null>();
   const [selectedPage, setPage] = useState<keyof typeof pageLabels>("media");
-  const page = selectedPage === "localChat" && !session?.localLlmEnabled ? "media" : selectedPage;
+  const [endUserView, setEndUserView] = useState(false);
+  const adminView = !!session?.administrator && !endUserView;
+  const localLlmVisible = adminView && !!session?.localLlmEnabled;
+  const page = selectedPage === "localChat" && !localLlmVisible ? "media" : selectedPage;
   const [error, setError] = useState(() => new URLSearchParams(window.location.search).get("auth") === "denied"
     ? "Sign-in was unsuccessful or this email has not been approved. Contact the app owner." : "");
   const [busy, setBusy] = useState(false);
@@ -26,6 +29,13 @@ export function BrowserApp() {
     if (new URLSearchParams(window.location.search).has("auth")) window.history.replaceState(null, "", window.location.pathname);
     return () => { active = false; window.removeEventListener("focus", refresh); };
   }, [client]);
+  useEffect(() => {
+    setEndUserView(false);
+  }, [session?.csrfToken]);
+  function switchView() {
+    setEndUserView(!endUserView);
+    if (!endUserView && selectedPage !== "media" && selectedPage !== "account") setPage("media");
+  }
   async function signIn() {
     setBusy(true);
     try { await client.signIn(); } catch (cause) { setError(cause instanceof Error ? cause.message : "Could not start sign-in."); setBusy(false); }
@@ -57,10 +67,13 @@ export function BrowserApp() {
     <aside id="browser-navigation" hidden={session.navigationCollapsed}>
       <nav aria-label="Main navigation">
         <button aria-current={page === "media" ? "page" : undefined} onClick={() => setPage("media")}>Media</button>
-        {session.localLlmEnabled && <button aria-current={page === "localChat" ? "page" : undefined}
+        {localLlmVisible && <button aria-current={page === "localChat" ? "page" : undefined}
           onClick={() => setPage("localChat")}>{pageLabels.localChat}</button>}
         <button aria-current={page === "account" ? "page" : undefined} onClick={() => setPage("account")}>Account</button>
       </nav>
+      {session.administrator && <button type="button" onClick={switchView}>
+        {endUserView ? "Switch to Admin view" : "Switch to End User view"}
+      </button>}
       <button disabled={busy} onClick={() => void signOut()}>Sign out</button>
     </aside>
     <NavigationToggle collapsed={session.navigationCollapsed} disabled={busy}
@@ -68,7 +81,7 @@ export function BrowserApp() {
     <div className="workspace-scroll"><section className={`workspace${page === "media" ? " workspace-media" : ""}`} aria-label={pageLabels[page]}>
       {error && <p className="error" role="alert">{error}</p>}
       {page === "media" && transport && <EmbeddedMedia sessionId="browser" administrator={false} transport={transport} />}
-      {session.localLlmEnabled && <div hidden={page !== "localChat"}>
+      {localLlmVisible && <div hidden={page !== "localChat"}>
         <LocalLlmChat key={session.csrfToken} client={client} csrf={session.csrfToken} />
       </div>}
       {page === "account" && <section className="panel">

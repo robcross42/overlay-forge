@@ -5,6 +5,7 @@ export interface BrowserSession {
   name: string | null;
   csrfToken: string;
   navigationCollapsed: boolean;
+  administrator: boolean;
   localLlmEnabled: boolean;
 }
 

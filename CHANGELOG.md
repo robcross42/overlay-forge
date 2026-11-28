@@ -20,6 +20,14 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 1.0.4 - 2026-11-28
+
+### 2026-11-28
+
+#### Added
+
+- 01:59:13 EST - Added a single browser administrator and an End User view switch for previewing the approved-user navigation. (#39)
+
 ## 0.7.0 - 2026-11-27
 
 ### 2026-11-27
