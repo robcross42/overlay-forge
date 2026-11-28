@@ -31,6 +31,11 @@ pub fn router(state: Shared) -> Router {
         .route("/api/navigation", post(save_navigation))
         .route("/api/local-llm/chat", post(local_llm_chat))
         .route("/api/hockey/inventory", post(hockey_inventory_query))
+        .route(
+            "/api/hockey/inventory/import",
+            post(crate::hockey_inventory::import_inventory)
+                .layer(axum::extract::DefaultBodyLimit::max(24 * 1024 * 1024)),
+        )
         .route("/api/hockey/market", post(crate::hockey_inventory::market_query))
         .route("/api/hockey/sales", post(crate::hockey_inventory::sales_query))
         .route("/api/hockey/sales/observe", post(crate::hockey_inventory::observe_sales))
@@ -121,6 +126,7 @@ struct SessionResponse {
     session: BrowserSession,
     local_llm_enabled: bool,
     hockey_inventory_enabled: bool,
+    hockey_inventory_can_import: bool,
     hockey_sales_enabled: bool,
     hockey_market_enabled: bool,
 }
@@ -133,6 +139,8 @@ async fn session(
     Ok(Json(SessionResponse {
         local_llm_enabled: is_local_llm_owner(&state, &session),
         hockey_inventory_enabled: hockey_inventory_allowed(&state, &session),
+        hockey_inventory_can_import: hockey_inventory_allowed(&state, &session)
+            && state.config.hockey_inventory_database.is_none(),
         hockey_sales_enabled: hockey_inventory_allowed(&state, &session) && state.hockey_market.sales.is_some(),
         hockey_market_enabled: hockey_inventory_allowed(&state, &session) && state.hockey_market.snapshot.is_some(),
         session,

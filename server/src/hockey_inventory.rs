@@ -15,10 +15,11 @@ pub fn configure(config: &Config, public_files: &Path) -> Option<Inventory> {
 }
 
 fn private_inventory(config: &Config, public_files: &Path) -> Result<Inventory, &'static str> {
+    let allow_capture = config.hockey_inventory_database.is_none();
     let database = config
         .hockey_inventory_database
         .clone()
-        .unwrap_or_else(|| config.data_dir.join("hockey-card-companion.sqlite3"));
+        .unwrap_or_else(|| config.data_dir.join("comc-browser-inventory.sqlite3"));
     let database = match std::fs::canonicalize(&database) {
         Ok(path) => path,
         Err(error)
@@ -26,7 +27,7 @@ fn private_inventory(config: &Config, public_files: &Path) -> Result<Inventory, 
                 && config.hockey_inventory_database.is_none()
                 && matches!(std::fs::symlink_metadata(&database), Err(error) if error.kind() == ErrorKind::NotFound) =>
         {
-            return Ok(Inventory::new(database));
+            return Ok(Inventory::browser_capture_database(database));
         }
         _ => return Err("Could not resolve the configured Hockey Cards database."),
     };
@@ -44,7 +45,11 @@ fn private_inventory(config: &Config, public_files: &Path) -> Result<Inventory, 
             );
         }
     }
-    Ok(Inventory::new(database))
+    Ok(if allow_capture {
+        Inventory::browser_capture_database(database)
+    } else {
+        Inventory::new(database)
+    })
 }
 
 use crate::{error::ApiError, routes, Shared};
@@ -54,6 +59,7 @@ use axum::{
     Json,
 };
 use hockey_comc_inventory::{
+    import::{InventoryCapture, InventoryImport},
     market::{MarketQuery, MarketSnapshot},
     sales::{SalesHistory, SalesImport, SalesObservation, SalesPage, SalesQuery},
     InventoryError,
@@ -199,4 +205,29 @@ pub async fn observe_sales(
 ) -> Result<Json<SalesImport>, ApiError> {
     let input = authorized_input::<SalesObservation>(&state, request).await?;
     sales_operation(state, move |sales| sales.save(input)).await
+}
+
+pub async fn import_inventory(
+    State(state): State<Shared>,
+    request: Request,
+) -> Result<Json<InventoryImport>, ApiError> {
+    let input = authorized_input::<InventoryCapture>(&state, request).await?;
+    let permit = state
+        .workers
+        .clone()
+        .try_acquire_owned()
+        .map_err(|_| ApiError::unavailable())?;
+    tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        let inventory = state
+            .hockey_inventory
+            .as_ref()
+            .ok_or_else(ApiError::forbidden)?;
+        inventory
+            .save_browser_capture(input)
+            .map(Json)
+            .map_err(api_error)
+    })
+    .await
+    .map_err(|_| ApiError::unavailable())?
 }

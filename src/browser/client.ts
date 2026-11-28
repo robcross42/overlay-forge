@@ -1,5 +1,5 @@
-import type { MarketTransport, SalesTransport } from "../../modules/hockey-cards/src/ComcMarket";
-import type { InventoryTransport } from "../../modules/hockey-cards/src/ComcInventory";
+import type { MarketTransport, SalesCaptureTransport, SalesTransport } from "../../modules/hockey-cards/src/ComcMarket";
+import type { InventoryCaptureTransport, InventoryTransport } from "../../modules/hockey-cards/src/ComcInventory";
 import type { MediaTransport } from "../../modules/media/src/embedded";
 
 export interface BrowserSession {
@@ -9,6 +9,7 @@ export interface BrowserSession {
   navigationCollapsed: boolean;
   localLlmEnabled: boolean;
   hockeyInventoryEnabled: boolean;
+  hockeyInventoryCanImport: boolean;
   hockeySalesEnabled: boolean;
   hockeyMarketEnabled: boolean;
 }
@@ -61,6 +62,14 @@ export class BrowserClient {
 
   hockeySalesTransport(csrf: string): SalesTransport {
     return (card) => this.post("/api/hockey/sales", csrf, { card });
+  }
+
+  hockeyInventoryCapture(csrf: string): InventoryCaptureTransport {
+    return (capture) => this.post("/api/hockey/inventory/import", csrf, capture);
+  }
+
+  hockeySalesCapture(csrf: string): SalesCaptureTransport {
+    return (observation) => this.post("/api/hockey/sales/observe", csrf, observation);
   }
 
   hockeyInventoryTransport(csrf: string): InventoryTransport {
