@@ -11,8 +11,9 @@ async function observeOpenedCard() {
   let sales;
   try {
     sales = parseRecentSales(document);
-  } catch {
-    await chrome.runtime.sendMessage({ type: "market-sales-unavailable", sourceUrl });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : undefined;
+    await chrome.runtime.sendMessage({ type: "market-sales-unavailable", sourceUrl, reason });
     return;
   }
   await chrome.runtime.sendMessage({ type: "market-sales", sourceUrl, sales });
@@ -23,6 +24,9 @@ function readCard() {
 }
 
 readCard();
-window.addEventListener("pageshow", (event) => {
-  if (event.persisted) readCard();
-});
+if (!globalThis.overlayForgeSalesPageListener) {
+  globalThis.overlayForgeSalesPageListener = true;
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) readCard();
+  });
+}

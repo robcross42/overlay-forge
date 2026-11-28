@@ -1,3 +1,4 @@
+const cardPath = /^\/Cards\/Hockey\/(?:[^/]+\/){4}\d{1,32}(?:\/(?:Graded|Ungraded|AftermarketAuto)\/[^/]+\/[^/]+)?$/;
 const forge = "http://127.0.0.1:3000";
 const forgePermission = { origins: ["http://127.0.0.1/*"] };
 let reading = false;
@@ -98,11 +99,12 @@ async function captureRecentSales(message, sender) {
   try {
     const opened = new URL(sender.url);
     const source = new URL(message.sourceUrl);
-    const cardPath = /^\/Cards\/Hockey\/(?:[^/]+\/){4}\d{1,32}(?:\/(?:Graded|Ungraded|AftermarketAuto)\/[^/]+\/[^/]+)?$/;
     if (source.origin !== opened.origin || source.pathname !== opened.pathname ||
         !cardPath.test(source.pathname) || message.sourceUrl !== source.origin + source.pathname) return {};
     if (message.type === "market-sales-unavailable") {
-      throw new Error("COMC’s Recent Sales data could not be read for this card.");
+      const reason = typeof message.reason === "string" && message.reason.length <= 160
+        ? message.reason : "COMC’s Recent Sales data could not be read for this card.";
+      throw new Error(reason);
     }
     if (!Array.isArray(message.sales) || message.sales.length > 200) {
       throw new Error("The Recent Sales table was too large or unreadable.");
@@ -159,15 +161,29 @@ chrome.permissions.onAdded.addListener(() => {
   void finishSave().catch(() => {});
 });
 
+async function readRecentSalesFromTab(tabId) {
+  const tab = await chrome.tabs.get(tabId);
+  const url = new URL(tab.url ?? "about:blank");
+  if (url.origin !== "https://www.comc.com" || !cardPath.test(url.pathname)) {
+    return { error: "Switch to a COMC Hockey card tab first." };
+  }
+  await chrome.scripting.executeScript({ target: { tabId }, files: ["sales.js"] });
+  return {};
+}
+
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (message?.type === "market-sales" || message?.type === "market-sales-unavailable") {
-    if (!sender.tab || sender.frameId !== 0 || sender.origin !== "https://www.comc.com") return;
+    if (!sender.tab || sender.frameId !== 0 || !sender.url?.startsWith("https://www.comc.com/")) return;
     captureRecentSales(message, sender).then(respond, () => respond({ error: "Could not record sales." }));
     return true;
   }
   if (sender.url !== chrome.runtime.getURL("popup.html")) return;
   let operation;
   switch (message?.type) {
+    case "read-market-sales":
+      if (!Number.isInteger(message.tabId)) return;
+      operation = readRecentSalesFromTab(message.tabId);
+      break;
     case "read-inventory":
       if (!Number.isInteger(message.tabId)) return;
       if (reading || saving) {

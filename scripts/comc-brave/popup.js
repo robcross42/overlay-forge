@@ -44,6 +44,18 @@ read.addEventListener("click", async () => {
   }
 });
 
+document.getElementById("read-sales").addEventListener("click", async () => {
+  salesStatus.textContent = "Reading Recent Sales…";
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) throw new Error("Open a COMC Hockey card tab first.");
+    const result = await chrome.runtime.sendMessage({ type: "read-market-sales", tabId: tab.id });
+    if (result?.error) throw new Error(result.error);
+  } catch (error) {
+    showSales(error.message);
+  }
+});
+
 save.addEventListener("click", async () => {
   if (!capture) return;
   save.disabled = true;
