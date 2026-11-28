@@ -60,7 +60,7 @@ use axum::{
 };
 use hockey_comc_inventory::{
     import::{InventoryCapture, InventoryImport},
-    market::{MarketQuery, MarketSnapshot},
+    market::{MarketPage, MarketQuery, MarketSnapshot, MarketStore, MarketView},
     sales::{SalesHistory, SalesImport, SalesObservation, SalesPage, SalesQuery},
     InventoryError,
 };
@@ -69,7 +69,7 @@ use std::path::PathBuf;
 
 pub struct MarketServices {
     pub sales: Option<SalesHistory>,
-    pub snapshot: Option<MarketSnapshot>,
+    pub snapshot: Option<MarketStore>,
 }
 
 impl MarketServices {
@@ -96,6 +96,16 @@ impl MarketServices {
                     None
                 }
             });
+        let snapshot = snapshot.and_then(|seed| {
+            let data_dir = std::fs::canonicalize(&config.data_dir).ok()?;
+            if data_dir.starts_with(public_files) {
+                return None;
+            }
+            Some(MarketStore::new(
+                seed,
+                data_dir.join("comc-market-recently-added.json"),
+            ))
+        });
         Self { sales, snapshot }
     }
 }
@@ -156,17 +166,38 @@ fn api_error(error: InventoryError) -> ApiError {
 pub async fn market_query(
     State(state): State<Shared>,
     request: Request,
-) -> Result<Json<serde_json::Value>, ApiError> {
+) -> Result<Json<MarketPage>, ApiError> {
     let input = authorized_input::<MarketQuery>(&state, request).await?;
     let snapshot = state
         .hockey_market
         .snapshot
         .as_ref()
         .ok_or_else(ApiError::forbidden)?;
-    let result = snapshot.query(input).map_err(api_error)?;
-    serde_json::to_value(result)
-        .map(Json)
-        .map_err(|_| ApiError::unavailable())
+    snapshot.query(input).map(Json).map_err(api_error)
+}
+
+pub async fn observe_market(
+    State(state): State<Shared>,
+    request: Request,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let input = authorized_input::<MarketView>(&state, request).await?;
+    let permit = state
+        .workers
+        .clone()
+        .try_acquire_owned()
+        .map_err(|_| ApiError::unavailable())?;
+    tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        let market = state
+            .hockey_market
+            .snapshot
+            .as_ref()
+            .ok_or_else(ApiError::forbidden)?;
+        let cards = market.save_recently_added(input).map_err(api_error)?;
+        Ok(Json(serde_json::json!({ "cards": cards })))
+    })
+    .await
+    .map_err(|_| ApiError::unavailable())?
 }
 
 async fn sales_operation<T: Send + 'static>(

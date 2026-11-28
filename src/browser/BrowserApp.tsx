@@ -1,3 +1,4 @@
+import { refreshComcMarket } from "./comcMarket";
 import { useObservedComcCard } from "./comcSales";
 import { useEffect, useMemo, useState } from "react";
 import { ComcWorkspace } from "../../modules/hockey-cards/src/ComcWorkspace";
@@ -87,6 +88,7 @@ export function BrowserApp() {
         key={session.csrfToken}
         inventory={hockeyInventory}
         market={hockeyMarket}
+        refreshMarket={hockeyMarket ? refreshComcMarket : undefined}
         sales={hockeySales}
         observedCard={observedComcCard}
         importInventory={session.hockeyInventoryCanImport ? client.hockeyInventoryCapture(session.csrfToken) : undefined}

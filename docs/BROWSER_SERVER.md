@@ -72,10 +72,10 @@ From **Hockey Cards**, open COMC Inventory Manager and sign in on COMC. In Brave
 
 Sign in to Overlay Forge at `http://127.0.0.1:3000`, then sign in to COMC and switch to a `www.comc.com` tab. In the optional **Overlay Forge COMC Read-only Probe** extension, choose **Read COMC inventory**, then choose **Save to Overlay Forge**. The first save asks for local browser permission. Saving continues in the background if the permission prompt closes the extension popup. Refresh Hockey Cards to load the saved snapshot. The extension reads the Inventory Manager pager in your existing COMC session and sends only validated inventory fields to the local importer. It stops on a repeated card, unexpected page, or after 25 pages. The scan result stays in browser session memory if the popup closes. Verified pages can be saved as partial when the scan stops early.
 
-To prepare the unpacked extension from a checkout with the Hockey Cards submodule and Node dependencies installed, copy `scripts/comc-brave/manifest.json`, `popup.html`, `popup.js`, and `worker.js` into a private directory. Run this from the host repository root, replacing `/path/to/extension` with that directory.
+To prepare the unpacked extension from a checkout with the Hockey Cards submodule and Node dependencies installed, copy `scripts/comc-brave/manifest.json`, `popup.html`, `popup.js`, `worker.js`, and `forge-bridge.js` into a private directory. Run this from the host repository root, replacing `/path/to/extension` with that directory.
 
 ```sh
-npm exec --offline -- esbuild scripts/comc-brave/read.js scripts/comc-brave/sales.js --bundle --format=iife --outdir=/path/to/extension
+npm exec --offline -- esbuild scripts/comc-brave/read.js scripts/comc-brave/sales.js scripts/comc-brave/market.js --bundle --format=iife --outdir=/path/to/extension
 ```
 
 In `brave://extensions`, enable **Developer mode** and choose **Load unpacked**. Select the extension directory. Use the extension’s **Reload** button after updating its files.
@@ -88,7 +88,7 @@ Use **Saved cards** or enter a COMC card URL or catalog ID to query saved sales.
 
 Select **Hockey Cards** to search all words in the saved card titles or item IDs and combine that with a year, sale status, and a USD asking-price range. Sorting keeps the applied filters. Moving a collection from Windows requires a separately reviewed logical export and import plan.
 
-Set `hockey_sales_database` to the existing private product-owned COMC sales history database and `hockey_market_snapshot` to a sanitized captured market JSON file to enable market research. Both files must reside outside the static frontend directory. The browser owner can combine Recently Added, a hide-at-copy-count threshold, a fixed-price-only filter and a minimum asking price. The view shows the capture time and keeps unknown copy counts visible. Verified COMC card URLs and catalog IDs open saved sales. New observations can be inserted through the owner-authorized backend once an approved source is available.
+Set `hockey_sales_database` to the existing private product-owned COMC sales history database and `hockey_market_snapshot` to a sanitized captured market JSON file to enable market research. Both files must reside outside the static frontend directory. The browser owner can combine Recently Added, a hide-at-copy-count threshold, a fixed-price-only filter and a minimum asking price. The view shows the capture time and keeps unknown copy counts visible. **Refresh Market** opens the Recently Added results in a temporary background tab through the Brave extension. It updates the first result page and reapplies the current copy threshold, auction filter, and minimum USD price. The backend keeps the latest verified refresh in its private data directory and retains the previous snapshot when a refresh fails. Reload the extension and the Overlay Forge tab to enable the local connection. Verified COMC card URLs and catalog IDs open saved sales. New observations can be inserted through the owner-authorized backend once an approved source is available.
 
 ## Local LLM Chat on Ubuntu
 

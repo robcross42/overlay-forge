@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Overlay Forge COMC Read-only Probe",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Read COMC inventory and Recent Sales and save them to your local Overlay Forge browser app.",
   "permissions": [
     "activeTab",
@@ -24,6 +24,15 @@
       ],
       "js": [
         "sales.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.comc.com/Cards/Hockey,sr*"
+      ],
+      "js": [
+        "market.js"
       ],
       "run_at": "document_idle"
     }

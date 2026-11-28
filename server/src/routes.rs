@@ -37,6 +37,10 @@ pub fn router(state: Shared) -> Router {
                 .layer(axum::extract::DefaultBodyLimit::max(24 * 1024 * 1024)),
         )
         .route("/api/hockey/market", post(crate::hockey_inventory::market_query))
+        .route(
+            "/api/hockey/market/observe",
+            post(crate::hockey_inventory::observe_market).layer(DefaultBodyLimit::max(512 * 1024)),
+        )
         .route("/api/hockey/sales", post(crate::hockey_inventory::sales_query))
         .route("/api/hockey/sales/observe", post(crate::hockey_inventory::observe_sales))
         .route("/api/media/{command}", post(media_command))
