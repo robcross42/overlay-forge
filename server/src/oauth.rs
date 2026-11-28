@@ -4,7 +4,7 @@ use crate::{
     Shared,
 };
 use axum::{
-    extract::{Query, State},
+    extract::{OriginalUri, Query, State},
     http::{header, HeaderMap, StatusCode},
     response::{IntoResponse, Redirect, Response},
     Json,
@@ -132,8 +132,14 @@ fn read_bounded(response: reqwest::blocking::Response) -> Result<Zeroizing<Vec<u
 pub async fn callback(
     State(state): State<Shared>,
     headers: HeaderMap,
+    OriginalUri(uri): OriginalUri,
     Query(query): Query<Callback>,
 ) -> Response {
+    if query.state.starts_with(overlay_forge_chatgpt_connection::oauth::BROWSER_STATE_PREFIX) {
+        let target = uri.path_and_query().map(|target| target.as_str()).unwrap_or_default();
+        return crate::browser_chatgpt::callback(state, &headers, &query.state, target.to_owned())
+            .await.into_response();
+    }
     let outcome = complete(state.clone(), &headers, query).await;
     let (location, session_cookie) = match outcome {
         Ok(cookie) => ("/", Some(cookie)),

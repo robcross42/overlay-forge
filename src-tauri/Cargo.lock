@@ -2755,13 +2755,14 @@ dependencies = [
 
 [[package]]
 name = "overlay-forge"
-version = "1.0.4"
+version = "1.2.0"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
  "bson",
  "flate2",
  "jsonwebtoken",
+ "overlay-forge-chatgpt-connection",
  "overlay-forge-google-identity",
  "overlay-forge-media",
  "png 0.18.1",
@@ -2783,8 +2784,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "overlay-forge-chatgpt-connection"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "jsonwebtoken",
+ "rand",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "zeroize",
+]
+
+[[package]]
 name = "overlay-forge-google-identity"
-version = "1.0.4"
+version = "1.2.0"
 dependencies = [
  "jsonwebtoken",
  "reqwest 0.12.28",

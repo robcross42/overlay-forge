@@ -6,7 +6,16 @@ export interface BrowserSession {
   csrfToken: string;
   navigationCollapsed: boolean;
   administrator: boolean;
+  chatgptEnabled: boolean;
   localLlmEnabled: boolean;
+}
+
+export interface ChatgptStatus {
+  state: string;
+  detail: string;
+  observedAt: number | null;
+  account: string | null;
+  models: { slug: string; displayName: string }[];
 }
 
 export interface LocalChatMessage {
@@ -47,6 +56,23 @@ export class BrowserClient {
   logout(csrf: string): Promise<void> { return this.post("/auth/logout", csrf); }
   saveNavigation(csrf: string, collapsed: boolean): Promise<void> { return this.post("/api/navigation", csrf, { collapsed }); }
 
+  chatgptStatus(csrf: string): Promise<ChatgptStatus> {
+    return this.post("/api/chatgpt/status", csrf);
+  }
+  async chatgptSignIn(csrf: string): Promise<void> {
+    const { url } = await this.post<{ url: string }>("/api/chatgpt/start", csrf);
+    const destination = new URL(url);
+    if (destination.origin !== "https://auth.openai.com" || destination.pathname !== "/api/accounts/authorize") {
+      throw new Error("Invalid ChatGPT sign-in destination.");
+    }
+    window.location.assign(destination.href);
+  }
+  chatgptCancelSignIn(csrf: string): Promise<void> { return this.post("/api/chatgpt/cancel-sign-in", csrf); }
+  chatgptDisconnect(csrf: string): Promise<void> { return this.post("/api/chatgpt/disconnect", csrf); }
+  chatgptStop(csrf: string): Promise<void> { return this.post("/api/chatgpt/stop", csrf); }
+  chatgptReply(csrf: string, model: string, messages: LocalChatMessage[]): Promise<{ content: string }> {
+    return this.post("/api/chatgpt/chat", csrf, { model, messages });
+  }
   localChat(csrf: string, messages: LocalChatMessage[]): Promise<{ content: string }> {
     return this.post("/api/local-llm/chat", csrf, { messages });
   }
