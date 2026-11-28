@@ -64,6 +64,28 @@ HTTP cookies without Secure are supported only in this explicit localhost mode; 
 
 Use the top buttons to switch between **Inventory**, **Market**, and **Sales History**. **View sales** in the market opens the selected card’s history. A new Brave sales observation also opens **Sales History** while Hockey Cards is active.
 
+### Resume the Ubuntu setup
+
+1. Open [Overlay Forge in Brave](http://127.0.0.1:3000/), sign in with the approved owner account, and open **Hockey Cards** in **Admin view**. If the page is unavailable, check the existing Ubuntu user service:
+
+   ```sh
+   systemctl --user status overlay-forge-browser.service
+   curl -fsS http://127.0.0.1:3000/health
+   ```
+
+   Start the existing service with `systemctl --user start overlay-forge-browser.service` if it is stopped. Keep its active configuration and data paths together.
+
+2. In `brave://extensions`, check that **Overlay Forge COMC Read-only Probe** is enabled. The direct Market handoff was verified with **0.5.1**. If its unpacked files changed, enable **Developer mode**, click the circular reload icon on its card, and refresh Overlay Forge. Use your normal COMC sign-in in Brave. Local access for the extension is granted through Brave.
+3. In **Market**, set the copy threshold, auction filter, and minimum price, then click **Refresh Market**. A COMC tab opens and closes after Overlay Forge saves the first Recently Added page. The **Captured** time advances and the active filters apply to the new rows. If COMC asks you to sign in, complete sign-in, return to Overlay Forge, and retry. The last saved results stay available after a failed refresh.
+4. In **Inventory**, the last saved snapshot loads automatically. To read a fresh inventory snapshot, open COMC Inventory Manager, then click **Read COMC inventory** and **Save to Overlay Forge** in the extension. Refresh the Inventory pane after the save.
+5. In **Sales History**, open a COMC card in Brave with Overlay Forge still open. Use **Read Recent Sales from this tab** if the card was already open. The popup reports the sales and pages scanned and how many rows were added. Replaying the same pages should report that all sales are already saved. The card’s catalog ID is the lookup key.
+
+The active server configuration identifies the private data to keep when resuming: `data_dir/comc-browser-inventory.sqlite3` for imported inventory, `hockey_sales_database` for sales history, `hockey_market_snapshot` for the initial market snapshot, and `data_dir/comc-market-recently-added.json` for the latest successful refresh. Keep those files and the browser extension's unpacked folder outside source control.
+
+Development continues on the existing [Overlay Forge review](https://github.com/robcross42/overlay-forge/pull/38) and [Hockey Card Companion review](https://github.com/robcross42/hockey-card-companion/pull/96). The host branch pins the product source as a submodule.
+
+### Configure Hockey Cards
+
 Set `hockey_inventory_owner_email` to the owner's approved Google email to enable the **Hockey Cards** tab. If the setting is omitted, browser access is disabled. The optional `hockey_inventory_database` points to an existing compatible product SQLite file. Without it, the service saves browser inventory snapshots to `comc-browser-inventory.sqlite3` in `data_dir`. An explicitly configured database is read-only. On Ubuntu the file must be private to the service user (chmod 600) and outside the frontend directory. Keep it separate from Media, browser access, and the desktop host database.
 
 From **Hockey Cards**, open COMC Inventory Manager and sign in on COMC. In Brave DevTools under **Network**, record each page with **All** selected, search empty, and the same sort and page size. Export a sanitized HAR and choose **Import inventory HAR**. A partial snapshot shows the cards it captured when no complete snapshot is saved. A complete snapshot takes priority.
@@ -72,7 +94,7 @@ From **Hockey Cards**, open COMC Inventory Manager and sign in on COMC. In Brave
 
 Sign in to Overlay Forge at `http://127.0.0.1:3000`, then sign in to COMC and switch to a `www.comc.com` tab. In the optional **Overlay Forge COMC Read-only Probe** extension, choose **Read COMC inventory**, then choose **Save to Overlay Forge**. The first save asks for local browser permission. Saving continues in the background if the permission prompt closes the extension popup. Refresh Hockey Cards to load the saved snapshot. The extension reads the Inventory Manager pager in your existing COMC session and sends only validated inventory fields to the local importer. It stops on a repeated card, unexpected page, or after 25 pages. The scan result stays in browser session memory if the popup closes. Verified pages can be saved as partial when the scan stops early.
 
-To prepare the unpacked extension from a checkout with the Hockey Cards submodule and Node dependencies installed, copy `scripts/comc-brave/manifest.json`, `popup.html`, `popup.js`, `worker.js` into a private directory. Run this from the host repository root, replacing `/path/to/extension` with that directory.
+To prepare the unpacked extension from a checkout with the Hockey Cards submodule and Node dependencies installed, copy `manifest.json`, `popup.html`, `popup.js`, and `worker.js` from `scripts/comc-brave/` into a private directory. Run this from the host repository root, replacing `/path/to/extension` with that directory.
 
 ```sh
 npm exec --offline -- esbuild scripts/comc-brave/read.js scripts/comc-brave/sales.js scripts/comc-brave/market.js --bundle --format=iife --outdir=/path/to/extension
@@ -88,7 +110,7 @@ Use **Saved cards** or enter a COMC card URL or catalog ID to query saved sales.
 
 Select **Hockey Cards** to search all words in the saved card titles or item IDs and combine that with a year, sale status, and a USD asking-price range. Sorting keeps the applied filters. Moving a collection from Windows requires a separately reviewed logical export and import plan.
 
-Set `hockey_sales_database` to the existing private product-owned COMC sales history database and `hockey_market_snapshot` to a sanitized captured market JSON file to enable market research. Both files must reside outside the static frontend directory. The browser owner can combine Recently Added, a hide-at-copy-count threshold, a fixed-price-only filter and a minimum asking price. The view shows the capture time and keeps unknown copy counts visible. **Refresh Market** opens the Recently Added results in a temporary COMC tab in Brave. The tab closes after the new snapshot is saved. It updates the first result page and reapplies the current copy threshold, auction filter, and minimum USD price. The backend keeps the latest verified refresh in its private data directory and retains the previous snapshot when a refresh fails. Reload the extension to 0.5.1 and refresh Overlay Forge to enable the direct tab handoff. Verified COMC card URLs and catalog IDs open saved sales. New observations can be inserted through the owner-authorized backend once an approved source is available.
+Set `hockey_sales_database` to the existing private product-owned COMC sales history database and `hockey_market_snapshot` to a sanitized captured market JSON file to enable market research. Both files must reside outside the static frontend directory. The browser owner can combine Recently Added, a hide-at-copy-count threshold, a fixed-price-only filter and a minimum asking price. The view shows the capture time and keeps unknown copy counts visible. **Refresh Market** opens the Recently Added results in a temporary COMC tab in Brave. The tab closes after the new snapshot is saved. It updates the first result page and reapplies the current copy threshold, auction filter, and minimum USD price. The backend keeps the latest verified refresh in its private data directory and retains the previous snapshot when a refresh fails. Reload the extension to 0.5.1 and refresh Overlay Forge to enable the direct tab handoff. Verified COMC card URLs and catalog IDs open saved sales. The owner-authorized backend validates and saves the rows sent by the Brave extension.
 
 ## Local LLM Chat on Ubuntu
 
