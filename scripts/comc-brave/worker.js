@@ -106,7 +106,8 @@ async function captureRecentSales(message, sender) {
         ? message.reason : "COMC’s Recent Sales data could not be read for this card.";
       throw new Error(reason);
     }
-    if (!Array.isArray(message.sales) || message.sales.length > 200) {
+    if (!Array.isArray(message.sales) || message.sales.length > 2_000 ||
+        !Number.isInteger(message.pages) || message.pages < 0 || message.pages > 100) {
       throw new Error("The Recent Sales table was too large or unreadable.");
     }
     if (!await chrome.permissions.contains(forgePermission)) {
@@ -115,9 +116,10 @@ async function captureRecentSales(message, sender) {
     const capture = { sourceUrl: message.sourceUrl, sales: message.sales };
     const { added } = await transferToOverlayForge("sales", capture, sender.tab.windowId);
     const catalog = source.pathname.split("/")[7];
-    status = added ? "Catalog " + catalog + " · " + added + " new sales saved."
-      : "Catalog " + catalog + " · " + (capture.sales.length
-        ? "Recent Sales already saved." : "COMC showed no Recent Sales.");
+    const scanned = capture.sales.length + " sales across " + message.pages + " page(s)";
+    status = "Catalog " + catalog + " · " + (capture.sales.length
+      ? scanned + " · " + (added ? added + " new sales saved." : "All sales already saved.")
+      : "COMC showed no Recent Sales.");
   } catch (error) {
     status = error.message;
   }
