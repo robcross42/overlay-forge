@@ -1,3 +1,4 @@
+import { useObservedComcCard } from "./comcSales";
 import { useEffect, useMemo, useState } from "react";
 import { ComcMarket } from "../../modules/hockey-cards/src/ComcMarket";
 import { ComcInventory } from "../../modules/hockey-cards/src/ComcInventory";
@@ -9,6 +10,7 @@ import { LocalLlmChat } from "./LocalLlmChat";
 const pageLabels = { media: "Media", account: "Account", hockey: "Hockey Cards", localChat: "Local LLM Chat" };
 
 export function BrowserApp() {
+  const observedComcCard = useObservedComcCard();
   const [session, setSession] = useState<BrowserSession | null>();
   const [selectedPage, setPage] = useState<keyof typeof pageLabels>("media");
   const page = (selectedPage === "localChat" && !session?.localLlmEnabled) ||
@@ -82,7 +84,7 @@ export function BrowserApp() {
     <div className="workspace-scroll"><section className={`workspace${page === "media" ? " workspace-media" : ""}`} aria-label={pageLabels[page]}>
       {error && <p className="error" role="alert">{error}</p>}
       {page === "media" && transport && <EmbeddedMedia sessionId="browser" administrator={false} transport={transport} />}
-      {page === "hockey" && hockeySales && <ComcMarket key={"market-" + session.csrfToken} market={hockeyMarket} sales={hockeySales} importSales={client.hockeySalesCapture(session.csrfToken)} />}
+      {page === "hockey" && hockeySales && <ComcMarket key={"market-" + session.csrfToken} market={hockeyMarket} sales={hockeySales} observedCard={observedComcCard} importSales={client.hockeySalesCapture(session.csrfToken)} />}
       {page === "hockey" && hockeyInventory && <ComcInventory key={session.csrfToken} load={hockeyInventory} importCapture={session.hockeyInventoryCanImport ? client.hockeyInventoryCapture(session.csrfToken) : undefined} />}
       {session.localLlmEnabled && <div hidden={page !== "localChat"}>
         <LocalLlmChat key={session.csrfToken} client={client} csrf={session.csrfToken} />

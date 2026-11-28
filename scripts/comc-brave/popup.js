@@ -3,6 +3,7 @@ const forgePermission = { origins: ["http://127.0.0.1/*"] };
 const read = document.getElementById("read");
 const save = document.getElementById("save");
 const result = document.getElementById("result");
+const salesStatus = document.getElementById("sales-status");
 let capture;
 
 function showReading(reading) {
@@ -13,9 +14,18 @@ function showReading(reading) {
 }
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "session" && changes.reading) showReading(changes.reading.newValue);
+  if (area !== "session") return;
+  if (changes.reading) showReading(changes.reading.newValue);
+  if (changes.salesStatus) showSales(changes.salesStatus.newValue);
 });
-chrome.storage.session.get("reading").then(({ reading }) => showReading(reading));
+chrome.storage.session.get(["reading", "salesStatus"]).then((state) => {
+  showReading(state.reading);
+  showSales(state.salesStatus);
+});
+
+function showSales(status) {
+  salesStatus.textContent = status ?? "Recent Sales sync runs when you open a COMC Hockey card.";
+}
 
 read.addEventListener("click", async () => {
   try {

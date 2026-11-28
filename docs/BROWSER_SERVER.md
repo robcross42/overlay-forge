@@ -73,12 +73,14 @@ Sign in to Overlay Forge at `http://127.0.0.1:3000`, then sign in to COMC and sw
 To prepare the unpacked extension from a checkout with the Hockey Cards submodule and Node dependencies installed, copy `scripts/comc-brave/manifest.json`, `popup.html`, `popup.js`, and `worker.js` into a private directory. Run this from the host repository root, replacing `/path/to/extension` with that directory.
 
 ```sh
-npm exec --offline -- esbuild scripts/comc-brave/read.js --bundle --format=iife --outfile=/path/to/extension/read.js
+npm exec --offline -- esbuild scripts/comc-brave/read.js scripts/comc-brave/sales.js --bundle --format=iife --outdir=/path/to/extension
 ```
 
 In `brave://extensions`, enable **Developer mode** and choose **Load unpacked**. Select the extension directory. Use the extension’s **Reload** button after updating its files.
 
 ### Saved sales
+
+With the Brave extension loaded and local access granted, keep the signed-in Overlay Forge tab open. Open a card on COMC Hockey. The extension reads the card’s visible Recent Sales and sends the USD date and price rows to the existing owner-only importer. Overlay Forge selects the card by catalog ID and refreshes its history. Unpriced or empty history adds no rows. When opening a graded listing, the extension reads the base card’s Recent Sales to keep the catalog-wide history consistent. The extension popup reports the latest capture status. Reopen the COMC card after loading an updated extension or signing back in to Overlay Forge.
 
 Use **Saved cards** or enter a COMC card URL or catalog ID to query saved sales. To add observations, open a COMC Hockey card’s Recent Sales page with Network recording, export a sanitized HAR, and choose **Import sales HAR**. Brave extracts the displayed card fields locally. The app sends only these fields to the signed-in browser backend. The backend keeps one identity per catalog ID, stores individual sales separately, and deduplicates repeat imports.
 

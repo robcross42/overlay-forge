@@ -35,32 +35,94 @@ async function readInventory(tabId) {
   }
 }
 
-// Runs inside the isolated world of the selected Overlay Forge tab. Its session
-// cookie and CSRF value stay within that origin and never enter the popup.
-async function saveSnapshot(origin, inventory) {
+// Executed in the local Overlay Forge tab. The session cookie and CSRF
+// value stay at that origin and never enter the extension worker.
+async function saveInOverlayForge(origin, kind, capture) {
   if (location.origin !== origin) return { error: "The Overlay Forge tab has changed." };
   const options = { credentials: "same-origin", cache: "no-store", redirect: "error" };
   const session = await fetch("/api/session", options);
   if (!session.ok) return { error: "Sign in to Overlay Forge as the owner before saving." };
   const identity = await session.json();
-  if (!identity.hockeyInventoryCanImport || !identity.csrfToken) {
-    return { error: "This Overlay Forge account cannot import inventory." };
+  const inventory = kind === "inventory";
+  if (!(inventory ? identity.hockeyInventoryCanImport : identity.hockeySalesEnabled) ||
+      !identity.csrfToken) {
+    return { error: "This Overlay Forge account cannot import " + kind + "." };
   }
 
-  const response = await fetch("/api/hockey/inventory/import", {
-    ...options,
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-OF-CSRF": identity.csrfToken },
-    body: JSON.stringify(inventory),
-  });
-  if (!response.ok) {
-    const detail = await response.json().catch(() => null);
-    return { error: detail?.error ?? "Overlay Forge rejected the snapshot." };
+  if (inventory || capture.sales.length) {
+    const response = await fetch(inventory ? "/api/hockey/inventory/import" : "/api/hockey/sales/observe", {
+      ...options,
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-OF-CSRF": identity.csrfToken },
+      body: JSON.stringify(capture),
+    });
+    if (!response.ok) {
+      const detail = await response.json().catch(() => null);
+      return { error: detail?.error ?? "Overlay Forge rejected the capture." };
+    }
+    const result = await response.json();
+    if (inventory) {
+      const { items, pages, partial } = result;
+      return { items, pages, partial };
+    }
+    selectCard();
+    return { added: result.added };
   }
-  const { items, pages, partial } = await response.json();
-  return { items, pages, partial };
+
+  selectCard();
+  return { added: 0 };
+
+  function selectCard() {
+    sessionStorage.setItem("overlay-forge:comc-sales-card", capture.sourceUrl);
+    window.dispatchEvent(new Event("overlay-forge:comc-sales"));
+  }
 }
 
+async function transferToOverlayForge(kind, capture, windowId) {
+  const tabs = await chrome.tabs.query({ url: "http://127.0.0.1/*" });
+  const forgeTabs = tabs.filter((tab) => tab.url && new URL(tab.url).origin === forge);
+  const tab = forgeTabs.find((candidate) => candidate.windowId === windowId) ?? forgeTabs[0];
+  if (!tab) throw new Error("Open Overlay Forge at " + forge + " and sign in first.");
+  const [execution] = await chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    func: saveInOverlayForge,
+    args: [forge, kind, capture],
+  });
+  const saved = execution?.result;
+  if (!saved || saved.error) throw new Error(saved?.error ?? "Overlay Forge returned no result.");
+  return saved;
+}
+
+async function captureRecentSales(message, sender) {
+  let status;
+  try {
+    const opened = new URL(sender.url);
+    const source = new URL(message.sourceUrl);
+    const cardPath = /^\/Cards\/Hockey\/(?:[^/]+\/){4}\d{1,32}$/;
+    const basePath = opened.pathname.replace(/\/(?:Graded|Ungraded|AftermarketAuto)\/[^/]+\/[^/]+$/, "");
+    if (source.origin !== opened.origin || source.pathname !== basePath ||
+        !cardPath.test(source.pathname) || message.sourceUrl !== source.origin + source.pathname) return {};
+    if (message.type === "market-sales-unavailable") {
+      throw new Error("COMC’s Recent Sales data could not be read for this card.");
+    }
+    if (!Array.isArray(message.sales) || message.sales.length > 200) {
+      throw new Error("The Recent Sales table was too large or unreadable.");
+    }
+    if (!await chrome.permissions.contains(forgePermission)) {
+      throw new Error("Allow the local Overlay Forge connection in this extension.");
+    }
+    const capture = { sourceUrl: message.sourceUrl, sales: message.sales };
+    const { added } = await transferToOverlayForge("sales", capture, sender.tab.windowId);
+    const catalog = source.pathname.split("/").at(-1);
+    status = added ? "Catalog " + catalog + " · " + added + " new sales saved."
+      : "Catalog " + catalog + " · " + (capture.sales.length
+        ? "Recent Sales already saved." : "COMC showed no Recent Sales.");
+  } catch (error) {
+    status = error.message;
+  }
+  await chrome.storage.session.set({ salesStatus: status });
+  return {};
+}
 
 async function finishSave() {
   const { reading: scan, saveUntil } = await chrome.storage.session.get(["reading", "saveUntil"]);
@@ -74,17 +136,7 @@ async function finishSave() {
       reading: { ...scan, pending: true, messages: ["Saving to Overlay Forge…"] },
     });
     try {
-      const tabs = await chrome.tabs.query({ url: "http://127.0.0.1/*" });
-      const tab = tabs.find((candidate) =>
-        candidate.url && new URL(candidate.url).origin === forge);
-      if (!tab) throw new Error("Open Overlay Forge at " + forge + " and sign in first.");
-      const [execution] = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: saveSnapshot,
-        args: [forge, scan.capture],
-      });
-      const saved = execution?.result;
-      if (!saved || saved.error) throw new Error(saved?.error ?? "Overlay Forge returned no result.");
+      const saved = await transferToOverlayForge("inventory", scan.capture);
       const confirmation = "Saved " + saved.items + " cards from " + saved.pages + " pages" +
         (saved.partial ? " as a partial snapshot." : ". Refresh Hockey Cards to see it.");
       await chrome.storage.session.set({ reading: { messages: [confirmation] } });
@@ -109,6 +161,11 @@ chrome.permissions.onAdded.addListener(() => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
+  if (message?.type === "market-sales" || message?.type === "market-sales-unavailable") {
+    if (!sender.tab || sender.frameId !== 0 || sender.origin !== "https://www.comc.com") return;
+    captureRecentSales(message, sender).then(respond, () => respond({ error: "Could not record sales." }));
+    return true;
+  }
   if (sender.url !== chrome.runtime.getURL("popup.html")) return;
   let operation;
   switch (message?.type) {
