@@ -2755,7 +2755,7 @@ dependencies = [
 
 [[package]]
 name = "overlay-forge"
-version = "0.7.0"
+version = "1.0.4"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
@@ -2784,7 +2784,7 @@ dependencies = [
 
 [[package]]
 name = "overlay-forge-google-identity"
-version = "0.7.0"
+version = "1.0.4"
 dependencies = [
  "jsonwebtoken",
  "reqwest 0.12.28",
