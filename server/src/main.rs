@@ -18,6 +18,7 @@ pub struct ServerState {
     media: overlay_forge_media_lib::runtime::MediaRuntime,
     local_llm: Option<local_llm::LocalLlm>,
     hockey_inventory: Option<hockey_comc_inventory::Inventory>,
+    hockey_market: hockey_inventory::MarketServices,
     http: reqwest::blocking::Client,
     attempts: oauth::Attempts,
     workers: Arc<tokio::sync::Semaphore>,
@@ -115,6 +116,7 @@ fn run() -> Result<(), String> {
         .transpose()
         .map_err(|_| "Could not initialize local chat transport.")?;
     let hockey_inventory = hockey_inventory::configure(&config, &public_files);
+    let hockey_market = hockey_inventory::MarketServices::configure(&config, &public_files);
     let bind = config.bind;
     let state = Arc::new(ServerState {
         config,
@@ -123,6 +125,7 @@ fn run() -> Result<(), String> {
         media,
         local_llm,
         hockey_inventory,
+        hockey_market,
         http,
         attempts: oauth::Attempts::new(),
         workers: Arc::new(tokio::sync::Semaphore::new(8)),

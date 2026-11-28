@@ -66,6 +66,8 @@ Set `hockey_inventory_owner_email` to the owner's approved Google email to enabl
 
 Select **Hockey Cards** to search all words in the saved card titles or item IDs and combine that with a year, sale status, and a USD asking-price range. Sorting keeps the applied filters. The view shows the most recent complete COMC snapshot and opens an empty state when none is available. COMC capture remains in the standalone app. Moving a collection from Windows requires a separately reviewed logical export and import plan.
 
+Set `hockey_sales_database` to the existing private product-owned COMC sales history database and `hockey_market_snapshot` to a sanitized captured market JSON file to enable market research. Both files must reside outside the static frontend directory. The browser owner can combine Recently Added, a hide-at-copy-count threshold, a fixed-price-only filter and a minimum asking price. The view shows the capture time and keeps unknown copy counts visible. Verified COMC card URLs and catalog IDs open saved sales. New observations can be inserted through the owner-authorized backend once an approved source is available.
+
 ## Local LLM Chat on Ubuntu
 
 The Ubuntu runner is Ollama with the installed model tag `qwen3:8b`. The server calls Ollama at `http://127.0.0.1:11434/api/chat`. Keep port 11434 bound to Ubuntu loopback and forward only Overlay Forge through SSH. Edge uses Overlay Forge's own origin for every chat request. Prompts and replies stay in the open browser tab's memory and go to the local runner for inference. Overlay Forge does not log prompt text or save transcripts. Each request carries up to six recent exchanges for context. **New Chat**, a reload or sign-out clears the transcript.

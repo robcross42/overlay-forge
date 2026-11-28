@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ComcMarket } from "../../modules/hockey-cards/src/ComcMarket";
 import { ComcInventory } from "../../modules/hockey-cards/src/ComcInventory";
 import { EmbeddedMedia } from "../app/EmbeddedMedia";
 import { BrowserClient, type BrowserSession } from "./client";
@@ -20,6 +21,12 @@ export function BrowserApp() {
   const hockeyInventory = useMemo(() => session?.hockeyInventoryEnabled
     ? client.hockeyInventoryTransport(session.csrfToken) : undefined,
   [client, session?.hockeyInventoryEnabled, session?.csrfToken]);
+  const hockeyMarket = useMemo(() => session?.hockeyMarketEnabled
+    ? client.hockeyMarketTransport(session.csrfToken) : undefined,
+  [client, session?.hockeyMarketEnabled, session?.csrfToken]);
+  const hockeySales = useMemo(() => session?.hockeySalesEnabled
+    ? client.hockeySalesTransport(session.csrfToken) : undefined,
+  [client, session?.hockeySalesEnabled, session?.csrfToken]);
   useEffect(() => {
     let active = true;
     const refresh = () => {
@@ -75,6 +82,7 @@ export function BrowserApp() {
     <div className="workspace-scroll"><section className={`workspace${page === "media" ? " workspace-media" : ""}`} aria-label={pageLabels[page]}>
       {error && <p className="error" role="alert">{error}</p>}
       {page === "media" && transport && <EmbeddedMedia sessionId="browser" administrator={false} transport={transport} />}
+      {page === "hockey" && hockeySales && <ComcMarket key={"market-" + session.csrfToken} market={hockeyMarket} sales={hockeySales} />}
       {page === "hockey" && hockeyInventory && <ComcInventory key={session.csrfToken} load={hockeyInventory} />}
       {session.localLlmEnabled && <div hidden={page !== "localChat"}>
         <LocalLlmChat key={session.csrfToken} client={client} csrf={session.csrfToken} />

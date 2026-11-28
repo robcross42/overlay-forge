@@ -31,6 +31,9 @@ pub fn router(state: Shared) -> Router {
         .route("/api/navigation", post(save_navigation))
         .route("/api/local-llm/chat", post(local_llm_chat))
         .route("/api/hockey/inventory", post(hockey_inventory_query))
+        .route("/api/hockey/market", post(crate::hockey_inventory::market_query))
+        .route("/api/hockey/sales", post(crate::hockey_inventory::sales_query))
+        .route("/api/hockey/sales/observe", post(crate::hockey_inventory::observe_sales))
         .route("/api/media/{command}", post(media_command))
         .fallback_service(ServeDir::new(&state.config.frontend_dir))
         .layer(DefaultBodyLimit::max(64 * 1024))
@@ -87,7 +90,7 @@ fn authenticate(state: &Shared, headers: &HeaderMap) -> Result<(String, BrowserS
         .ok_or_else(ApiError::unauthorized)?;
     Ok((hash, session))
 }
-fn authorize_write(
+pub(crate) fn authorize_write(
     state: &Shared,
     headers: &HeaderMap,
 ) -> Result<(String, BrowserSession), ApiError> {
@@ -106,7 +109,7 @@ fn is_local_llm_owner(state: &Shared, session: &BrowserSession) -> bool {
     state.config.local_llm_owner_email.as_deref() == Some(session.email.as_str())
 }
 
-fn hockey_inventory_allowed(state: &Shared, session: &BrowserSession) -> bool {
+pub(crate) fn hockey_inventory_allowed(state: &Shared, session: &BrowserSession) -> bool {
     state.hockey_inventory.is_some()
         && state.config.hockey_inventory_owner_email.as_deref() == Some(session.email.as_str())
 }
@@ -118,6 +121,8 @@ struct SessionResponse {
     session: BrowserSession,
     local_llm_enabled: bool,
     hockey_inventory_enabled: bool,
+    hockey_sales_enabled: bool,
+    hockey_market_enabled: bool,
 }
 
 async fn session(
@@ -128,6 +133,8 @@ async fn session(
     Ok(Json(SessionResponse {
         local_llm_enabled: is_local_llm_owner(&state, &session),
         hockey_inventory_enabled: hockey_inventory_allowed(&state, &session),
+        hockey_sales_enabled: hockey_inventory_allowed(&state, &session) && state.hockey_market.sales.is_some(),
+        hockey_market_enabled: hockey_inventory_allowed(&state, &session) && state.hockey_market.snapshot.is_some(),
         session,
     }))
 }

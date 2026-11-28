@@ -16,6 +16,8 @@ pub struct Config {
     pub media_database: Option<PathBuf>,
     pub hockey_inventory_owner_email: Option<String>,
     pub hockey_inventory_database: Option<PathBuf>,
+    pub hockey_sales_database: Option<PathBuf>,
+    pub hockey_market_snapshot: Option<PathBuf>,
     pub local_llm_owner_email: Option<String>,
     #[serde(default = "default_bind")]
     pub bind: SocketAddr,
@@ -83,7 +85,7 @@ impl Config {
                 *value = base.join(&*value);
             }
         }
-        for database in [&mut config.media_database, &mut config.hockey_inventory_database]
+        for database in [&mut config.media_database, &mut config.hockey_inventory_database, &mut config.hockey_sales_database, &mut config.hockey_market_snapshot]
             .into_iter()
             .flatten()
         {

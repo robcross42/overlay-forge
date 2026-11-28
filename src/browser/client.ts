@@ -1,3 +1,4 @@
+import type { MarketTransport, SalesTransport } from "../../modules/hockey-cards/src/ComcMarket";
 import type { InventoryTransport } from "../../modules/hockey-cards/src/ComcInventory";
 import type { MediaTransport } from "../../modules/media/src/embedded";
 
@@ -8,6 +9,8 @@ export interface BrowserSession {
   navigationCollapsed: boolean;
   localLlmEnabled: boolean;
   hockeyInventoryEnabled: boolean;
+  hockeySalesEnabled: boolean;
+  hockeyMarketEnabled: boolean;
 }
 
 export interface LocalChatMessage {
@@ -50,6 +53,14 @@ export class BrowserClient {
 
   localChat(csrf: string, messages: LocalChatMessage[]): Promise<{ content: string }> {
     return this.post("/api/local-llm/chat", csrf, { messages });
+  }
+
+  hockeyMarketTransport(csrf: string): MarketTransport {
+    return (sort, hideAt, hideAuctions, minAsking) => this.post("/api/hockey/market", csrf, { sort, hideAt, hideAuctions, minAsking });
+  }
+
+  hockeySalesTransport(csrf: string): SalesTransport {
+    return (card) => this.post("/api/hockey/sales", csrf, { card });
   }
 
   hockeyInventoryTransport(csrf: string): InventoryTransport {
