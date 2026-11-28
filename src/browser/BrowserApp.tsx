@@ -2,10 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { EmbeddedMedia } from "../app/EmbeddedMedia";
 import { BrowserClient, type BrowserSession } from "./client";
 import { NavigationToggle } from "../app/NavigationToggle";
+import { LocalLlmChat } from "./LocalLlmChat";
+
+const pageLabels = { media: "Media", account: "Account", localChat: "Local LLM Chat" };
 
 export function BrowserApp() {
   const [session, setSession] = useState<BrowserSession | null>();
-  const [page, setPage] = useState<"media" | "account">("media");
+  const [selectedPage, setPage] = useState<keyof typeof pageLabels>("media");
+  const page = selectedPage === "localChat" && !session?.localLlmEnabled ? "media" : selectedPage;
   const [error, setError] = useState(() => new URLSearchParams(window.location.search).get("auth") === "denied"
     ? "Sign-in was unsuccessful or this email has not been approved. Contact the app owner." : "");
   const [busy, setBusy] = useState(false);
@@ -53,15 +57,21 @@ export function BrowserApp() {
     <aside id="browser-navigation" hidden={session.navigationCollapsed}>
       <nav aria-label="Main navigation">
         <button aria-current={page === "media" ? "page" : undefined} onClick={() => setPage("media")}>Media</button>
+        {session.localLlmEnabled && <button aria-current={page === "localChat" ? "page" : undefined}
+          onClick={() => setPage("localChat")}>{pageLabels.localChat}</button>}
         <button aria-current={page === "account" ? "page" : undefined} onClick={() => setPage("account")}>Account</button>
       </nav>
       <button disabled={busy} onClick={() => void signOut()}>Sign out</button>
     </aside>
     <NavigationToggle collapsed={session.navigationCollapsed} disabled={busy}
       controls="browser-navigation" onToggle={() => void toggleNavigation()} />
-    <div className="workspace-scroll"><section className={`workspace${page === "media" ? " workspace-media" : ""}`} aria-label={page === "media" ? "Media" : "Account"}>
+    <div className="workspace-scroll"><section className={`workspace${page === "media" ? " workspace-media" : ""}`} aria-label={pageLabels[page]}>
       {error && <p className="error" role="alert">{error}</p>}
-      {page === "media" && transport ? <EmbeddedMedia sessionId="browser" administrator={false} transport={transport} /> : <section className="panel">
+      {page === "media" && transport && <EmbeddedMedia sessionId="browser" administrator={false} transport={transport} />}
+      {session.localLlmEnabled && <div hidden={page !== "localChat"}>
+        <LocalLlmChat key={session.csrfToken} client={client} csrf={session.csrfToken} />
+      </div>}
+      {page === "account" && <section className="panel">
         <p>{session.name ?? session.email}</p><p>{session.email}</p>
         <button disabled={busy} onClick={() => void signOut()}>Sign out</button>
       </section>}

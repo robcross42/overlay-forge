@@ -1,5 +1,12 @@
 # Overlay Forge Host Validation
 
+## Local LLM Chat — 27 November 2026
+
+- The owner marked Local LLM Chat validated after promotion to the existing browser service on port 3000.
+- The live service served the tested bundle, opened the existing Media and access databases, preserved the registered Google OAuth callback, and returned HTTP 401 from chat for a signed-out request.
+- In Ubuntu Chromium, the preview showed the waiting state, kept the conversation across a switch to Media and back, and cleared the transcript with New Chat. Qwen recalled a test code on follow-up. An approved non-owner could load Media and received HTTP 403 from chat.
+- An isolated network namespace reproduced runner-down and missing-model responses with actionable messages. Ollama remained on Ubuntu loopback.
+
 ## Projects catalog — 27 November 2026
 
 - `npm.cmd run build` and the native Tauri development compilation passed for 0.6.0.

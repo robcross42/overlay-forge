@@ -5,14 +5,14 @@ use crate::{
     Shared,
 };
 use axum::{
-    extract::{DefaultBodyLimit, Path, Request, State},
+    extract::{DefaultBodyLimit, FromRequest, Path, Request, State},
     http::{header, HeaderMap, HeaderValue, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use subtle::ConstantTimeEq;
 use tower_http::services::ServeDir;
@@ -28,6 +28,7 @@ pub fn router(state: Shared) -> Router {
         .route("/auth/logout", post(logout))
         .route("/api/session", get(session))
         .route("/api/navigation", post(save_navigation))
+        .route("/api/local-llm/chat", post(local_llm_chat))
         .route("/api/media/{command}", post(media_command))
         .fallback_service(ServeDir::new(&state.config.frontend_dir))
         .layer(DefaultBodyLimit::max(64 * 1024))
@@ -99,12 +100,43 @@ fn authorize_write(
     }
     Ok(auth)
 }
+fn is_local_llm_owner(state: &Shared, session: &BrowserSession) -> bool {
+    state.config.local_llm_owner_email.as_deref() == Some(session.email.as_str())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SessionResponse {
+    #[serde(flatten)]
+    session: BrowserSession,
+    local_llm_enabled: bool,
+}
+
 async fn session(
     State(state): State<Shared>,
     headers: HeaderMap,
-) -> Result<Json<BrowserSession>, ApiError> {
+) -> Result<Json<SessionResponse>, ApiError> {
     let (_, session) = authenticate(&state, &headers)?;
-    Ok(Json(session))
+    Ok(Json(SessionResponse {
+        local_llm_enabled: is_local_llm_owner(&state, &session),
+        session,
+    }))
+}
+
+async fn local_llm_chat(
+    State(state): State<Shared>,
+    request: Request,
+) -> Result<Json<crate::local_llm::ChatReply>, ApiError> {
+    let (_, session) = authorize_write(&state, request.headers())?;
+    let service = state
+        .local_llm
+        .as_ref()
+        .filter(|_| is_local_llm_owner(&state, &session))
+        .ok_or_else(ApiError::forbidden)?;
+    let Json(input) = Json::<crate::local_llm::ChatInput>::from_request(request, &state)
+        .await
+        .map_err(|_| ApiError(StatusCode::BAD_REQUEST, "Invalid local chat request."))?;
+    service.chat(input).await.map(Json)
 }
 async fn logout(State(state): State<Shared>, headers: HeaderMap) -> Result<Response, ApiError> {
     let (hash, _) = authorize_write(&state, &headers)?;

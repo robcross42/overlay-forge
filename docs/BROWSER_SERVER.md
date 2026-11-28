@@ -1,6 +1,6 @@
 # Browser server
 
-The headless Rust server serves the same Media UI and product services to Edge, Brave and other normal browsers. It does not need Tauri, GTK, WebKit, a desktop login or a display session. Desktop mode remains separate. Browser users get the family Media library and Account controls; desktop ChatGPT/admin, module launching, settings mutation and server-file imports are not HTTP endpoints. All approved accounts share this server's Media library; it is not partitioned by Google account.
+The headless Rust server serves the same Media UI and product services to Edge, Brave and other normal browsers. It does not need Tauri, GTK, WebKit, a desktop login or a display session. Desktop mode remains separate. Browser users get the family Media library and Account controls. The configured browser owner also gets Local LLM Chat in the same navigation pane. Desktop ChatGPT and admin commands, module launching, settings mutation and server-file imports are not HTTP endpoints. All approved accounts share this server's Media library; it is not partitioned by Google account.
 
 ## Configure Google and HTTPS
 
@@ -59,6 +59,46 @@ Parents browse to your configured HTTPS URL, choose **Continue with Google**, an
 Use the same server and frontend build. Put a local config outside Git with `public_origin` set to `http://localhost:4280`, `allow_http_localhost` set to `true`, writable local `data_dir`, your local `dist` path, and a Google Web client JSON registering the exact `http://localhost:4280/auth/callback` URI. Set `bind` to `127.0.0.1:4280`. Run the same command with that config path and browse to `http://localhost:4280`. On Windows use a full PowerShell path for the config; use `npm.cmd` for npm commands.
 
 HTTP cookies without Secure are supported only in this explicit localhost mode; production requires HTTPS. `localhost` and `127.0.0.1` are different origins: browse using the configured host. `http://localhost:1420` is the desktop Vite preview, not the browser server.
+
+## Local LLM Chat on Ubuntu
+
+The Ubuntu runner is Ollama with the installed model tag `qwen3:8b`. The server calls Ollama at `http://127.0.0.1:11434/api/chat`. Keep port 11434 bound to Ubuntu loopback and forward only Overlay Forge through SSH. Edge uses Overlay Forge's own origin for every chat request. Prompts and replies stay in the open browser tab's memory and go to the local runner for inference. Overlay Forge does not log prompt text or save transcripts. Each request carries up to six recent exchanges for context. **New Chat**, a reload or sign-out clears the transcript.
+
+To enable chat, set `local_llm_owner_email` in the server JSON to the owner's approved Google email. The server requires the usual approved, Google-subject-bound session and its Origin and CSRF checks. Only that configured owner gets the navigation entry and can send prompts. Omitting the field disables chat. Media approval remains the same.
+
+For the deployed port 3000 service, use the existing Windows SSH tunnel and open `http://127.0.0.1:3000/` in your regular Edge profile. Sign in as the owner and select **Local LLM Chat** beside **Media**.
+
+### Isolated SSH preview
+
+From the Overlay Forge checkout on Ubuntu, use the installed Node and Rust toolchains. Put the preview settings, data and build outputs in a private directory outside Git. Leave the running server's port, config, assets and data as they are.
+
+```sh
+preview=$(mktemp -d /tmp/overlay-forge-local-llm.XXXXXX)
+./node_modules/.bin/tsc
+./node_modules/.bin/vite build --outDir "$preview/dist"
+cargo build --offline --manifest-path server/Cargo.toml --target-dir "$preview/target"
+```
+
+Create `$preview/server.json` with `bind` set to `127.0.0.1:3001`, `public_origin` set to `http://127.0.0.1:3000`, and `allow_http_localhost` set to `true`. Port 3000 in the browser origin preserves the Google Web client's registered callback. Point `google_client_file` at the existing private Web client JSON, `data_dir` at `$preview/data`, and `frontend_dir` at `$preview/dist`. Set `local_llm_owner_email` and omit `media_database` to give the preview its own empty library. Substitute the actual preview directory in JSON paths.
+
+```sh
+"$preview/target/debug/overlay-forge-server" --config "$preview/server.json" approve <owner-email>
+"$preview/target/debug/overlay-forge-server" --config "$preview/server.json" serve
+```
+
+Add a local forward for Windows `127.0.0.1:3001` to Ubuntu `127.0.0.1:3001` using the same SSH host. If your existing SSH session cannot add a forward, open a PowerShell window and run the following alongside it.
+
+```powershell
+ssh.exe -N -o ExitOnForwardFailure=yes -L 127.0.0.1:3001:127.0.0.1:3001 robolinux@10.0.0.18
+```
+
+Open a separate Edge profile from another PowerShell window. The address bar stays at the OAuth origin while this profile sends its traffic through the preview forward.
+
+```powershell
+& "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe" "--user-data-dir=$env:TEMP\OverlayForgeLocalLlmEdge" '--host-resolver-rules=MAP 127.0.0.1:3000 127.0.0.1:3001' 'http://127.0.0.1:3000/'
+```
+
+Sign in with the configured owner, select **Local LLM Chat**, and send `Remember cedar-74619. Reply READY.` Then ask for the exact string in the same chat. Expect Qwen to recall it. **New Chat** clears the transcript. If Ollama cannot be reached, the chat reports how to check it and keeps the draft available to retry.
 
 ## Access and validation boundaries
 
