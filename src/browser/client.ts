@@ -1,3 +1,4 @@
+import type { InventoryTransport } from "../../modules/hockey-cards/src/ComcInventory";
 import type { MediaTransport } from "../../modules/media/src/embedded";
 
 export interface BrowserSession {
@@ -6,6 +7,7 @@ export interface BrowserSession {
   csrfToken: string;
   navigationCollapsed: boolean;
   localLlmEnabled: boolean;
+  hockeyInventoryEnabled: boolean;
 }
 
 export interface LocalChatMessage {
@@ -48,6 +50,10 @@ export class BrowserClient {
 
   localChat(csrf: string, messages: LocalChatMessage[]): Promise<{ content: string }> {
     return this.post("/api/local-llm/chat", csrf, { messages });
+  }
+
+  hockeyInventoryTransport(csrf: string): InventoryTransport {
+    return (query) => this.post("/api/hockey/inventory", csrf, query);
   }
 
   mediaTransport(csrf: string): MediaTransport {

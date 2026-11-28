@@ -41,11 +41,17 @@ Startup sequence:
 
 ## Integrated Media
 
-`AppShell` owns navigation, independent scrolling, persisted collapse state and the common Quit flow for administrator and family views. Home renders connection status tiles only. `EmbeddedMedia` mounts the owning product's React UI in a shadow root to isolate its stylesheet; product content titles remain visible while repeated page/section headings are omitted. Product links are direct navigation entries. Only Media is embedded in this slice.
+`AppShell` owns navigation, independent scrolling, persisted collapse state and the common Quit flow for administrator and family views. Home renders connection status tiles only. `EmbeddedMedia` mounts the owning product's React UI in a shadow root to isolate its stylesheet; product content titles remain visible while repeated page/section headings are omitted. Product links are direct navigation entries.
 
 `modules/media` pins the Media repository via Git submodule. Cargo links its crate with the standalone feature disabled. `integrated_media` initializes the same product-owned database path and forwards only its shared command registry, rejecting missing/stale sessions and non-main-window requests. Settings writes and legacy import are administrator-only. Authorization guards remain held through synchronous Media commands so a session cannot switch during a mutation. Product services, mapping, schema and provider behavior remain owned by Media; no source copy or second process/server is used. The injected renderer transport adds the session ID before calling native commands. The existing Media data is device-local and shared across host profiles.
 
-The host still launches other standalone products. It does not implement their integration or copy their databases. Media's standalone developer bootstrap uses the same UI, registry and services.
+The host still launches Gaming, Retirement, and other standalone products through their existing paths. Media's standalone developer bootstrap uses the same UI, registry and services.
+
+## Integrated Hockey Cards
+
+The pinned `modules/hockey-cards` repository exports a window-free Rust query service and the React inventory view. Native `hockey_inventory_query` requires the main window and an active administrator session. The opt-in browser route uses approved Google identity, the configured owner, exact Origin and CSRF checks, and the existing bounded blocking-worker pool. Both adapters call the same product query, which selects the latest complete saved USD snapshot and applies combined filters and stable pagination in SQLite.
+
+Desktop looks for `collection.sqlite3` in the sibling product app-data directory `com.robcross42.hockeycardcompanion`. Browser mode uses its explicitly configured product database or the default path in its private service data directory. Both open the database read-only. A missing product database shows an empty state and leaves the host available.
 
 ## Browser/server mode
 

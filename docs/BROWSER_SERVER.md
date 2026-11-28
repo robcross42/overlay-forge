@@ -60,6 +60,12 @@ Use the same server and frontend build. Put a local config outside Git with `pub
 
 HTTP cookies without Secure are supported only in this explicit localhost mode; production requires HTTPS. `localhost` and `127.0.0.1` are different origins: browse using the configured host. `http://localhost:1420` is the desktop Vite preview, not the browser server.
 
+## Hockey Cards
+
+Set `hockey_inventory_owner_email` to the owner's approved Google email to enable the **Hockey Cards** tab. If the setting is omitted, browser access is disabled. The optional `hockey_inventory_database` points to an existing compatible product SQLite file. Without it, the service looks for `hockey-card-companion.sqlite3` in `data_dir`. On Ubuntu the file must be private to the service user (chmod 600) and outside the frontend directory. Keep it separate from Media, browser access, and the desktop host database.
+
+Select **Hockey Cards** to search all words in the saved card titles or item IDs and combine that with a year, sale status, and a USD asking-price range. Sorting keeps the applied filters. The view shows the most recent complete COMC snapshot and opens an empty state when none is available. COMC capture remains in the standalone app. Moving a collection from Windows requires a separately reviewed logical export and import plan.
+
 ## Local LLM Chat on Ubuntu
 
 The Ubuntu runner is Ollama with the installed model tag `qwen3:8b`. The server calls Ollama at `http://127.0.0.1:11434/api/chat`. Keep port 11434 bound to Ubuntu loopback and forward only Overlay Forge through SSH. Edge uses Overlay Forge's own origin for every chat request. Prompts and replies stay in the open browser tab's memory and go to the local runner for inference. Overlay Forge does not log prompt text or save transcripts. Each request carries up to six recent exchanges for context. **New Chat**, a reload or sign-out clears the transcript.

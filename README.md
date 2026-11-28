@@ -11,7 +11,7 @@ Projects is unavailable to family accounts and browser Media clients.
 Overlay Forge is the resident personal AI host and launcher for independently owned desktop products and the local Journal web product.
 
 ```text
-Current development version: 0.7.0
+Current development version: 1.1.0
 Source extraction baseline: develop@96aeb79778e148a66b8f88c2b9bcd27b8a415454
 ```
 

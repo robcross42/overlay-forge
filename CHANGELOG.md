@@ -20,6 +20,14 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 1.1.0 - 2026-11-28
+
+### 2026-11-28
+
+#### Added
+
+- 01:37:41 EST - Added owner-only Hockey Cards in the desktop and opt-in browser host. Combine card search, year, COMC sale status and USD price filters with sorting over the latest complete saved inventory. (#37)
+
 ## 0.7.0 - 2026-11-27
 
 ### 2026-11-27

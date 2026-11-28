@@ -1756,6 +1756,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "hockey-comc-inventory"
+version = "0.1.0"
+dependencies = [
+ "rusqlite",
+ "serde",
+]
+
+[[package]]
 name = "html5ever"
 version = "0.38.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2755,12 +2763,13 @@ dependencies = [
 
 [[package]]
 name = "overlay-forge"
-version = "0.7.0"
+version = "1.1.0"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
  "bson",
  "flate2",
+ "hockey-comc-inventory",
  "jsonwebtoken",
  "overlay-forge-google-identity",
  "overlay-forge-media",
@@ -2784,7 +2793,7 @@ dependencies = [
 
 [[package]]
 name = "overlay-forge-google-identity"
-version = "0.7.0"
+version = "1.1.0"
 dependencies = [
  "jsonwebtoken",
  "reqwest 0.12.28",

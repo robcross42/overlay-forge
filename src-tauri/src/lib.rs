@@ -7,6 +7,7 @@ mod computer_session;
 mod db;
 mod ui_preferences;
 mod integrated_media;
+mod hockey_inventory;
 mod hub_commands;
 mod windows;
 mod browser_auth;
@@ -60,6 +61,7 @@ pub fn run() {
                     hub.startup_message("Media data could not be opened. The host remains available.".into());
                 }
             }
+            hockey_inventory::initialize(app.handle(), &root);
             status_watch::start(app.handle().clone());
             report(app.handle(),state.chatgpt.restore(&state.database));
             state.windows.preload(app.handle()).map_err(std::io::Error::other)?;
@@ -92,7 +94,7 @@ pub fn run() {
                 report(app,app.state::<AppState>().windows.hide(app,kind));
             }
         })
-        .invoke_handler(integrated_media::handler(tauri::generate_handler![projects::projects_list,projects::projects_save,projects::projects_archive,projects::projects_delete,projects::projects_open_web_link,ui_preferences::navigation_preference,ui_preferences::save_navigation_preference,profiles::identity_import_google_client,profiles::identity_snapshot,profiles::identity_sign_in,profiles::identity_cancel,profiles::identity_sign_out,list_products,launch_product,shutdown_app,hub_commands::hub_snapshot,hub_commands::hub_draft,hub_commands::hub_submit,hub_commands::hub_action,hub_commands::hub_stop_all,chatgpt::chatgpt_sign_in,chatgpt::chatgpt_verify,chatgpt::chatgpt_disconnect,windows::show_main,windows::show_quick_prompt,windows::hide_quick_prompt]))
+        .invoke_handler(integrated_media::handler(tauri::generate_handler![hockey_inventory::hockey_inventory_query,projects::projects_list,projects::projects_save,projects::projects_archive,projects::projects_delete,projects::projects_open_web_link,ui_preferences::navigation_preference,ui_preferences::save_navigation_preference,profiles::identity_import_google_client,profiles::identity_snapshot,profiles::identity_sign_in,profiles::identity_cancel,profiles::identity_sign_out,list_products,launch_product,shutdown_app,hub_commands::hub_snapshot,hub_commands::hub_draft,hub_commands::hub_submit,hub_commands::hub_action,hub_commands::hub_stop_all,chatgpt::chatgpt_sign_in,chatgpt::chatgpt_verify,chatgpt::chatgpt_disconnect,windows::show_main,windows::show_quick_prompt,windows::hide_quick_prompt]))
         .run(tauri::generate_context!())
         .expect("error while running Overlay Forge");
 }

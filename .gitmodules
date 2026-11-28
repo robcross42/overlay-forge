@@ -2,3 +2,6 @@
 	path = modules/media
 	url = https://github.com/robcross42/overlay-forge-media.git
 	branch = codex/headless-server
+[submodule "modules/hockey-cards"]
+	path = modules/hockey-cards
+	url = https://github.com/robcross42/hockey-card-companion.git

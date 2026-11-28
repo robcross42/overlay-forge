@@ -14,6 +14,8 @@ pub struct Config {
     pub data_dir: PathBuf,
     pub frontend_dir: PathBuf,
     pub media_database: Option<PathBuf>,
+    pub hockey_inventory_owner_email: Option<String>,
+    pub hockey_inventory_database: Option<PathBuf>,
     pub local_llm_owner_email: Option<String>,
     #[serde(default = "default_bind")]
     pub bind: SocketAddr,
@@ -67,6 +69,10 @@ impl Config {
             *email = crate::repository::normalize_email(email)
                 .map_err(|_| "local_llm_owner_email must be a complete email address.")?;
         }
+        if let Some(email) = &mut config.hockey_inventory_owner_email {
+            *email = crate::repository::normalize_email(email)
+                .map_err(|_| "hockey_inventory_owner_email must be a complete email address.")?;
+        }
         let base = path.parent().unwrap_or(Path::new("."));
         for value in [
             &mut config.google_client_file,
@@ -77,7 +83,10 @@ impl Config {
                 *value = base.join(&*value);
             }
         }
-        if let Some(database) = &mut config.media_database {
+        for database in [&mut config.media_database, &mut config.hockey_inventory_database]
+            .into_iter()
+            .flatten()
+        {
             if database.is_relative() {
                 *database = base.join(&*database);
             }
