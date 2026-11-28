@@ -15,6 +15,8 @@ pub struct Config {
     pub frontend_dir: PathBuf,
     pub media_database: Option<PathBuf>,
     pub browser_admin_email: Option<String>,
+    #[serde(default)]
+    pub browser_chatgpt: bool,
     pub local_llm_owner_email: Option<String>,
     #[serde(default = "default_bind")]
     pub bind: SocketAddr,
@@ -62,6 +64,11 @@ impl Config {
         }
         if !config.bind.ip().is_loopback() {
             return Err("Bind the server to loopback behind your HTTPS reverse proxy.".into());
+        }
+        if config.browser_chatgpt
+            && (url.scheme() != "http" || url.host_str() != Some("127.0.0.1") || url.port() != Some(config.bind.port()))
+        {
+            return Err("Browser ChatGPT requires the exact HTTP 127.0.0.1 listener origin.".into());
         }
         config.public_origin = url.origin().ascii_serialization();
         if let Some(email) = &mut config.local_llm_owner_email {

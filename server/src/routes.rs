@@ -29,6 +29,12 @@ pub fn router(state: Shared) -> Router {
         .route("/api/session", get(session))
         .route("/api/navigation", post(save_navigation))
         .route("/api/local-llm/chat", post(local_llm_chat))
+        .route("/api/chatgpt/status", post(crate::browser_chatgpt::status))
+        .route("/api/chatgpt/start", post(crate::browser_chatgpt::start))
+        .route("/api/chatgpt/cancel-sign-in", post(crate::browser_chatgpt::cancel_sign_in))
+        .route("/api/chatgpt/disconnect", post(crate::browser_chatgpt::disconnect))
+        .route("/api/chatgpt/chat", post(crate::browser_chatgpt::chat))
+        .route("/api/chatgpt/stop", post(crate::browser_chatgpt::stop))
         .route("/api/media/{command}", post(media_command))
         .fallback_service(ServeDir::new(&state.config.frontend_dir))
         .layer(DefaultBodyLimit::max(64 * 1024))
@@ -100,6 +106,22 @@ fn authorize_write(
     }
     Ok(auth)
 }
+pub fn authenticate_admin(state: &Shared, headers: &HeaderMap) -> Result<String, ApiError> {
+    let (hash, session) = authenticate(state, headers)?;
+    require_admin(state, &session)?;
+    Ok(hash)
+}
+
+pub fn authorize_admin(state: &Shared, headers: &HeaderMap) -> Result<String, ApiError> {
+    let (hash, session) = authorize_write(state, headers)?;
+    require_admin(state, &session)?;
+    Ok(hash)
+}
+
+fn require_admin(state: &Shared, session: &BrowserSession) -> Result<(), ApiError> {
+    if state.config.is_browser_admin(&session.email) { Ok(()) } else { Err(ApiError::forbidden()) }
+}
+
 fn is_local_llm_owner(state: &Shared, session: &BrowserSession) -> bool {
     state.config.is_browser_admin(&session.email)
         && state.config.local_llm_owner_email.as_deref() == Some(session.email.as_str())
@@ -111,6 +133,7 @@ struct SessionResponse {
     #[serde(flatten)]
     session: BrowserSession,
     administrator: bool,
+    chatgpt_enabled: bool,
     local_llm_enabled: bool,
 }
 
@@ -121,6 +144,7 @@ async fn session(
     let (_, session) = authenticate(&state, &headers)?;
     Ok(Json(SessionResponse {
         administrator: state.config.is_browser_admin(&session.email),
+        chatgpt_enabled: state.chatgpt.is_some() && state.config.is_browser_admin(&session.email),
         local_llm_enabled: is_local_llm_owner(&state, &session),
         session,
     }))

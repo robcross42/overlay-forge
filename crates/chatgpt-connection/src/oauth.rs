@@ -3,7 +3,6 @@ use jsonwebtoken::{decode, decode_header, jwk::JwkSet, Algorithm, DecodingKey, V
 use rand::RngCore;
 use reqwest::{blocking::Client, Url};
 use serde::{Deserialize, Serialize};
-#[cfg(any(windows, test))]
 use sha2::{Digest, Sha256};
 use std::{
     collections::HashMap,
@@ -14,7 +13,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 pub const ISSUER: &str = "https://auth.openai.com";
 pub const RESOURCE: &str = "https://api.openai.com/v1";
 pub const TOKEN_ENDPOINT: &str = "https://auth.openai.com/api/accounts/oauth/token";
-#[cfg(any(windows, test))]
+pub const BROWSER_STATE_PREFIX: &str = "of-chatgpt-";
 const SCOPES: &str =
     "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct";
 pub fn seconds() -> u64 {
@@ -53,16 +52,24 @@ impl AuthAttempt {
             expected_subject,
         }
     }
-    #[cfg(windows)]
-    pub fn open_browser(&self, host: &str) -> Result<(), String> {
-        crate::browser_auth::open_system_browser(&self.authorization_url(host))
-    }
-    #[cfg(not(windows))]
-    pub fn open_browser(&self, _host: &str) -> Result<(), String> {
-        Err("ChatGPT browser sign-in is currently available on Windows.".into())
+    pub fn for_browser(
+        port: u16,
+        client_id: Option<String>,
+        expected_subject: Option<String>,
+    ) -> Self {
+        let mut attempt = Self::new(port, client_id, expected_subject);
+        attempt.state.insert_str(0, BROWSER_STATE_PREFIX);
+        attempt
     }
 
-    #[cfg(any(windows, test))]
+    pub fn matches_state(&self, state: &str) -> bool {
+        self.state.as_str() == state
+    }
+
+    pub fn expired(&self) -> bool {
+        self.created.elapsed() > Duration::from_secs(300)
+    }
+
     pub fn authorization_url(&self, host: &str) -> String {
         let mut url =
             Url::parse("https://auth.openai.com/api/accounts/authorize").expect("fixed URL");
@@ -94,7 +101,7 @@ impl AuthAttempt {
             return Err("Sign-in callback was already consumed. Start a fresh attempt.".into());
         }
         self.consumed = true;
-        if self.created.elapsed() > Duration::from_secs(300) {
+        if self.expired() {
             return Err("Sign-in expired. Start a fresh attempt.".into());
         }
         let url = Url::parse(&format!("http://127.0.0.1{target}"))

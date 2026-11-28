@@ -1,3 +1,4 @@
+mod browser_chatgpt;
 mod config;
 mod error;
 mod local_llm;
@@ -16,6 +17,7 @@ pub struct ServerState {
     repository: AccessRepository,
     media: overlay_forge_media_lib::runtime::MediaRuntime,
     local_llm: Option<local_llm::LocalLlm>,
+    chatgpt: Option<browser_chatgpt::BrowserChatgpt>,
     http: reqwest::blocking::Client,
     attempts: oauth::Attempts,
     workers: Arc<tokio::sync::Semaphore>,
@@ -113,12 +115,16 @@ fn run() -> Result<(), String> {
         .transpose()
         .map_err(|_| "Could not initialize local chat transport.")?;
     let bind = config.bind;
+    let chatgpt = config.browser_chatgpt
+        .then(|| browser_chatgpt::BrowserChatgpt::new(bind.port(), &config.data_dir))
+        .transpose()?;
     let state = Arc::new(ServerState {
         config,
         google,
         repository,
         media,
         local_llm,
+        chatgpt,
         http,
         attempts: oauth::Attempts::new(),
         workers: Arc::new(tokio::sync::Semaphore::new(8)),

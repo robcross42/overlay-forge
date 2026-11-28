@@ -1,6 +1,6 @@
 [package]
 name = "overlay-forge"
-version = "1.0.4"
+version = "1.2.0"
 description = "Private launcher for Overlay Forge products."
 authors = ["Overlay Forge"]
 edition = "2021"
@@ -13,6 +13,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.5.0", features = [] }
 
 [dependencies]
+overlay-forge-chatgpt-connection = { path = "../crates/chatgpt-connection" }
 overlay-forge-google-identity = { path = "../crates/google-identity" }
 overlay-forge-media = { path = "../modules/media/src-tauri", default-features = false, features = ["desktop"] }
 serde = { version = "1", features = ["derive"] }

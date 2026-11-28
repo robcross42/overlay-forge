@@ -1,5 +1,5 @@
 use super::oauth::Credentials;
-use crate::ai_hub::{ChatMessage, ChatRole};
+use crate::{ChatMessage, ChatRole};
 use reqwest::{
     blocking::{Client, Response},
     header::{ACCEPT, CONTENT_TYPE},

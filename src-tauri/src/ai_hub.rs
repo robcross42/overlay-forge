@@ -1,4 +1,5 @@
 //! Local request registry. No provider transport, secret, billing, or account access exists here.
+pub use overlay_forge_chatgpt_connection::{ChatMessage, ChatRole};
 use crate::computer_session::{CleanupReason, ComputerSession};
 use crate::status_watch::{EvidenceSource, VerificationSnapshot};
 use serde::{Deserialize, Serialize};
@@ -317,19 +318,6 @@ enum RequestMode<'a> {
         conversation_id: &'a str,
         registration: &'a str,
     },
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum ChatRole {
-    User,
-    Assistant,
-}
-
-#[derive(Serialize)]
-pub struct ChatMessage {
-    pub role: ChatRole,
-    pub content: String,
 }
 
 pub struct PendingChat {

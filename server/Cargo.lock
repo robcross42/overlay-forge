@@ -852,8 +852,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
+name = "overlay-forge-chatgpt-connection"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "jsonwebtoken",
+ "rand 0.9.5",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "zeroize",
+]
+
+[[package]]
 name = "overlay-forge-google-identity"
-version = "1.0.4"
+version = "1.2.0"
 dependencies = [
  "jsonwebtoken",
  "reqwest",
@@ -878,10 +892,11 @@ dependencies = [
 
 [[package]]
 name = "overlay-forge-server"
-version = "1.0.4"
+version = "1.2.0"
 dependencies = [
  "axum",
  "base64 0.22.1",
+ "overlay-forge-chatgpt-connection",
  "overlay-forge-google-identity",
  "overlay-forge-media",
  "rand 0.9.5",
@@ -893,6 +908,7 @@ dependencies = [
  "subtle",
  "tokio",
  "tower-http",
+ "uuid",
  "zeroize",
 ]
 

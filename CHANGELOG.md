@@ -20,6 +20,14 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 ## Unreleased
 
+## 1.2.0 - 2026-11-28
+
+### 2026-11-28
+
+#### Added
+
+- 02:21:14 EST - Added browser-admin ChatGPT sign-in and plan-backed chat, Home integration status, and browser Monitoring. End User view shows only Media. (#40)
+
 ## 1.0.4 - 2026-11-28
 
 ### 2026-11-28

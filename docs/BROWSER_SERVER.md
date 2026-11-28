@@ -64,7 +64,13 @@ HTTP cookies without Secure are supported only in this explicit localhost mode; 
 
 Set `browser_admin_email` to one approved Google email. The server uses the browser session's verified, pinned Google identity. Existing configurations that omit this field use `local_llm_owner_email` as their single administrator. Local LLM Chat still requires its own opt-in setting for that same account.
 
-Only the administrator can switch between **Admin** and **End User** views in the sidebar. End User view shows the same pages as a regular approved account. This is a preview of the other account's navigation. Endpoint authorization still uses the signed-in identity. A fresh page starts in Admin view for the administrator.
+Only the administrator can switch between **Admin** and **End User** views in the sidebar. End User view and regular approved accounts see only Media. Sign-out and the administrator’s view switch remain available. This is a preview of the other account's navigation. Endpoint authorization still uses the signed-in identity. A fresh page starts in Admin view for the administrator.
+
+## Connected ChatGPT on Ubuntu
+
+On a loopback-only installation, set `browser_chatgpt` to `true` and configure the sole browser administrator. The public origin must be the exact HTTP `127.0.0.1` listener and port. Brave must reach that origin through the existing SSH tunnel, if remote. Sign in to Overlay Forge as the administrator and choose **ChatGPT Chat → Continue with ChatGPT**. The consent flow returns to that same listener and is bound to the initiating approved Google session.
+
+The Ubuntu service owns a separate ChatGPT registration and keeps tokens in server memory. A service restart requires fresh sign-in. Browser transcripts are local to the tab. Models are available only when the verified ChatGPT registration grants plan access. **Home** lists browser integrations. **Monitoring** shows the latest observed browser ChatGPT connection or request state and its recorded time.
 
 ## Local LLM Chat on Ubuntu
 

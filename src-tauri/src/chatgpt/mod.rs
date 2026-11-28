@@ -1,6 +1,5 @@
-mod oauth;
 mod secrets;
-mod transport;
+use overlay_forge_chatgpt_connection::{oauth, transport};
 use crate::{
     ai_hub::{ChatMessage, CompletedReply, PendingChat, SavedChatConversation},
     db::HostDatabase,
@@ -421,7 +420,7 @@ impl ChatgptService {
             saved.as_ref().map(|c| c.client_id.clone()),
             saved.as_ref().map(|c| c.subject.clone()),
         );
-        attempt.open_browser(&host)?;
+        open_sign_in_browser(&attempt, &host)?;
         let start = Instant::now();
         while start.elapsed() < Duration::from_secs(300) {
             if self.cancel.load(Ordering::SeqCst) {
@@ -682,6 +681,16 @@ pub enum Operation {
     Verify(Option<String>),
     Disconnect,
 }
+#[cfg(windows)]
+fn open_sign_in_browser(attempt: &AuthAttempt, host: &str) -> Result<(), String> {
+    crate::browser_auth::open_system_browser(&attempt.authorization_url(host))
+}
+
+#[cfg(not(windows))]
+fn open_sign_in_browser(_attempt: &AuthAttempt, _host: &str) -> Result<(), String> {
+    Err("ChatGPT browser sign-in is currently available on Windows.".into())
+}
+
 #[tauri::command]
 pub fn chatgpt_sign_in(app: AppHandle, session_id: String) -> Result<(), String> {
     let state = app.state::<AppState>();
