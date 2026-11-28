@@ -61,8 +61,8 @@ nav button{text-align:left;background:transparent;border-color:transparent}nav b
 .connection-attention .status-dot { background:#f3c987; }
 .connection-attention .connection-symbol { background:#3c3324; color:#f3c987; }
 .connection-tile small { overflow-wrap:anywhere; }
-.workspace-media { max-width:none; height:100%; display:flex; flex-direction:column; }
-.workspace-media .workspace-tools { flex:none; }
+.workspace-media, .workspace-hockey { max-width:none; height:100%; display:flex; flex-direction:column; }
+.workspace-media .workspace-tools, .workspace-hockey .workspace-tools { flex:none; }
 .embedded-media { flex:1; min-height:400px; }
 .hub-shell { position:relative; --sidebar-width:225px; }
 .navigation-toggle {

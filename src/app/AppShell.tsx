@@ -62,7 +62,7 @@ export function AppShell({ session, page, onPage, quick, children }: {
     {!quick && <NavigationToggle collapsed={navigation.collapsed} disabled={navigation.disabled}
       controls="main-navigation" onToggle={() => void navigation.toggle()} />}
     <div className="workspace-scroll">
-      <section className={`workspace${page === "Media" && !quick ? " workspace-media" : ""}`} aria-label={quick ? "Quick prompt" : page}>
+      <section className={`workspace${quick ? "" : page === "Media" ? " workspace-media" : page === "Hockey Cards" ? " workspace-hockey" : ""}`} aria-label={quick ? "Quick prompt" : page}>
         <div className="workspace-tools">
           {(quick || session.profile?.admin) && <button onClick={() => void invoke(quick ? "show_main" : "show_quick_prompt").catch(() => setError("Could not open the requested view."))}>
             {quick ? "Open main app" : "Open quick prompt"}</button>}

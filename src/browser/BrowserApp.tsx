@@ -1,7 +1,6 @@
 import { useObservedComcCard } from "./comcSales";
 import { useEffect, useMemo, useState } from "react";
-import { ComcMarket } from "../../modules/hockey-cards/src/ComcMarket";
-import { ComcInventory } from "../../modules/hockey-cards/src/ComcInventory";
+import { ComcWorkspace } from "../../modules/hockey-cards/src/ComcWorkspace";
 import { EmbeddedMedia } from "../app/EmbeddedMedia";
 import { BrowserClient, type BrowserSession } from "./client";
 import { NavigationToggle } from "../app/NavigationToggle";
@@ -81,11 +80,18 @@ export function BrowserApp() {
     </aside>
     <NavigationToggle collapsed={session.navigationCollapsed} disabled={busy}
       controls="browser-navigation" onToggle={() => void toggleNavigation()} />
-    <div className="workspace-scroll"><section className={`workspace${page === "media" ? " workspace-media" : ""}`} aria-label={pageLabels[page]}>
+    <div className="workspace-scroll"><section className={`workspace${page === "media" ? " workspace-media" : page === "hockey" ? " workspace-hockey" : ""}`} aria-label={pageLabels[page]}>
       {error && <p className="error" role="alert">{error}</p>}
       {page === "media" && transport && <EmbeddedMedia sessionId="browser" administrator={false} transport={transport} />}
-      {page === "hockey" && hockeySales && <ComcMarket key={"market-" + session.csrfToken} market={hockeyMarket} sales={hockeySales} observedCard={observedComcCard} importSales={client.hockeySalesCapture(session.csrfToken)} />}
-      {page === "hockey" && hockeyInventory && <ComcInventory key={session.csrfToken} load={hockeyInventory} importCapture={session.hockeyInventoryCanImport ? client.hockeyInventoryCapture(session.csrfToken) : undefined} />}
+      {page === "hockey" && hockeyInventory && <ComcWorkspace
+        key={session.csrfToken}
+        inventory={hockeyInventory}
+        market={hockeyMarket}
+        sales={hockeySales}
+        observedCard={observedComcCard}
+        importInventory={session.hockeyInventoryCanImport ? client.hockeyInventoryCapture(session.csrfToken) : undefined}
+        importSales={hockeySales ? client.hockeySalesCapture(session.csrfToken) : undefined}
+      />}
       {session.localLlmEnabled && <div hidden={page !== "localChat"}>
         <LocalLlmChat key={session.csrfToken} client={client} csrf={session.csrfToken} />
       </div>}

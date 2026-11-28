@@ -1,4 +1,5 @@
-import type { MarketTransport, SalesCaptureTransport, SalesTransport } from "../../modules/hockey-cards/src/ComcMarket";
+import type { MarketTransport } from "../../modules/hockey-cards/src/ComcMarket";
+import type { SalesCaptureTransport, SalesTransport } from "../../modules/hockey-cards/src/ComcSalesHistory";
 import type { InventoryCaptureTransport, InventoryTransport } from "../../modules/hockey-cards/src/ComcInventory";
 import type { MediaTransport } from "../../modules/media/src/embedded";
 

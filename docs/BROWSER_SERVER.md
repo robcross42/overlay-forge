@@ -62,6 +62,8 @@ HTTP cookies without Secure are supported only in this explicit localhost mode; 
 
 ## Hockey Cards
 
+Use the top buttons to switch between **Inventory**, **Market**, and **Sales History**. **View sales** in the market opens the selected card’s history. A new Brave sales observation also opens **Sales History** while Hockey Cards is active.
+
 Set `hockey_inventory_owner_email` to the owner's approved Google email to enable the **Hockey Cards** tab. If the setting is omitted, browser access is disabled. The optional `hockey_inventory_database` points to an existing compatible product SQLite file. Without it, the service saves browser inventory snapshots to `comc-browser-inventory.sqlite3` in `data_dir`. An explicitly configured database is read-only. On Ubuntu the file must be private to the service user (chmod 600) and outside the frontend directory. Keep it separate from Media, browser access, and the desktop host database.
 
 From **Hockey Cards**, open COMC Inventory Manager and sign in on COMC. In Brave DevTools under **Network**, record each page with **All** selected, search empty, and the same sort and page size. Export a sanitized HAR and choose **Import inventory HAR**. A partial snapshot shows the cards it captured when no complete snapshot is saved. A complete snapshot takes priority.
