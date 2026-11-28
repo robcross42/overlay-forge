@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Overlay Forge COMC Read-only Probe",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Read COMC inventory and Recent Sales and save them to your local Overlay Forge browser app.",
   "permissions": [
     "activeTab",

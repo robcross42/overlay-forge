@@ -3,25 +3,12 @@ const forge = "http://127.0.0.1:3000";
 const forgePermission = { origins: ["http://127.0.0.1/*"] };
 let reading = false;
 let saving = false;
-let marketRefreshing = false;
-const marketUrl = "https://www.comc.com/Cards/Hockey,sr#overlay-forge-market-refresh";
-const marketCaptures = new Map();
+const marketUrl = "https://www.comc.com/Cards/Hockey,sr";
 
-async function registerForgeBridge() {
-  if (!await chrome.permissions.contains(forgePermission)) return;
-  const id = "overlay-forge-market-bridge";
-  const scripts = await chrome.scripting.getRegisteredContentScripts({ ids: [id] });
-  if (!scripts.length) {
-    await chrome.scripting.registerContentScripts([{
-      id, matches: forgePermission.origins, js: ["forge-bridge.js"], runAt: "document_start",
-    }]);
-  }
-}
-
-void registerForgeBridge().catch(() => {});
-chrome.runtime.onInstalled.addListener(() => { void registerForgeBridge().catch(() => {}); });
-chrome.runtime.onStartup.addListener(() => { void registerForgeBridge().catch(() => {}); });
-
+chrome.runtime.onInstalled.addListener(() => {
+  // Remove the dynamic bridge used by extension 0.5.0.
+  void chrome.scripting.unregisterContentScripts({ ids: ["overlay-forge-market-bridge"] }).catch(() => {});
+});
 
 async function readInventory(tabId) {
   reading = true;
@@ -188,7 +175,6 @@ async function queueSave() {
 }
 
 chrome.permissions.onAdded.addListener(() => {
-  void registerForgeBridge().catch(() => {});
   void finishSave().catch(() => {});
 });
 
@@ -202,46 +188,57 @@ async function readRecentSalesFromTab(tabId) {
   return {};
 }
 
-async function refreshMarket(originatingTab) {
-  if (marketRefreshing) return { error: "A market refresh is already running." };
-  marketRefreshing = true;
-  let marketTab;
-  let timeout;
-  try {
-    marketTab = await chrome.tabs.create({ active: false, windowId: originatingTab.windowId, url: "about:blank" });
-    const capture = await new Promise((resolve, reject) => {
-      marketCaptures.set(marketTab.id, resolve);
-      timeout = setTimeout(() => reject(new Error("COMC did not load a Recently Added result page in Brave.")), 20_000);
-      chrome.tabs.update(marketTab.id, { url: marketUrl }).catch(reject);
-    });
-    if (capture.error) return { error: capture.error };
-    return await transferToForgeTab("market", capture.capture, originatingTab.id);
-  } catch (error) {
-    return { error: error.message };
-  } finally {
-    clearTimeout(timeout);
-    if (marketTab?.id) {
-      marketCaptures.delete(marketTab.id);
-      const tab = await chrome.tabs.get(marketTab.id).catch(() => null);
-      if (tab && !tab.active && (tab.url === marketUrl || tab.url === "about:blank")) {
-        await chrome.tabs.remove(tab.id).catch(() => {});
+async function receiveMarketCapture(message, sender) {
+  const requestId = message.requestId;
+  const opened = new URL(sender.url);
+  if (opened.origin + opened.pathname !== marketUrl ||
+      typeof requestId !== "string" || !/^[0-9a-f-]{36}$/.test(requestId) ||
+      (opened.hash && opened.hash !== "#overlay-forge-market-refresh=" + requestId)) return;
+
+  const tabs = await chrome.tabs.query({ url: "http://127.0.0.1/*" });
+  for (const tab of tabs) {
+    if (!tab.url || new URL(tab.url).origin !== forge) continue;
+    const target = { tabId: tab.id };
+    const [match] = await chrome.scripting.executeScript({
+      target,
+      func: (id) => sessionStorage.getItem("overlay-forge:market-refresh") === id,
+      args: [requestId],
+    }).catch(() => []);
+    if (match?.result !== true) continue;
+
+    let outcome;
+    try {
+      if (message.error) throw new Error(message.error);
+      outcome = await transferToForgeTab("market", message.capture, tab.id);
+    } catch (error) {
+      outcome = { error: error.message };
+    }
+    const [delivered] = await chrome.scripting.executeScript({
+      target,
+      func: (id, result) => {
+        if (sessionStorage.getItem("overlay-forge:market-refresh") !== id) return false;
+        const key = "overlay-forge:market-refresh-result";
+        sessionStorage.setItem(key, JSON.stringify({ requestId: id, ...result }));
+        window.dispatchEvent(new Event(key));
+        return true;
+      },
+      args: [requestId, outcome],
+    }).catch(() => []);
+    if (delivered?.result && typeof outcome.cards === "number") {
+      const marketTab = await chrome.tabs.get(sender.tab.id).catch(() => null);
+      if (marketTab?.url === marketUrl + "#overlay-forge-market-refresh=" + requestId) {
+        await chrome.tabs.remove(marketTab.id).catch(() => {});
       }
     }
-    marketRefreshing = false;
+    return;
   }
 }
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  if (message?.type === "refresh-market") {
-    if (!sender.tab || sender.frameId !== 0 || !sender.url?.startsWith(forge + "/")) return;
-    refreshMarket(sender.tab).then(respond, () => respond({ error: "Could not refresh the COMC market." }));
-    return true;
-  }
   if (message?.type === "recent-market-capture") {
-    if (sender.frameId === 0 && sender.url?.split("#")[0] === marketUrl.split("#")[0]) {
-      marketCaptures.get(sender.tab?.id)?.(message);
-    }
-    return;
+    if (!sender.tab || sender.frameId !== 0 || !sender.url?.startsWith(marketUrl)) return;
+    receiveMarketCapture(message, sender).then(respond, () => respond({ error: "Could not deliver the market results." }));
+    return true;
   }
   if (message?.type === "market-sales" || message?.type === "market-sales-unavailable") {
     if (!sender.tab || sender.frameId !== 0 || !sender.url?.startsWith("https://www.comc.com/")) return;
