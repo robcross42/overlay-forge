@@ -1,4 +1,4 @@
-const comc = "https://www.comc.com/Manage/Inventory";
+const comc = "https://www.comc.com";
 const forge = "http://127.0.0.1:3000";
 const forgePermission = { origins: ["http://127.0.0.1/*"] };
 const read = document.getElementById("read");
@@ -6,34 +6,30 @@ const save = document.getElementById("save");
 const result = document.getElementById("result");
 let capture;
 
+function showReading(reading) {
+  capture = reading?.capture;
+  read.disabled = Boolean(reading?.pending);
+  save.disabled = !capture || read.disabled;
+  result.textContent = reading?.messages.join("\n") ?? "Open a COMC tab to read your inventory.";
+}
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "session" && changes.reading) showReading(changes.reading.newValue);
+});
+chrome.storage.session.get("reading").then(({ reading }) => showReading(reading));
+
 read.addEventListener("click", async () => {
-  capture = undefined;
-  read.disabled = true;
-  save.disabled = true;
-  result.textContent = "Reading COMC inventory… Keep this popup open.";
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    const address = new URL(tab?.url ?? "about:blank");
-    if (address.origin + address.pathname !== comc) {
-      throw new Error("Open COMC Inventory Manager and sign in first.");
+    if (!tab?.url || new URL(tab.url).origin !== comc) {
+      throw new Error("Switch to your www.comc.com tab, then open this popup again.");
     }
-    const target = { tabId: tab.id };
-    await chrome.scripting.executeScript({ target, files: ["read.js"] });
-    const [execution] = await chrome.scripting.executeScript({
-      target,
-      func: () => {
-        const readInventory = globalThis.overlayForgeReadComcInventory;
-        delete globalThis.overlayForgeReadComcInventory;
-        return readInventory();
-      },
-    });
-    const reading = execution?.result;
-    if (!reading) throw new Error("Brave returned no result.");
-    capture = reading.capture;
-    result.textContent = reading.messages.join("\n");
+    read.disabled = true;
+    save.disabled = true;
+    const status = await chrome.runtime.sendMessage({ type: "read-inventory", tabId: tab.id });
+    if (status?.error) throw new Error(status.error);
   } catch (error) {
     result.textContent = error.message;
-  } finally {
     read.disabled = false;
     save.disabled = !capture;
   }
@@ -85,9 +81,9 @@ save.addEventListener("click", async () => {
     });
     const saved = execution?.result;
     if (!saved || saved.error) throw new Error(saved?.error ?? "Overlay Forge returned no result.");
-    result.textContent = "Saved " + saved.items + " cards from " + saved.pages + " pages" +
+    const confirmation = "Saved " + saved.items + " cards from " + saved.pages + " pages" +
       (saved.partial ? " as a partial snapshot." : ". Refresh Hockey Cards to see it.");
-    capture = undefined;
+    await chrome.storage.session.set({ reading: { messages: [confirmation] } });
   } catch (error) {
     result.textContent = summary + "\n" + error.message;
   } finally {

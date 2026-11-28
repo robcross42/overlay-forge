@@ -32,15 +32,15 @@ function nextPageBody(html, page) {
   return fields;
 }
 
-// Injected only after the user clicks Read on an Inventory Manager tab.
+// Injected only after the user clicks Read on a COMC tab.
 async function readComcInventory() {
   const messages = [];
   const pages = [];
   const ids = new Set();
   const signal = AbortSignal.timeout(90_000);
   try {
-    if (location.origin + location.pathname !== inventoryManagerUrl) {
-      throw new Error("Open the COMC Inventory Manager tab first.");
+    if (location.origin !== new URL(inventoryManagerUrl).origin) {
+      throw new Error("Switch to a www.comc.com tab to read your inventory.");
     }
 
     let body;
@@ -90,7 +90,7 @@ async function readComcInventory() {
       ? "COMC redirected or the request failed. Check that you are still signed in."
       : error.message;
     messages.push("Stopped after " + pages.length + " verified pages. " + detail);
-    return { messages };
+    return { messages, capture: pages.length ? { pages } : undefined };
   }
 }
 

@@ -68,9 +68,9 @@ From **Hockey Cards**, open COMC Inventory Manager and sign in on COMC. In Brave
 
 ### Read inventory directly from Brave
 
-Sign in to Overlay Forge at `http://127.0.0.1:3000`, then open and sign in to COMC Inventory Manager in another tab. In the optional **Overlay Forge COMC Read-only Probe** extension, choose **Read COMC inventory**, leave the popup open, then choose **Save to Overlay Forge**. The first save asks for local browser permission. Refresh Hockey Cards to load the saved snapshot. The extension reads the Inventory Manager pager in your existing COMC session and sends only validated inventory fields to the local importer. It stops on a repeated card, unexpected page, or after 25 pages. Save is available after a complete scan.
+Sign in to Overlay Forge at `http://127.0.0.1:3000`, then sign in to COMC and switch to a `www.comc.com` tab. In the optional **Overlay Forge COMC Read-only Probe** extension, choose **Read COMC inventory**, then choose **Save to Overlay Forge**. The first save asks for local browser permission. Refresh Hockey Cards to load the saved snapshot. The extension reads the Inventory Manager pager in your existing COMC session and sends only validated inventory fields to the local importer. It stops on a repeated card, unexpected page, or after 25 pages. The scan result stays in browser session memory if the popup closes. Verified pages can be saved as partial when the scan stops early.
 
-To prepare the unpacked extension from a checkout with the Hockey Cards submodule and Node dependencies installed, copy `scripts/comc-brave/manifest.json`, `popup.html`, and `popup.js` into a private directory. Run this from the host repository root, replacing `/path/to/extension` with that directory.
+To prepare the unpacked extension from a checkout with the Hockey Cards submodule and Node dependencies installed, copy `scripts/comc-brave/manifest.json`, `popup.html`, `popup.js`, and `worker.js` into a private directory. Run this from the host repository root, replacing `/path/to/extension` with that directory.
 
 ```sh
 npm exec --offline -- esbuild scripts/comc-brave/read.js --bundle --format=iife --outfile=/path/to/extension/read.js
