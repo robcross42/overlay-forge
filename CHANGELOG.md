@@ -26,7 +26,7 @@ Use local Toronto time for timestamped entries unless otherwise requested.
 
 #### Added
 
-- 01:37:41 EST - Added owner-only Hockey Cards in the desktop and opt-in browser host. Combine card search, year, COMC sale status and USD price filters with sorting over saved inventory. The browser can import inventory and Recent Sales captures and look up saved sales by catalog ID. (#37)
+- 01:37:41 EST - Added owner-only Hockey Cards in the desktop and opt-in browser host. Combine card search, year, COMC sale status and USD price filters with sorting over saved inventory. The browser can import inventory and Recent Sales captures and look up saved sales by catalog ID. An optional Brave extension can read and save a complete inventory directly from a signed-in COMC tab. (#37)
 
 ## 0.7.0 - 2026-11-27
 

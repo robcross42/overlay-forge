@@ -66,6 +66,20 @@ Set `hockey_inventory_owner_email` to the owner's approved Google email to enabl
 
 From **Hockey Cards**, open COMC Inventory Manager and sign in on COMC. In Brave DevTools under **Network**, record each page with **All** selected, search empty, and the same sort and page size. Export a sanitized HAR and choose **Import inventory HAR**. A partial snapshot shows the cards it captured when no complete snapshot is saved. A complete snapshot takes priority.
 
+### Read inventory directly from Brave
+
+Sign in to Overlay Forge at `http://127.0.0.1:3000`, then open and sign in to COMC Inventory Manager in another tab. In the optional **Overlay Forge COMC Read-only Probe** extension, choose **Read COMC inventory**, leave the popup open, then choose **Save to Overlay Forge**. The first save asks for local browser permission. Refresh Hockey Cards to load the saved snapshot. The extension reads the Inventory Manager pager in your existing COMC session and sends only validated inventory fields to the local importer. It stops on a repeated card, unexpected page, or after 25 pages. Save is available after a complete scan.
+
+To prepare the unpacked extension from a checkout with the Hockey Cards submodule and Node dependencies installed, copy `scripts/comc-brave/manifest.json`, `popup.html`, and `popup.js` into a private directory. Run this from the host repository root, replacing `/path/to/extension` with that directory.
+
+```sh
+npm exec --offline -- esbuild scripts/comc-brave/read.js --bundle --format=iife --outfile=/path/to/extension/read.js
+```
+
+In `brave://extensions`, enable **Developer mode** and choose **Load unpacked**. Select the extension directory. Use the extension’s **Reload** button after updating its files.
+
+### Saved sales
+
 Use **Saved cards** or enter a COMC card URL or catalog ID to query saved sales. To add observations, open a COMC Hockey card’s Recent Sales page with Network recording, export a sanitized HAR, and choose **Import sales HAR**. Brave extracts the displayed card fields locally. The app sends only these fields to the signed-in browser backend. The backend keeps one identity per catalog ID, stores individual sales separately, and deduplicates repeat imports.
 
 Select **Hockey Cards** to search all words in the saved card titles or item IDs and combine that with a year, sale status, and a USD asking-price range. Sorting keeps the applied filters. Moving a collection from Windows requires a separately reviewed logical export and import plan.
